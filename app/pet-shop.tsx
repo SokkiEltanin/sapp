@@ -4,14 +4,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, X, SlidersHorizontal } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, X, SlidersHorizontal, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
+import RadialGlow from '@/components/ui/RadialGlow';
+import GroundShadow from '@/components/ui/GroundShadow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
+import { POTIONS, PotionKind, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
@@ -68,9 +71,16 @@ interface ArtAdjust {
   bg: ImgAdjust; top: ImgAdjust; topSlots: ImgAdjust; cat: ImgAdjust; bottom: ImgAdjust; bottomSlots: ImgAdjust;
 }
 const DEFAULT_IMG: ImgAdjust = { x: 0, y: 0, scale: 1 };
+// Finalne wartości dostrojone przez usera na urządzeniu w edytorze sceny (2026-09-08,
+// wyeksportowane przyciskiem "Eksportuj" i wklejone w czacie) — zastępują `DEFAULT_IMG` per
+// warstwa jako NOWY stan "zerowy" sceny Rynku.
 const DEFAULT_ADJUST: ArtAdjust = {
-  bg: { ...DEFAULT_IMG }, top: { ...DEFAULT_IMG }, topSlots: { ...DEFAULT_IMG },
-  cat: { ...DEFAULT_IMG }, bottom: { ...DEFAULT_IMG }, bottomSlots: { ...DEFAULT_IMG },
+  bg: { x: 0, y: 0, scale: 1.02 },
+  top: { x: -116, y: 44, scale: 0.5 },
+  topSlots: { x: -4, y: 100, scale: 1.08 },
+  cat: { x: 0, y: 104, scale: 1.6 },
+  bottom: { x: -112, y: -144, scale: 0.46 },
+  bottomSlots: { x: 4, y: -16, scale: 1.1 },
 };
 const ADJUST_KEY = 'rynek_art_adjust_v3';
 const IMG_GROUPS: { key: keyof ArtAdjust; label: string }[] = [
@@ -88,6 +98,11 @@ const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: numb
 ];
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
+
+// Placeholder ikony potek (2026-09-08) — user sam dostarczy grafiki pod skrzynki/potki
+// ("ja zrobię grafiki"), więc na razie lucide zamiast finalnego assetu, żeby mechanika
+// działała od zaraz i dała się przetestować bez czekania na art.
+const POTION_ICON: Record<PotionKind, typeof HeartPulse> = { hp: HeartPulse, atk: Swords, xp: Sparkles };
 
 const todayKey = () => {
   const d = new Date();
@@ -137,7 +152,7 @@ export default function PetShop() {
   const s = useMemo(() => makeS(c), [c]);
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, grantStartup,
     claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
-    ownedCombatItems, grantOrLevelCombatItem } = usePetStore();
+    ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
@@ -213,6 +228,22 @@ export default function PetShop() {
     confirmBuy('Zamrożenie serii', FREEZE_COST, () => {
       if (spendCoins(FREEZE_COST)) { addFreezes(1); haptic.success(); toast.success('Kupione: Zamrożenie serii ❄'); }
     });
+  };
+
+  // Potki (2026-09-08) — zakup = natychmiastowa konsumpcja, żadnej odsłony jak przy
+  // skrzynkach. Kupienie nowej PODMIENIA aktywną (patrz `buyPotion` w petStore) — user o
+  // tym ostrzeżony w ConfirmDialog PRZED zakupem, żeby nie stracił niewykorzystanego czasu
+  // przez przypadek.
+  const onBuyPotion = (kind: PotionKind) => {
+    haptic.tap();
+    const def = POTIONS[kind];
+    if (isPotionActive(activePotion, kind)) { toast.info(`${def.name} już aktywna — ${fmtPotionCountdown(activePotion!.endsAt)}`); return; }
+    if (coins < def.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${def.cost}`); return; }
+    const overwrite = isPotionActive(activePotion) ? POTIONS[activePotion!.kind].name : null;
+    confirmBuy(def.name, def.cost, () => {
+      if (buyPotion(kind)) { haptic.success(); toast.success(`Wypito: ${def.name}`); }
+      else { haptic.error(); toast.error('Nie udało się kupić'); }
+    }, 'Wypij', overwrite ? `${def.desc}\nZastąpi aktywną: ${overwrite}` : def.desc);
   };
 
   // Kup skrzynkę → POTWIERDŹ → wylosuj → przyznaj nagrodę → pokaż odsłonę.
@@ -295,27 +326,11 @@ export default function PetShop() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
-        <PressableScale onPress={onBuyFreeze}>
-          <View style={s.freezeHero}>
-            <LinearGradient
-              colors={['#7DD3FC22', '#7DD3FC08'] as [string, string]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={s.freezeIcon}><Snowflake size={22} color="#7DD3FC" /></View>
-            <View style={{ flex: 1 }}>
-              {/* Podpis "ratuje serię za 1 pominięty dzień" USUNIĘTY (2026-09-06, user:
-                  "wypierdol te napisy wszystkie... i wgle przebuduj żeby było dobrze" —
-                  odchudzenie sceny Rynku z instruktażowych podpisów objęło też tę kartę) —
-                  to tekst dla NOWEGO usera, powracający już wie co robi zamrożenie; sama
-                  nazwa + licznik posiadanych wystarczy. */}
-              <Text style={s.freezeTitle}>Zamrożenie serii</Text>
-              <Text style={s.freezeSub}>masz: {freezes}</Text>
-            </View>
-            <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
-          </View>
-        </PressableScale>
+        {/* Przypięta karta "Zamrożenie serii" USUNIĘTA (2026-09-08, przebudowa slotów —
+            user: "u góry w tych 4 slotach: zamrożenie serii, potka HP, potka ATK, potka XP")
+            — Zamrożenie przeniosło się do slotu 0 tablicy (patrz niżej), dwie ścieżki zakupu
+            tej samej rzeczy byłyby zbędną duplikacją. `onBuyFreeze` bez zmian, tylko trigger
+            się przeniósł. */}
 
         {/* ── SCENA RYNKU (2026-09-05, fix po zgłoszeniu usera: "grafiki wstawione nie na
             miejscu... rusza się a miało być statyczne jakby ze sobą") — tło było wcześniej
@@ -342,6 +357,14 @@ export default function PetShop() {
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
+            {/* Tło POD CAŁĄ tablicą (2026-09-08, user: "miałeś zrobić wypełnienie pod
+                slotami czyli pod grafiką dać jeden większy prostokąt... żeby sloty nie były
+                przezroczyste" — poprzednia próba to był osobny mały kwadracik pod KAŻDYM
+                slotem, nie to co user chciał). JEDEN duży, płaski prostokąt, PIERWSZE dziecko
+                (więc pod obrazkiem/slotami w z-order), rozmiaru całego `artPiece` — okna
+                wycięte w `RYNEK_TOP` mają teraz stałą, spójną podkładkę zamiast przebijającej
+                się ruchliwej sceny Rynku pod spodem. */}
+            <View style={s.boardBg} />
             {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
                 spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
@@ -349,22 +372,30 @@ export default function PetShop() {
             </View>
             {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
                 niedopasowanie siatki klikalnych okien względem narysowanych na obrazku okien,
-                bez ruszania samego obrazka. */}
+                bez ruszania samego obrazka. Zawartość PRZEBUDOWANA (2026-09-08, user: "u góry
+                w tych 4 slotach: zamrożenie serii, potka HP, potka atak, potka XP") — dawna
+                skrzynka dnia + 3 loot-boxy PRZENIESIONE do dolnego rzędu lady (patrz niżej,
+                `RYNEK_BOTTOM_SLOTS[4..7]`), bo tablica ma teraz Zamrożenie + 3 potki. Ikony
+                potek to na razie placeholder z lucide (user: "ja zrobię grafiki pod
+                skrzynki") — do podmiany na własne ikony gdy user je dostarczy. Per-slot
+                `artSlotBg` USUNIĘTY (patrz `s.boardBg` wyżej — jedno wspólne tło zastępuje
+                osobne kwadraciki). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
-              <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
-                <View style={s.artSlotBg} />
-                <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
-                {dailyReady
-                  ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
-                  : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
+              <PressableScale onPress={onBuyFreeze} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+                <Snowflake size={24} color="#7DD3FC" />
+                {freezes > 0 && <View style={s.artSlotCountBadge}><Text style={s.artSlotBadgeTxt}>{freezes}</Text></View>}
+                <View style={s.artCostPill}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
               </PressableScale>
-              {LOOT_BOXES.map((box, i) => {
-                const afford = coins >= box.cost;
+              {(Object.values(POTIONS)).map((def, i) => {
+                const afford = coins >= def.cost;
+                const active = isPotionActive(activePotion, def.kind);
+                const PotionIcon = POTION_ICON[def.kind];
                 return (
-                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
-                    <View style={s.artSlotBg} />
-                    <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
-                    <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
+                  <PressableScale key={def.kind} onPress={() => onBuyPotion(def.kind)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                    <PotionIcon size={22} color={def.color} style={!afford && !active ? { opacity: 0.5 } : undefined} />
+                    {active
+                      ? <View style={[s.artSlotBadge, { backgroundColor: def.color }]}><Text style={s.artSlotBadgeTxt}>{fmtPotionCountdown(activePotion!.endsAt)}</Text></View>
+                      : <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{def.cost}</Text></View>}
                   </PressableScale>
                 );
               })}
@@ -380,7 +411,16 @@ export default function PetShop() {
             wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
         <View style={{ alignItems: 'center', marginTop: spacing[3], marginBottom: spacing[3] }}>
           <View style={{ transform: [{ translateX: adjust.cat.x }, { translateY: adjust.cat.y }, { scale: adjust.cat.scale }] }}>
-            <CatArt size={catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
+            {/* Efekt głębi (2026-09-08, user: "ten sklepikarz nie był tak płasko z tym
+                obrazkiem") — ten sam duet co sprite'y w boss-fight.tsx ("high-end fight
+                scene", 2026-09-06): miękka poświata w kolorze futra ZA kotkiem (odcina
+                sylwetkę od ruchliwego tła sceny) + eliptyczny cień POD łapkami (kotek
+                wygląda jak STOI na ladzie, nie jak wklejony płasko na obrazek). */}
+            <View style={{ width: catSize, height: catSize, alignItems: 'center', justifyContent: 'center' }}>
+              <RadialGlow size={catSize * 1.5} color={SHOPKEEPER_PALETTE.coat} opacity={0.2} />
+              <GroundShadow width={catSize * 0.62} height={catSize * 0.18} opacity={0.45} />
+              <CatArt size={catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
+            </View>
           </View>
         </View>
 
@@ -393,6 +433,8 @@ export default function PetShop() {
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
+            {/* Tło POD CAŁĄ ladą — patrz identyczny komentarz przy tablicy wyżej (`s.boardBg`). */}
+            <View style={s.boardBg} />
             {/* Warstwa OBRAZKA — patrz analogiczny komentarz przy tablicy wyżej. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
               <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
@@ -401,12 +443,9 @@ export default function PetShop() {
                 z samym obrazkiem — mają zostać czytelne względem okien niezależnie od tego,
                 jak bardzo obrazek trzeba było doszlifować x/y). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottomSlots.x }, { translateY: adjust.bottomSlots.y }, { scale: adjust.bottomSlots.scale }] }]}>
-              <View style={s.refreshRow} pointerEvents="none">
-                <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
-              </View>
               {dailySlots.length === 0 && (
                 <View style={s.emptyRow} pointerEvents="none">
-                  <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Brak itemów na Twoim poziomie</Text></View>
+                  <View style={s.shopSignPill}><Text style={s.shopSignPillTxt}>Brak itemów na Twoim poziomie</Text></View>
                 </View>
               )}
               {dailySlots.map((slot, i) => {
@@ -417,16 +456,11 @@ export default function PetShop() {
                 const meta = RARITY_META[rarity];
                 return (
                   <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
-                    {/* Tło slotu = gradient rzadkości (2026-09-05, user: "kolor gradientu za
-                        nimi jakby") — ciemny róg dla kontrastu ikony na busy tle, przeciwległy
-                        róg podbarwiony kolorem rzadkości, ten sam `meta.color` co plakietka ✓
-                        i pigułka w GearPreviewModal, więc kolor rzadkości czyta się spójnie
-                        wszędzie w Sklepie dnia. */}
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.55)', meta.color + '77'] as [string, string]}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={s.artSlotBg}
-                    />
+                    {/* Tło slotu USUNIĘTE (2026-09-08, user: "pod itemami w sklepiku wywalamy
+                        tło") — te itemy mają własną, szczegółową ikonę (nie generyczny emoji
+                        jak skrzynki na tablicy wyżej), więc dodatkowy gradientowy blok pod
+                        spodem tylko zaśmiecał ladę zamiast pomagać w kontraście. Rzadkość
+                        dalej czytelna z plakietki ✓ (kolor `meta.color`) i z modala podglądu. */}
                     <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
                     {(bought || owned) && (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
@@ -436,7 +470,36 @@ export default function PetShop() {
                   </PressableScale>
                 );
               })}
+              {/* Dolny rząd lady (2026-09-08, przeniesione z tablicy — patrz komentarz przy
+                  górnej warstwie slotów wyżej) — skrzynka dnia (darmowa) + 3 skrzynki gacha
+                  (LOOT_BOXES), teraz na `RYNEK_BOTTOM_SLOTS[4..7]` (EKSTRAPOLOWANE
+                  współrzędne, patrz komentarz w rynekArt.ts). */}
+              <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[4])]}>
+                <Gift size={22} color={dailyReady ? '#FBBF24' : c.text.muted} />
+                {dailyReady
+                  ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
+                  : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
+              </PressableScale>
+              {LOOT_BOXES.map((box, i) => {
+                const afford = coins >= box.cost;
+                return (
+                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 5])]}>
+                    <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
+                    <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
+                  </PressableScale>
+                );
+              })}
             </View>
+          </View>
+          {/* Licznik odświeżenia PRZENIESIONY pod ladę (2026-09-08, user: "napis co jest za
+              ile się odświeżają itemy żeby był pod itemami i bardziej w stylu sklepiku
+              samego") — dawniej nakładał się na obrazek lady jako pigułka wewnątrz warstwy
+              slotów (`bottomSlots`); teraz to zwykły element w normalnym przepływie POD
+              `s.artPiece`, więc zawsze siedzi pod itemami niezależnie od dostrojenia
+              `adjust`, i wygląda jak drewniana tabliczka szyldu sklepu, nie generyczna
+              ciemna etykieta. */}
+          <View style={{ alignItems: 'center' }}>
+            <View style={s.shopSignPill}><Text style={s.shopSignPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
           </View>
         </View>
         </View>
@@ -661,23 +724,36 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // itemów". Okno na grafice jest samo w sobie przezroczyste (przebija ruchliwe tło sklepu),
   // więc bez tego ikony/emoji ledwo widać. `inset` zamiast absoluteFillObject — mały margines
   // (4%) żeby ciemny prostokąt nie wychodził poza obrys okna narysowanego na grafice.
-  artSlotBg: { position: 'absolute', top: '4%', left: '4%', right: '4%', bottom: '4%', borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.5)' },
+  // Jedno wspólne tło POD CAŁĄ tablicą/ladą (2026-09-08, user: "miałeś zrobić wypełnienie
+  // pod slotami czyli pod grafiką dać jeden większy prostokąt... nie próbowałeś dopasować
+  // idealnie kwadraciki nie???" — poprzednia wersja, `artSlotBg`, była DOKŁADNIE tym czego
+  // user nie chciał: osobny mały kwadracik pod KAŻDYM slotem). Renderowany jako PIERWSZE
+  // dziecko `s.artPiece` (więc pod obrazkiem/slotami w z-order), rozmiaru niemal całego
+  // kontenera — jedna spójna podkładka zamiast wielu małych, żeby okna wycięte w grafice nie
+  // przebijały ruchliwej sceny Rynku pod spodem.
+  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.4)' },
   artSlotImg: { width: '62%', height: '62%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  // Liczba posiadanych (np. zamrożeń) w rogu slotu — ten sam róg co `artSlotCheck`, ale
+  // `minWidth` zamiast stałej szerokości (liczba może być 2-cyfrowa), zostawia DÓŁ slotu
+  // wolny dla `artCostPill` (2026-09-08 — zamrożenie w slocie tablicy ma OBA naraz: ile
+  // masz + ile kosztuje kolejne, więc nie mogą siedzieć w tym samym miejscu co `artSlotBadge`).
+  artSlotCountBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7DD3FC' },
   artCostPill: { position: 'absolute', bottom: -8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
   artSlotBadge: { position: 'absolute', bottom: -8, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
   artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
   rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 5, width: '70%' },
 
-  // Pigułka odświeżenia Sklepu dnia (2026-09-06) — zastępuje dawne pełne zdanie tekstu nad
-  // ladą ("Nowy zestaw za..." + "Brak itemów...") po usunięciu instruktażowych podpisów z
-  // całej sceny Rynku. `refreshRow`/`emptyRow` to niewidoczne, pełnoszerokościowe "wiersze
-  // pozycjonujące" (position:absolute + alignItems:center) — sama widoczna pigułka to
-  // dziecko `refreshPill`, które hugguje tekst zamiast rozciągać się na całą szerokość.
-  refreshRow: { position: 'absolute', top: -13, left: 0, right: 0, alignItems: 'center' },
+  // Pigułka odświeżenia Sklepu dnia — POD ladą, w normalnym przepływie (2026-09-08, user:
+  // "napis... żeby był pod itemami i bardziej w stylu sklepiku samego") — stylizowana jak
+  // drewniana tabliczka szyldu (ciepły brąz + złota ramka), zamiast neutralnej ciemnej
+  // etykiety, żeby pasowała do reszty sceny sklepu zamiast wyglądać jak systemowy tooltip.
+  // `emptyRow` (pełnoszerokościowy "wiersz pozycjonujący", position:absolute + centrowanie)
+  // ZOSTAJE nad samą ladą — "brak itemów" ma sens TYLKO nałożony na pustą siatkę slotów, w
+  // odróżnieniu od licznika odświeżenia, który jest ogólną informacją o całej ladzie.
   emptyRow: { position: 'absolute', top: '38%', left: 0, right: 0, alignItems: 'center' },
-  refreshPill: { backgroundColor: 'rgba(11,14,26,0.85)', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
-  refreshPillTxt: { fontSize: 10.5, fontWeight: '700', color: '#fff' },
+  shopSignPill: { backgroundColor: '#2A1C10E6', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1.5, borderColor: '#B8863599', marginTop: spacing[1] },
+  shopSignPillTxt: { fontSize: 11, fontWeight: '800', color: '#E8C88A', letterSpacing: 0.3 },
 
   cellState: { fontSize: 10, color: c.text.muted },
 

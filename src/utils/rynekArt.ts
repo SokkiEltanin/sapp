@@ -3,10 +3,10 @@
 // trzy warstwy złożone jedna pod drugą w ScrollView na app/pet-shop.tsx:
 //   1. `RYNEK_BG` — tło całego ekranu (wnętrze sklepu), position:absolute pod wszystkim.
 //   2. `RYNEK_TOP` — mała "tablica" z 4 oknami: skrzynka dnia (za darmo) + 3 skrzynki (gacha).
-//   3. `RYNEK_BOTTOM` — właściwa lada z 8 oknami (2x4), ale UŻYWANY tylko górny rząd (4) —
-//      Sklep dnia oferuje dziś tylko 4 konkretne itemy (`dailyShopSlots`), dolny rząd okien
-//      zostaje pusty (tło prześwituje przez otwór, jak niewypełniona gablota) — jeśli kiedyś
-//      Sklep dnia urośnie do 8 itemów, drugi rząd współrzędnych trzeba by dodać tu.
+//   3. `RYNEK_BOTTOM` — właściwa lada z 8 oknami (2x4). Górny rząd = Sklep dnia (4 konkretne
+//      itemy, `dailyShopSlots`), dolny rząd = 4 rodzaje skrzynek (2026-09-08, patrz
+//      `RYNEK_BOTTOM_SLOTS` niżej — współrzędne dolnego rzędu są EKSTRAPOLACJĄ, nie zmierzone
+//      tym samym skryptem co reszta, do zweryfikowania na urządzeniu).
 //
 // Oryginalne kanwy usera miały 1080x1920 z dużym marginesem przezroczystości dookoła
 // właściwej grafiki (ChatGPT wygenerował portretowy obrazek, ale treść zajmowała tylko
@@ -46,10 +46,24 @@ export const RYNEK_TOP_SLOTS: PctRect[] = [
   { left: 72.17, top: 29.10, width: 14.95, height: 30.81 },
 ];
 
-// Górny rząd lady = 4 itemy Sklepu dnia (`dailyShopSlots`, w tej samej kolejności).
+// Górny rząd lady = 4 itemy Sklepu dnia (`dailyShopSlots`, w tej samej kolejności, BEZ ZMIAN
+// pozycji/mechaniki — user: "4 pierwsze itemy daily"). Dolny rząd (2026-09-08, wcześniej
+// nieużywany — patrz komentarz o 8 oknach LADADOL.png u góry pliku) = 4 rodzaje skrzynek
+// (darmowa dzienna + LOOT_BOXES sardine/silver/gold, user: "4 ostatnie skrzynki").
+//
+// UWAGA na dolny rząd: `left`/`width` skopiowane 1:1 z górnego (kolumny na pewno się
+// pokrywają), ale `top`/`height` to EKSTRAPOLACJA (odstęp między rzędami = ten sam rząd
+// wielkości co odstęp między kolumnami w tym samym wierszu, ~4.5%), NIE zmierzone tym samym
+// skryptem alfa co reszta plików — real real real coordinates czekają na test na urządzeniu
+// (edytor sceny w pet-shop.tsx skaluje/przesuwa CAŁĄ warstwę `bottomSlots` naraz, nie da się
+// nim poprawić TYLKO dolnego rzędu — jeśli źle trafione, trzeba będzie tu poprawić ręcznie).
 export const RYNEK_BOTTOM_SLOTS: PctRect[] = [
   { left: 12.09, top: 54.37, width: 15.59, height: 13.17 },
   { left: 31.86, top: 54.37, width: 15.59, height: 13.17 },
   { left: 51.53, top: 54.37, width: 15.82, height: 13.17 },
   { left: 71.30, top: 54.37, width: 15.82, height: 13.17 },
+  { left: 12.09, top: 72.04, width: 15.59, height: 13.17 },
+  { left: 31.86, top: 72.04, width: 15.59, height: 13.17 },
+  { left: 51.53, top: 72.04, width: 15.82, height: 13.17 },
+  { left: 71.30, top: 72.04, width: 15.82, height: 13.17 },
 ];

@@ -3,6 +3,38 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: finalne wartości edytora + 4 poprawki wizualne + potki czasowe (HP/ATK/XP) — NIEsprawdzone (2026-09-08)
+
+User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz. Pełny opis w ARCHITECTURE.md
+§46-47. W skrócie:
+1. `DEFAULT_ADJUST` w `app/pet-shop.tsx` ustawione na finalne, wyeksportowane przez usera
+   wartości (nie zmienia nic realnie — miał je już zapisane, koduje jako nowy stan zerowy).
+2. Pigułka "Nowy zestaw za..." przeniesiona POD ladę (zwykły element, nie nakładka na
+   obrazek) + restylowana jako drewniana tabliczka szyldu.
+3. Sklepikarz dostał `RadialGlow`+`GroundShadow` (ten sam duet co sprite'y w boss-fight.tsx)
+   — nie wygląda już płasko wklejony.
+4. Tło slotu — **poprawione DWA RAZY** (pierwsza próba źle zrozumiana, user: "nie tak
+   chciałem... miałeś zrobić jeden większy prostokąt pod tym co mamy, nie kwadraciki").
+   Finalnie: JEDNO duże tło (`s.boardBg`) za CAŁĄ grafiką tablicy/lady (pierwsze dziecko
+   `s.artPiece`, ~cały kontener), żadnych osobnych kwadracików pod pojedynczymi slotami
+   (`artSlotBg` całkiem usunięty z pliku).
+5. **Potki czasowe** — nowy system: górne 4 sloty tablicy = Zamrożenie serii + 3 potki
+   (HP +20 flat/24h, ATK +15%/24h, XP +25%/24h — świadomie umiarkowany balans, DO
+   SKORYGOWANIA po realnym teście). Dolne sloty lady rozszerzone z 4 na 8 (górny rząd =
+   Sklep dnia bez zmian, dolny rząd = skrzynka dnia + 3 LOOT_BOXES przeniesione z tablicy).
+   Badge aktywnej potki na `/pet` (obok imienia, kolorowany per typ). Nowy `src/utils/
+   potions.ts` + `activePotion` w petStore + `effectiveCatMaxHp()` (skonsolidowana formuła
+   max HP, była zduplikowana w 4 miejscach) + `xpWithPotion()` (wpięty we WSZYSTKIE 14 miejsc
+   przyznających XP w petStore, nie tylko `addXp`).
+
+**Do zweryfikowania na urządzeniu, priorytetowo**: dolny rząd lady (`RYNEK_BOTTOM_SLOTS[4..7]`
+w `rynekArt.ts`) ma EKSTRAPOLOWANE, nie zmierzone współrzędne — LADADOL.png fizycznie ma 8 okien
+(2×4), ale tylko górny rząd był kiedykolwiek zmierzony realnym skryptem. Jeśli skrzynki nie
+trafiają w narysowane okna, trzeba będzie ręcznie poprawić `top` w `RYNEK_BOTTOM_SLOTS[4..7]`
+(edytor sceny nie potrafi poprawić TYLKO dolnego rzędu, skaluje/przesuwa całą warstwę naraz).
+
+`tsc`/`jest` zielone (69 suit/873 testy, +17 nowych w `potions.test.ts`).
+
 ## 🆕 Szablony powiadomień banku — ucz kategorię PRZED pierwszą płatnością — NIEsprawdzone (2026-09-08)
 
 User przesłał realną obcowalutową płatność subskrypcji ("Zapłacono kwotę 22,14 EUR ... w

@@ -4363,6 +4363,131 @@ płatność Claude → kategoria "Subskrypcje", nazwa "Subskrypcja Claude" → Z
 powiadomień (ten sam ekran) → wklej tę samą treść jeszcze raz → powinno wpaść do kolejki z
 kategorią Subskrypcje od razu, bez ręcznej korekty.
 
+## 46. Rynek — finalne wartości edytora sceny + 3 poprawki wizualne — 2026-09-08
+
+User przesłał zrzut ekranu ze sklepem i cztery drobne poprawki naraz:
+
+1. **Finalne `DEFAULT_ADJUST`** — user dostroił scenę w edytorze (§42-43) i wkleił
+   wyeksportowany JSON na stałe jako nowe wartości domyślne (`app/pet-shop.tsx`):
+   `bg{x:0,y:0,scale:1.02}`, `top{x:-116,y:44,scale:0.5}`, `topSlots{x:-4,y:100,scale:1.08}`,
+   `cat{x:0,y:104,scale:1.6}`, `bottom{x:-112,y:-144,scale:0.46}`,
+   `bottomSlots{x:4,y:-16,scale:1.1}`. Nie zmienia niczego dla użytkownika samego (miał to
+   już zapisane w AsyncStorage z wcześniejszego dostrajania) — koduje to jako bazowy stan
+   "zerowy" na przyszłość (świeża instalacja, reset edytora).
+2. **Pigułka "Nowy zestaw za..." przeniesiona pod ladę** — user: "napis... żeby był pod
+   itemami i bardziej w stylu sklepiku samego". Dawniej siedziała WEWNĄTRZ warstwy
+   `bottomSlots` (nakładała się na obrazek lady, position:absolute, top:-13). Teraz to zwykły
+   element w normalnym przepływie POD `s.artPiece` (lady) — zawsze "pod itemami" niezależnie
+   od `adjust`. Restylowana jako drewniana tabliczka szyldu (`shopSignPill`: ciepły brąz
+   `#2A1C10E6` + złota ramka `#B8863599`, tekst kremowo-złoty `#E8C88A`) zamiast neutralnej
+   ciemnej etykiety — pasuje do reszty sceny sklepu. Stare `refreshRow`/`refreshPill`
+   usunięte, `emptyRow` ("brak itemów na Twoim poziomie") zostaje nad ladą (ma sens tylko
+   nałożona na pustą siatkę slotów) i też używa nowego stylu tabliczki.
+3. **Efekt głębi za sklepikarzem** — user: "ten sklepikarz nie był tak płasko z tym
+   obrazkiem". Ten sam duet co sprite'y w `boss-fight.tsx` ("high-end fight scene",
+   2026-09-06, §40): `RadialGlow` (miękka poświata w kolorze futra, `SHOPKEEPER_PALETTE.coat`,
+   `size=catSize*1.5, opacity=0.2`) ZA kotkiem — odcina sylwetkę od ruchliwego tła sceny —
+   plus `GroundShadow` (eliptyczny cień pod łapkami, `width=catSize*0.62, height=catSize*0.18,
+   opacity=0.45`) — kotek wygląda jak STOI na ladzie zamiast być wklejony płasko. Oba
+   komponenty już istniały (`src/components/ui/RadialGlow.tsx`/`GroundShadow.tsx`), zero
+   nowego kodu wizualnego, czysty reużyty wzorzec.
+4. **Tło slotów: zostaje na tablicy, znika przy itemach na ladzie** — user: "za obrazkami
+   musisz jednak dać tam gdzie miejsce slotów tło pod nie, a pod itemami w sklepiku wywalamy
+   tło". Tablica (skrzynka dnia + 3 loot-boxy, generyczne ikony/emoji) ZATRZYMUJE ciemne
+   `artSlotBg` pod każdym oknem (kontrast dla prostych ikon na busy tle) — bez zmian, już tam
+   był. Lada (Sklep dnia, 4 konkretne itemy ekwipunku z własną, szczegółową ikoną) TRACI
+   gradientowy blok rzadkości pod spodem (`LinearGradient` usunięty z `s.artSlotBg` w tym
+   miejscu) — item ma wystarczająco szczegółową ikonę, dodatkowy blok tylko zaśmiecał ladę;
+   rzadkość dalej czytelna z plakietki ✓ i modala podglądu.
+
+`tsc`/`jest` zielone (68 suit/856 testów, bez zmian w liczbie testów — czysto UI/layout).
+**Priorytet testu na urządzeniu**: scena Rynku wygląda jak w edytorze usera od razu po
+świeżym uruchomieniu; licznik "Nowy zestaw za..." widoczny POD ladą jako drewniana
+tabliczka; sklepikarz ma widoczny cień pod łapkami + delikatną poświatę; itemy na ladzie
+BEZ kolorowego bloku pod spodem, skrzynki na tablicy DALEJ z ciemnym tłem.
+
+## 47. Rynek — potki czasowe (HP/ATK/XP) + przebudowa slotów tablica/lada — 2026-09-08
+
+User (screenshot + wiadomość): górne 4 sloty tablicy = Zamrożenie serii + 3 potki (HP/ATK/XP
+na 24h, ze wskaźnikiem aktywnej potki na `/pet`); dolne sloty lady rozszerzone z 4 na **8** (2
+rzędy po 4) — górny rząd to DZISIEJSZE 4 itemy Sklepu dnia (bez zmian, tylko przeniesione
+niżej), dolny rząd to 4 rodzaje skrzynek (darmowa dzienna + drewniana/srebrna/złota — bez
+nowego, piątego tieru: "4 pierwsze itemy daily > 4 ostatnie skrzynki"). Przed implementacją
+zbadano dokładnie (bez zgadywania), gdzie podpiąć mnożniki w istniejących obliczeniach walki —
+raport w skrócie:
+
+**Nowy `src/utils/potions.ts`** — katalog 3 potek (`POTIONS: Record<PotionKind, PotionDef>`),
+świadomie umiarkowany balans (do skorygowania po teście): `hp` +20 max HP (flat, jak
+`gearFlatHp`), `atk` +15% (ułamkowy dodatek do `bonuses.atk`, stackuje się DOKŁADNIE jak
+loot/gear — addytywnie, nie osobny mnożnik), `xp` +25% (mnoży KAŻDE przyznane XP). Wzorzec
+timera: `ActivePotion{kind, endsAt}` — ISO timestamp sprawdzany LENIWIE (`isPotionActive`)
+wszędzie gdzie efekt jest czytany, ten sam styl co `missionEndsAt`/`energyRegenAt`, żadnego
+osobnego tickera czyszczącego stan w tle. **Tylko jedna potka aktywna naraz** — kupienie
+nowej PODMIENIA poprzednią (bez zwrotu monet za niewykorzystany czas), user ostrzegany o tym
+w ConfirmDialog PRZED zakupem.
+
+**`petStore.ts`**: nowe pole `activePotion` (persystowane) + akcje `buyPotion(kind)`/
+`syncPotionExpiry()`. Nowy eksportowany helper `effectiveCatMaxHp(catMaxHpBonus, equippedGear,
+ownedGear, activePotion)` KONSOLIDUJE formułę `catMaxHp(bonus) + gearFlatHp(...)`, która była
+ZDUPLIKOWANA w 4 miejscach (boss-fight.tsx, pet.tsx, `damageCat`/`resetCatHp` w petStore) —
+teraz jedno źródło prawdy, potka HP dodana w jednym miejscu zamiast czterech. XP: `addXp` NIE
+było jedynym chokepointem — 14 osobnych akcji (`claimQuest`/`claimDaily`/`defeatBoss`/
+`raidClaim`/`menaceClaim`/`careTick`/`petCat` itd.) robiło `xp: s.xp + xp` WPROST w swoim
+`set()`. Zamiast refaktoru na wspólną funkcję wywoływaną przez wszystkich, dodano mały
+helper `xpWithPotion(s, amount)` i przepisano WSZYSTKIE 14 miejsc (+`addXp`) na
+`xp: s.xp + xpWithPotion(s, xp)` — mechaniczna, ale kompletna zmiana w jednym pliku.
+
+**`boss-fight.tsx`/`pet.tsx`**: `bonuses.atk` (useMemo łączący loot+gear) dostał trzeci
+addytywny składnik `potionAtkBonus(activePotion)`; `catMax`/`maxHp` liczone teraz przez
+`effectiveCatMaxHp(...)` zamiast lokalnej kopii formuły. `pet.tsx` dostał też badge aktywnej
+potki (ten sam wzorzec co `moodChip` przy imieniu — kolor tintowany kolorem konkretnej potki,
+te same barwy co istniejące etykiety ATK/HP na kartach "Siła bojowa": zielony HP, czerwony
+ATK, fioletowy XP) + `syncPotionExpiry()` na mount (sprzątanie kosmetyczne, odczyty i tak są
+leniwe).
+
+**`app/pet-shop.tsx`**: przypięta karta "Zamrożenie serii" nad sceną USUNIĘTA (przeniosła się
+do slotu 0 tablicy — dwie ścieżki zakupu tej samej rzeczy byłyby zbędne). Tablica: slot 0 =
+Zamrożenie (licznik posiadanych w rogu + cena na dole), sloty 1-3 = potki (ikona lucide
+placeholder — `HeartPulse`/`Swords`/`Sparkles`, user dostarczy własne grafiki później; aktywna
+potka pokazuje odliczanie zamiast ceny). Lada: górny rząd (`RYNEK_BOTTOM_SLOTS[0..3]`) = Sklep
+dnia BEZ ZMIAN, dolny rząd (`[4..7]`) = skrzynka dnia + 3 LOOT_BOXES, PRZENIESIONE z tablicy
+z niezmienioną logiką (`onDailyBox`/`onBuyBox`).
+
+**`src/utils/rynekArt.ts`**: `RYNEK_BOTTOM_SLOTS` rozszerzone z 4 do 8 wpisów — górny rząd
+BEZ ZMIAN (zmierzony realnie skryptem alfa), dolny rząd to EKSTRAPOLACJA (te same kolumny
+`left`/`width`, `top` przesunięty o wysokość rzędu + szacowany odstęp) — LADADOL.png fizycznie
+ma 8 okien narysowanych (2×4), ale tylko górny rząd był kiedykolwiek zmierzony. **Do
+zweryfikowania na urządzeniu** — edytor sceny skaluje/przesuwa CAŁĄ warstwę `bottomSlots`
+naraz, nie da się nim poprawić TYLKO dolnego rzędu; jeśli źle trafione, `rynekArt.ts` trzeba
+będzie poprawić ręcznie po tym jak user zobaczy realny rezultat.
+
+Testy: `__tests__/potions.test.ts` (17 nowych — funkcje czyste + `buyPotion`/
+`syncPotionExpiry` + potwierdzenie że XP faktycznie mnoży się przez `claimQuest`/`addXp`).
+`tsc`/`jest` zielone (69 suit/873 testy). **Priorytet testu na urządzeniu**: (a) czy dolny
+rząd lady faktycznie trafia w okna LADADOL.png (patrz zastrzeżenie wyżej — realny test
+pokaże, czy ekstrapolacja trafiła); (b) kupno każdej z 3 potek → badge na `/pet` pokazuje
+poprawny kolor/nazwę/odliczanie; (c) walka z bossem z aktywną potką ATK/HP → widoczna różnica
+w "Siła bojowa"; (d) potka XP aktywna → quest/walka faktycznie daje więcej XP niż zwykle.
+
+## 48. Rynek — tło slotów: JEDEN duży prostokąt, nie kwadraciki per slot (korekta §46 pkt 4) — 2026-09-08
+
+User, natychmiast po PR #158: "no to hujowo bo nie tak chciałem... miałeś zrobic wypełnienie
+pod slotami czyli pod grafika dać jeden większy prostokąt pod tym co mamy teraz zeby sloty nie
+byly przezroczyste". §46 pkt 4 źle zinterpretowany — "tło pod slotami" NIE znaczyło "osobny
+mały kwadracik pod każdą ikoną" (`artSlotBg`, wciąż tam zostawiony na tablicy), tylko JEDNO
+duże tło za CAŁĄ grafiką tablicy/lady.
+
+Naprawa (`app/pet-shop.tsx`): `artSlotBg` (per-slot, `top/left/right/bottom: 4%` wewnątrz
+KAŻDEGO `s.artSlot`) usunięty ZE WSZYSTKICH miejsc gdzie jeszcze był (tablica: Zamrożenie +
+3 potki; lada: skrzynka dnia + 3 LOOT_BOXES w dolnym rzędzie — Sklep dnia w górnym rzędzie już
+wcześniej nie miał tła, zgodnie z §46 pkt 4 drugą połową). Zamiast tego nowy `s.boardBg` —
+JEDEN prostokąt (`top/left/right/bottom: 2%`, `rgba(0,0,0,0.4)`, zaokrąglone rogi) jako
+PIERWSZE dziecko `s.artPiece` (czyli pod obrazkiem i slotami w z-order), rozmiaru niemal
+całego kontenera tablicy/lady — renderowany RAZ per plansza, nie osiem razy per slot. Stary,
+teraz martwy styl `artSlotBg` usunięty z arkusza.
+
+`tsc`/`jest` bez zmian w liczbie testów (69 suit/873, czysto wizualna korekta stylu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
