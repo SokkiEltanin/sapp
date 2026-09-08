@@ -1,4 +1,4 @@
-import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
+import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt, fmtStat, fmtWave, unitChip, periodCaption } from '@/utils/dashboard/format';
 import { MOOD_COLORS } from '@/types';
 
 describe('dashboard/format', () => {
@@ -50,5 +50,48 @@ describe('dashboard/format', () => {
     expect(metricTagLabel({ label: 'X', unit: 'zł', needsTag: true }, 'słodycze')).toBe('Słodycze (wydatki)');
     expect(metricTagLabel({ label: 'X', unit: 'kg', needsTag: true }, 'mięso')).toBe('Mięso (kg)');
     expect(metricTagLabel({ label: 'X', unit: 'szt', needsTag: true }, 'jajka')).toBe('Jajka (szt.)');
+  });
+
+  // 2026-09-08 — `fmtStat`/`fmtWave`/`unitChip`/`periodCaption` wyniesione z app/(tabs)/
+  // index.tsx (ekstrakcja `<StatTile>`, druga runda optymalizacji dashboardu) — wcześniej
+  // prywatne funkcje komponentu, bez ŻADNEGO pokrycia testami mimo używania w każdym custom
+  // stat tile na dashboardzie. Zachowanie 1:1 z tym co było, tylko teraz testowalne w node.
+  test('fmtStat — wartość liczbowa z jednostką', () => {
+    expect(fmtStat(1234.5, 'zł')).toBe('1235 zł'); // grupowanie tysięcy, zaokrąglone
+    expect(fmtStat(72.5, 'kg')).toBe('72.5 kg');
+    expect(fmtStat(8, 'h')).toBe('8 h');            // .0 przycięte
+    expect(fmtStat(3.456, '/5')).toBe('3.5');
+    expect(fmtStat(12, 'szt.')).toBe('12 szt.');
+    expect(fmtStat(3, '×')).toBe('×3');
+    expect(fmtStat(20, 'dni')).toBe('20 dni');
+    expect(fmtStat(4, '/5 nawyków')).toBe('4 /5 nawyków'); // dowolna jednostka zaczynająca się od "/"
+    expect(fmtStat(500, 'kroki')).toBe('500');
+  });
+
+  test('fmtWave — puste dla zera/ujemnych, zaokrąglone dla reszty', () => {
+    expect(fmtWave(0, 'zł')).toBe('');
+    expect(fmtWave(-3, 'zł')).toBe('');
+    expect(fmtWave(72.5, 'kg')).toBe('72.5');
+    expect(fmtWave(8, 'h')).toBe('8');
+    expect(fmtWave(3.456, '/5')).toBe('3.5');
+    expect(fmtWave(500, 'szt.')).toBe('500');
+  });
+
+  test('unitChip — czytelna etykieta jednostki w nagłówku kafelka', () => {
+    expect(unitChip('zł')).toBe('PLN');
+    expect(unitChip('szt.')).toBe('szt.');
+    expect(unitChip('×')).toBe('razy');
+    expect(unitChip('kg')).toBe('kg');
+    expect(unitChip('h')).toBe('godziny');
+    expect(unitChip('/5')).toBe('ocena /5');
+    expect(unitChip('kroki')).toBe('kroki');
+    expect(unitChip('dni')).toBe('dni');
+    expect(unitChip('/5 nawyków')).toBe('/5 nawyków');
+    expect(unitChip('nieznana')).toBe('');
+  });
+
+  test('periodCaption — opis okna wykresu wg okresu', () => {
+    expect(periodCaption('month', 6)).toBe('Ostatnie 6 mies.');
+    expect(periodCaption('week', 8)).toBe('Ostatnie 8 tyg. · etykieta = poniedziałek tygodnia');
   });
 });
