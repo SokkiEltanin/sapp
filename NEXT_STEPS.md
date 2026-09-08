@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Finanse: ikony per typ rachunku + czerwony/zielony wg wydatek/przychód — NIEsprawdzone (2026-09-08)
+
+User: "czytelniejsze ikony ze to jest za internet ze tamto jest wyplata... w finansach na
+kafelkach jak sa ikonki przy nich zrobic ikonkę i kolor względem czy wydatek czy przychod
+czerwony i zielony". Pełny opis w ARCHITECTURE.md §52. Dwa realne braki naprawione:
+1. `BILL_TYPES` (`recurringBills.ts`) — dodane `icon` per typ rachunku (Zap/Wifi/Flame/
+   Droplet/Thermometer/Shield/Phone/Home), wcześniej wszystkie dziedziczyły wspólną ikonę
+   kategorii (dom).
+2. `ExpenseItem.tsx` (główny wiersz listy w Finansach) — ikona rozwiązywana dynamicznie
+   (rachunek > kategoria, ten sam wzorzec co reszta apki), zamiast twardego 3-drożnego
+   switcha ignorującego kategorię. Kolor całego wiersza (pasek/tło ikony/glif/kwota) to teraz
+   `isIncome ? colors.accent.green : colors.accent.red` — wcześniej wydatek nie miał żadnego
+   koloru, tylko przychód był zielony.
+3. Filtr "Rachunki" w Finansach dostał te same ikony przy chipach (wcześniej same napisy).
+
+`tsc`/`jest` zielone (69 suit/886 testów, +1 nowy w `financePredicates.test.ts`).
+
+**Priorytet testu na urządzeniu**: Finanse → lista transakcji → wydatek za internet/prąd/
+telefon pokazuje właściwą ikonę (nie dom); wszystkie wydatki mają czerwony akcent, przychody
+(zwłaszcza wypłata → teczka/Briefcase) zielony; filtr "Rachunki" pokazuje ikony przy chipach.
+
 ## 🆕 "Czasami nie łapie powiadomienia z banku" — zbadane, parser OK, przyczyna gdzie indziej — NIEsprawdzone (2026-09-08)
 
 User: "czasami mi nie łapie z powiadomienia np tego ze wypłaty" + realny przykład (tytuł

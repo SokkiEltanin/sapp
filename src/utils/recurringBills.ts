@@ -5,15 +5,20 @@ import { Expense, Subscription } from '@/types';
 // Order = display priority. Exported (2026-08-31) so the Finanse filter (finances.tsx)
 // can reuse the SAME recognition as the dashboard's bill-suggest — one definition of
 // "co liczy się jako rachunek za prąd" instead of two that could drift apart.
-export const BILL_TYPES: { match: string[]; name: string; tag: string }[] = [
-  { match: ['czynsz', 'mieszkanie', 'administr', 'adm ', 'spółdziel', 'spoldziel', 'wspólnot', 'wspolnot'], name: 'Czynsz / mieszkanie', tag: 'czynsz' },
-  { match: ['prąd', 'prad', 'pge', 'tauron', 'energa', 'enea', 'energia elektr'], name: 'Prąd', tag: 'prąd' },
-  { match: ['internet'], name: 'Internet', tag: 'internet' },
-  { match: ['gaz '], name: 'Gaz', tag: 'gaz' },
-  { match: ['woda', 'ścieki', 'scieki', 'wod-kan'], name: 'Woda', tag: 'woda' },
-  { match: ['ogrzewani', 'ciepł', 'cieplo'], name: 'Ogrzewanie', tag: 'ogrzewanie' },
-  { match: ['ubezpiecz'], name: 'Ubezpieczenie', tag: 'ubezpieczenie' },
-  { match: ['abonament', 'telefon'], name: 'Telefon / abonament', tag: 'telefon' },
+// `icon` (2026-09-08, user: "czytelniejsze ikony... custom pod internet") — lucide-
+// react-native component name, resolved dynamically the same way as `CATEGORY_META.icon`
+// everywhere else in the app (`(LucideIcons as any)[icon]`). Wszystkie te rachunki
+// wcześniej dziedziczyły TYLKO ikonę swojej `ExpenseCategory` (prawie zawsze 'housing' →
+// dom), więc Internet/Prąd/Gaz/Woda wyglądały identycznie — teraz każdy ma własną.
+export const BILL_TYPES: { match: string[]; name: string; tag: string; icon: string }[] = [
+  { match: ['czynsz', 'mieszkanie', 'administr', 'adm ', 'spółdziel', 'spoldziel', 'wspólnot', 'wspolnot'], name: 'Czynsz / mieszkanie', tag: 'czynsz', icon: 'Home' },
+  { match: ['prąd', 'prad', 'pge', 'tauron', 'energa', 'enea', 'energia elektr'], name: 'Prąd', tag: 'prąd', icon: 'Zap' },
+  { match: ['internet'], name: 'Internet', tag: 'internet', icon: 'Wifi' },
+  { match: ['gaz '], name: 'Gaz', tag: 'gaz', icon: 'Flame' },
+  { match: ['woda', 'ścieki', 'scieki', 'wod-kan'], name: 'Woda', tag: 'woda', icon: 'Droplet' },
+  { match: ['ogrzewani', 'ciepł', 'cieplo'], name: 'Ogrzewanie', tag: 'ogrzewanie', icon: 'Thermometer' },
+  { match: ['ubezpiecz'], name: 'Ubezpieczenie', tag: 'ubezpieczenie', icon: 'Shield' },
+  { match: ['abonament', 'telefon'], name: 'Telefon / abonament', tag: 'telefon', icon: 'Phone' },
 ];
 
 // True when an expense's text reads like a fixed bill (rent/utilities/internet…).
@@ -26,10 +31,10 @@ export function looksLikeBill(text: string): boolean {
 // tags, so a receipt logged with storeName "PGE" (no note/tag at all) still matches
 // "Prąd" (2026-08-31, user: "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile
 // płacę za prąd" — the Finanse filter needs this same match, not just the tag list).
-export function billTagFor(e: { note?: string; storeName?: string; tags?: string[] }): { tag: string; name: string } | null {
+export function billTagFor(e: { note?: string; storeName?: string; tags?: string[] }): { tag: string; name: string; icon: string } | null {
   const hay = `${e.note ?? ''} ${e.storeName ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase();
   const t = BILL_TYPES.find(bt => bt.match.some(m => hay.includes(m)));
-  return t ? { tag: t.tag, name: t.name } : null;
+  return t ? { tag: t.tag, name: t.name, icon: t.icon } : null;
 }
 
 export interface BillCandidate {

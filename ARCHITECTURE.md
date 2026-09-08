@@ -4642,6 +4642,53 @@ zanim założymy że to nowy bug parsera.
 
 `tsc`/`jest` zielone (69 suit/885 testów, +1 nowy).
 
+## 52. Finanse: czytelniejsze ikony per typ rachunku + czerwony/zielony wg wydatek/przychód — 2026-09-08
+
+User: "i możemy dodać czytelniejsze ikony ze to jest za internet ze tamto jest wyplata... w
+finansach natychmiast kafelkach jak sa ikonki przy nich tam zrobic ikonkę i kolor względem
+czy wydatek czy przychod czerwony i zielony". Dwa realne braki znalezione (nie zgadywane —
+przeczytany cały `ExpenseItem.tsx` i `recurringBills.ts` przed zmianą):
+
+**1. `BILL_TYPES` (`src/utils/recurringBills.ts`) nie miało ŻADNEGO pola ikony** — tylko
+`match`/`name`/`tag`. Każdy rachunek (prąd/internet/czynsz/gaz/woda/ogrzewanie/ubezpieczenie/
+telefon) dziedziczył WYŁĄCZNIE ikonę swojej `ExpenseCategory` (prawie zawsze `'housing'` →
+`Home`), więc wszystkie wyglądały identycznie. Dodane `icon: string` per wpis (Zap/Wifi/
+Flame/Droplet/Thermometer/Shield/Phone/Home), zwracane teraz też z `billTagFor()`.
+
+**2. `ExpenseItem.tsx` (główny wiersz listy transakcji w Finansach) miał TWARDO wpisany
+3-drożny switch ikony** (`isIncome ? TrendingUp : isReceipt ? ShoppingCart : TrendingDown`)
+— `meta` (z `getCategoryMeta`) było liczone, ale NIGDY nieużywane do ikony/koloru, tylko do
+tekstu etykiety. Efekt: KAŻDY wydatek (spożywcze/transport/zdrowie/internet/wszystko) miał
+identyczną szarą strzałkę w dół, a KAŻDY przychód (pensja/freelance/prezent/przelew)
+identyczną zieloną strzałkę w górę — mimo że `INCOME_CATEGORY_META.salary` już miało własną
+ikonę `Briefcase` (wypłata jako pełnoprawna `IncomeCategory`, nie tylko flaga — patrz
+`bankIngest.ts`/`bankCommit.ts`, `[JD]` ustawia `category:'salary'` przy commit), po prostu
+nigdy niepodłączoną do tego wiersza.
+
+Naprawa: dynamiczne rozwiązywanie ikony jak WSZĘDZIE indziej w apce (`(LucideIcons as
+any)[iconName]`, ten sam wzorzec co `app/expenses/[id].tsx`/`add.tsx`/`manual.tsx`/
+`subscriptions.tsx`/`stats.tsx`/`settings.tsx`) — `iconName = bill?.icon ?? meta.icon`
+(rachunek wygrywa, bo jest bardziej specyficzny niż kategoria). Kolor CAŁEGO wiersza (pasek z
+lewej, tło+glif ikony, kwota) to teraz prosta reguła `isIncome ? colors.accent.green :
+colors.accent.red` (`#2AC68F`/`#E43434`, TA SAMA para co karta "TEN MIESIĄC" wyżej w tym
+samym ekranie i cała reszta apki — nie wymyślone nowe kolory), tło ikony `colors.tint.green/
+red` (miękki 12% odcień, już istniejący w `theme/colors.ts` dokładnie do tego). Wcześniej
+wydatek nie miał ŻADNEGO koloru (neutralny szary/biały) — tylko przychód był zielony, więc
+para nie czytała się symetrycznie; teraz oba mają kolor.
+
+Przy okazji: "Rachunki" filtr w `finances.tsx` (chipy "Prąd"/"Internet"/itd.) dostał te same
+ikony (wcześniej same napisy, zero ikon) — `billsInData` przebudowane z ręcznej `Map`
+(kolejność "pierwszy napotkany") na filtrowanie `BILL_TYPES` (kolejność priorytetu, zgodnie z
+tym co komentarz w kodzie już zresztą TWIERDZIŁ, ale nie robił).
+
+Testy: `__tests__/financePredicates.test.ts` (istniejące 2 zaktualizowane pod nowe pole
+`icon`, +1 nowy sprawdzający że wszystkie 8 typów rachunków ma RÓŻNE ikony).
+
+`tsc`/`jest` zielone (69 suit/886 testów). **Priorytet testu na urządzeniu**: Finanse → lista
+transakcji → wydatek za internet/prąd/telefon pokazuje właściwą ikonę (nie dom), cała reszta
+wydatków ma czerwony akcent, przychody (zwłaszcza wypłata → `Briefcase`) zielony; filtr
+"Rachunki" pokazuje ikony przy chipach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
