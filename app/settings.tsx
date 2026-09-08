@@ -57,7 +57,7 @@ import { useUiPrefs } from '@/store/uiPrefs';
 import { runSamsungBackfill, backfillRange, isBackfillDone } from '@/utils/samsungBackfill';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { ingestBankNotification } from '@/services/bankIngest';
-import { useBankRules } from '@/store/bankRulesStore';
+import { useBankRules, BankRule, BankRuleKind, ruleKind } from '@/store/bankRulesStore';
 import { parseBankNotification } from '@/utils/bankNotification';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef } from '@/types/settings';
@@ -155,11 +155,15 @@ export default function SettingsScreen() {
   const [bankTest, setBankTest] = useState('');
   const bankRules = useBankRules(s => s.rules);
   const addBankRule = useBankRules(s => s.addRule);
+  const updateBankRule = useBankRules(s => s.updateRule);
   const removeBankRule = useBankRules(s => s.removeRule);
+  const [ruleEditId, setRuleEditId] = useState<string | null>(null);
   const [ruleText, setRuleText] = useState('');
   const [rulePattern, setRulePattern] = useState('');
   const [ruleName, setRuleName] = useState('');
+  const [ruleKindSel, setRuleKindSel] = useState<BankRuleKind>('expense');
   const [ruleCat, setRuleCat] = useState<ExpenseCategory>('subscriptions');
+  const [ruleTagsText, setRuleTagsText] = useState('');
   const rulePreview = useMemo(() => {
     const t = ruleText.trim();
     if (!t) return null;
@@ -167,11 +171,27 @@ export default function SettingsScreen() {
   }, [ruleText]);
   // Prefill "fragment do rozpoznania"/"nazwa" z tego, co sam parser już wyciągnął z
   // wklejonego przykładu — tylko gdy user jeszcze ich nie dotknął, żeby nie nadpisywać
-  // ręcznej poprawki (np. gdy parser źle podzielił nazwę sklepu).
+  // ręcznej poprawki (np. gdy parser źle podzielił nazwę sklepu). Nie odpala się przy
+  // edycji istniejącego szablonu (pola już wypełnione, więc warunek `!rulePattern` i tak
+  // nie przejdzie), więc bezpiecznie zostaje jednym efektem dla obu trybów.
   useEffect(() => {
     if (rulePreview?.storeKey && !rulePattern) setRulePattern(rulePreview.storeKey);
     if (rulePreview?.store && !ruleName) setRuleName(rulePreview.store);
   }, [rulePreview]);
+  const resetRuleForm = () => {
+    setRuleEditId(null); setRuleText(''); setRulePattern(''); setRuleName('');
+    setRuleKindSel('expense'); setRuleCat('subscriptions'); setRuleTagsText('');
+  };
+  const startEditRule = (r: BankRule) => {
+    haptic.tap();
+    setRuleEditId(r.id);
+    setRuleText('');
+    setRulePattern(r.pattern);
+    setRuleName(r.name);
+    setRuleKindSel(ruleKind(r));
+    setRuleCat(r.category ?? 'subscriptions');
+    setRuleTagsText((r.tags ?? []).join(', '));
+  };
   const setThemeMode = useThemeStore(s => s.setMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
@@ -1580,38 +1600,98 @@ export default function SettingsScreen() {
               <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 2 }]}>Nazwa do pokazania:</Text>
               <TextInput value={ruleName} onChangeText={setRuleName} placeholder="np. Subskrypcja Claude" placeholderTextColor={colors.text.muted}
                 style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, fontSize: 13 }} />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
-                {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][]).map(([cat, meta]) => {
-                  const active = ruleCat === cat;
+
+              {/* Rodzaj (2026-09-08, user: "chce miec opcje... że to jest wyplata i zeby
+                  targował automatycznie") — dotąd szablon mógł oznaczyć TYLKO wydatek/
+                  kategorię; teraz da się też zadeklarować że dany nadawca to WYPŁATA
+                  (przychód), co w bankIngest.ts ustawia `jd` i księguje automatycznie,
+                  niezależnie od globalnego przełącznika "dodawaj automatycznie". */}
+              <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 2 }]}>Rodzaj:</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {([['expense', 'Wydatek (kategoria)'], ['income', 'Wypłata / przychód']] as [BankRuleKind, string][]).map(([k, lbl]) => {
+                  const active = ruleKindSel === k;
                   return (
-                    <PressableScale key={cat} onPress={() => { haptic.tap(); setRuleCat(cat); }}
-                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? `${meta.color}22` : colors.bg.elevated, borderWidth: 1, borderColor: active ? meta.color : colors.border.default }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: active ? meta.color : colors.text.secondary }}>{meta.label}</Text>
+                    <PressableScale key={k} onPress={() => { haptic.tap(); setRuleKindSel(k); }} style={{ flex: 1 }}>
+                      <View style={{ paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: active ? '#2AC68F22' : colors.bg.elevated, borderWidth: 1, borderColor: active ? '#2AC68F' : colors.border.default }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#2AC68F' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
                     </PressableScale>
                   );
                 })}
               </View>
-              <PressableScale
-                onPress={() => {
-                  if (!rulePattern.trim()) { toast.error('Wpisz fragment do rozpoznania'); return; }
-                  addBankRule({ pattern: rulePattern, name: ruleName, category: ruleCat });
-                  haptic.success();
-                  toast.success('Zapisano szablon');
-                  setRuleText(''); setRulePattern(''); setRuleName(''); setRuleCat('subscriptions');
-                }}
-                style={{ backgroundColor: '#2AC68F', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 2 }}>
-                <Text style={{ color: colors.bg.primary, fontWeight: '800' }}>Zapisz szablon</Text>
-              </PressableScale>
+
+              {ruleKindSel === 'expense' ? (
+                <>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                    {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][]).map(([cat, meta]) => {
+                      const active = ruleCat === cat;
+                      return (
+                        <PressableScale key={cat} onPress={() => { haptic.tap(); setRuleCat(cat); }}
+                          style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? `${meta.color}22` : colors.bg.elevated, borderWidth: 1, borderColor: active ? meta.color : colors.border.default }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: active ? meta.color : colors.text.secondary }}>{meta.label}</Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
+                  {/* Tagi (2026-09-08, user: "że za prąd bo tam nie mam takich tagow wgle") —
+                      dotąd `BankRule.tags` istniało w store od początku, ale ten formularz
+                      NIGDY o nie nie pytał — czysto brakujące pole, nie logika. Wolne tagi po
+                      przecinku, np. "prąd" żeby spiąć się z filtrem rachunków w Finansach
+                      (BILL_TYPES w recurringBills.ts rozpoznaje "prąd" po tagu/nazwie i tak). */}
+                  <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 2 }]}>Tagi (opcjonalnie, po przecinku, np. "prąd"):</Text>
+                  <TextInput value={ruleTagsText} onChangeText={setRuleTagsText} autoCapitalize="none" placeholder="np. prąd, tauron" placeholderTextColor={colors.text.muted}
+                    style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, fontSize: 13 }} />
+                </>
+              ) : (
+                <Text style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>
+                  Płatności od tego nadawcy będą od razu oznaczone jako wypłata i dodane automatycznie, bez czekania na zatwierdzenie.
+                </Text>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: 2 }}>
+                {ruleEditId && (
+                  <PressableScale onPress={() => { haptic.tap(); resetRuleForm(); }} style={{ flex: 1 }}>
+                    <View style={{ backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
+                      <Text style={{ color: colors.text.primary, fontWeight: '800' }}>Anuluj edycję</Text>
+                    </View>
+                  </PressableScale>
+                )}
+                <PressableScale
+                  onPress={() => {
+                    if (!rulePattern.trim()) { toast.error('Wpisz fragment do rozpoznania'); return; }
+                    const tags = ruleTagsText.split(',').map(t => t.trim()).filter(Boolean);
+                    if (ruleEditId) {
+                      updateBankRule(ruleEditId, { pattern: rulePattern, name: ruleName, kind: ruleKindSel, category: ruleCat, tags });
+                      toast.success('Zapisano zmiany');
+                    } else {
+                      addBankRule({ pattern: rulePattern, name: ruleName, kind: ruleKindSel, category: ruleCat, tags });
+                      toast.success('Zapisano szablon');
+                    }
+                    haptic.success();
+                    resetRuleForm();
+                  }}
+                  style={{ flex: 1 }}>
+                  <View style={{ backgroundColor: '#2AC68F', borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
+                    <Text style={{ color: colors.bg.primary, fontWeight: '800' }}>{ruleEditId ? 'Zapisz zmiany' : 'Zapisz szablon'}</Text>
+                  </View>
+                </PressableScale>
+              </View>
 
               {bankRules.length > 0 && (
                 <View style={{ marginTop: 8, gap: 6 }}>
                   {bankRules.map(r => (
-                    <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.subtle, padding: 10 }}>
-                      <View style={{ flex: 1 }}>
+                    <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: ruleEditId === r.id ? '#2AC68F' : colors.border.subtle, padding: 10 }}>
+                      <PressableScale onPress={() => startEditRule(r)} style={{ flex: 1 }}>
                         <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{r.name}</Text>
-                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>{CATEGORY_META[r.category]?.label ?? r.category} · „{r.pattern}"</Text>
-                      </View>
-                      <PressableScale onPress={() => { haptic.tap(); removeBankRule(r.id); }}>
+                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>
+                          {ruleKind(r) === 'income' ? 'Wypłata' : (CATEGORY_META[r.category!]?.label ?? r.category)}
+                          {r.tags?.length ? ` · ${r.tags.join(', ')}` : ''} · „{r.pattern}"
+                        </Text>
+                      </PressableScale>
+                      <PressableScale onPress={() => startEditRule(r)}>
+                        <LucideIcons.Pencil size={16} color={colors.text.muted} />
+                      </PressableScale>
+                      <PressableScale onPress={() => { haptic.tap(); if (ruleEditId === r.id) resetRuleForm(); removeBankRule(r.id); }}>
                         <Trash2 size={16} color={colors.text.muted} />
                       </PressableScale>
                     </View>

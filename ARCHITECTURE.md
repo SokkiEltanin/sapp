@@ -4548,6 +4548,70 @@ kolistą poświatę za sobą, żaden prostokąt/blok; (c) dolny rząd lady pokaz
 (🪵⚙️🥇👑) w cenach 35/90/200/450, bez darmowego prezentu; (d) darmowa skrzynka dnia dalej
 działa z `/pet` i pokazuje się na dashboardzie jak wcześniej.
 
+## 50. Trzy niezależne poprawki: trudność bossów, droprate perków, szablony banku — 2026-09-08
+
+Jedna wiadomość, trzy osobne prośby:
+
+**1. Bossy od Hydry Odwodnienia za łatwe** — user: "od bossa Hydra Odwodnienia jest za łatwo,
+zwiększ im każdemu minimum 2x HP i 2x dmg dosłownie". `hp` PODWOJONE dla bossów order 11-22
+(Hydra Odwodnienia → Iluzja Kontroli, finał kampanii) w `BOSSES` (`src/utils/bosses.ts`),
+order 1-10 świadomie nietknięte (user wskazał konkretnie "OD Hydry"). W odróżnieniu od
+poprzedniej korekty trudności (2026-08-21, hp×√2/√3, KALIBROWANE żeby uniknąć kwadratowego
+narastania trudności — `counterDamage()` liczy obrażenia jako `boss.hp × COUNTER_PCT`, więc
+naiwne hp×2 daje ~4x łącznego ryzyka, nie 2x) — user tym razem wyraźnie chciał SUROWE hp×2,
+nie skalibrowaną wersję ("dosłownie" + "MINIMUM 2x", czyli więcej też OK). Ponieważ nie ma
+osobnego pola "dmg" na bossie, podwojenie `hp` automatycznie realizuje "2x HP i 2x dmg" naraz
+(dmg pochodzi z hp). MAD bossy (`madBosses.ts`, `hp: boss.hp × MAD_HP_MULT`) dziedziczą
+podwyżkę automatycznie, bez osobnej zmiany. Testy bossów/MAD (`bosses.test.ts`,
+`madBosses.test.ts`) przeszły bez zmian (nie hardkodują konkretnych `hp`).
+
+**2. "Nie mogę dropnąć umiejętności"** — zbadane, to NIE był bug. `COMBAT_ITEM_DROP_CHANCE_BY_TIER`
+(`src/utils/crates.ts`) miało `basic: 0` (celowo, z 2026-08-18: "zbyt częsta, zabiłaby
+rzadkość"), a `basic` to AŻ 60% wszystkich otwarć wg `rollCrate()` (legendary 2%/epic 10%/
+rare 28%/basic 60%). Łączna szansa na drop ważona tym rozkładem: `0.60×0 + 0.28×0.03 +
+0.10×0.08 + 0.02×0.18 ≈ 2.0%` na otwarcie — przy takiej rzadkości >50% szans na ZERO dropów
+nawet po 30 otwarciach, statystycznie zgodne z frustracją usera, nie błąd w kodzie (droga
+`openCrate()`/`rollBox()`/`menaceClaim()` w `petStore.ts`/`petBoxes.ts` poprawnie wołają tę
+stałą, sprawdzone czytaniem). Naprawa (balans, nie bugfix): `basic` dostało małą, ale
+NIEZEROWĄ szansę (0.01), reszta podbita proporcjonalnie (`rare` 0.03→0.05, `epic` 0.08→0.12,
+`legendary` 0.18→0.25) — nowa łączna szansa ≈3.7%, prawie 2× więcej. Test w
+`__tests__/crates.test.ts` zaktualizowany (`basic=0` → `basic>0`) + nowy test na ŁĄCZNĄ,
+ważoną szansę (>3%), żeby przyszła zmiana pojedynczego tieru nie zepsuła całości po cichu.
+
+**3. Szablony powiadomień banku — rozszerzone** — user: "chce miec opcje do słownego
+polaczenia tego że subskrypcja oraz np że to jest wyplata i zeby targował automatycznie lub
+że za prąd bo tam nie mam takich tagow wgle. I zeby mocy edytowac te szablony". Trzy realne
+braki w pierwszej wersji (§7/§45):
+- **Brak rodzaju "wypłata"** — szablon mógł oznaczyć TYLKO wydatek (kategorię). Nowy
+  `BankRule.kind: 'expense' | 'income'` (`bankRulesStore.ts`). `kind='income'` dopasowywany w
+  GAŁĘZI PRZYCHODZĄCEJ `bankIngest.ts` (nie wydatkowej) — ustawia `jd=true` (jak
+  `isKnownPaycheckSender`, ale to user'a WŁASNA, natychmiastowa deklaracja, nie coś czego
+  apka musi się dopiero nauczyć) I `auto: true` BEZWARUNKOWO (pomija globalny przełącznik
+  "dodawaj automatycznie" — user explicite powiedział czym jest ten nadawca, to najwyższy
+  możliwy poziom pewności). Starsze zapisane szablony (sprzed `kind`) nie mają tego pola —
+  `ruleKind(r)` (eksportowana funkcja) traktuje brak jak `'expense'`, jedyny rodzaj jaki
+  wcześniej istniał — bez migracji danych.
+- **Brak pola tagów w formularzu** — `BankRule.tags` istniało w store OD POCZĄTKU (PR #157),
+  ale Ustawienia NIGDY nie pytały o nie — czysto brakujący input, nie logika (`bankIngest.ts`
+  już czytał `rule?.tags` poprawnie). Dodane pole tekstowe "Tagi (po przecinku)" — widoczne
+  tylko dla `kind='expense'` (dla wypłaty nic by nie robiły — `bankIngest.ts`'s gałąź
+  przychodząca nie czyta tagów, tylko `jd`/`auto`/nazwę).
+- **Brak edycji** — tylko dodaj/usuń. Nowy `updateRule(id, patch)` w store + tryb edycji w
+  Ustawieniach (tap na wiersz szablonu → wypełnia formularz, przycisk "Zapisz zmiany" zamiast
+  "Zapisz szablon", "Anuluj edycję" obok).
+
+Testy: `__tests__/bankRules.test.ts` (+6 nowych — tagi normalizowane, `kind` fallback na
+starych danych, `income` → `jd`+`auto` nawet przy `autoAll=false`, `income` nie miesza się z
+kategoryzacją wydatków, `updateRule` zmienia pola, `updateRule` przełącza `kind`).
+
+`tsc`/`jest` zielone (69 suit/884 testy). **Priorytet testu na urządzeniu**: (a) walka z
+bossem #11+ wyraźnie trudniejsza niż wcześniej; (b) kilkanaście otwarć skrzynek — perk bojowy
+powinien wypaść zauważalnie częściej niż wcześniej (statystycznie, nie gwarantowane za 1
+próbę); (c) Ustawienia → Szablony powiadomień → dodaj szablon "Wypłata" dla realnego nadawcy
+pensji → kolejny przelew od niego powinien wpaść jako [JD] bez zatwierdzania; (d) dodaj tag
+"prąd" do szablonu PGE, zobacz czy Finanse → filtr rachunków go łapie; (e) edytuj istniejący
+szablon, sprawdź że zmiany się zapisały.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -2,7 +2,7 @@ import { parseBankNotification } from '@/utils/bankNotification';
 import { loadMerchantMemory, merchantFor, guessCategory } from '@/utils/merchantMemory';
 import { isKnownPaycheckSender } from '@/utils/paycheckSenders';
 import { useBankQueue } from '@/store/bankQueueStore';
-import { useBankRules, matchBankRule } from '@/store/bankRulesStore';
+import { useBankRules, matchBankRule, ruleKind } from '@/store/bankRulesStore';
 
 // Turn one bank push notification into a queued, pre-categorised payment. Safe to call
 // from a headless task (uses zustand + AsyncStorage, both work with the app closed).
@@ -23,16 +23,24 @@ export async function ingestBankNotification(title: string, text: string): Promi
   // Verify better, but never drop: only genuinely odd ones ASK. `jd` still matters —
   // it's what tags the income as a paycheck (workPrefix) on commit.
   if (tx.direction === 'in') {
-    const jd = !!tx.isSalary || await isKnownPaycheckSender(tx.storeKey);
+    // "Wypłata" szablony (2026-09-08, user: "chce mieć opcje... że to jest wypłata i żeby
+    // targował automatycznie") — user'a WŁASNA deklaracja "ten nadawca to moja pensja" jest
+    // co najmniej tak samo pewna jak nauczone `isKnownPaycheckSender` (uczy się dopiero PO
+    // kilku ręcznych potwierdzeniach), więc dopasowanie od razu ustawia `jd` I auto-księguje
+    // bezwarunkowo — nie czeka na globalny przełącznik `autoAll`, bo user explicite
+    // powiedział czym jest ten konkretny nadawca.
+    const incomeRule = matchBankRule(tx.store, tx.raw, useBankRules.getState().rules.filter(r => ruleKind(r) === 'income'));
+    const jd = !!incomeRule || !!tx.isSalary || await isKnownPaycheckSender(tx.storeKey);
     // A large credit that doesn't look like your paycheck is worth one glance — it's
     // the one case where booking it silently as income could quietly skew the stats.
     const uncertain = !jd && tx.amount > 1500;
     return store.enqueue({
       ...tx,
+      ...(incomeRule?.name ? { store: incomeRule.name } : {}),
       category: 'other',
       suggestedCategory: 'other',
       jd,
-      auto: store.autoAll && !uncertain,
+      auto: (store.autoAll || !!incomeRule) && !uncertain,
       ...(uncertain ? { flagReason: 'duży przelew przychodzący — potwierdź, czy to przychód' } : {}),
     });
   }
@@ -58,7 +66,7 @@ export async function ingestBankNotification(title: string, text: string): Promi
   // (Ustawienia → Auto-wydatki z banku → Szablony powiadomień) — pozwalają z góry
   // zadeklarować kategorię dla nadawcy, zanim padnie pierwsza płatność (np. "anthropic"/
   // "claude" → Subskrypcje, "pge" → Mieszkanie) — dopiero potem sztywny słownik-zgadywacz.
-  const rule = learned ? undefined : matchBankRule(tx.store, tx.raw, useBankRules.getState().rules);
+  const rule = learned ? undefined : matchBankRule(tx.store, tx.raw, useBankRules.getState().rules.filter(r => ruleKind(r) === 'expense'));
   const category = learned?.category ?? rule?.category ?? guessCategory(tx.store);
   // Verify better, but never critically drop: auto-book the usual card payment. Only
   // genuinely WEIRD ones ask — an unusually large amount (a common sign of a mis-parsed
