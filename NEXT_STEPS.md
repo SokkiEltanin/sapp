@@ -3,6 +3,40 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Streak "bez słodyczy" (stale-keyword) + dashboard 1Hz-tick lag — NIEsprawdzone (2026-09-08)
+
+User: "w streak wgle nie łapie ze zjadłem dzisiaj nutelle i nadal mam 20 dni... I musimy
+zoptymalizowac apke bo znowu laguje". Dwie recydywy, obie zbadane background-agentem PRZED
+naprawą (root cause potwierdzony, nie zgadywany). Pełny opis w ARCHITECTURE.md §53.
+
+1. **Streak-bug: prawdziwa przyczyna to NIE keyword-matching (ten jest OK od 09-06)** — to
+   `Counter.keyword`/`Habit.avoidKeyword` będące jednorazową, zamrożoną KOPIĄ presetu z
+   momentu utworzenia licznika/nawyku. Edycja `AVOID_PRESETS` (np. dodanie "nutella") nigdy
+   nie dociera do już istniejących trackerów. Naprawa: `presetKey`/`avoidPresetKey` +
+   `resolveAvoidKeyword()` rozwiązujący ŻYWY string presetu przy odczycie, plus migracja dla
+   już istniejących trackerów bez presetKey (subset-heuristic — jeśli stary keyword jest
+   podzbiorem aktualnego presetu, traktuj jak jego starą kopię).
+2. **Dashboard lag: `useWorkEarnings.ts` tykał co sekundę BEZ gate'a na `isWorking`**,
+   wymuszając pełny rerender całego 5420-liniowego `index.tsx` co sekundę, zawsze — nawet w
+   tle na innej zakładce, nawet bez aktywnej zmiany w pracy. Naprawione: interval skalowany
+   1s (pracujesz, jak było) / 60s (nie pracujesz). Osobno wyniesiony do `useMemo`
+   `gotPaidThisMonth` (pełny skan historii wydatków liczony inline na każdym renderze).
+   **NIE naprawione świadomie** (zbyt ryzykowne bez testu na urządzeniu): memoizacja całego
+   ~1040-liniowego bloku `nodes` (rejestr sekcji dashboardu) i wydzielenie
+   `renderStatTile`/`renderCustomTile` (~520 linii) do osobnego zmemoizowanego komponentu —
+   agent-audyt wskazał to jako kolejny co do wielkości hotspot (custom stat tiles = 8 pełnych
+   skanów historii wydatków × N kafelków na renderze), ale ręczna tablica zależności do bloku
+   tej wielkości bez realnego testu = realne ryzyko cichego "stale closure" bug. **Zrobić w
+   kolejnej sesji, z testem na urządzeniu pod ręką.**
+
+`tsc`/`jest` zielone (69 suit/891 testów, +5 nowych w `countersStore.test.ts`).
+
+**Priorytet testu na urządzeniu**: (a) Odliczanie → "Bez słodyczy" (jeśli jest starszy niż
+09-06) → zjedz coś z Nutellą → streak powinien spaść do 0 OD RAZU, bez usuwania licznika; (b)
+to samo dla nawyku "Bez słodyczy" jeśli masz taki w Nawykach; (c) zostaw Dashboard otwarty (na
+innej zakładce lub w tle) kilka minut bez aktywnej zmiany w pracy → wróć, sprawdź płynność —
+zwłaszcza jeśli masz skonfigurowane custom stat tiles na dashboardzie.
+
 ## 🆕 Finanse: ikony per typ rachunku + czerwony/zielony wg wydatek/przychód — NIEsprawdzone (2026-09-08)
 
 User: "czytelniejsze ikony ze to jest za internet ze tamto jest wyplata... w finansach na

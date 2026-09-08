@@ -390,6 +390,9 @@ export interface Habit {
                             // with a streak/calendar instead of a standalone counter).
   avoidKeyword?: string;   // 'avoid' only: '|'-separated keywords, same format/matcher as
                             // Counter.keyword (matchesAvoid in countersStore.ts)
+  avoidPresetKey?: string; // 'avoid' only: if chosen from AVOID_PRESETS, its `key` — resolved
+                            // LIVE at read time (resolveAvoidKeyword), same reasoning as
+                            // Counter.presetKey (2026-09-08 stale-keyword fix)
   dailyGoal?: number;      // for count type (e.g. 8 glasses)
   step?: number;           // amount added per tap (e.g. 250 for a glass of water); default 1
   unit?: string;           // e.g. 'szkl.', 'ml', 'min'

@@ -2730,6 +2730,18 @@ export default function DashboardScreen() {
       }));
   }, [deferredReady, expenses, nameAliases, scope]);
 
+  // Don't ask if a paycheck already landed this month — whether logged by hand, via this
+  // prompt, or auto-captured from a [JD]/salary bank credit. Was a plain `.some()` scan over
+  // the ENTIRE expense history recomputed inline on every render of the payday-prompt section
+  // below — hoisted to its own memo (2026-09-08 perf pass, see useWorkEarnings.ts for the
+  // bigger companion fix).
+  const gotPaidThisMonth = useMemo(() => {
+    const wpLc = (workSettings.workPrefix ?? '').trim().toLowerCase();
+    return expenses.some(e =>
+      e.type === 'income' && (e.date ?? '').slice(0, 7) === currentMonth() &&
+      (e.category === 'salary' || (!!wpLc && (e.tags ?? []).some(t => (t ?? '').toLowerCase() === wpLc))));
+  }, [expenses, workSettings.workPrefix]);
+
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -2817,12 +2829,6 @@ export default function DashboardScreen() {
                 </View>
               );
 
-              // Don't ask if a paycheck already landed this month — whether logged by
-              // hand, via this prompt, or auto-captured from a [JD]/salary bank credit.
-              const wpLc = (workSettings.workPrefix ?? '').trim().toLowerCase();
-              const gotPaidThisMonth = expenses.some(e =>
-                e.type === 'income' && (e.date ?? '').slice(0, 7) === currentMonth() &&
-                (e.category === 'salary' || (!!wpLc && (e.tags ?? []).some(t => (t ?? '').toLowerCase() === wpLc))));
               nodes['payday-prompt'] = paydayDue(paydayCfg, paydayHandled, paydayDismissedDate) && !gotPaidThisMonth && (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
                   <View style={s.cardHeader}>

@@ -1,4 +1,4 @@
-import { matchesAvoid, AVOID_PRESETS } from '@/store/countersStore';
+import { matchesAvoid, AVOID_PRESETS, resolveAvoidKeyword, autoDaysWithout, Counter } from '@/store/countersStore';
 
 const sweetsKeyword = AVOID_PRESETS.find(p => p.key === 'sweets')!.keyword;
 
@@ -65,5 +65,56 @@ describe('matchesAvoid — preset "słodycze" łapie Nutellę (2026-09-06)', () 
 
   test('Masło orzechowe nadal NIE pasuje (to nie słodycz, mimo "orzech")', () => {
     expect(matchesAvoid('Masło orzechowe', sweetsKeyword)).toBe(false);
+  });
+});
+
+// 2026-09-08, user: "w streak wgle nie łapie ze zjadłem dzisiaj nutelle i nadal mam 20 dni" —
+// RECURRENCE of the already-fixed 09-06 bug. Root cause: `matchesAvoid` above was always correct
+// in isolation, but a real Counter/Habit stores a ONE-TIME COPY of the preset keyword string at
+// creation time (`counter.keyword`), so a counter made before "nutella" was appended to
+// `AVOID_PRESETS` never sees the new word — `resolveAvoidKeyword` fixes this by resolving the
+// LIVE preset string at read time, either via a stored `presetKey` (new counters) or, for
+// counters made before this fix (no presetKey), by detecting that the stored keyword's terms are
+// a strict subset of a current preset's terms (migration heuristic).
+describe('resolveAvoidKeyword — stale preset copy dogania nowe słowa (2026-09-08)', () => {
+  test('presetKey obecny → zawsze zwraca AKTUALNY string presetu, nawet jeśli keyword jest stary', () => {
+    const staleKeyword = 'słodycz|slodycz|czekolad'; // ancient snapshot, missing "nutella" and much more
+    expect(resolveAvoidKeyword(staleKeyword, 'sweets')).toBe(sweetsKeyword);
+    expect(matchesAvoid('Nutella', resolveAvoidKeyword(staleKeyword, 'sweets')!)).toBe(true);
+  });
+
+  test('brak presetKey, ale stary keyword jest podzbiorem obecnego presetu → migruje do świeżego', () => {
+    // A pre-nutella snapshot: every term still exists in the current preset, none are extra.
+    const oldTerms = sweetsKeyword.split('|').filter(t => t !== 'nutella');
+    const staleKeyword = oldTerms.join('|');
+    const resolved = resolveAvoidKeyword(staleKeyword, undefined);
+    expect(resolved).toBe(sweetsKeyword);
+    expect(matchesAvoid('Nutella', resolved!)).toBe(true);
+  });
+
+  test('naprawdę własny keyword (nie podzbiór żadnego presetu) zostaje NIETKNIĘTY', () => {
+    const custom = 'cola|fanta|sprite';
+    expect(resolveAvoidKeyword(custom, undefined)).toBe(custom);
+  });
+
+  test('pojedyncze słowo NIE jest migrowane (za mało pewności, mogło być celowo wąskie)', () => {
+    expect(resolveAvoidKeyword('lody', undefined)).toBe('lody');
+  });
+});
+
+// End-to-end regression for the exact user report: a Counter created BEFORE "nutella" existed in
+// AVOID_PRESETS, with today's food log containing "Nutella", must show 0 dni (broken today) — not
+// a frozen historical streak.
+describe('autoDaysWithout — Nutella zjedzona dziś resetuje streak nawet dla starego licznika', () => {
+  test('stary Counter (bez presetKey, pre-nutella keyword) łapie dzisiejszą Nutellę', () => {
+    const oldTerms = sweetsKeyword.split('|').filter(t => t !== 'nutella');
+    const staleCounter: Counter = {
+      id: 'c1', kind: 'since', name: 'Bez słodyczy', mode: 'auto',
+      keyword: oldTerms.join('|'), track: 'eat',
+      date: '2026-08-01', startDate: '2026-08-01', createdAt: '2026-08-01T00:00:00.000Z',
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const meals = [{ date: `${today}T12:00:00`, items: [{ name: 'Nutella' }] }];
+    expect(autoDaysWithout(staleCounter, [], meals)).toBe(0);
   });
 });

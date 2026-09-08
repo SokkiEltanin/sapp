@@ -4691,6 +4691,85 @@ wydatków ma czerwony akcent, przychody (zwłaszcza wypłata → `Briefcase`) zi
 
 ---
 
+## 53. Stale-keyword bug w streaku "bez słodyczy" + dashboard znowu laguje (1Hz tick) — 2026-09-08
+
+User: *"I musisz mi poprawić zeby jak jem cos zeby wiedziało co to czy warzywa czy slodycze
+czy co to bo w streak wgle nie łapie ze zjadłem dzisiaj nutelle i nadal mam 20 dni mimo ze juz
+ile razy jadłem coś xdd I musimy zoptymalizowac apke bo znowu laguje nie wiem index znowu ma
+5k linijek??? 👀😭"* — dwa niezależne zgłoszenia, oba RECYDYWY (Nutella: naprawiona §51-ish
+09-06 keyword-fix; lag: po kilku wcześniejszych przejściach memoizacji).
+
+**1. Streak "bez słodyczy" — prawdziwa przyczyna (zbadana agentem, nie zgadywana)**
+
+`matchesAvoid`/`AVOID_PRESETS` (poprawione 09-06 o "nutella") były cały czas poprawne w
+IZOLACJI — testy to potwierdzały. Prawdziwy bug: `Counter.keyword` / `Habit.avoidKeyword` to
+JEDNORAZOWA KOPIA stringa presetu, wzięta w momencie kliknięcia chipsa w `counters.tsx`/
+`habits.tsx` i zapisana na stałe do AsyncStorage. Edycja `AVOID_PRESETS` w kodzie (dodanie
+"nutella") NIGDY nie dociera do już istniejącego licznika/nawyku — dopasowanie zawsze czyta
+zamrożoną kopię (`autoDaysWithout`→`autoLastEatDate`/`autoLastDate`, `computeAvoidCounts`,
+`habit-year.tsx`), nie źródłowy `AVOID_PRESETS`. Każdy tracker założony PRZED jakąkolwiek
+zmianą listy słów (09-02 drożdżówka, 09-04 wielki audyt, 09-06 nutella) ma swoją WŁASNĄ, węższą
+kopię zamrożoną na zawsze.
+
+Naprawa (`countersStore.ts`): nowe pole `Counter.presetKey?` / `Habit.avoidPresetKey?` —
+zapisywane przy wyborze presetu w UI (`counters.tsx`, `habits.tsx`), czyszczone gdy user
+ręcznie edytuje keyword (przestaje być "z presetu"). Nowy `resolveAvoidKeyword(keyword,
+presetKey)`: jeśli jest `presetKey`, zwraca ŻYWY string z `AVOID_PRESETS` (nie zamrożoną
+kopię). **Migracja dla już istniejących trackerów bez `presetKey`** (w tym realnego licznika
+usera): jeśli WSZYSTKIE słowa zapisanego keyword są podzbiorem AKTUALNEGO presetu (a lista
+tylko rośnie, nigdy nic nie usunięto), traktuje to jako starą kopię tego presetu i też
+rozwiązuje na żywo — bez wymagania od usera usunięcia/dodania licznika na nowo. Zabezpieczone
+progiem ≥2 słów (pojedyncze słowo nie jest migrowane — mogło być celowo wąskie). Podpięte we
+WSZYSTKICH miejscach czytających keyword: `autoDaysWithout` (counters.tsx, counters/[id].tsx),
+`computeAvoidCounts` (habits.ts), `habit-year.tsx`'s `matchDays`.
+
+Testy: `__tests__/countersStore.test.ts` (+4, w tym end-to-end regresja dokładnie odtwarzająca
+zgłoszenie: stary Counter bez presetKey, dzisiejszy posiłek "Nutella" → `autoDaysWithout`
+zwraca 0), `__tests__/habits.test.ts` (istniejące 12 nadal zielone — custom keyword w tych
+testach też jest podzbiorem presetu, migracja nie psuje ich założeń).
+
+**2. Dashboard "znowu laguje" — 1Hz timer wymuszający rerender całego 5420-liniowego pliku**
+
+Agent-audyt (nie zgadywanie): `src/hooks/useWorkEarnings.ts` miał `setInterval(() =>
+setTick(t=>t+1), 1000)` BEZ ŻADNEGO gate'a na `isWorking` — leciał co sekundę, zawsze, od
+momentu zamontowania hooka, bo `tick` jest zależnością finalnego `useMemo` zwracanego z hooka.
+`index.tsx:743` wywołuje ten hook wewnątrz `DashboardScreen` → `setTick` wymuszał pełny
+rerender CAŁEGO komponentu (5420 linii) RAZ NA SEKUNDĘ, bezwarunkowo — także gdy Dashboard
+siedział zamrożony w tle na innej zakładce (`index.tsx`'s własny komentarz o "stays
+mounted-but-frozen" to potwierdza) i nawet gdy żadna zmiana ("shift") w ogóle nie trwała.
+Osobno: ~1040-liniowy blok budujący `nodes` (rejestr sekcji dashboardu, linie ~2789-3827) nie
+ma ŻADNEJ memoizacji — odtwarzany od zera na każdym renderze, więc ten sam 1Hz tick uderzał w
+cały ten blok co sekundę.
+
+Naprawa zastosowana (bezpieczna, w pełni zweryfikowana): `useWorkEarnings.ts` dostał
+`isWorkingNow` — tani, PODOBNY do już istniejącej logiki `colorMode`/`activeShift`, ale liczony
+bez zależności od `tick` — sprawdzający "czy JAKAŚ zmiana/wydarzenie pokrywa TERAZ". Interval
+skalowany dynamicznie: 1s gdy faktycznie się pracuje (bez zmian — licznik zarobków nadal żywy
+co sekundę, jak było), 60s gdy nie (nadal łapie start zmiany w ciągu maks. minuty, przy ~1.7%
+poprzedniego kosztu renderów). Dodatkowo `index.tsx`: `gotPaidThisMonth` (pełny `.some()` po
+CAŁEJ historii wydatków, liczony inline przy KAŻDYM renderze sekcji payday-prompt) wyniesiony
+do osobnego `useMemo([expenses, workSettings.workPrefix])`.
+
+**Świadomie NIE ruszone w tym przebiegu** (udokumentowane, nie zapomniane — patrz
+NEXT_STEPS.md): memoizacja całego ~1040-liniowego `nodes` IIFE i wydzielenie `renderStatTile`/
+`renderCustomTile` (~520 linii, `index.tsx:1246-1767`) do osobnego zmemoizowanego komponentu.
+Agent-audyt wskazał to jako drugi/trzeci co do wielkości hotspot (custom stat tiles = 8 pełnych
+skanów historii wydatków × N kafelków, na każdym renderze), ale ręczne dopisanie POPRAWNEJ
+tablicy zależności do bloku tej wielkości bez realnego testu na urządzeniu (nie da się
+sensownie zweryfikować w headless CLI) to realne ryzyko cichego "stale closure" — sekcja
+przestaje się aktualizować i nikt tego długo nie zauważy. 1Hz-timer był jednoznacznie
+NAJWIĘKSZYM, najbezpieczniejszym do naprawienia hotspotem (jedna przyczyna, jeden mechanizm,
+łatwa do zweryfikowania `tsc`/`jest`-em) — zrobiony teraz; reszta jako świadomie odłożony
+kolejny krok wymagający testu na urządzeniu.
+
+`tsc`/`jest` zielone (69 suit/891 testów). **Priorytet testu na urządzeniu**: (1) Odliczanie →
+"Bez słodyczy" → zjedz coś z Nutellą dziś → streak powinien spaść do 0 dni od razu (bez
+usuwania/dodawania licznika na nowo); (2) Dashboard → zostaw ekran otwarty na innej zakładce
+przez kilka minut bez aktywnej zmiany w pracy → wróć, sprawdź płynność/brak spadku FPS,
+zwłaszcza jeśli masz skonfigurowane custom stat tiles.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

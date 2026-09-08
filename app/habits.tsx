@@ -370,7 +370,7 @@ const FREQ_OPTIONS: { label: string; value: number }[] = [
 const HABIT_PRESETS: Array<{
   title: string; type: HabitType; icon: string; color: string;
   dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number;
-  kind?: 'water' | 'avoid'; avoidKeyword?: string;
+  kind?: 'water' | 'avoid'; avoidKeyword?: string; avoidPresetKey?: string;
 }> = [
   { title: 'Woda',       type: 'count', icon: 'droplets',  color: '#60A5FA', dailyGoal: 8, unit: 'szkl.', kind: 'water' },
   { title: 'Ruch',       type: 'check', icon: 'dumbbell',  color: '#34D399' },
@@ -383,14 +383,14 @@ const HABIT_PRESETS: Array<{
   // słodycz" dla obu ekranów, żeby się nie rozjechały.
   ...AVOID_PRESETS.map(p => ({
     title: `Bez ${p.label}`, type: 'check' as HabitType, icon: 'cookie', color: '#F87171',
-    kind: 'avoid' as const, avoidKeyword: p.keyword,
+    kind: 'avoid' as const, avoidKeyword: p.keyword, avoidPresetKey: p.key,
   })),
 ];
 
 interface HabitFormData {
   title: string; color: string; icon: string; reminderTime?: string;
   type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number;
-  kind?: 'water' | 'avoid'; avoidKeyword?: string;
+  kind?: 'water' | 'avoid'; avoidKeyword?: string; avoidPresetKey?: string;
 }
 
 function HabitFormModal({ visible, onClose, onSave, editing }: {
@@ -415,6 +415,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [weeklyTarget, setWeeklyTarget] = useState(7);
   const [kind, setKind]               = useState<'water' | 'avoid' | undefined>(undefined);
   const [avoidKeyword, setAvoidKeyword] = useState<string | undefined>(undefined);
+  const [avoidPresetKey, setAvoidPresetKey] = useState<string | undefined>(undefined);
 
   const applyPreset = (p: typeof HABIT_PRESETS[number]) => {
     haptic.tap();
@@ -424,6 +425,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     setSelColor(p.color);
     setKind(p.kind);
     setAvoidKeyword(p.avoidKeyword);
+    setAvoidPresetKey(p.avoidPresetKey);
     if (p.type === 'count') {
       setGoal(String(p.dailyGoal ?? 8));
       setUnit(p.unit ?? 'szkl.');
@@ -454,6 +456,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     setWeeklyTarget(editing?.weeklyTarget ?? 7);
     setKind(editing?.kind);
     setAvoidKeyword(editing?.avoidKeyword);
+    setAvoidPresetKey(editing?.avoidPresetKey);
     const rt = editing?.reminderTime;
     if (rt) {
       const [h, m] = rt.split(':').map(Number);
@@ -473,7 +476,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     const effType = kind === 'avoid' ? 'check' : type;
     const goalN = effType === 'count' ? (parseInt(goal) || 1) : undefined;
     const unitVal = effType === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
-    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type: effType, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined, kind, avoidKeyword });
+    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type: effType, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined, kind, avoidKeyword, avoidPresetKey });
     onClose();
   };
 

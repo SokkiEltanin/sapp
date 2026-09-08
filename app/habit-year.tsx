@@ -9,7 +9,7 @@ import { ChevronLeft, Flame, Snowflake } from 'lucide-react-native';
 import { Habit } from '@/types';
 import { getHabits } from '@/utils/habits';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { useCounters, matchesAvoid, matchedEatDays, type Counter } from '@/store/countersStore';
+import { useCounters, matchesAvoid, matchedEatDays, resolveAvoidKeyword, type Counter } from '@/store/countersStore';
 import { useFoodStore } from '@/store/foodStore';
 import { expensesService } from '@/services/expensesService';
 import { spacing, radius, fonts } from '@/theme';
@@ -93,7 +93,7 @@ export default function HabitYear() {
   // "słodycze" — patrz komentarz przy `matchedEatDays`.
   const matchDays = useMemo(() => {
     if (!isCounter || !counter?.keyword) return new Set<string>();
-    const kw = counter.keyword;
+    const kw = resolveAvoidKeyword(counter.keyword, counter.presetKey)!;
     if ((counter.track ?? 'eat') === 'buy') {
       const set = new Set<string>();
       for (const e of expenses) {
