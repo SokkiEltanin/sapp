@@ -3,35 +3,45 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Rynek: finalne wartości edytora + 4 poprawki wizualne + potki czasowe (HP/ATK/XP) — NIEsprawdzone (2026-09-08)
+## 🆕 Rynek: finalne wartości edytora + potki czasowe + 3 poprawki po teście na urządzeniu — NIEsprawdzone (2026-09-08)
 
-User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz. Pełny opis w ARCHITECTURE.md
-§46-47. W skrócie:
+User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz, potem — po realnym teście na
+telefonie — trzy kolejne poprawki. Pełny opis w ARCHITECTURE.md §46-49. Aktualny stan:
 1. `DEFAULT_ADJUST` w `app/pet-shop.tsx` ustawione na finalne, wyeksportowane przez usera
-   wartości (nie zmienia nic realnie — miał je już zapisane, koduje jako nowy stan zerowy).
-2. Pigułka "Nowy zestaw za..." przeniesiona POD ladę (zwykły element, nie nakładka na
-   obrazek) + restylowana jako drewniana tabliczka szyldu.
-3. Sklepikarz dostał `RadialGlow`+`GroundShadow` (ten sam duet co sprite'y w boss-fight.tsx)
-   — nie wygląda już płasko wklejony.
-4. Tło slotu — **poprawione DWA RAZY** (pierwsza próba źle zrozumiana, user: "nie tak
-   chciałem... miałeś zrobić jeden większy prostokąt pod tym co mamy, nie kwadraciki").
-   Finalnie: JEDNO duże tło (`s.boardBg`) za CAŁĄ grafiką tablicy/lady (pierwsze dziecko
-   `s.artPiece`, ~cały kontener), żadnych osobnych kwadracików pod pojedynczymi slotami
-   (`artSlotBg` całkiem usunięty z pliku).
+   wartości.
+2. Pigułka "Nowy zestaw za..." POD ladą, restylowana jako drewniana tabliczka szyldu.
+3. Sklepikarz: **poprawione DWA RAZY**. `RadialGlow`+`GroundShadow` (kopia z boss-fight.tsx)
+   wyglądało jak "jakiś prostokąt" — `GroundShadow` (cień POD łapkami) nie ma sensu dla
+   sklepikarza wystającego W POŁOWIE zza lady (brak widocznych łap/podłogi). Finalnie:
+   `GroundShadow` CAŁKOWICIE USUNIĘTY, zostaje tylko `RadialGlow` (poświata, podbita
+   opacity/size).
+4. Tło slotów — **poprawione DWA RAZY**. Finalnie: JEDNO duże, PRAWIE NIEPRZEZROCZYSTE
+   brązowe tło (`s.boardBg`, `#2A1B0EF0`) za CAŁĄ grafiką tablicy/lady (pierwsze dziecko
+   `s.artPiece`) — pierwsza próba (`rgba(0,0,0,0.4)`) czytała się jako przezroczysta, nie
+   jako "stałe brązowe". Dodatkowo każda ikona/emoji dostała miękki cień ZA SOBĄ
+   (`<RadialGlow color="#000".../>`, nie natywny `elevation` — dałby brzydki kwadratowy
+   cień na przezroczystym SVG).
 5. **Potki czasowe** — nowy system: górne 4 sloty tablicy = Zamrożenie serii + 3 potki
    (HP +20 flat/24h, ATK +15%/24h, XP +25%/24h — świadomie umiarkowany balans, DO
-   SKORYGOWANIA po realnym teście). Dolne sloty lady rozszerzone z 4 na 8 (górny rząd =
-   Sklep dnia bez zmian, dolny rząd = skrzynka dnia + 3 LOOT_BOXES przeniesione z tablicy).
-   Badge aktywnej potki na `/pet` (obok imienia, kolorowany per typ). Nowy `src/utils/
-   potions.ts` + `activePotion` w petStore + `effectiveCatMaxHp()` (skonsolidowana formuła
-   max HP, była zduplikowana w 4 miejscach) + `xpWithPotion()` (wpięty we WSZYSTKIE 14 miejsc
-   przyznających XP w petStore, nie tylko `addXp`).
+   SKORYGOWANIA po realnym teście). Badge aktywnej potki na `/pet`. Nowy `src/utils/
+   potions.ts` + `activePotion` w petStore + `effectiveCatMaxHp()` + `xpWithPotion()`
+   (wpięty we WSZYSTKIE 14 miejsc przyznających XP w petStore).
+6. **Dolny rząd lady — poprawiony**: miały być DOKŁADNIE 4 PŁATNE skrzynie (user: "miała być
+   ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"), nie darmowa skrzynka dnia + 3 LOOT_BOXES.
+   `petBoxes.ts`: dawna "silver" przemianowana na "iron"/Żelazna (te same liczby), dodany
+   nowy 4. tier "divine"/Boska (koszt 450, najlepsze szanse — `gearChance` świadomie NIEjest
+   najwyższa z czterech, patrz komentarz w kodzie o kaskadzie progów `rollBox()`). Nowy
+   `BOX_RANK` zastąpił twarde `box.id === 'gold'`. Darmowa skrzynka dnia USUNIĘTA z Rynku
+   (mechanika żyje dalej — `/pet` + wskaźnik na dashboardzie, to był zduplikowany trigger).
 
-**Do zweryfikowania na urządzeniu, priorytetowo**: dolny rząd lady (`RYNEK_BOTTOM_SLOTS[4..7]`
+**Do zweryfikowania na urządzeniu, priorytetowo**: (a) dolny rząd lady (`RYNEK_BOTTOM_SLOTS[4..7]`
 w `rynekArt.ts`) ma EKSTRAPOLOWANE, nie zmierzone współrzędne — LADADOL.png fizycznie ma 8 okien
 (2×4), ale tylko górny rząd był kiedykolwiek zmierzony realnym skryptem. Jeśli skrzynki nie
 trafiają w narysowane okna, trzeba będzie ręcznie poprawić `top` w `RYNEK_BOTTOM_SLOTS[4..7]`
-(edytor sceny nie potrafi poprawić TYLKO dolnego rzędu, skaluje/przesuwa całą warstwę naraz).
+(edytor sceny nie potrafi poprawić TYLKO dolnego rzędu, skaluje/przesuwa całą warstwę naraz);
+(b) tło tablicy/lady faktycznie wygląda brązowo/nieprzezroczyście, nie kwadraciki; (c) cień
+sklepikarza to teraz poświata, nie prostokąt; (d) dolny rząd lady pokazuje 4 skrzynie
+(🪵⚙️🥇👑) w cenach 35/90/200/450.
 
 `tsc`/`jest` zielone (69 suit/873 testy, +17 nowych w `potions.test.ts`).
 

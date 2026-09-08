@@ -7,7 +7,13 @@ import { STARTUPS } from '@/utils/petStartups';
 import { GearRarity, unlockedGearFor, GEAR_SLOTS, rollGearValue } from '@/utils/gear';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 
-export type BoxId = 'sardine' | 'silver' | 'gold';
+export type BoxId = 'sardine' | 'iron' | 'gold' | 'divine';
+
+// Ranga skrzynki (0 = najtańsza, rośnie w górę) — zastępuje twarde porównania `box.id ===
+// 'gold'` rozsiane po `rollBox()` (2026-09-08, dodanie 4. tieru "Boska" — user: "miała być
+// ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"). Gdyby kiedyś doszedł 5. tier, wystarczy dopisać
+// go tutaj — logika niżej porównuje RANGI, nie konkretne id.
+export const BOX_RANK: Record<BoxId, number> = { sardine: 0, iron: 1, gold: 2, divine: 3 };
 
 export interface LootBox {
   id: BoxId;
@@ -59,7 +65,9 @@ export const LOOT_BOXES: LootBox[] = [
     coins: { min: 18, max: 105, jackpot: 40, jackpotChance: 0.03 },
   },
   {
-    id: 'silver', name: 'Srebrna skrzynka', cost: 90, color: '#4DA8FF', emoji: '🥈',
+    // Dawniej "silver"/"Srebrna skrzynka" — PRZEMIANOWANA (2026-09-08, user: "miała być ta
+    // nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"), liczby BEZ ZMIAN, tylko nazwa/emoji/kolor.
+    id: 'iron', name: 'Żelazna skrzynka', cost: 90, color: '#8A93A8', emoji: '⚙️',
     blurb: 'Lepsze szanse na rzadki kolor, item ekwipunku, startup + zamrożenie',
     colorChance: 0.28, startupChance: 0.10, freezeChance: 0.10, gearChance: 0.28, combatItemChance: 0.05,
     tierWeight: { basic: 4, rare: 4, epic: 1.5 },
@@ -68,11 +76,31 @@ export const LOOT_BOXES: LootBox[] = [
   },
   {
     id: 'gold', name: 'Złota skrzynka', cost: 200, color: '#FBBF24', emoji: '🥇',
-    blurb: 'Najlepsze szanse — epicki kolor, wysokiej rzadkości ekwipunek lub startup',
+    blurb: 'Bardzo dobre szanse — epicki kolor, wysokiej rzadkości ekwipunek lub startup',
     colorChance: 0.32, startupChance: 0.16, freezeChance: 0.10, gearChance: 0.38, combatItemChance: 0.08,
     tierWeight: { basic: 2, rare: 4, epic: 4.5 },
     gearRarityWeight: { common: 15, rare: 30, epic: 30, legendary: 18, mythic: 7 },
     coins: { min: 100, max: 600, jackpot: 200, jackpotChance: 0.05 },
+  },
+  {
+    // NOWY 4. tier (2026-09-08, user: "miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA")
+    // — najdroższa, najlepsze szanse ze wszystkich. Koszt/monety wg tej samej skali co reszta
+    // (50%-300% WŁASNEGO kosztu). `gearChance` celowo NIE jest najwyższa z czterech (niżej
+    // niż gold) — `rollBox()` sprawdza kategorie po kolei (kolor→startup→zamrożenie→
+    // EKWIPUNEK→PERKI BOSSÓW→monety) i zwraca przy PIERWSZYM trafionym progu, więc zbyt
+    // wysoki skumulowany próg PRZED perkami bossów zjadłby całą przestrzeń [0,1) i uczyniłby
+    // `combatItemChance` praktycznie nieosiągalną (dokładnie to już się dzieje dla monet przy
+    // gold, którego suma progów to 1.04 — świadomie zaakceptowane tam, ale przy boskiej
+    // chcemy USZANOWAĆ realną, szerszą szansę na perk, nie tylko wyższe liczby na papierze).
+    // Ogólna jakość i tak jest wyraźnie lepsza niż gold: wyższe `colorChance`/`startupChance`,
+    // PRAWIE DWA RAZY wyższe `combatItemChance`, i `gearRarityWeight` mocno przechylone w
+    // legendary/mythic. Do skorygowania po realnym teście balansu.
+    id: 'divine', name: 'Boska skrzynka', cost: 450, color: '#C4B5FD', emoji: '👑',
+    blurb: 'Absolutny szczyt — najlepsze szanse na rzadki kolor, mitycznej jakości ekwipunek i perki bossów',
+    colorChance: 0.34, startupChance: 0.18, freezeChance: 0.10, gearChance: 0.30, combatItemChance: 0.16,
+    tierWeight: { basic: 1, rare: 3, epic: 6 },
+    gearRarityWeight: { common: 5, rare: 20, epic: 30, legendary: 30, mythic: 15 },
+    coins: { min: 225, max: 1350, jackpot: 900, jackpotChance: 0.07 },
   },
 ];
 
@@ -142,7 +170,7 @@ export function rollBox(
   }
   // 3) ZAMROŻENIE
   if (r < freezeCut) {
-    return { type: 'freeze', count: 1, rarity: box.id === 'gold' ? 'epic' : 'rare' };
+    return { type: 'freeze', count: 1, rarity: BOX_RANK[box.id] >= BOX_RANK.gold ? 'epic' : 'rare' };
   }
   // 4) EKWIPUNEK (dowolny slot, tylko odblokowane wg poziomu; rzadkość ważona wg skrzynki)
   if (r < gearCut) {
@@ -165,10 +193,10 @@ export function rollBox(
   // Gdy nic nie da się przyznać (np. wszystko już posiadane i na maksie) — brak `return`,
   // spada do monet niżej, tak jak gałąź ekwipunku wyżej w tej samej sytuacji.
   if (r < combatItemCut) {
-    const preferUpgrade = box.id === 'gold';
+    const preferUpgrade = BOX_RANK[box.id] >= BOX_RANK.gold;
     const upgradeable = (Object.keys(ownedCombatItems) as CombatItemId[])
       .filter(id => (ownedCombatItems[id] ?? 0) < COMBAT_ITEMS[id].maxLevel);
-    const perkRarity: CrateTier = box.id === 'gold' ? 'legendary' : box.id === 'silver' ? 'epic' : 'rare';
+    const perkRarity: CrateTier = BOX_RANK[box.id] >= BOX_RANK.gold ? 'legendary' : BOX_RANK[box.id] >= BOX_RANK.iron ? 'epic' : 'rare';
     if (preferUpgrade && upgradeable.length > 0) {
       const id = upgradeable[Math.floor(Math.random() * upgradeable.length)];
       const nextLevel = (ownedCombatItems[id] ?? 0) + 1;
