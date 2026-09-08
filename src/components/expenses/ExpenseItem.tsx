@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp, Wallet } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Wallet } from 'lucide-react-native';
+import * as LucideIcons from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
+import { billTagFor } from '@/utils/recurringBills';
 import { estimateItemKcal } from '@/utils/calories';
 import { isMine } from '@/store/statsScope';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -34,7 +36,18 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const isIncome  = expense.type === 'income';
   const isReceipt = !isIncome && (expense.receiptItems?.length ?? 0) > 0;
   const meta      = getCategoryMeta(expense.category);
-  const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : colors.border.default;
+  // Rozpoznany rachunek cykliczny (prąd/internet/czynsz…) dostaje WŁASNĄ ikonę zamiast
+  // ikony swojej kategorii (prawie zawsze 'housing' → dom dla wszystkich) — 2026-09-08,
+  // user: "czytelniejsze ikony ze to jest za internet ze tamto jest wyplata". Kolor całego
+  // wiersza (pasek/tło ikony/glif/kwota) to teraz PROSTA reguła wydatek=czerwony,
+  // przychód=zielony (`colors.accent.red/green`, ten sam konwencja co karta "TEN MIESIĄC"
+  // wyżej w Finansach i dashboard) — wcześniej wydatek nie miał ŻADNEGO koloru (neutralny
+  // szary/biały), tylko przychód był zielony, więc para nie czytała się symetrycznie.
+  const bill = !isIncome ? billTagFor(expense) : null;
+  const iconName = bill?.icon ?? meta.icon;
+  const IconComp: any = (LucideIcons as any)[iconName];
+  const rowColor = isIncome ? colors.accent.green : colors.accent.red;
+  const accentColor = rowColor;
   // Paid by someone else (partner) → excluded from YOUR totals. Flag it visually.
   const mine = isMine(expense);
 
@@ -66,13 +79,8 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
       >
         <View style={[styles.bar, { backgroundColor: accentColor }]} />
 
-        <View style={[styles.iconWrap, isReceipt && { backgroundColor: colors.accent.blue + '15' }]}>
-          {isIncome
-            ? <TrendingUp size={16} color={colors.accent.green} />
-            : isReceipt
-              ? <ShoppingCart size={16} color={colors.accent.blue} />
-              : <TrendingDown size={16} color={colors.text.muted} />
-          }
+        <View style={[styles.iconWrap, { backgroundColor: isIncome ? colors.tint.green : colors.tint.red }]}>
+          {IconComp && <IconComp size={16} color={rowColor} />}
         </View>
 
         <View style={styles.info}>
@@ -89,7 +97,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
         <View style={styles.amountCol}>
           <Text style={[
             styles.amount,
-            { color: isIncome ? colors.accent.green : colors.text.primary },
+            { color: rowColor },
             !mine && styles.amountNotMine,
           ]}>
             {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł

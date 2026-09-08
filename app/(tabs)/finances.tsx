@@ -13,6 +13,7 @@ import { foodAmountOf } from '@/utils/food';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Wallet } from 'lucide-react-native';
+import * as LucideIcons from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -27,7 +28,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
 import { getCategoryMeta } from '@/utils/categories';
-import { billTagFor } from '@/utils/recurringBills';
+import { billTagFor, BILL_TYPES } from '@/utils/recurringBills';
 import { Expense } from '@/types';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -140,12 +141,16 @@ export default function FinancesScreen() {
     return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
   }, [expenses]);
 
-  // Bill types that actually occur in the data (dedup, first-seen order — priority
-  // enough for a short chip row; BILL_TYPES itself is already ordered by relevance).
+  // Bill types that actually occur in the data — filtruje `BILL_TYPES` (już w kolejności
+  // priorytetu) do tagów faktycznie obecnych w danych, więc chipy niosą też `icon`
+  // (2026-09-08, user: "czytelniejsze ikony... ze tamto w finansach... kafelkach jak sa
+  // ikonki przy nich") — wcześniej ta lista budowała się osobno z Map (tag→name) w
+  // kolejności "pierwszy napotkany", nie w kolejności `BILL_TYPES`, mimo komentarza
+  // twierdzącego inaczej.
   const billsInData = useMemo(() => {
-    const seen = new Map<string, string>();   // tag → name
-    for (const e of expenses) { const b = billTagFor(e); if (b && !seen.has(b.tag)) seen.set(b.tag, b.name); }
-    return Array.from(seen, ([tag, name]) => ({ tag, name }));
+    const seen = new Set<string>();
+    for (const e of expenses) { const b = billTagFor(e); if (b) seen.add(b.tag); }
+    return BILL_TYPES.filter(bt => seen.has(bt.tag));
   }, [expenses]);
 
   // Explicit, auditable current-month totals (string-based date match — no
@@ -660,12 +665,17 @@ export default function FinancesScreen() {
                       style={[st.tagChip, !activeBillFilter && st.tagChipOn]} activeOpacity={0.8}>
                       <Text style={[st.tagText, !activeBillFilter && st.tagTextOn]}>Wszystkie</Text>
                     </TouchableOpacity>
-                    {billsInData.map(b => (
-                      <TouchableOpacity key={b.tag} onPress={() => { haptic.tap(); setActiveBillFilter(activeBillFilter === b.tag ? null : b.tag); }}
-                        style={[st.tagChip, activeBillFilter === b.tag && st.tagChipOn]} activeOpacity={0.8}>
-                        <Text style={[st.tagText, activeBillFilter === b.tag && st.tagTextOn]}>{b.name}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {billsInData.map(b => {
+                      const BillIcon = (LucideIcons as any)[b.icon];
+                      const on = activeBillFilter === b.tag;
+                      return (
+                        <TouchableOpacity key={b.tag} onPress={() => { haptic.tap(); setActiveBillFilter(on ? null : b.tag); }}
+                          style={[st.tagChip, on && st.tagChipOn]} activeOpacity={0.8}>
+                          {BillIcon && <BillIcon size={12} color={on ? F.accent : colors.text.muted} />}
+                          <Text style={[st.tagText, on && st.tagTextOn]}>{b.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </>
               )}

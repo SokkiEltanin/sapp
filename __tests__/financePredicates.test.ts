@@ -36,13 +36,25 @@ describe('recurringBills — looksLikeBill', () => {
 // mają "PGE"/"Tauron" jako storeName, nie w note.
 describe('recurringBills — billTagFor', () => {
   test('rozpoznaje po storeName (np. paragon/ręczny wpis bez note)', () => {
-    expect(billTagFor(e({ storeName: 'PGE Obrót' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
-    expect(billTagFor(e({ storeName: 'Tauron' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
+    expect(billTagFor(e({ storeName: 'PGE Obrót' }))).toEqual({ tag: 'prąd', name: 'Prąd', icon: 'Zap' });
+    expect(billTagFor(e({ storeName: 'Tauron' }))).toEqual({ tag: 'prąd', name: 'Prąd', icon: 'Zap' });
   });
   test('rozpoznaje po note, jak dawniej', () => {
-    expect(billTagFor(e({ note: 'Rachunek za prąd sierpień' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
+    expect(billTagFor(e({ note: 'Rachunek za prąd sierpień' }))).toEqual({ tag: 'prąd', name: 'Prąd', icon: 'Zap' });
   });
   test('zwykły zakup → null', () => {
     expect(billTagFor(e({ storeName: 'Biedronka', note: 'zakupy' }))).toBeNull();
+  });
+  // 2026-09-08, user: "czytelniejsze ikony ze to jest za internet" — każdy typ rachunku
+  // ma teraz WŁASNĄ ikonę (lucide-react-native, resolvowana dynamicznie jak CATEGORY_META),
+  // nie tylko wspólną ikonę kategorii ('housing' → dom dla wszystkich).
+  test('każdy typ rachunku ma własną, różną ikonę', () => {
+    expect(billTagFor(e({ note: 'Internet Orange' }))?.icon).toBe('Wifi');
+    expect(billTagFor(e({ note: 'Czynsz wrzesień' }))?.icon).toBe('Home');
+    expect(billTagFor(e({ note: 'Gaz ' }))?.icon).toBe('Flame');
+    expect(billTagFor(e({ note: 'Woda i ścieki' }))?.icon).toBe('Droplet');
+    expect(billTagFor(e({ note: 'Ogrzewanie miejskie' }))?.icon).toBe('Thermometer');
+    expect(billTagFor(e({ note: 'Ubezpieczenie mieszkania' }))?.icon).toBe('Shield');
+    expect(billTagFor(e({ note: 'Abonament telefon' }))?.icon).toBe('Phone');
   });
 });
