@@ -14,20 +14,52 @@ import { ExpenseCategory } from '@/types';
 // zadeklarować kategorię/nazwę/tagi — patrz `matchBankRule`, wpięte w `bankIngest.ts`
 // PRZED sztywnym `guessCategory()` (ale PO już nauczonym `merchantMemory`, które zostaje
 // najbardziej wiarygodne, bo pochodzi z realnie zaakceptowanej płatności).
+//
+// ROZSZERZONE (2026-09-08, user: "chce miec opcje do słownego polaczenia tego że
+// subskrypcja oraz np że to jest wyplata i zeby targował automatycznie lub że za prąd bo
+// tam nie mam takich tagow wgle. I zeby mogc edytowac te szablony") — trzy braki z
+// pierwszej wersji: (1) szablon mógł oznaczyć TYLKO wydatek (kategoria), nie przychód —
+// `kind` rozróżnia teraz `'expense'` (jak dotąd) od `'income'` (nadawca = wypłata/pensja,
+// dopasowywane w gałęzi PRZYCHODZĄCEJ w bankIngest.ts, nie wydatkowej); (2) formularz w
+// Ustawieniach nigdy nie pytał o `tags` mimo że store je od początku wspierał — teraz jest
+// pole tekstowe; (3) `updateRule` — edycja istniejącego szablonu w miejscu, nie tylko
+// dodaj/usuń. `kind` może brakować na już zapisanych (starszych) szablonach — traktowany
+// wtedy jak `'expense'` (jedyny rodzaj jaki wcześniej istniał), patrz `ruleKind()` niżej.
+export type BankRuleKind = 'expense' | 'income';
+
 export interface BankRule {
   id: string;
   pattern: string;        // lowercased substring — dopasowywane do nazwy sklepu + surowego tekstu powiadomienia
   name: string;           // nazwa do pokazania zamiast surowego tekstu z banku (np. "Subskrypcja Claude")
-  category: ExpenseCategory;
+  kind: BankRuleKind;
+  category?: ExpenseCategory; // tylko dla kind='expense'
   tags?: string[];
   createdAt: string;
 }
 
+// Starsze zapisane szablony (sprzed `kind`) nie mają tego pola — jedyny rodzaj jaki wtedy
+// istniał to dzisiejsze 'expense'.
+export function ruleKind(r: BankRule): BankRuleKind { return r.kind ?? 'expense'; }
+
+interface BankRuleInput {
+  pattern: string;
+  name: string;
+  kind: BankRuleKind;
+  category?: ExpenseCategory;
+  tags?: string[];
+}
+
 interface BankRulesState {
   rules: BankRule[];
-  addRule: (r: { pattern: string; name: string; category: ExpenseCategory; tags?: string[] }) => void;
+  addRule: (r: BankRuleInput) => void;
+  updateRule: (id: string, patch: Partial<BankRuleInput>) => void;
   removeRule: (id: string) => void;
 }
+
+const cleanTags = (tags?: string[]) => {
+  const t = (tags ?? []).map(x => x.trim().toLowerCase()).filter(Boolean);
+  return t.length ? Array.from(new Set(t)) : undefined;
+};
 
 export const useBankRules = create<BankRulesState>()(
   persist(
@@ -40,12 +72,27 @@ export const useBankRules = create<BankRulesState>()(
           id: `rule_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           pattern,
           name: r.name.trim() || pattern,
-          category: r.category,
-          ...(r.tags?.length ? { tags: r.tags } : {}),
+          kind: r.kind,
+          ...(r.kind === 'expense' ? { category: r.category ?? 'other' } : {}),
+          ...(cleanTags(r.tags) ? { tags: cleanTags(r.tags) } : {}),
           createdAt: new Date().toISOString(),
         };
         set({ rules: [rule, ...get().rules] });
       },
+      updateRule: (id, patch) => set((s) => ({
+        rules: s.rules.map(r => {
+          if (r.id !== id) return r;
+          const kind = patch.kind ?? ruleKind(r);
+          return {
+            ...r,
+            ...(patch.pattern !== undefined ? { pattern: patch.pattern.trim().toLowerCase() || r.pattern } : {}),
+            ...(patch.name !== undefined ? { name: patch.name.trim() || r.name } : {}),
+            kind,
+            category: kind === 'expense' ? (patch.category ?? r.category ?? 'other') : undefined,
+            tags: patch.tags !== undefined ? cleanTags(patch.tags) : r.tags,
+          };
+        }),
+      })),
       removeRule: (id) => set((s) => ({ rules: s.rules.filter(r => r.id !== id) })),
     }),
     { name: 'bank-rules-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },

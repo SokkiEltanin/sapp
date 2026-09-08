@@ -16,18 +16,28 @@ export type CrateTier = 'basic' | 'rare' | 'epic' | 'legendary';
 // poziomy czyli ulepszanie itemów na trudniejszych") — dotąd FLAT 1% niezależnie od tieru
 // skrzynki, zawsze nowy nieposiadany item na poziomie 1 (nigdy level-up). Teraz TIEROWANE:
 // niższe/gorsze skrzynki (`basic`/`rare`) dalej dają TYLKO pierwsze zdobycie (nowy item,
-// poziom 1, "najsłabszy poziom") — `basic` bez zmian nie daje nic (zbyt częsta, zabiłoby
-// rzadkość), `rare` dostaje niewielką, ale WYRAŹNIE wyższą niż stare 1% szansę. Wyższe/
-// trudniejsze skrzynki (`epic`/`legendary`, same z definicji rzadsze — `rollCrate()` daje
-// je w 10%/2% przypadków) dostają WYŻSZĄ szansę I mogą zamiast nowego itemu ULEPSZYĆ już
-// posiadany (patrz gałąź w `openCrate()` w petStore.ts — `legendary` PREFERUJE level-up
-// nad nowym itemem, gdy masz cokolwiek jeszcze nie na max poziomie). Osiągalne przez zwykłe
-// codzienne skrzynki (głaskanie do pełnego paska afekcji) — bez potrzeby realnego grindu.
+// poziom 1, "najsłabszy poziom"). Wyższe/trudniejsze skrzynki (`epic`/`legendary`, same z
+// definicji rzadsze — `rollCrate()` daje je w 10%/2% przypadków) dostają WYŻSZĄ szansę I mogą
+// zamiast nowego itemu ULEPSZYĆ już posiadany (patrz gałąź w `openCrate()` w petStore.ts —
+// `legendary` PREFERUJE level-up nad nowym itemem, gdy masz cokolwiek jeszcze nie na maksie).
+// Osiągalne przez zwykłe codzienne skrzynki (głaskanie do pełnego paska afekcji) — bez
+// potrzeby realnego grindu.
+//
+// PODBITE (2026-09-08, user: "te umiejętności nie mogę dropnąć nie wiem czemu") — zbadane:
+// to NIE był bug, tylko `basic` (60% wszystkich otwarć wg `rollCrate()` niżej) miał TWARDE
+// 0% — więc licząc łączną szansę na CAŁYM rozkładzie tierów: 0.60×0 + 0.28×0.03 + 0.10×0.08 +
+// 0.02×0.18 = tylko ~2.0% na jedno otwarcie skrzynki. Przy takiej rzadkości ponad 50% szans
+// jest na ZERO dropów nawet po 30 otwarciach — statystycznie zgodne z frustracją usera, nie
+// błąd w kodzie. Skoro `basic` to WIĘKSZOŚĆ otwarć, zerowa szansa akurat tam dominowała cały
+// łączny wynik. Naprawa (balans, nie bugfix): `basic` dostaje małą, ale NIEZEROWĄ szansę,
+// reszta tierów podbita proporcjonalnie — nowa łączna szansa ≈3.7% na otwarcie (prawie 2×
+// więcej), `legendary` dalej wyraźnie najlepsza. Do dalszej korekty, jeśli user uzna że
+// nadal za rzadko.
 export const COMBAT_ITEM_DROP_CHANCE_BY_TIER: Record<CrateTier, number> = {
-  basic: 0,
-  rare: 0.03,
-  epic: 0.08,
-  legendary: 0.18,
+  basic: 0.01,
+  rare: 0.05,
+  epic: 0.12,
+  legendary: 0.25,
 };
 
 export const CRATE_META: Record<CrateTier, { label: string; color: string }> = {

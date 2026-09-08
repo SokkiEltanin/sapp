@@ -3,6 +3,35 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Trudność bossów #11+ ×2, droprate perków podbity, szablony banku rozszerzone — NIEsprawdzone (2026-09-08)
+
+Trzy niezależne prośby w jednej wiadomości. Pełny opis w ARCHITECTURE.md §50.
+1. **Bossy od Hydry Odwodnienia (order 11) do finału (order 22, Iluzja Kontroli) — `hp`
+   PODWOJONE**, dosłownie ×2 (nie skalibrowane hp×√2 jak przy poprzedniej korekcie trudności)
+   — user wyraźnie chciał surowe 2x tym razem. Ponieważ obrażenia kontrataku liczą się jako
+   `boss.hp × COUNTER_PCT`, podwojenie hp automatycznie podwaja też dmg — jedna zmiana
+   realizuje oba żądania. Realny efekt łącznego ryzyka będzie bliżej ~4x (ten sam mechanizm co
+   przy poprzedniej korekcie), ale user powiedział "minimum 2x", więc to mieści się w
+   żądaniu — **warto obserwować na urządzeniu, czy nie za dużo, łatwo cofnąć**.
+2. **"Nie mogę dropnąć umiejętności" — zbadane, nie był to bug.** `basic` (60% wszystkich
+   otwarć skrzynek) miało twarde 0% szansy na perk — łączna szansa na otwarcie wynosiła tylko
+   ~2%. Podbite: `basic` 0→0.01, `rare` 0.03→0.05, `epic` 0.08→0.12, `legendary` 0.18→0.25 —
+   nowa łączna szansa ≈3.7%.
+3. **Szablony powiadomień banku rozszerzone** — nowy rodzaj `kind: 'income'` ("Wypłata") obok
+   dotychczasowego `'expense'` (kategoria) — dopasowanie w gałęzi przychodzącej `bankIngest.ts`
+   ustawia `jd`+auto-księgowanie bezwarunkowo. Dodane brakujące pole "Tagi" w formularzu (store
+   je miał od początku, formularz nigdy nie pytał). Dodana edycja istniejących szablonów (tap
+   na wiersz → wypełnia formularz, "Zapisz zmiany").
+
+`tsc`/`jest` zielone (69 suit/884 testy, +6 w `bankRules.test.ts`, `crates.test.ts`
+zaktualizowany).
+
+**Priorytet testu na urządzeniu**: (a) walka z bossem #11+ wyraźnie trudniejsza — jeśli ZA
+trudna, można zejść z ×2 na coś łagodniejszego; (b) kilkanaście otwarć skrzynek → perk bojowy
+powinien wypaść zauważalnie częściej; (c) dodaj szablon "Wypłata" dla realnego nadawcy pensji
+→ kolejny przelew powinien wpaść jako [JD] bez zatwierdzania; (d) dodaj tag "prąd" do szablonu
+PGE, sprawdź w Finansach; (e) edytuj istniejący szablon, sprawdź że zmiany się zapisały.
+
 ## 🆕 Rynek: finalne wartości edytora + potki czasowe + 3 poprawki po teście na urządzeniu — NIEsprawdzone (2026-09-08)
 
 User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz, potem — po realnym teście na

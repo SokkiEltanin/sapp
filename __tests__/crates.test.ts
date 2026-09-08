@@ -54,12 +54,23 @@ describe('crates — stałe', () => {
   });
   // 2026-08-18 — user: "itemy z bossów [mają] większy droprate... najsłabsze [zdobycie] na
   // niższych gorszych boksach, lepsze poziomy [ulepszenia] na trudniejszych" — tierowane,
-  // rosnące z tierem skrzynki, `basic` celowo 0 (zbyt częsta, zabiłaby rzadkość itemów).
-  test('szansa dropu itemu bojowego rośnie z tierem skrzynki (basic=0, rosnąco do legendary)', () => {
-    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic).toBe(0);
+  // rosnące z tierem skrzynki. `basic` PODBITE z 0 na małą, ale niezerową szansę (2026-09-08,
+  // patrz komentarz przy stałej — user: "nie mogę dropnąć", zbadane: `basic`=0% dominowało
+  // całą łączną szansę, bo to 60% wszystkich otwarć).
+  test('szansa dropu itemu bojowego rośnie z tierem skrzynki, basic niezerowa ale najniższa', () => {
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic).toBeGreaterThan(0);
     expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.rare).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic);
     expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.epic).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.rare);
     expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.legendary).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.epic);
     expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.legendary).toBeLessThan(0.5); // wciąż rzadkie, nie gwarantowane
+  });
+  test('łączna szansa na dowolne otwarcie (ważona rozkładem tierów z rollCrate) jest wyraźnie odczuwalna', () => {
+    // Wagi z rollCrate(): legendary 2%, epic 10%, rare 28%, basic 60%.
+    const combined =
+      0.60 * COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic +
+      0.28 * COMBAT_ITEM_DROP_CHANCE_BY_TIER.rare +
+      0.10 * COMBAT_ITEM_DROP_CHANCE_BY_TIER.epic +
+      0.02 * COMBAT_ITEM_DROP_CHANCE_BY_TIER.legendary;
+    expect(combined).toBeGreaterThan(0.03); // > co 33. otwarcie średnio, nie co 50.
   });
 });
