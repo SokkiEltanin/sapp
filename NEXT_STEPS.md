@@ -3,6 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Szablony powiadomień banku — ucz kategorię PRZED pierwszą płatnością — NIEsprawdzone (2026-09-08)
+
+User przesłał realną obcowalutową płatność subskrypcji ("Zapłacono kwotę 22,14 EUR ... w
+ANTHROPIC* CLAUDE SUB ... Bank Pekao S.A.") i poprosił o możliwość z góry zadeklarowania w
+Ustawieniach, co dana płatność oznacza (subskrypcja/kategoria/nazwa) — tak samo dla PGE,
+przejazdów itp. — zamiast czekać, aż pierwsza realna płatność wyląduje ze zgadniętą (często
+złą) kategorią. Pełny opis w ARCHITECTURE.md §7/§45.
+
+Nowy `src/store/bankRulesStore.ts` (lista `BankRule{pattern,name,category,tags?}`) wpięty w
+`bankIngest.ts` — nieznany nadawca sprawdzany najpierw przeciw user'a szablonom, dopiero
+potem przeciw sztywnemu `guessCategory()`. Ustawienia → "Auto-wydatki z banku" → nowa sekcja
+"Szablony powiadomień": wklej przykład powiadomienia → live-preview (ten sam parser co "Test
+odczytu") → prefill fragmentu-do-rozpoznania i nazwy → wybór kategorii → zapis, z listą i
+usuwaniem zapisanych szablonów.
+
+Obca waluta dalej wymusza ręczne wpisanie kwoty w PLN (bezpiecznik nietknięty) — szablon
+zmienia TYLKO kategorię/nazwę/tagi. `tsc`/`jest` zielone (68 suit/856 testów, +7 nowych w
+`bankRules.test.ts`).
+
+**Priorytet testu na urządzeniu**: Ustawienia → Auto-wydatki z banku → Szablony powiadomień →
+wklej dokładnie tę płatność Claude z EUR → kategoria Subskrypcje, nazwa "Subskrypcja Claude" →
+Zapisz → wklej tę samą treść jeszcze raz w "Test odczytu powiadomień" → powinna wpaść do
+kolejki z kategorią Subskrypcje bez ręcznej korekty (kwota PLN i tak trzeba wpisać ręcznie —
+to osobny, celowy bezpiecznik dla kursu karty). Warto też przetestować PGE i bilet
+komunikacji (transport) tym samym mechanizmem.
+
 ## 🆕 Audyt specjalistyczny: parser paragonów / kategoryzacja wydatków — NIEsprawdzone (2026-09-07)
 
 User: "okiem specjalisty posprawdzaj po kolei rzeczy typu parser paragonów itp i powiedz czy

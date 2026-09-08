@@ -57,6 +57,8 @@ import { useUiPrefs } from '@/store/uiPrefs';
 import { runSamsungBackfill, backfillRange, isBackfillDone } from '@/utils/samsungBackfill';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { ingestBankNotification } from '@/services/bankIngest';
+import { useBankRules } from '@/store/bankRulesStore';
+import { parseBankNotification } from '@/utils/bankNotification';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef } from '@/types/settings';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
@@ -151,6 +153,25 @@ export default function SettingsScreen() {
   const setBankAutoAll = useBankQueue(s => s.setAutoAll);
   const bankPending = useBankQueue(s => s.pending.length);
   const [bankTest, setBankTest] = useState('');
+  const bankRules = useBankRules(s => s.rules);
+  const addBankRule = useBankRules(s => s.addRule);
+  const removeBankRule = useBankRules(s => s.removeRule);
+  const [ruleText, setRuleText] = useState('');
+  const [rulePattern, setRulePattern] = useState('');
+  const [ruleName, setRuleName] = useState('');
+  const [ruleCat, setRuleCat] = useState<ExpenseCategory>('subscriptions');
+  const rulePreview = useMemo(() => {
+    const t = ruleText.trim();
+    if (!t) return null;
+    return parseBankNotification('', t);
+  }, [ruleText]);
+  // Prefill "fragment do rozpoznania"/"nazwa" z tego, co sam parser już wyciągnął z
+  // wklejonego przykładu — tylko gdy user jeszcze ich nie dotknął, żeby nie nadpisywać
+  // ręcznej poprawki (np. gdy parser źle podzielił nazwę sklepu).
+  useEffect(() => {
+    if (rulePreview?.storeKey && !rulePattern) setRulePattern(rulePreview.storeKey);
+    if (rulePreview?.store && !ruleName) setRuleName(rulePreview.store);
+  }, [rulePreview]);
   const setThemeMode = useThemeStore(s => s.setMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
@@ -1528,6 +1549,75 @@ export default function SettingsScreen() {
                 style={{ backgroundColor: '#2AC68F18', borderWidth: 1, borderColor: '#2AC68F55', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 2 }}>
                 <Text style={{ color: '#2AC68F', fontWeight: '800' }}>Płatności do zatwierdzenia{bankPending > 0 ? ` (${bankPending})` : ''} →</Text>
               </PressableScale>
+            </View>
+          ) },
+        }] : []),
+        ...(bankEnabled ? [{
+          id: 'bank-templates', title: 'Szablony powiadomień',
+          subtitle: bankRules.length > 0 ? `${bankRules.length} zapisanych` : 'Naucz z góry, np. subskrypcje/PGE/przejazdy',
+          keywords: ['szablon', 'template', 'subskrypcja', 'anthropic', 'claude', 'pge', 'prąd', 'przejazd', 'bilet', 'wypłata', 'reguła', 'ucz'],
+          control: { kind: 'custom' as const, render: () => (
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+              <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400' }]}>
+                Wklej przykład powiadomienia (subskrypcja w walucie obcej, PGE, bilet komunikacji…) — z góry przypisz kategorię, żeby przy pierwszej realnej płatności apka od razu zgadła dobrze.
+              </Text>
+              <TextInput
+                value={ruleText} onChangeText={setRuleText} multiline
+                placeholder="Zapłacono kwotę 22,14 EUR kartą *8743 dnia 07-09-2026 godz. 02:03:56 w ANTHROPIC* CLAUDE SUB…"
+                placeholderTextColor={colors.text.muted}
+                style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, minHeight: 60, fontSize: 13 }}
+              />
+              {ruleText.trim().length > 0 && (
+                <Text style={{ fontSize: 12, color: rulePreview ? '#2AC68F' : '#FBBF24' }}>
+                  {rulePreview
+                    ? `Wykryto: ${rulePreview.store || '(bez nazwy)'} · ${rulePreview.amount.toFixed(2)} ${rulePreview.currency}`
+                    : 'Nie rozpoznano jako pełne powiadomienie — mimo to możesz zapisać szablon poniżej.'}
+                </Text>
+              )}
+              <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 2 }]}>Fragment do rozpoznania (małe litery, np. "anthropic" albo "pge"):</Text>
+              <TextInput value={rulePattern} onChangeText={setRulePattern} autoCapitalize="none" placeholder="np. anthropic" placeholderTextColor={colors.text.muted}
+                style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, fontSize: 13 }} />
+              <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 2 }]}>Nazwa do pokazania:</Text>
+              <TextInput value={ruleName} onChangeText={setRuleName} placeholder="np. Subskrypcja Claude" placeholderTextColor={colors.text.muted}
+                style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, fontSize: 13 }} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][]).map(([cat, meta]) => {
+                  const active = ruleCat === cat;
+                  return (
+                    <PressableScale key={cat} onPress={() => { haptic.tap(); setRuleCat(cat); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: active ? `${meta.color}22` : colors.bg.elevated, borderWidth: 1, borderColor: active ? meta.color : colors.border.default }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: active ? meta.color : colors.text.secondary }}>{meta.label}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+              <PressableScale
+                onPress={() => {
+                  if (!rulePattern.trim()) { toast.error('Wpisz fragment do rozpoznania'); return; }
+                  addBankRule({ pattern: rulePattern, name: ruleName, category: ruleCat });
+                  haptic.success();
+                  toast.success('Zapisano szablon');
+                  setRuleText(''); setRulePattern(''); setRuleName(''); setRuleCat('subscriptions');
+                }}
+                style={{ backgroundColor: '#2AC68F', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 2 }}>
+                <Text style={{ color: colors.bg.primary, fontWeight: '800' }}>Zapisz szablon</Text>
+              </PressableScale>
+
+              {bankRules.length > 0 && (
+                <View style={{ marginTop: 8, gap: 6 }}>
+                  {bankRules.map(r => (
+                    <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.subtle, padding: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }}>{r.name}</Text>
+                        <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }}>{CATEGORY_META[r.category]?.label ?? r.category} · „{r.pattern}"</Text>
+                      </View>
+                      <PressableScale onPress={() => { haptic.tap(); removeBankRule(r.id); }}>
+                        <Trash2 size={16} color={colors.text.muted} />
+                      </PressableScale>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           ) },
         }] : []),

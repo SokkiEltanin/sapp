@@ -536,6 +536,36 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   tworzeniu wydatku) — WYSTARCZYŁO wypełnić je z pamięci sprzedawcy, żadnej nowej ścieżki
   danych. Test: `__tests__/merchantMemory.test.ts` (nowe opisy `saveMerchantTags`).
 
+- **Szablony powiadomień — ucz PRZED pierwszą płatnością (2026-09-08)** — user przesłał
+  realną obcowalutową płatność subskrypcji ("Zapłacono kwotę 22,14 EUR ... w ANTHROPIC*
+  CLAUDE SUB ... Bank Pekao S.A.") i poprosił: "kiedyś robiliśmy jak łapanie z powiadomien
+  z banku że jak wykryje to to zeby mnie zapytało o subskrypcję claudie... zeby dodac co
+  jest wyplata co subskrypcję jaka itp... tak samo opłaty za pge, opłaty za przejazdy że
+  mogę dodać ile chce takich wkleić takie templatki jak na górze on sam zrozumie". Do tej
+  pory pierwsza płatność od nieznanego nadawcy ZAWSZE zgadywała kategorię przez sztywny
+  słownik `STORE_CAT` w `merchantMemory.ts` (nie zna "anthropic"/"pge" itp. → domyślnie
+  `groceries`), a dopiero PO ręcznej korekcie w `bank-review.tsx` `merchantMemory` uczyła
+  się na przyszłość — czyli pierwszy raz zawsze wychodził źle.
+  Nowy store `src/store/bankRulesStore.ts` (`BankRule { pattern, name, category, tags? }`,
+  zustand+persist jak `bankQueueStore`) + `matchBankRule(store, raw, rules)` — dopasowanie
+  substring (case-insensitive) do nazwy sklepu ORAZ surowego tekstu powiadomienia. Wpięty w
+  `bankIngest.ts` między nauczonym `merchantMemory` (najwyższy priorytet — pochodzi z
+  realnie zaakceptowanej płatności) a sztywnym `guessCategory()` (ostatni fallback) — więc
+  szablon wypełnia dokładnie tę lukę: nieznany JESZCZE nadawca, ale user już zadeklarował z
+  góry co to jest. Ustawienia → "Auto-wydatki z banku" → nowa sekcja "Szablony powiadomień":
+  wklej przykład powiadomienia (live-preview przez ten sam `parseBankNotification` co test
+  odczytu wyżej) → prefill fragmentu-do-rozpoznania i nazwy z tego, co parser wyciągnął
+  (edytowalne) → wybór kategorii (chipy z `CATEGORY_META`, ten sam słownik co wszędzie
+  indziej w apce) → zapis. Lista zapisanych szablonów z usuwaniem pod formularzem.
+  Obca waluta (EUR) i tak zawsze wymusza ręczne wpisanie kwoty w PLN w `bank-review.tsx` —
+  szablon zmienia TYLKO kategorię/nazwę/tagi, nie omija tego bezpiecznika (i tak nie ma
+  żadnego "salda" w klasycznym sensie do popsucia — `accountBalance.ts` liczy je jako
+  offset + suma(przychód−wydatek) z już zaksięgowanych kwot w PLN, więc poprawna kategoria
+  na starcie nie zmienia mechaniki salda, tylko to, co widać w statystykach kategorii).
+  Testy: `__tests__/bankRules.test.ts` (dopasowanie, normalizacja, usuwanie, oraz pełny
+  `ingestBankNotification` na dokładnie tej płatności Claude — z szablonem trafia w
+  `subscriptions`, bez niego nie).
+
 ## 7b. Paragon → wydatek (skan/wklej) — `src/utils/receiptParser.ts`, `app/expenses/scan.tsx`
 
 `parseReceiptText(text)` routuje po `storeKeyFromText` do `parseKaufland`/`parseBiedronka`/
@@ -4307,6 +4337,31 @@ Nowe testy w `receiptParser.test.ts` (10 nowych, w tym udokumentowane znane ogra
 `tsc`/`jest` zielone (67 suit/849 testów). **Priorytet testu**: ręczne dodawanie wydatku →
 wpisz "Serwis samochodowy" (wciąż źle, znany kompromis) i "Toster"/"Laser"/"Sport"/
 "PlayStation"/"Autostrada" (powinny już NIE sugerować "Spożywcze").
+
+## 45. Szablony powiadomień banku — ucz kategorię PRZED pierwszą płatnością — 2026-09-08
+
+Pełny opis (kod, priorytet dopasowania, testy) w §7 wyżej — to wpis w kolejności
+chronologicznej. User przesłał realną obcowalutową płatność subskrypcji Claude ("Zapłacono
+kwotę 22,14 EUR ... w ANTHROPIC* CLAUDE SUB ... Bank Pekao S.A.") i poprosił o możliwość z
+góry nauczenia apki takich nadawców (subskrypcje w walucie obcej, PGE, bilety komunikacji)
+w Ustawieniach, żeby pierwsza realna płatność nie lądowała ze zgadniętą złą kategorią.
+
+Nowy `src/store/bankRulesStore.ts` (`BankRule`, zustand+persist) + `matchBankRule()` — wpięte
+w `bankIngest.ts` między nauczonym `merchantMemory` (najwyższy priorytet) a sztywnym
+`guessCategory()` (fallback). Nowa sekcja Ustawienia → "Auto-wydatki z banku" → "Szablony
+powiadomień": wklej przykład → live-preview (`parseBankNotification`) → prefill
+fragmentu/nazwy → kategoria z `CATEGORY_META` → zapis, lista z usuwaniem.
+
+Foreign-currency bezpiecznik (ręczne wpisanie kwoty w PLN w `bank-review.tsx`) NIEtknięty —
+szablon zmienia tylko kategorię/nazwę/tagi, nigdy kwotę. Saldo (`accountBalance.ts`, offset +
+suma z już zaksięgowanych PLN) też nietknięte — poprawna kategoria z góry zmienia tylko
+statystyki kategorii, nie mechanikę salda.
+
+`tsc`/`jest` zielone (68 suit/856 testów, +7 nowych w `bankRules.test.ts`). **Priorytet testu
+na urządzeniu**: Ustawienia → Auto-wydatki z banku → Szablony powiadomień → wklej dokładnie tę
+płatność Claude → kategoria "Subskrypcje", nazwa "Subskrypcja Claude" → Zapisz → Test odczytu
+powiadomień (ten sam ekran) → wklej tę samą treść jeszcze raz → powinno wpaść do kolejki z
+kategorią Subskrypcje od razu, bez ręcznej korekty.
 
 ---
 
