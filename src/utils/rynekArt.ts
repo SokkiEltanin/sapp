@@ -57,13 +57,17 @@ export const RYNEK_TOP_SLOTS: PctRect[] = [
 // skryptem alfa co reszta plików — real real real coordinates czekają na test na urządzeniu
 // (edytor sceny w pet-shop.tsx skaluje/przesuwa CAŁĄ warstwę `bottomSlots` naraz, nie da się
 // nim poprawić TYLKO dolnego rzędu — jeśli źle trafione, trzeba będzie tu poprawić ręcznie).
+// Dolny rząd (indeksy 4-7, skrzynki) podniesiony o ~1.2% (2026-09-08, po realnym teście na
+// urządzeniu, user: "ten najbardziej dolne 4 sloty podnieś w górę o 4-5 px żeby były w
+// slotach dobrze dopasowane" — 1.2% ≈ 4-5px przy typowej szerokości ekranu telefonu, patrz
+// `botH`/`ART_CONTENT_W` w pet-shop.tsx; górny rząd BEZ zmian, wskazane tylko dolne 4).
 export const RYNEK_BOTTOM_SLOTS: PctRect[] = [
   { left: 12.09, top: 54.37, width: 15.59, height: 13.17 },
   { left: 31.86, top: 54.37, width: 15.59, height: 13.17 },
   { left: 51.53, top: 54.37, width: 15.82, height: 13.17 },
   { left: 71.30, top: 54.37, width: 15.82, height: 13.17 },
-  { left: 12.09, top: 72.04, width: 15.59, height: 13.17 },
-  { left: 31.86, top: 72.04, width: 15.59, height: 13.17 },
-  { left: 51.53, top: 72.04, width: 15.82, height: 13.17 },
-  { left: 71.30, top: 72.04, width: 15.82, height: 13.17 },
+  { left: 12.09, top: 70.84, width: 15.59, height: 13.17 },
+  { left: 31.86, top: 70.84, width: 15.59, height: 13.17 },
+  { left: 51.53, top: 70.84, width: 15.82, height: 13.17 },
+  { left: 71.30, top: 70.84, width: 15.82, height: 13.17 },
 ];

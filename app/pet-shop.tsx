@@ -346,17 +346,18 @@ export default function PetShop() {
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
-            {/* Tło POD CAŁĄ tablicą (2026-09-08, user: "miałeś zrobić wypełnienie pod
-                slotami czyli pod grafiką dać jeden większy prostokąt... żeby sloty nie były
-                przezroczyste" — poprzednia próba to był osobny mały kwadracik pod KAŻDYM
-                slotem, nie to co user chciał). JEDEN duży, płaski prostokąt, PIERWSZE dziecko
-                (więc pod obrazkiem/slotami w z-order), rozmiaru całego `artPiece` — okna
-                wycięte w `RYNEK_TOP` mają teraz stałą, spójną podkładkę zamiast przebijającej
-                się ruchliwej sceny Rynku pod spodem. */}
-            <View style={s.boardBg} />
             {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
-                spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
+                spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). Tło pod
+                tablicą (`s.boardBg`, patrz komentarz przy stylu) renderowane TU JAKO
+                PIERWSZE DZIECKO tej warstwy (2026-09-08, korekta po realnym teście: dawniej
+                siedziało jako osobny sibling na nieprzesuniętym `artPiece`, więc ignorowało
+                `adjust.top` całkowicie — przy scale 0.5 wystawało daleko poza faktyczną
+                grafikę tablicy zamiast się pod nią schować, user: "ten na górze za wysoko
+                wystaje wgle, i przez to nie pokrywa nawet kafelków"). Teraz dostaje DOKŁADNIE
+                ten sam transform co obrazek, więc zawsze pokrywa się z narysowaną tablicą,
+                niezależnie od dostrojenia w edytorze sceny. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
+              <View style={s.boardBg} />
               <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             </View>
             {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
@@ -371,7 +372,7 @@ export default function PetShop() {
                 osobne kwadraciki). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
               <PressableScale onPress={onBuyFreeze} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
-                <RadialGlow size={40} color="#000" opacity={0.4} />
+                <RadialGlow size={40} color="#000" opacity={0.55} />
                 <Snowflake size={24} color="#7DD3FC" />
                 {freezes > 0 && <View style={s.artSlotCountBadge}><Text style={s.artSlotBadgeTxt}>{freezes}</Text></View>}
                 <View style={s.artCostPill}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
@@ -382,7 +383,7 @@ export default function PetShop() {
                 const PotionIcon = POTION_ICON[def.kind];
                 return (
                   <PressableScale key={def.kind} onPress={() => onBuyPotion(def.kind)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
-                    <RadialGlow size={38} color="#000" opacity={0.4} />
+                    <RadialGlow size={38} color="#000" opacity={0.55} />
                     <PotionIcon size={22} color={def.color} style={!afford && !active ? { opacity: 0.5 } : undefined} />
                     {active
                       ? <View style={[s.artSlotBadge, { backgroundColor: def.color }]}><Text style={s.artSlotBadgeTxt}>{fmtPotionCountdown(activePotion!.endsAt)}</Text></View>
@@ -429,10 +430,12 @@ export default function PetShop() {
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
-            {/* Tło POD CAŁĄ ladą — patrz identyczny komentarz przy tablicy wyżej (`s.boardBg`). */}
-            <View style={s.boardBg} />
-            {/* Warstwa OBRAZKA — patrz analogiczny komentarz przy tablicy wyżej. */}
+            {/* Warstwa OBRAZKA + tło pod ladą — patrz identyczny komentarz przy tablicy
+                wyżej (`s.boardBg` teraz wewnątrz TEGO transformu, nie osobny sibling —
+                user po tej samej poprawce: "ten na dole tez wystaje przez co zakrywa
+                sklepikarza"). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
+              <View style={s.boardBg} />
               <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             </View>
             {/* Warstwa SLOTÓW + pigułki (żywe, funkcjonalne, więc jadą RAZEM ze slotami, nie
@@ -452,11 +455,17 @@ export default function PetShop() {
                 const meta = RARITY_META[rarity];
                 return (
                   <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
-                    {/* Tło slotu USUNIĘTE (2026-09-08, user: "pod itemami w sklepiku wywalamy
-                        tło") — te itemy mają własną, szczegółową ikonę (nie generyczny emoji
-                        jak skrzynki na tablicy wyżej), więc dodatkowy gradientowy blok pod
-                        spodem tylko zaśmiecał ladę zamiast pomagać w kontraście. Rzadkość
-                        dalej czytelna z plakietki ✓ (kolor `meta.color`) i z modala podglądu. */}
+                    {/* Płaskie TŁO slotu USUNIĘTE (2026-09-08, user: "pod itemami w sklepiku
+                        wywalamy tło") — te itemy mają własną, szczegółową ikonę (nie
+                        generyczny emoji jak skrzynki na tablicy wyżej), więc dodatkowy
+                        gradientowy blok pod spodem tylko zaśmiecał ladę. Rzadkość dalej
+                        czytelna z plakietki ✓ (kolor `meta.color`) i z modala podglądu.
+                        CIEŃ (RadialGlow) DODANY osobno (2026-09-08, po realnym teście, user:
+                        "dodaj itemom w sklepie cień mocniejszy, słabo ich widać") — te 4
+                        sloty jako jedyne nie miały żadnej poświaty pod ikoną, w przeciwieństwie
+                        do zamrożenia/potek/skrzynek, stąd znikały na (poprzednio ciemniejszym)
+                        `s.boardBg`. */}
+                    <RadialGlow size={40} color="#000" opacity={0.55} />
                     <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
                     {(bought || owned) && (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
@@ -479,7 +488,7 @@ export default function PetShop() {
                 const afford = coins >= box.cost;
                 return (
                   <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 4])]}>
-                    <RadialGlow size={44} color="#000" opacity={0.4} />
+                    <RadialGlow size={44} color="#000" opacity={0.55} />
                     <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
                     <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </PressableScale>
@@ -726,7 +735,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // obrazkiem/slotami w z-order), rozmiaru niemal całego kontenera — okna wycięte w grafice
   // (RYNEK_TOP/RYNEK_BOTTOM) mają teraz spójną, nieprzezroczystą podkładkę zamiast
   // przebijającej ruchliwej sceny Rynku pod spodem.
-  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#2A1B0EF0' },
+  // Jaśniejszy brąz (2026-09-08, user po teście: "możesz te brązowe tło jaśniejsze zrobić dla
+  // kontrastu" — itemy/ikonki na nim słabo widoczne) — poprzedni `#2A1B0EF0` był niemal
+  // czarny, nowy `#4A3420F0` to ten sam ciepły odcień, wyraźnie jaśniejszy.
+  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#4A3420F0' },
   // Miękki cień ZA ikoną/emoji slotu (2026-09-08, user: "ikonki mają nie mieć tła, tylko
   // lekki cień z tyłu") — CELOWO nie natywny `shadowColor`/`elevation` na samej ikonie:
   // ikony to przezroczyste SVG (lucide), a natywny cień RN liczy się z PROSTOKĄTA layoutu

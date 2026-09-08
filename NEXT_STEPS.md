@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: sloty skrzynek wyżej + naprawa wystającego tła + mocniejszy cień itemów — NIEsprawdzone (2026-09-08)
+
+User przesłał kolejny zrzut ekranu po §46-49, trzy uwagi naraz. Pełny opis w ARCHITECTURE.md
+§54.
+1. **4 dolne sloty (skrzynki)** podniesione o 1.2% wysokości (`RYNEK_BOTTOM_SLOTS[4..7].top`
+   72.04→70.84, ~4-5px przy typowej szerokości telefonu) — te współrzędne były jawnie
+   oznaczone jako ekstrapolacja czekająca na test.
+2. **`s.boardBg` (brązowe tło pod tablicą/ladą) NAPRAWIONE STRUKTURALNIE** — był renderowany
+   jako sibling transformowanej warstwy obrazka, więc ignorował `scale`/`x`/`y` z
+   `DEFAULT_ADJUST` (0.5/0.46!) i wystawał daleko poza faktyczną grafikę (stąd "wystaje u
+   góry" ORAZ "zakrywa sklepikarza u dołu" jednocześnie z "nie pokrywa kafelków"). Przeniesiony
+   do środka tej samej transformowanej warstwy co `<Image>` — teraz zawsze dokładnie pokrywa
+   się z narysowaną tablicą/ladą.
+3. **Cień + kontrast**: `boardBg` kolor rozjaśniony (`#2A1B0EF0`→`#4A3420F0`), wszystkie
+   `RadialGlow` 0.4→0.55, i dodany BRAKUJĄCY `RadialGlow` na 4 itemach Sklepu dnia (jedyne
+   sloty bez żadnego cienia w ogóle — stąd "słabo widać" ich dotyczyło najbardziej).
+
+`tsc`/`jest` zielone (69 suit/891 testów — czysto wizualna zmiana, bez pokrycia testowego).
+
+**Priorytet testu na urządzeniu**: (a) 4 skrzynki na dole trafiają w narysowane okna; (b)
+brązowe tło NIE wystaje ponad tablicę ani nie zasłania sklepikarza; (c) itemy Sklepu dnia mają
+teraz widoczny cień i są czytelniejsze; (d) jeśli podniesienie o 4-5px okaże się za mało/za
+dużo, łatwa poprawka `top` w `RYNEK_BOTTOM_SLOTS[4..7]` (`src/utils/rynekArt.ts`).
+
 ## 🆕 Streak "bez słodyczy" (stale-keyword) + dashboard 1Hz-tick lag — NIEsprawdzone (2026-09-08)
 
 User: "w streak wgle nie łapie ze zjadłem dzisiaj nutelle i nadal mam 20 dni... I musimy

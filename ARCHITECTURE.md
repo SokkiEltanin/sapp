@@ -4768,6 +4768,48 @@ usuwania/dodawania licznika na nowo); (2) Dashboard → zostaw ekran otwarty na 
 przez kilka minut bez aktywnej zmiany w pracy → wróć, sprawdź płynność/brak spadku FPS,
 zwłaszcza jeśli masz skonfigurowane custom stat tiles.
 
+## 54. Rynek — trzy poprawki po kolejnym realnym teście (sloty/tło/cień) — 2026-09-08
+
+User przesłał zrzut ekranu sklepu po §46-49 z trzema konkretnymi uwagami: *"1. ten najbardziej
+dolne 4 sloty podnieś w górę o 4-5 px żeby były w slotach dobrze dopasowane, 2. popraw tła pod
+kafelki te brązowe (zobacz grafikę) tam jest ten na górze za wysoko wystaje wgle, i przez to
+nie pokrywa nawet kafelków, a poza tym ten na dole tez wystaje przez co zakrywa sklepikarza, 3.
+dodaj itemom w sklepie cień mocniejszy ewentualnie słabo ich widac i możesz te brązowe tło
+jaśniejsze zrobić dla kontrastu"*.
+
+**1. Dolne 4 sloty (skrzynki, `RYNEK_BOTTOM_SLOTS[4..7]`)** — te współrzędne były jawnie
+oznaczone w `rynekArt.ts` jako EKSTRAPOLACJA czekająca na test na urządzeniu (§ komentarz
+"real real real coordinates czekają na test"). Podniesione o 1.2% wysokości kontenera (`top`
+72.04→70.84), co przy typowej szerokości telefonu odpowiada requested 4-5px. Górny rząd
+(Sklep dnia) bez zmian — user wskazał tylko dolny.
+
+**2. `s.boardBg` wystawał poza grafikę tablicy/lady — prawdziwa przyczyna (nie tylko "za
+wysoko").** `boardBg` był renderowany jako SIBLING warstwy obrazka (`adjust.top`/`adjust.bottom`
+transform), NIE jej dzieckiem — więc kompletnie ignorował skalowanie/przesunięcie obrazka
+(`top.scale: 0.5`, `bottom.scale: 0.46` w `DEFAULT_ADJUST`). Efekt: stały prostokąt "2% inset
+całego `artPiece`" bez związku z tym, gdzie faktycznie narysowana jest tablica/lada — przy
+skali 0.5/0.46 znacznie WIĘKSZY niż widoczna grafika, stąd "wystaje" u góry i zakrywa
+sklepikarza u dołu jednocześnie z niedopasowaniem do kafelków. Naprawa: `boardBg` przeniesiony
+DO ŚRODKA tej samej transformowanej warstwy co `<Image>` (pierwsze dziecko, przed obrazkiem w
+z-order) — dostaje dokładnie ten sam `transform`, więc zawsze pokrywa się z narysowaną tablicą/
+ladą niezależnie od dostrojenia w edytorze sceny, raz a porządnie (nie osobna korekta per-
+wartość, tylko strukturalna naprawa niepoprawnego zagnieżdżenia).
+
+**3. Cień itemów + jaśniejszy brąz.** `boardBg` kolor `#2A1B0EF0` (niemal czarny) → `#4A3420F0`
+(ten sam ciepły odcień, wyraźnie jaśniejszy, dla kontrastu z ikonami). Wszystkie istniejące
+`RadialGlow` (zamrożenie/potki/skrzynki) `opacity` 0.4→0.55 (mocniejszy cień, jak proszone).
+Odkryta przy okazji realna luka: 4 itemy Sklepu dnia (górny rząd lady, `dailySlots.map`) nie
+miały ŻADNEGO `RadialGlow` — jedyne sloty bez cienia w ogóle (świadomie usunięte płaskie tło w
+§49, ale cień nigdy nie dodany w zamian) — stąd "słabo widać" dotyczyło ich najbardziej. Dodany
+`<RadialGlow size={40} color="#000" opacity={0.55}/>` przed ikoną, tym samym wzorcem co reszta.
+
+`tsc`/`jest` zielone (69 suit/891 testów — czysto wizualna/koordynatowa zmiana, bez pokrycia
+testowego). **Priorytet testu na urządzeniu**: Rynek → sprawdź czy 4 skrzynki na dole trafiają
+teraz w narysowane okna; czy brązowe tło NIE wystaje ponad tablicę ani nie zasłania
+sklepikarza; czy itemy Sklepu dnia (górny rząd lady) mają teraz widoczny cień i są czytelniejsze
+na jaśniejszym tle. Jeśli 4-5px okaże się za mało/za dużo — łatwa poprawka `top` w
+`RYNEK_BOTTOM_SLOTS[4..7]` (`rynekArt.ts`).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
