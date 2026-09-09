@@ -18,6 +18,11 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
+import {
+  loadProductMemory, applyProductMemory, saveProductCategories,
+  loadTagMemory, applyTagMemory, saveTagMemory,
+  loadPriceMemory, savePriceMemory, priceFor, PriceMemory,
+} from '@/utils/productMemory';
 import { getPayers, addPayer } from '@/utils/payers';
 import { toast } from '@/store/toastStore';
 import { localISO } from '@/utils/date';
@@ -36,6 +41,12 @@ interface Item {
   category: ExpenseCategory;
   tags: string[];
   groupWithPrev?: boolean; // shares one combined price with the item(s) above
+  // Set once the user manually touches that field — stops auto-fill-from-memory
+  // (below) from overwriting a deliberate choice once the name later happens to
+  // re-match (e.g. editing category first, then finishing typing the name).
+  catTouched?: boolean;
+  tagsTouched?: boolean;
+  priceTouched?: boolean;
 }
 
 // Split a combined price evenly across n items to the grosz, remainder on the first
@@ -84,7 +95,7 @@ function CategoryPicker({ current, onSelect }: {
   );
 }
 
-function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, onToggleGroup }: {
+function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, onToggleGroup, catMemory, tagMemory, priceMemory }: {
   item: Item;
   index: number;
   onUpdate: (updates: Partial<Item>) => void;
@@ -93,6 +104,9 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
   share: number | null;   // this item's split of the combined price (preview)
   canGroup: boolean;      // there is an item above to share a price with
   onToggleGroup: () => void;
+  catMemory: Record<string, ExpenseCategory>;
+  tagMemory: Record<string, string[]>;
+  priceMemory: PriceMemory;
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -100,6 +114,12 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
   const [tagsOpen, setTagsOpen] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [suggCat, setSuggCat] = useState<ExpenseCategory | null>(null);
+  // Ustawiony gdy nazwa dopasowała się do CZEGOŚ już kupionego wcześniej (2026-09-09,
+  // user: "jak dodaje ręcznie żeby produkty które już istnieją jak wpisuje żeby się
+  // pokazywały szybciej bo od razu tag cena i wgle wskoczy") — silny sygnał (realna
+  // historia zakupów, nie zgadywanie po słowach-kluczach jak `catSugg` niżej), więc
+  // zamiast czekać na tapnięcie od razu wypełnia puste pola i tylko INFORMUJE co zrobił.
+  const [memHit, setMemHit] = useState<{ cat?: ExpenseCategory; price?: number } | null>(null);
   const suggTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meta = getCategoryMeta(item.category);
   const isFollower = !!item.groupWithPrev;
@@ -111,9 +131,29 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
   const handleNameChange = (name: string) => {
     onUpdate({ name });
     if (suggTimer.current) clearTimeout(suggTimer.current);
-    if (name.trim().length < 3) { setSuggCat(null); return; }
-    suggTimer.current = setTimeout(() => {
-      const cat = categorize(name);
+    const key = name.trim();
+    if (key.length < 3) { setSuggCat(null); setMemHit(null); return; }
+    suggTimer.current = setTimeout(async () => {
+      // Rozpoznanie po HISTORII ZAKUPÓW (ten sam magazyn co scan.tsx po zeskanowaniu
+      // paragonu) wygrywa nad statycznym zgadywaniem po słowach-kluczach niżej — to
+      // KONKRETNY produkt, który user już kiedyś kupił/wpisał, nie ogólny keyword.
+      const [rememberedCat, rememberedTags] = await Promise.all([
+        applyProductMemory([{ name: key }], catMemory).then(r => r[0]),
+        applyTagMemory([{ name: key }], tagMemory).then(r => r[0]),
+      ]);
+      const priceStat = priceFor(key, priceMemory);
+      if (rememberedCat != null || (rememberedTags?.length ?? 0) > 0 || priceStat) {
+        setSuggCat(null);
+        const patch: Partial<Item> = {};
+        if (rememberedCat != null && !item.catTouched) patch.category = rememberedCat;
+        if ((rememberedTags?.length ?? 0) > 0 && !item.tagsTouched) patch.tags = rememberedTags!;
+        if (priceStat && !item.priceTouched && !item.price.trim()) patch.price = String(priceStat.last).replace('.', ',');
+        if (Object.keys(patch).length > 0) onUpdate(patch);
+        setMemHit({ cat: rememberedCat ?? (patch.category as ExpenseCategory | undefined), price: priceStat?.last });
+        return;
+      }
+      setMemHit(null);
+      const cat = categorize(key);
       setSuggCat(cat !== item.category ? cat : null);
     }, 300);
   };
@@ -132,7 +172,7 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
     const next = item.tags.includes(tag)
       ? item.tags.filter(t => t !== tag)
       : [...item.tags, tag];
-    onUpdate({ tags: next });
+    onUpdate({ tags: next, tagsTouched: true });
   };
 
   return (
@@ -162,6 +202,18 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
               Może być: {getCategoryMeta(suggCat).label} — zastosuj
             </Text>
           </TouchableOpacity>
+        )}
+
+        {/* Rozpoznano z historii zakupów — już zastosowane (nie trzeba tapnąć), tylko
+            informuje co się wypełniło. */}
+        {memHit && (
+          <View style={styles.memHint}>
+            <Check size={10} color={colors.accent.green} />
+            <Text style={styles.memHintText} numberOfLines={1}>
+              Rozpoznano{memHit.cat ? `: ${getCategoryMeta(memHit.cat).label}` : ''}
+              {memHit.price ? ` · ostatnio ${memHit.price.toFixed(2)} zł` : ''}
+            </Text>
+          </View>
         )}
 
         {/* Qty × price row — or, when this item shares a combined price, an inherited-share row */}
@@ -204,7 +256,7 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
             )}
             <TextInput
               value={item.price}
-              onChangeText={price => onUpdate({ price })}
+              onChangeText={price => onUpdate({ price, priceTouched: true })}
               placeholder={isLeaderGroup ? 'łącznie' : '0,00'}
               placeholderTextColor={colors.text.muted}
               style={styles.unitPriceInput}
@@ -271,7 +323,7 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
       {catOpen && (
         <CategoryPicker
           current={item.category}
-          onSelect={cat => { onUpdate({ category: cat }); setCatOpen(false); }}
+          onSelect={cat => { onUpdate({ category: cat, catTouched: true }); setCatOpen(false); }}
         />
       )}
 
@@ -312,7 +364,7 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
               returnKeyType="done"
               onSubmitEditing={() => {
                 const t = newTag.trim().toLowerCase().replace(/\s+/g, '-');
-                if (t && !item.tags.includes(t)) onUpdate({ tags: [...item.tags, t] });
+                if (t && !item.tags.includes(t)) onUpdate({ tags: [...item.tags, t], tagsTouched: true });
                 setNewTag('');
               }}
             />
@@ -343,6 +395,19 @@ export default function ManualReceiptScreen() {
   const confirmSync = useExpensesStore(s => s.confirmSync);
   const updateExpense = useExpensesStore(s => s.updateExpense);
   const setExpenses = useExpensesStore(s => s.setExpenses);
+  // Rozpoznawanie znanych produktów przy ręcznym wpisywaniu (2026-09-09, user: "produkty
+  // które już istnieją jak wpisuje żeby się pokazywały szybciej bo od razu tag cena i wgle
+  // wskoczy") — TE SAME magazyny pamięci co scan.tsx już od dawna zapisuje po zeskanowanym
+  // paragonie (kategoria/tagi/cena per nazwa produktu), tylko dotąd nigdy nie czytane przy
+  // ręcznym wpisie. Ładowane raz przy wejściu na ekran, przekazywane w dół do `ItemRow`.
+  const [catMemory, setCatMemory] = useState<Record<string, ExpenseCategory>>({});
+  const [tagMemory, setTagMemory] = useState<Record<string, string[]>>({});
+  const [priceMemory, setPriceMemory] = useState<PriceMemory>({});
+  useEffect(() => {
+    Promise.all([loadProductMemory(), loadTagMemory(), loadPriceMemory()])
+      .then(([c, t, p]) => { setCatMemory(c); setTagMemory(t); setPriceMemory(p); })
+      .catch(() => {});
+  }, []);
   // Attach mode: opened from a bare (e.g. bank-logged) payment — the manually-typed
   // receipt ENRICHES that expense in place instead of creating a duplicate. `attachTo`
   // = its id (passed from the payment screen or the scanner's "wpisz ręcznie" link).
@@ -497,6 +562,21 @@ export default function ManualReceiptScreen() {
           receiptItems.push(makeItemRecord(it, unitPrice * qty, qty));
         }
       }
+
+      // Uczy pamięć produktów z RĘCZNIE wpisanego paragonu — dotąd (2026-09-09) uczył ją
+      // WYŁĄCZNIE zeskanowany paragon (`scan.tsx`), mimo że ten sam magazyn jest teraz
+      // czytany też tutaj przy wpisywaniu nazwy (patrz `handleNameChange`). Bez tego
+      // ręcznie dodany, nowy produkt nigdy by się sam nie "nauczył" — user musiałby go
+      // najpierw zeskanować, żeby przyszłe ręczne wpisy go rozpoznały.
+      const catPatch: Record<number, ExpenseCategory> = {};
+      const tagPatch: Record<number, string[]> = {};
+      receiptItems.forEach((it, i) => {
+        catPatch[i] = it.category;
+        if (it.tags.length > 0) tagPatch[i] = it.tags;
+      });
+      saveProductCategories(receiptItems, catPatch, {}).catch(() => {});
+      saveTagMemory(receiptItems, tagPatch).catch(() => {});
+      savePriceMemory(receiptItems.filter(it => it.unitPrice > 0).map(it => ({ name: it.name, unitPrice: it.unitPrice }))).catch(() => {});
 
       const totalAmount = receiptItems.reduce((s, it) => s + it.price, 0);
 
@@ -720,6 +800,9 @@ export default function ManualReceiptScreen() {
                 share={info?.share ?? null}
                 canGroup={i > 0}
                 onToggleGroup={() => toggleGroup(item.id)}
+                catMemory={catMemory}
+                tagMemory={tagMemory}
+                priceMemory={priceMemory}
               />
             );
           })}
@@ -956,6 +1039,16 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.accent.blue + '40',
   },
   catSuggText: { fontSize: 10, fontWeight: '600', color: c.accent.blue },
+
+  memHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing[2], paddingVertical: 4,
+    borderRadius: radius.sm,
+    backgroundColor: c.accent.green + '18',
+    borderWidth: 1, borderColor: c.accent.green + '40',
+  },
+  memHintText: { fontSize: 10, fontWeight: '600', color: c.accent.green },
 
   addItemBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
