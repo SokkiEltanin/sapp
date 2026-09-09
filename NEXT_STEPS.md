@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 `expo-image` w Rynku/Pupilu/Walce — cache grafik — NIEsprawdzone, WYMAGA nowego builda APK (2026-09-09)
+
+User: "dawaj dalej optymalizacje" → wybrał oba zaproponowane kandydaty. Pełny opis w
+ARCHITECTURE.md §60. RN core `Image` (`pet-shop.tsx`/`pet.tsx`/`boss-fight.tsx` — ekrany
+z najwięcej nowej grafiki w tej sesji) nie miał cache dysk+pamięć na Androidzie. Podmienione
+na `expo-image` (`~3.0.11`) — drop-in, `resizeMode`→`contentFit`. Jeden RN `Image` (alias
+`RNImage`) zostaje w `pet-shop.tsx` tylko po `resolveAssetSource` (statyczna metoda, brak
+odpowiednika w `expo-image`).
+
+**WAŻNE**: to natywny moduł — zero efektu przez OTA, działa dopiero po nowym buildzie APK.
+
+`tsc`/`jest` zielone (70 suit/902 testy). **Priorytet testu na urządzeniu (po nowym APK)**:
+Rynek/Pupil/Walka — płynniejsze pierwsze wejście, zero regresji proporcji obrazków.
+
 ## 🆕 Ręczny paragon: autouzupełnianie znanych produktów z historii — NIEsprawdzone (2026-09-09)
 
 User: "produkty które już istnieją jak wpisuje żeby się pokazywały szybciej bo od razu tag

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable } from 'react-native';
+import { Image, ImageBackground } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -694,7 +695,7 @@ export default function BossFight() {
               source={arenaBgFor(kind)}
               style={s.arenaScene}
               imageStyle={s.arenaSceneImg}
-              resizeMode="cover"
+              contentFit="cover"
             >
             {/* Scrim/winieta (2026-09-06, user ze zrzutem: "postacie są niewidoczne, arena
                 za jasna... wygląda tanio, zrób z tego high-end fight scene") — 3-stopniowy
@@ -751,7 +752,7 @@ export default function BossFight() {
                     {boltFlying && target?.attackKind === 'claw' && (
                       <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
                         <RadialGlow size={130} color="#F87171" opacity={0.55} />
-                        <Image source={counterPng} style={{ width: 90, height: 90 }} resizeMode="contain" />
+                        <Image source={counterPng} style={{ width: 90, height: 90 }} contentFit="contain" />
                       </Animated.View>
                     )}
                     {catHit && !!catHit.dmg && (
@@ -834,7 +835,7 @@ export default function BossFight() {
             {boltFlying && target?.attackKind !== 'claw' && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
                 <RadialGlow size={46} color="#F87171" opacity={0.5} />
-                <Image source={counterPng} style={{ width: 28, height: 28 }} resizeMode="contain" />
+                <Image source={counterPng} style={{ width: 28, height: 28 }} contentFit="contain" />
               </Animated.View>
             )}
             </ImageBackground>
@@ -903,7 +904,7 @@ export default function BossFight() {
                 "nie widzę żeby był aktywny jakoś podczas walki realnie". */}
             {!!lastHit?.thornDmg && (
               <View style={s.mechRow}>
-                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} resizeMode="contain" />
+                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} contentFit="contain" />
                 <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
               </View>
             )}
