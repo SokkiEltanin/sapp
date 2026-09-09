@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 // Which WeeklyBoard tiles the user has hidden. Empty = show all (that have data).
 interface WeeklyBoardState {
@@ -17,6 +17,6 @@ export const useWeeklyBoard = create<WeeklyBoardState>()(
           hidden: s.hidden.includes(id) ? s.hidden.filter((h) => h !== id) : [...s.hidden, id],
         })),
     }),
-    { name: 'weekly-board-tiles-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'weekly-board-tiles-v1', storage: throttledPersistStorage() },
   ),
 );

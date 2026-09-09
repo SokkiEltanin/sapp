@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 // „Zamrożenie serii" (streak freeze) — jak w Duolingo. Masz zapas zamrożeń (kupujesz za
 // monety pupila). Gdy pominiesz dzień nawyku z serią, apka AUTOMATYCZNIE zużywa jedno
@@ -38,7 +38,7 @@ export const useStreakFreezeStore = create<StreakFreezeState>()(
     }),
     {
       name: 'streak-freeze-v1',
-      storage: createJSONStorage(() => throttledAsyncStorage()),
+      storage: throttledPersistStorage(),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

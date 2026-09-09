@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { ExpenseCategory } from '@/types';
 
 // User-defined recognition templates for bank notifications (2026-09-08, user: "kiedyś
@@ -95,7 +95,7 @@ export const useBankRules = create<BankRulesState>()(
       })),
       removeRule: (id) => set((s) => ({ rules: s.rules.filter(r => r.id !== id) })),
     }),
-    { name: 'bank-rules-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'bank-rules-v1', storage: throttledPersistStorage() },
   ),
 );
 

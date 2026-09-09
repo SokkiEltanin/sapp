@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { normalizeProductName } from '@/utils/productMemory';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -470,7 +470,7 @@ export const useFoodStore = create<FoodState>()(
     }),
     {
       name: 'food-store-v1',
-      storage: createJSONStorage(() => throttledAsyncStorage()),
+      storage: throttledPersistStorage(),
       partialize: (s) => ({
         products: s.products, meals: s.meals, presets: s.presets, goalMode: s.goalMode, manualGoal: s.manualGoal,
       }),

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 
@@ -15,6 +15,6 @@ export const useThemeStore = create<ThemeState>()(
       mode: 'dark',
       setMode: (mode) => set({ mode }),
     }),
-    { name: 'theme-mode-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'theme-mode-v1', storage: throttledPersistStorage() },
   ),
 );

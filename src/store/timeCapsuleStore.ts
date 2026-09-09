@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 // "List do przyszłego siebie" — a time capsule. You write a short message and pick when
 // it unlocks (e.g. in 6 months); until then it's sealed. Persisted in AsyncStorage, so it
@@ -31,6 +31,6 @@ export const useTimeCapsule = create<State>()(
       markRead: (id) => set((s) => ({ letters: s.letters.map((l) => (l.id === id ? { ...l, read: true } : l)) })),
       remove: (id) => set((s) => ({ letters: s.letters.filter((l) => l.id !== id) })),
     }),
-    { name: 'time-capsule-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'time-capsule-v1', storage: throttledPersistStorage() },
   ),
 );

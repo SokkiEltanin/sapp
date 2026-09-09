@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { CalendarEvent, Task } from '@/types';
 import { todayISO } from '@/utils/date';
 
@@ -63,7 +63,7 @@ export const useCalendarStore = create<CalendarState>()(
     }),
     {
       name: 'calendar-store-v1',
-      storage: createJSONStorage(() => throttledAsyncStorage()),
+      storage: throttledPersistStorage(),
       partialize: (state) => ({ events: state.events, tasks: state.tasks }),
     },
   ),

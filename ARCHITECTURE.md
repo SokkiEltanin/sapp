@@ -4966,6 +4966,59 @@ nowym, jaśniejszym `boardBg` (§54).
 **Zapowiedź od usera**: analogiczne grafiki pod POTKI (górne sloty tablicy — zamrożenie +
 HP/ATK/XP) w przygotowaniu, jeszcze nie dostarczone — osobne zadanie gdy nadejdą.
 
+## 58. throttledStorage: `JSON.stringify` przeniesiony do debounce'a (wszystkie 19 store'ów) — 2026-09-09
+
+User: *"dawaj w takim razie ty tu rządzisz działaj (jak będzie źle wrócimy do tego miejsca
+najwyżej i tyle xd)"* — zgoda na ruszenie punktu 1 z listy "co byś jeszcze zoptymalizował"
+(§55-follow-up): rosnący koszt `JSON.stringify` całego bloba w zustand `persist`.
+
+**Realny zakres (węższy i bezpieczniejszy niż pełny redesign warstwy danych z §15)**:
+`throttledAsyncStorage` (2026-08-25) throttlował TYLKO zapis na dysk — `createJSONStorage()`
+(helper zustanda, dotąd owijający ten plik) stringifyuje `value` PRZED wywołaniem naszego
+`setItem`, więc `JSON.stringify` całego persystowanego stanu (rosnącego z historią —
+`expenses`/`meals`/`products` w szczególności, ale też każdy inny store) leciał SYNCHRONICZNIE
+na KAŻDYM pojedynczym `set()`, blokując wątek JS w TEJ SAMEJ klatce co akcja usera — throttling
+dysku uruchamiał się dopiero PO tym koszcie, nie przed nim. Przy walce bossa (kilka `set()` na
+rundę) czy szybkiej edycji paragonu to kilka pełnych stringify zamiast jednego.
+
+**Naprawa**: `throttledStorage.ts` implementuje teraz `PersistStorage<S>` BEZPOŚREDNIO (surowe
+`{state, version}` obiekty, nie wcześniej-zstringifikowany tekst) zamiast być owinięty przez
+`createJSONStorage` — `JSON.stringify` przeniesiony DO ŚRODKA debounced `setTimeout` (ten sam
+mechanizm co dotychczasowy throttling zapisu, 600ms). Efekt: seria szybkich `set()` do tego
+samego klucza kosztuje TERAZ jeden `JSON.stringify`, nie jeden na wywołanie — i ten jeden
+koszt leci OFF interakcji usera (macrotask 600ms później), nie w tej samej klatce co tap/save.
+`getItem` teraz sam parsuje JSON (wcześniej robił to `createJSONStorage`). Wszystkie 19
+store'ów (nie tylko expenses/food — zmiana jest jednolita, mechaniczna, bez zmiany semantyki
+per store) przełączone z `storage: createJSONStorage(() => throttledAsyncStorage())` na
+`storage: throttledPersistStorage()` — stary `throttledAsyncStorage` (string-based) USUNIĘTY
+całkowicie (zero pozostałych wywołań po migracji, nie zostawiony jako martwy kod).
+
+**Świadomie NIE ruszone**: koszt REHYDRACJI (parsowanie całego blobu przy zimnym starcie) —
+to osobny, dużo rzadszy koszt (raz na uruchomienie apki, nie raz na mutację) niż ten
+naprawiony tu. Prawdziwa naprawa TEGO połowy problemu (chunkowanie/paginacja AsyncStorage per
+kolekcja, albo SQLite) to dalej ten sam "duży, ryzykowny redesign warstwy danych" z §15 — nie
+coś do wciśnięcia przy okazji. Ryzyko tej zmiany oceniam jako niskie: zachowanie identyczne
+(te same bajty ostatecznie trafiają na dysk, ten sam debounce), zmienia się WYŁĄCZNIE KIEDY
+stringify się odpala — nic co test jednostkowy inny niż "kolejność/czas wewnętrznego
+stringify" mógłby wykryć jako regresję, a takiego testu nikt nie miał.
+
+**Uboczna korekta po drodze**: przy scalaniu z PR #166 (duplikat wydatku z banku) okazało się,
+że `bankQueueStore.ts` był już lokalnie zmigrowany na `throttledPersistStorage()` ZANIM tamten
+PR trafił na CI — CI złapało to od razu (`error TS2305: Module has no exported member`), bo
+scommitowany stan brakował definicji tej funkcji. Naprawione osobnym fix-commitem na #166
+(przywrócony do starego wzorca na czas tamtego PR), migracja `bankQueueStore.ts` wraca tutaj,
+razem z resztą 18 store'ów, w jednym spójnym kroku.
+
+Testy: `__tests__/throttledStorage.test.ts` przepisany pod nowy interfejs (`StorageValue`
+zamiast gołych stringów) — te same przypadki co dawniej (koalescencja, niezależne klucze,
+`removeItem` anuluje, `flush` wymusza) + nowe (`getItem` na uszkodzonym JSON → `null`, nie
+rzuca).
+
+`tsc`/`jest` zielone (70 suit/902 testów). **Priorytet testu na urządzeniu**: walka z bossem
+(kilka szybkich zmian HP/coinów pod rząd) i szybka edycja/dodawanie kilku wydatków pod rząd —
+nie powinno być zauważalnego zacinania się UI; żadne dane nie giną (to samo okno utraty przy
+force-kill co wcześniej, 600ms, zaakceptowane od dawna w §10).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

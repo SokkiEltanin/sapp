@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 throttledStorage: JSON.stringify przeniesiony do debounce'a (wszystkie 19 store'ów) — NIEsprawdzone (2026-09-09)
+
+User dał zielone światło na punkt 1 z listy "co byś jeszcze zoptymalizował" (§55). Pełny opis
+w ARCHITECTURE.md §58. `throttledAsyncStorage` throttlował TYLKO zapis na dysk —
+`JSON.stringify` całego persystowanego stanu leciał SYNCHRONICZNIE na każdym `set()`, bo
+`createJSONStorage()` stringifyuje przed naszym `setItem`. Naprawione: `throttledStorage.ts`
+implementuje teraz `PersistStorage<S>` bezpośrednio (bez `createJSONStorage`), stringify
+przeniesiony DO ŚRODKA debounced timera — seria szybkich `set()` kosztuje jeden stringify,
+nie jeden na wywołanie, i leci off głównej interakcji usera. Wszystkie 19 store'ów
+zmigrowane jednolicie na `throttledPersistStorage()`; stary `throttledAsyncStorage` usunięty.
+
+Świadomie NIE ruszony koszt REHYDRACJI (parsowanie całego blobu przy starcie apki) — osobny,
+dużo rzadszy koszt; prawdziwa naprawa TEJ połowy to dalej "duży redesign warstwy danych" z
+§15, nie coś na przy okazji.
+
+`tsc`/`jest` zielone (70 suit/902 testów, `throttledStorage.test.ts` przepisany pod nowy
+interfejs). **Priorytet testu na urządzeniu**: walka z bossem (kilka szybkich zmian HP/coinów)
+i szybkie dodawanie/edycja kilku wydatków pod rząd — brak zauważalnego zacinania UI, żadne
+dane nie giną.
+
 ## 🆕 Rynek: własne grafiki 4 skrzynek zamiast emoji — NIEsprawdzone (2026-09-09)
 
 User dostarczył `assets/chests/skrzynka_{drewniana,zelazna,zlota,boska}.png` (uploadowane

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 export type CounterKind = 'until' | 'since';
 
@@ -47,7 +47,7 @@ export const useCounters = create<CountersState>()(
       remove: (id) => set((s) => ({ counters: s.counters.filter(c => c.id !== id) })),
       resetSince: (id) => set((s) => ({ counters: s.counters.map(c => c.id === id ? { ...c, date: todayStr() } : c) })),
     }),
-    { name: 'counters-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'counters-v1', storage: throttledPersistStorage() },
   ),
 );
 
