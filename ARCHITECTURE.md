@@ -5156,6 +5156,41 @@ rząd (HP/coiny/XP migają szybko) — sprawdź czy mniej "szarpania"/lagów ni�
 WSZYSTKO nadal działa identycznie (customizacja kotka, sklep, ekwipunek, misje) — to czysta
 optymalizacja re-renderów, zero zmiany w danych/logice.
 
+## 63. Rynek — wypełnienia brązowe i itemy jako WŁASNE, niezależne warstwy w edytorze sceny — 2026-09-09
+
+User: *"w rynku daj mi opcje ustawienia tez indywidualnie tych wypełnień brązowych bo
+zjebałeś znowu, i itemow tez możesz"*.
+
+**Prawdziwa przyczyna "zjebałeś znowu"**: `s.boardBg` (brązowe wypełnienie pod tablicą/ladą,
+§49) nigdy nie miało WŁASNEGO wpisu w `ArtAdjust` — renderowało się jako dziecko TEGO SAMEGO
+transformu co obrazek tablicy/lady (`adjust.top`/`adjust.bottom`). Efekt: dostrojenie obrazka
+(żeby pasował do sceny) siłą rzeczy przesuwało/skalowało RAZEM wypełnienie — nie dało się
+poprawić jednego bez zepsucia drugiego, więc każda kolejna korekta obrazka od nowa rozjeżdżała
+wypełnienie względem okien. Analogicznie ikony itemów Sklepu dnia (`s.artSlotImg`) miały
+sztywne 62%/62%, zero regulacji w ogóle.
+
+**Naprawa**: `ArtAdjust` dostał trzy nowe, NIEZALEŻNE grupy — `boardBgTop`, `boardBgBottom`
+(wypełnienie tablicy/lady, rozprzęgnięte od `top`/`bottom`) i `items` (ikony 4 itemów Sklepu
+dnia, jeden wspólny suwak, nie per-item — user poprosił o regulację "itemów" jako grupy).
+JSX: `<View style={s.boardBg}/>` wyszedł z transformu obrazka do WŁASNEGO wrappera z
+`adjust.boardBgTop`/`adjust.boardBgBottom`; `item.icon`'s `<Image>` dostał inline `transform`
+z `adjust.items`. Domyślne wartości nowych grup = TAKIE SAME jak `top`/`bottom` miały w chwili
+tej zmiany (dla wypełnień) / identyczność (`{0,0,1}`) dla itemów — wygląd na urządzeniu
+zostaje IDENTYCZNY zaraz po wdrożeniu, tylko od teraz wszystkie trzy warstwy dają się kręcić
+NIEZALEŻNIE w edytorze sceny (ikona ⚙️ w headerze Rynku).
+
+**Migracja stanu zapisanego**: `ADJUST_KEY` BEZ ZMIAN (`rynek_art_adjust_v3`) — loader już
+robił `{ ...DEFAULT_ADJUST, ...JSON.parse(raw) }`, więc stare, już dostrojone przez usera na
+urządzeniu wartości (`bg`/`top`/`topSlots`/`cat`/`bottom`/`bottomSlots`) zostają nietknięte,
+a trzy nowe klucze (nieobecne w starym zapisie) po prostu spadają na nowe defaulty — brak
+potrzeby bump'owania wersji klucza / czyszczenia dostrojenia usera.
+
+`tsc`/`jest` zielone (70 suit/905 testów — bez nowych testów, to czysto wizualna zmiana
+struktury transformów, `stepImgAdjust`/edytor już były generyczne po `keyof ArtAdjust`, zero
+nowej logiki do przetestowania). **Priorytet testu na urządzeniu**: Rynek → ikona edytora sceny
+→ nowe trzy pozycje ("Tablica — wypełnienie", "Lada — wypełnienie", "Itemy sklepu dnia — ikony")
+— sprawdź że dają się kręcić NIEZALEŻNIE od obrazka/slotów bez rozjeżdżania reszty sceny.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

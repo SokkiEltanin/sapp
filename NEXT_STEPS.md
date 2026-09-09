@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek — wypełnienia brązowe/itemy jako niezależne warstwy edytora — NIEsprawdzone (2026-09-09)
+
+User: "daj mi opcje ustawienia tez indywidualnie tych wypełnień brązowych bo zjebałeś znowu,
+i itemow tez możesz". Pełny opis w ARCHITECTURE.md §63. `s.boardBg` dzieliło transform z
+obrazkiem tablicy/lady — dostrojenie jednego psuło drugie. Naprawione: `boardBgTop`/
+`boardBgBottom`/`items` to teraz osobne grupy w edytorze sceny (ikona ⚙️ w headerze Rynku),
+domyślne wartości = identyczny wygląd jak przed zmianą.
+
+`tsc`/`jest` zielone (70 suit/905 testów).
+
+**Priorytet testu na urządzeniu**: Rynek → edytor sceny → trzy nowe pozycje — sprawdź że
+wypełnienie/itemy dają się kręcić NIEZALEŻNIE od obrazka bez rozjeżdżania reszty.
+
 ## 🆕 `useShallow` w Pupilu/Rynku/Walce — mniej zbędnych re-renderów — NIEsprawdzone (2026-09-09)
 
 Pełny opis w ARCHITECTURE.md §62. `boss-fight.tsx`/`pet.tsx`/`pet-shop.tsx` woływały
