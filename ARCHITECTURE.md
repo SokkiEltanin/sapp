@@ -5191,6 +5191,54 @@ nowej logiki do przetestowania). **Priorytet testu na urządzeniu**: Rynek → i
 → nowe trzy pozycje ("Tablica — wypełnienie", "Lada — wypełnienie", "Itemy sklepu dnia — ikony")
 — sprawdź że dają się kręcić NIEZALEŻNIE od obrazka/slotów bez rozjeżdżania reszty sceny.
 
+## 64. Ustawienia, runda 1 — duplikat id, kolizja nazw "eksport", finanse rozrzucone + rok w kalendarzu
+
+User: *"jest sporo danych i wgle zakładki ale one są chaotyczne... w ustawieniach bym też
+uklarował wszystko, eksport danych mamy w kilku miejscach a dobrze by było te ustawienia
+dobrze połączyć umiejscowić, gdzie skróty do zakładek tam skróty, gdzie eksport tam eksport"* +
+osobno, przy okazji przeglądu "Dane osobowe": *"jak klikam datę urodzenia to mam tylko opcje
+przeklikiwania miesięcy a nie mam roku przez co muszę przeklinać milion razy"*.
+
+Duży, wieloczęściowy temat (user: "musimy ogarniać to po kolei") — TA runda to Ustawienia,
+Praca (przebudowa "jak w banku", z obsługą zmiany pracodawcy/prefiksu) zostaje jako osobny,
+kolejny front, świadomie NIE ruszony tutaj.
+
+**Prawdziwe, sprawdzone w kodzie problemy (nie zgadywanie)**:
+1. **Duplikat `id: 'personalizacja'`** — DWIE różne sekcje ustawień (dane osobowe: wiek/płeć/
+   poziom treningowy; i faktyczna personalizacja: motyw/dashboard) dzieliły DOKŁADNIE ten sam
+   `id`. Realny bug, nie tylko nazewnictwo — duplikat `id` w liście renderowanej z `key={id}`
+   psuje reconciliation Reacta, a każde ewentualne `sections.find(id === 'personalizacja')`
+   zawsze trafiało w PIERWSZĄ z nich. Naprawa: pierwsza sekcja dostała własny
+   `id: 'dane-osobowe'`/`title: 'Dane osobowe'`.
+2. **Kolizja nazwy "Eksportuj"** — prawdziwy eksport danych (sekcja "Dane" → `BackupSection`,
+   backup/przywracanie/plik) i "Eksportuj postęp pupila" w Diagnostyce (raport balansu bossów
+   do wysłania mi na czacie — zupełnie inna rzecz) nazywały się TAK SAMO. Naprawa: zmiana
+   nazwy na "Udostępnij raport postępu pupila" — narzędzie ZOSTAJE w Diagnostyce (tam
+   pasuje — to debug/balans, nie dane usera), tylko nazwa przestała kolidować.
+3. **Finanse rozrzucone** — Saldo/Wypłata były obok siebie, ale Budżet miesięczny/Limity na
+   tagi siedziały PO Powiadomieniach, rozbijając logiczny blok finansowy na dwie części.
+   Naprawa: kolejność sekcji teraz Saldo → Wypłata → Budżet → Limity na tagi → Powiadomienia —
+   cały klaster finansowy razem, Powiadomienia (temat niezwiązany) po nim, nie w środku.
+4. **`DatePickerField` bez skoku po latach** (`src/components/ui/DatePickerField.tsx`, 19 miejsc
+   użycia w apce) — tylko strzałki miesiąc-po-miesiącu; cofnięcie się o dekady (np. do roku
+   urodzenia) wymagało dziesiątek tapnięć. Naprawa: nagłówek miesiąca/roku jest teraz TAPPABLE —
+   przełącza na siatkę lat (`CURRENT_YEAR-100`…`CURRENT_YEAR+15`, malejąco), wybór roku wraca
+   do siatki dni z tym samym miesiącem. Strzałki miesiąca bez zmian — to DODATEK, nie
+   zastąpienie istniejącej nawigacji. Współdzielony komponent — poprawka działa wszędzie
+   (Ustawienia, paragony, długi, zadania, pojazdy...), nie tylko w dacie urodzenia.
+
+**Świadomie NIE zrobione w tej rundzie**: żadna WIZUALNA przebudowa layoutu ustawień (karty/
+zakładki/nested-grouping) — to był ASK o KOLEJNOŚĆ i NAZEWNICTWO ("gdzie eksport tam eksport"),
+nie o nowy system nawigacji; sekcje zostają płaską listą collapsible-paneli jak dotąd, tylko
+lepiej poukładaną. Praca (redesign "jak w banku") — osobny, następny front.
+
+`tsc`/`jest` zielone (70 suit/905 testów — bez nowych testów: to reorganizacja istniejących
+sekcji + jedna, czysto UI-owa funkcja w współdzielonym komponencie, żadna z tych zmian nie
+dotyka logiki wartej jednostkowego pokrycia). **Priorytet testu na urządzeniu**: Ustawienia →
+sprawdź nową kolejność (Saldo/Wypłata/Budżet/Tagi razem) i że "Dane osobowe"/"Personalizacja"
+to teraz dwie WYRAŹNIE różne sekcje; DatePickerField → dowolne pole daty (np. data urodzenia)
+→ tapnij nagłówek miesiąca → siatka lat → wybierz → wraca do dni z wybranym rokiem.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
