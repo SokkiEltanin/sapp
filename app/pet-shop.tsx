@@ -70,11 +70,27 @@ const ART_CONTENT_W = SCREEN_W - spacing[4] * 2;   // dokładnie tyle, ile zosta
 interface ImgAdjust { x: number; y: number; scale: number }
 interface ArtAdjust {
   bg: ImgAdjust; top: ImgAdjust; topSlots: ImgAdjust; cat: ImgAdjust; bottom: ImgAdjust; bottomSlots: ImgAdjust;
+  boardBgTop: ImgAdjust; boardBgBottom: ImgAdjust; items: ImgAdjust;
 }
 const DEFAULT_IMG: ImgAdjust = { x: 0, y: 0, scale: 1 };
 // Finalne wartości dostrojone przez usera na urządzeniu w edytorze sceny (2026-09-08,
 // wyeksportowane przyciskiem "Eksportuj" i wklejone w czacie) — zastępują `DEFAULT_IMG` per
 // warstwa jako NOWY stan "zerowy" sceny Rynku.
+//
+// 2026-09-09, user: "w rynku daj mi opcje ustawienia tez indywidualnie tych wypełnień
+// brązowych bo zjebałeś znowu, i itemow tez możesz" — `boardBg` (brązowe wypełnienie pod
+// tablicą/ladą) dotąd nie miało WŁASNEGO wpisu w `ArtAdjust` w ogóle: renderowało się jako
+// dziecko WSPÓLNEGO transformu z samym obrazkiem (`adjust.top`/`adjust.bottom`), więc
+// dostrojenie obrazka (żeby pasował do tła sceny) siłą rzeczy przesuwało/skalowało RAZEM
+// wypełnienie — nie dało się poprawić jednego bez zepsucia drugiego, stąd "zjebałeś znowu".
+// Naprawa: `boardBgTop`/`boardBgBottom` to TERAZ niezależne warstwy z własnym x/y/scale,
+// rozprzęgnięte od `top`/`bottom` (patrz JSX niżej — `s.boardBg` wyszedł z transformu obrazka
+// do WŁASNego, osobnego wrappera). Domyślne wartości = TAKIE SAME jak `top`/`bottom` miały w
+// chwili tej zmiany — więc wygląd na urządzeniu zostaje IDENTYCZNY dopóki user nie ruszy
+// nowych suwaków, tylko od teraz da się je odkleić od siebie. `items` (nowa grupa) — ikony
+// itemów Sklepu dnia (`s.artSlotImg`) też dostały własny x/y/scale (dotąd stałe 62%/62%, zero
+// regulacji) — jeden wspólny suwak dla wszystkich 4 itemów naraz (nie per-item — user
+// poprosił o regulację "itemów", nie o osobny suwak KAŻDEGO z osobna).
 const DEFAULT_ADJUST: ArtAdjust = {
   bg: { x: 0, y: 0, scale: 1.02 },
   top: { x: -116, y: 44, scale: 0.5 },
@@ -82,15 +98,21 @@ const DEFAULT_ADJUST: ArtAdjust = {
   cat: { x: 0, y: 104, scale: 1.6 },
   bottom: { x: -112, y: -144, scale: 0.46 },
   bottomSlots: { x: 4, y: -16, scale: 1.1 },
+  boardBgTop: { x: -116, y: 44, scale: 0.5 },
+  boardBgBottom: { x: -112, y: -144, scale: 0.46 },
+  items: { x: 0, y: 0, scale: 1 },
 };
 const ADJUST_KEY = 'rynek_art_adjust_v3';
 const IMG_GROUPS: { key: keyof ArtAdjust; label: string }[] = [
   { key: 'bg', label: 'Tło (cała scena)' },
   { key: 'top', label: 'Tablica — obrazek' },
+  { key: 'boardBgTop', label: 'Tablica — wypełnienie (brąz)' },
   { key: 'topSlots', label: 'Tablica — sloty (klikalne okna)' },
   { key: 'cat', label: 'Sklepikarz' },
   { key: 'bottom', label: 'Lada — obrazek' },
+  { key: 'boardBgBottom', label: 'Lada — wypełnienie (brąz)' },
   { key: 'bottomSlots', label: 'Lada — sloty (klikalne okna)' },
+  { key: 'items', label: 'Itemy sklepu dnia — ikony' },
 ];
 const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
   { key: 'x', label: 'Pozycja X', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
@@ -356,18 +378,17 @@ export default function PetShop() {
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
-            {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
-                spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). Tło pod
-                tablicą (`s.boardBg`, patrz komentarz przy stylu) renderowane TU JAKO
-                PIERWSZE DZIECKO tej warstwy (2026-09-08, korekta po realnym teście: dawniej
-                siedziało jako osobny sibling na nieprzesuniętym `artPiece`, więc ignorowało
-                `adjust.top` całkowicie — przy scale 0.5 wystawało daleko poza faktyczną
-                grafikę tablicy zamiast się pod nią schować, user: "ten na górze za wysoko
-                wystaje wgle, i przez to nie pokrywa nawet kafelków"). Teraz dostaje DOKŁADNIE
-                ten sam transform co obrazek, więc zawsze pokrywa się z narysowaną tablicą,
-                niezależnie od dostrojenia w edytorze sceny. */}
-            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
+            {/* Warstwa WYPEŁNIENIA — WŁASNY x/y/scale (`adjust.boardBgTop`), 2026-09-09
+                ROZPRZĘGNIĘTY od warstwy obrazka niżej (dawniej dzielił transform z
+                `RYNEK_TOP`, więc dostrojenie jednego psuło drugie — user: "daj mi opcje
+                ustawienia tez indywidualnie tych wypełnień brązowych bo zjebałeś znowu").
+                Renderowana PIERWSZA (pod obrazkiem/slotami w z-order). */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.boardBgTop.x }, { translateY: adjust.boardBgTop.y }, { scale: adjust.boardBgTop.scale }] }]}>
               <View style={s.boardBg} />
+            </View>
+            {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
+                spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
               <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} contentFit="contain" />
             </View>
             {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
@@ -440,12 +461,13 @@ export default function PetShop() {
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
-            {/* Warstwa OBRAZKA + tło pod ladą — patrz identyczny komentarz przy tablicy
-                wyżej (`s.boardBg` teraz wewnątrz TEGO transformu, nie osobny sibling —
-                user po tej samej poprawce: "ten na dole tez wystaje przez co zakrywa
-                sklepikarza"). */}
-            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
+            {/* Warstwa WYPEŁNIENIA — WŁASNY x/y/scale (`adjust.boardBgBottom`), rozprzęgnięty
+                od obrazka niżej — patrz identyczny komentarz przy tablicy wyżej. */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.boardBgBottom.x }, { translateY: adjust.boardBgBottom.y }, { scale: adjust.boardBgBottom.scale }] }]}>
               <View style={s.boardBg} />
+            </View>
+            {/* Warstwa OBRAZKA lady — patrz identyczny komentarz przy tablicy wyżej. */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
               <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} contentFit="contain" />
             </View>
             {/* Warstwa SLOTÓW + pigułki (żywe, funkcjonalne, więc jadą RAZEM ze slotami, nie
@@ -476,7 +498,10 @@ export default function PetShop() {
                         do zamrożenia/potek/skrzynek, stąd znikały na (poprzednio ciemniejszym)
                         `s.boardBg`. */}
                     <RadialGlow size={40} color="#000" opacity={0.55} />
-                    <Image source={item.icon} style={s.artSlotImg} contentFit="contain" />
+                    {/* Własny x/y/scale (`adjust.items`, 2026-09-09, user: "itemow tez
+                        możesz [dać regulację]") — jeden wspólny suwak dla wszystkich 4 itemów
+                        Sklepu dnia naraz, dotąd sztywne 62%/62% bez regulacji. */}
+                    <Image source={item.icon} style={[s.artSlotImg, { transform: [{ translateX: adjust.items.x }, { translateY: adjust.items.y }, { scale: adjust.items.scale }] }]} contentFit="contain" />
                     {(bought || owned) && (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
                         <Check size={11} color="#0B0E1A" strokeWidth={3} />
