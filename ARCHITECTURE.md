@@ -5123,6 +5123,39 @@ na urządzeniu**: poużywaj apki chwilę (kilka wydatków, posiłków, walka z b
 Ustawienia → Diagnostyka → "Rozmiar zapisywanych danych" — sprawdź czy któryś store ma
 niepokojący rozmiar/czas; jeśli tak, wróć do tematu partycjonowania z konkretnymi liczbami.
 
+## 62. `usePetStore()` bez selektora — `useShallow` w Pupilu/Rynku/Walce — 2026-09-09
+
+User: *"rob dopóki nie będziesz zadowolony po kolei rozbijają optymalizuj rozbijaj optymalizuj
+i w kółko"* — kontynuacja, znaleziona przy przeglądzie zustand-owych subskrypcji pod kątem
+klasycznego antywzorca: `const { ... } = useXStore()` (bez selektora) subskrybuje CAŁY store —
+komponent re-renderuje się na KAŻDĄ zmianę DOWOLNEGO pola, nie tylko tych faktycznie użytych.
+
+**Skala problemu**: `petStore.ts` (1149 linii) to WSPÓLNY store dla całego systemu pupila —
+questy, ekwipunek, customizacja, streaki, walka, misje, skrzynki — dziesiątki pól. `boss-fight.tsx`
+(walka — HP/coiny/XP zmieniają się CO RUNDĘ, na ekranie z ciężką animacją kotka/pocisków/portretów),
+`pet.tsx` i `pet-shop.tsx` wołały `usePetStore()` bez selektora — KAŻDA zmiana w petStore, nawet
+zupełnie niezwiązana z tym co dany ekran wyświetla (np. tick questa gdzieś indziej w tle),
+re-renderowała cały, ciężki komponent.
+
+**Naprawa**: `usePetStore(useShallow((s) => ({ pole1: s.pole1, ... })))` — `useShallow` z
+`zustand/react/shallow` (zustand v5, już w projekcie). Selektor wymienia WYŁĄCZNIE pola faktycznie
+użyte w danym pliku (boss-fight.tsx: 48, pet.tsx: 40, pet-shop.tsx: 16) — re-render triggeruje
+się teraz tylko gdy jedna z TYCH konkretnych wartości faktycznie się zmieni (shallow compare),
+nie na dowolną mutację gdziekolwiek w store. Akcje (`defeatBoss`, `damageCat` itp.) mają stabilne
+referencje w zustand, więc ich obecność w selektorze nie psuje shallow-compare.
+
+**Świadomie NIE dotknięte**: dziesiątki innych `useXStore()` bez selektora w apce (grep: ~30
+miejsc) — większość to ekrany renderowane raz (ustawienia, formularze dodawania), gdzie koszt
+jest pomijalny; fix skupiony na TRZECH faktycznie hot-path ekranach pupila, nie ślepy sweep
+całej bazy kodu.
+
+`tsc`/`jest` zielone (70 suit/905 testów — bez nowych testów: to czysto renderowa optymalizacja,
+zero zmiany zachowania/logiki, `tsc` sam w sobie zweryfikował poprawność wszystkich nazw pól
+przez typowanie selektora). **Priorytet testu na urządzeniu**: kilka rund walki z bossem pod
+rząd (HP/coiny/XP migają szybko) — sprawdź czy mniej "szarpania"/lagów niż wcześniej, oraz że
+WSZYSTKO nadal działa identycznie (customizacja kotka, sklep, ekwipunek, misje) — to czysta
+optymalizacja re-renderów, zero zmiany w danych/logice.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
