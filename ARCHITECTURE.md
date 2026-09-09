@@ -5060,6 +5060,42 @@ tylko nowe miejsce ich wywołania). **Priorytet testu na urządzeniu**: Wydatki 
 tej zmianie) → kategoria/tagi/cena powinny wskoczyć same, z zielonym potwierdzeniem pod nazwą;
 zupełnie nowy produkt dalej dostaje starą, statyczną podpowiedź kategorii (tap-to-apply).
 
+## 60. `expo-image` zamiast RN `Image` w Rynku/Pupilu/Walce — cache grafik — 2026-09-09
+
+User: *"dawaj dalej optymalizacje"* + wybór z listy dwóch kandydatów ("wszystko po kolei co
+możesz dawaj bez przerwy dziel to na osobne pushe"). Kandydat 1 z dwóch zaproponowanych.
+
+**Problem**: `pet-shop.tsx`, `pet.tsx`, `boss-fight.tsx` — trzy ekrany, które w tej sesji
+dostały najwięcej nowej grafiki (skrzynki, gear, bossy) — renderowały ją przez RN-owy core
+`Image`, który na Androidzie NIE ma domyślnego cache dysk+pamięć: te same, wielokrotnie
+pokazywane PNG-i (ikony itemów w sklepie, portrety w walce, tło Rynku) są dekodowane od nowa
+za każdym razem, gdy komponent się mountuje.
+
+**Naprawa**: `expo-image` (`~3.0.11`, dociągnięty przez `npx expo install` pod SDK 54) —
+drop-in zamiennik z automatycznym cache dysk+pamięć i dekodowaniem po stronie GPU. Podmienione
+WSZYSTKIE renderowane `<Image>`/`<ImageBackground>` w tych trzech plikach (`resizeMode` →
+`contentFit`, `"stretch"` → `"fill"` bo `expo-image` inaczej nazywa ten tryb). Jeden wyjątek
+świadomie zostawiony na RN-owym `Image`: `pet-shop.tsx`'s `Image.resolveAssetSource(RYNEK_BG)`
+(synchroniczny odczyt szerokości/wysokości `require()`'owanego assetu, do przeliczenia skali
+tła) — `expo-image` tej statycznej metody nie ma, więc import RN `Image` zostaje pod aliasem
+`RNImage` WYŁĄCZNIE do tego jednego wywołania.
+
+**Świadomie NIE dotknięte**: żaden inny ekran w apce nie używał `Image` na tyle intensywnie
+(powtarzalne ikony w wielu miejscach), żeby cache dawał realny zysk — reszta zostaje na RN
+`Image`, nie ma sensu migrować całą apkę na raz pod jeden, niepewny zysk.
+
+**Ważne — to NIE jest zmiana czysto JS-owa**: `expo-image` to natywny moduł (jak
+`android.permissions` w `app.json`, patrz zasada #2 w CLAUDE.md) — efekt zobaczysz DOPIERO po
+nowym buildzie APK, nie przez OTA. Do czasu nowego builda apka dalej używa starego, wbudowanego
+binarnie kodu i wygląda/działa identycznie (brak cache'u, nie regresja — po prostu nowy kod
+jeszcze nieaktywny).
+
+`tsc`/`jest` zielone (70 suit/902 testy — bez nowych testów, żaden test nie renderuje tych
+ekranów). **Priorytet testu na urządzeniu (WYMAGA nowego builda APK, nie samego OTA)**: Rynek
+(przewijanie sklepu skrzynek/itemów), Pupil (poziomy pupila), Walka z bossem (kilka rund) —
+płynniejsze pierwsze wejście na ekran po restarcie apki (mniej "popcornu" przy ładowaniu ikon),
+zero wizualnych regresji (proporcje/aspect ratio identyczne jak przed zmianą).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

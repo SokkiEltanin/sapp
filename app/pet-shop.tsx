@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image as RNImage, Modal, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -202,7 +203,7 @@ export default function PetShop() {
   // zoom jednej grafiki zostaje czysto wizualny i lokalny, zero wpływu na resztę sceny. Jedyny
   // wyjątek to Tło — jego `scale` i tak ZAWSZE był niezależny od `sceneH` (mnożnik NAD
   // minimalną skalą `cover`, patrz niżej), więc nie wymagał tej samej poprawki.
-  const bgSrc = useMemo(() => Image.resolveAssetSource(RYNEK_BG), []);
+  const bgSrc = useMemo(() => RNImage.resolveAssetSource(RYNEK_BG), []);
   const topW = ART_CONTENT_W;
   const topH = topW / RYNEK_TOP_ASPECT;
   const botW = ART_CONTENT_W;
@@ -336,7 +337,7 @@ export default function PetShop() {
             ZOSTAJĄ POZA tym wrapperem — nigdy nie miały wymogu piksel-w-piksel wyrównania
             z konkretnym miejscem na obrazku, to zwykłe karty UI, nie część "obrazu". ── */}
         <View style={[s.scene, { height: sceneH }]}>
-          <Image source={RYNEK_BG} style={{ position: 'absolute', width: bgRenderW, height: bgRenderH, left: bgLeft, top: bgTop }} resizeMode="stretch" />
+          <Image source={RYNEK_BG} style={{ position: 'absolute', width: bgRenderW, height: bgRenderH, left: bgLeft, top: bgTop }} contentFit="fill" />
 
         {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Etykieta
             "Skrzynki" + instruktażowy podpis USUNIĘTE (2026-09-06, user: "wypierdol te
@@ -358,7 +359,7 @@ export default function PetShop() {
                 niezależnie od dostrojenia w edytorze sceny. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
               <View style={s.boardBg} />
-              <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+              <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} contentFit="contain" />
             </View>
             {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
                 niedopasowanie siatki klikalnych okien względem narysowanych na obrazku okien,
@@ -436,7 +437,7 @@ export default function PetShop() {
                 sklepikarza"). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
               <View style={s.boardBg} />
-              <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+              <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} contentFit="contain" />
             </View>
             {/* Warstwa SLOTÓW + pigułki (żywe, funkcjonalne, więc jadą RAZEM ze slotami, nie
                 z samym obrazkiem — mają zostać czytelne względem okien niezależnie od tego,
@@ -466,7 +467,7 @@ export default function PetShop() {
                         do zamrożenia/potek/skrzynek, stąd znikały na (poprzednio ciemniejszym)
                         `s.boardBg`. */}
                     <RadialGlow size={40} color="#000" opacity={0.55} />
-                    <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
+                    <Image source={item.icon} style={s.artSlotImg} contentFit="contain" />
                     {(bought || owned) && (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
                         <Check size={11} color="#0B0E1A" strokeWidth={3} />
@@ -493,7 +494,7 @@ export default function PetShop() {
                         assets/chests/skrzynka_*.png — "dodaj je do rynku naszego") — `emoji`
                         zostaje jako fallback (BoxRevealModal, DAILY_BOX bez własnej grafiki). */}
                     {box.icon
-                      ? <Image source={box.icon} style={[s.boxSlotImg, !afford && { opacity: 0.5 }]} resizeMode="contain" />
+                      ? <Image source={box.icon} style={[s.boxSlotImg, !afford && { opacity: 0.5 }]} contentFit="contain" />
                       : <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>}
                     <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </PressableScale>
@@ -655,7 +656,7 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
           </View>
           <View style={s.previewTop}>
             <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55', width: 64, height: 64 }]}>
-              <Image source={item.icon} style={{ width: 40, height: 40 }} resizeMode="contain" />
+              <Image source={item.icon} style={{ width: 40, height: 40 }} contentFit="contain" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.cellState, { color: meta.color, fontSize: 12, fontWeight: '800' }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>

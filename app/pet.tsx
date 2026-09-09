@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Modal } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -629,7 +630,7 @@ export default function Pet() {
               <View key={id} style={[s.itemRow, !owned && s.itemRowLocked]}>
                 <View style={[s.itemIcon, !owned && s.itemIconLocked]}>
                   {owned
-                    ? <Image source={def.icons[Math.min(level, def.icons.length) - 1]} style={{ width: 30, height: 30 }} resizeMode="contain" />
+                    ? <Image source={def.icons[Math.min(level, def.icons.length) - 1]} style={{ width: 30, height: 30 }} contentFit="contain" />
                     : <Lock size={18} color={c.text.muted} />}
                 </View>
                 <View style={{ flex: 1 }}>
