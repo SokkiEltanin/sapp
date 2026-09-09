@@ -4932,6 +4932,40 @@ i limit rozmiaru `seenNotifications`.
 się tego łatwo wymusić ręcznie (zależy od realnego reconnect Androida) — obserwować, czy
 problem się powtórzy; jeśli tak, sprawdzić czy to inny wektor duplikacji niż zdiagnozowany tu.
 
+## 57. Rynek — własne grafiki skrzynek (4 tiery) zamiast emoji — 2026-09-09
+
+User: *"dodałem CI skrzynki grafiki: assets/chests/skrzynka_zlota.png itp, dodaj je do rynku
+naszego, zaraz przygotuje te pod POTKI"* — cztery PNG (drewniana/zelazna/zlota/boska,
+odpowiadające `LOOT_BOXES` z `petBoxes.ts`) wgrane przez usera bezpośrednio na `master`
+(commit "Add files via upload", 1536×1024 każdy, ChatGPT-owy rozmiar, ~1.5-2.4MB/szt).
+
+**Downscale przed użyciem** (ten sam skrypt/parametry co assety ekwipunku, §13/§30) — PIL
+LANCZOS do 300×200 (docelowy rozmiar ikon-slotów już ustalony w `assets/ekwipunek/`), RGBA
+zachowana: 7.5MB → ~322KB łącznie.
+
+**Podpięcie**: `LootBox.icon?: any` (nowe, opcjonalne pole) + `BOX_ICON: Record<BoxId, any>`
+mapujący `sardine/iron/gold/divine` na `require()` odpowiedniego pliku — dodane w
+`petBoxes.ts` obok istniejącego `emoji` (zostaje jako fallback, nie usunięty: `BoxRevealModal`
+i `DAILY_BOX`, żadne z nich nie było częścią tego zgłoszenia, dalej używają samego emoji).
+`app/pet-shop.tsx`'s dolny rząd lady (4 sloty skrzynek) renderuje teraz `<Image
+source={box.icon}>` gdy dostępne, z fallbackiem na stary `<Text>{box.emoji}</Text>` — więc
+DAILY_BOX (gdyby kiedyś tu wrócił) i przyszłe tiery bez własnej grafiki nadal działają.
+Nowy styl `s.boxSlotImg` (68% slotu, `resizeMode="contain"`) — NIE nazwany `boxIcon`, bo ta
+nazwa była już zajęta przez inny, niepowiązany styl (chip w podglądzie zakupu, 46×46 z
+obwódką) — kolizja złapana od razu przez `tsc` (duplicate object literal property).
+
+Świadomie NIE ruszony `BoxRevealModal`'s duży emoji przy otwieraniu skrzynki (`app/pet-shop.tsx`,
+`app/pet.tsx`) — user poprosił konkretnie o Rynek/sloty, nie o cały cykl otwierania; zostaje
+jako osobna, przyszła decyzja jeśli user zechce.
+
+`tsc`/`jest` zielone (70 suit/900 testów — czysto wizualna zmiana, bez nowej logiki biznesowej
+poza opcjonalnym polem). **Priorytet testu na urządzeniu**: Rynek → dolny rząd lady → 4
+skrzynki mają teraz własne grafiki zamiast emoji drewna/zębatki/medalu/korony, czytelne na
+nowym, jaśniejszym `boardBg` (§54).
+
+**Zapowiedź od usera**: analogiczne grafiki pod POTKI (górne sloty tablicy — zamrożenie +
+HP/ATK/XP) w przygotowaniu, jeszcze nie dostarczone — osobne zadanie gdy nadejdą.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
