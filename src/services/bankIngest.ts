@@ -9,11 +9,21 @@ import { useBankRules, matchBankRule, ruleKind } from '@/store/bankRulesStore';
 // Trusted (auto) merchants are still queued but flagged `auto` — the in-app processor
 // commits those without manual review the next time the app is opened (so receipt
 // matching runs with expenses loaded and nothing gets double-counted).
-export async function ingestBankNotification(title: string, text: string): Promise<boolean> {
+//
+// `notifKey` (2026-09-09) — a caller-supplied dedup identity (see `bankNotificationDrain.ts`,
+// built from Android's `pkg:postTime`) for THIS specific notification event. When given, a
+// notification whose key we've already processed — ever, not just recently — is dropped
+// before parsing even runs. See the long comment on `bankQueueStore.seenNotifications` for
+// why this exists: the native listener's reconnect sweep can re-deliver the exact same,
+// still-undismissed notification days later, producing a real duplicate expense once the
+// original has long since been committed and dropped out of the review queue.
+export async function ingestBankNotification(title: string, text: string, notifKey?: string): Promise<boolean> {
   const store = useBankQueue.getState();
   if (!store.enabled) return false;
+  if (notifKey && store.wasNotificationSeen(notifKey)) return false;
   const tx = parseBankNotification(title, text);
   if (!tx) return false;
+  if (notifKey) store.markNotificationSeen(notifKey);
 
   // Incoming transfer → income. Full-auto means FULL auto: an ordinary credit is booked
   // straight away, exactly like a card payment. This used to hold back everything that

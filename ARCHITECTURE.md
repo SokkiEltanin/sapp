@@ -4872,6 +4872,66 @@ testu na urządzeniu**: dashboard z kilkoma skonfigurowanymi custom stat tiles (
 przed zmianą (0 zmian w logice renderowania, czysta ekstrakcja) i że strzałki zmiany roku na
 kafelku pixels dalej działają (`updateCustomTile`).
 
+## 56. Duplikat wydatku z powtórzonego powiadomienia banku — postTime dedup — 2026-09-09
+
+User przesłał zrzut ekranu Finansów: ta sama płatność za internet (P4/Play, -60 zł) zalogowana
+DWA razy — "wczoraj" i "dziś" — *"nie wiem czemu zdublowało mi wczorajszy wyciąg mimo że go
+nie mam już w powiadomieniach jakby na telefonie. Może niech on sobie zapisuje datę kiedy
+dostał co żeby jak dostanie to sprawdzi czas powiadomienia"* i drugi raz: *"powinno wykryć że
+to to samo przecież nie płacę za internet dwa razy tak samo i jeszcze w jednym miesiącu"*.
+
+**Prawdziwa przyczyna (zbadana, nie zgadywana)**: Androidowy `NotificationListenerService`
+(`plugins/withBankNotificationListener.js`) ma DWIE ścieżki dostawy: `onNotificationPosted`
+normalnie, ale też `onListenerConnected` — gdy system re-bind'uje usługę (np. po tym jak OEM
+battery-saver ją zabił, co na realnych urządzeniach zdarza się regularnie), ten callback
+ZAMIATA wszystkie wciąż widoczne powiadomienia w zasobniku. Jeśli bankowa apka nie skasowała
+swojego powiadomienia od razu (zostaje widoczne, dopóki user go nie odrzuci lub bank go nie
+zastąpi), TEN SAM realny event potrafi zostać dostarczony PONOWNIE dni później — z tym samym
+`postTime` (oryginalny czas wysłania), ale w zupełnie innej sesji apki.
+
+Dwie ISTNIEJĄCE warstwy dedupu obie zawodzą w tym dokładnym scenariuszu:
+1. Natywny dedup w Kotlinowym `append()` (`SappNotificationListener.kt`) porównuje
+   `(time, title, text)` — ale TYLKO w ramach jednego, jeszcze nie wyczyszczonego pliku
+   przechwytu. `bankNotificationDrain.ts` czyści ten plik od razu po każdym odczycie, więc ta
+   pamięć znika, zanim reconnect-sweep miałby szansę coś w niej znaleźć.
+2. `bankQueueStore.enqueue`'s dedup (amount+storeKey w oknie 3 minut) patrzy TYLKO w aktualną
+   `pending` — ale do czasu ponownej dostawy oryginalny wpis jest już dawno zaakceptowany i
+   USUNIĘTY z kolejki (stał się prawdziwym `Expense`), więc nie ma z czym porównać.
+
+Rezultat: `parseBankNotification`'s `dateISO` domyślnie bierze `localISO()` (czas WŁASNEGO
+ingestu, nie czas z treści powiadomienia, gdy notification nie ma go w treści) — druga
+dostawa dostaje DZISIEJSZĄ datę, stąd user widzi dokładnie "ten sam wydatek, wczoraj i dziś".
+
+**Naprawa (dokładnie w duchu propozycji usera — "zapisuje datę kiedy dostał")**: `pkg:postTime`
+(natywny `n.postTime` już był zbierany i zapisywany przez Kotlin od dawna — `append()` go ma,
+tylko `bankNotificationDrain.ts` go dotąd IGNOROWAŁ przy przekazywaniu do `ingestBankNotification`)
+jako trwały, MIĘDZYSESYJNY klucz w nowym `bankQueueStore.seenNotifications: string[]`
+(ograniczony do 500 wpisów, `wasNotificationSeen`/`markNotificationSeen`). `ingestBankNotification`
+sprawdza to PRZED parsowaniem — dokładnie ten sam event nie trafi do kolejki drugi raz,
+niezależnie ile dni minęło między dostawami. Zmiana WYŁĄCZNIE JS/TS (`bankQueueStore.ts`,
+`bankIngest.ts`, `bankNotificationDrain.ts`) — natywny Kotlin już dawno zbierał `postTime`,
+tylko nikt go dotąd nie czytał po stronie JS — więc **żadnego nowego builda APK nie trzeba**,
+naprawa wchodzi zwykłą aktualizacją JS (w przeciwieństwie do CLAUDE.md punkt 2 o
+uprawnieniach/pluginach, które WYMAGAJĄ nowego APK).
+
+Świadomie NIE dodany drugi heuristic z propozycji usera ("nie płacę za internet dwa razy w
+jednym miesiącu") — twardy blok "ten sam sklep+kwota w tym samym miesiącu" miałby realne
+ryzyko fałszywych trafień (user MOŻE legalnie zapłacić temu samemu sprzedawcy tę samą kwotę
+dwa razy w miesiącu — rata + dopłata, dwa różne prawdziwe zakupy o zbieżnej cenie) i cicho
+gubiłby prawdziwe transakcje. Naprawa po `postTime` jest PRECYZYJNA (identyfikuje dokładnie
+TEN SAM event powiadomienia, nie zgaduje po treści biznesowej) i w pełni rozwiązuje realnie
+opisany scenariusz bez tego ryzyka.
+
+Testy: nowy `__tests__/bankNotificationDedup.test.ts` (5 testów) — odtwarza dokładnie
+zgłoszony scenariusz (notifKey raz, wpis usunięty z kolejki jak po akceptacji, ten sam
+notifKey drugi raz → odrzucony), plus dwie realnie różne płatności o tej samej treści ale
+innym czasie NIE są blokowane, nieparsowalne powiadomienie nie zaśmieca pamięci "widzianych",
+i limit rozmiaru `seenNotifications`.
+
+`tsc`/`jest` zielone (70 suit/902 testy, +5 nowych). **Priorytet testu na urządzeniu**: nie da
+się tego łatwo wymusić ręcznie (zależy od realnego reconnect Androida) — obserwować, czy
+problem się powtórzy; jeśli tak, sprawdzić czy to inny wektor duplikacji niż zdiagnozowany tu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
