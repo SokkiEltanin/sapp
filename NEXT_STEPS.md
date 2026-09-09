@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Duplikat wydatku z powtórzonego powiadomienia banku — postTime dedup — NIEsprawdzone (2026-09-09)
+
+User: zdublowana płatność za internet (P4/Play, -60 zł) — wczoraj i dziś, ta sama. Pełny opis
+w ARCHITECTURE.md §56. Root cause: Android `onListenerConnected` (reconnect po np. OEM
+battery-saver) potrafi dostarczyć TĘ SAMĄ, wciąż-niewidoczną w zasobniku notyfikację ponownie
+dni później — dotychczasowy dedup (natywny per-plik + `enqueue`'s 3-minutowe okno w kolejce)
+oba zawodzą, bo oryginał jest już dawno zaakceptowany i usunięty z `pending`. Naprawa: trwały,
+międzysesyjny dedup po `pkg:postTime` (`bankQueueStore.seenNotifications`) — Kotlin już zbierał
+`postTime`, tylko JS strona go ignorowała. **Zmiana WYŁĄCZNIE JS — nie wymaga nowego builda
+APK**, wchodzi zwykłą aktualizacją.
+
+`tsc`/`jest` zielone (70 suit/902 testy, +5 nowych w `bankNotificationDedup.test.ts`).
+
+**Priorytet obserwacji**: nie da się tego łatwo wymusić ręcznie (zależy od realnego reconnectu
+Androida, OEM battery-saver itp.) — obserwuj czy duplikat się powtórzy. Jeśli tak mimo tej
+naprawy, to inny wektor duplikacji niż zdiagnozowany (np. dwa RÓŻNE bank-app powiadomienia o
+tej samej transakcji z różnym `postTime` — do zbadania osobno, jeśli się pojawi).
+
 ## 🆕 Dashboard perf runda 2 — `<StatTile>` wydzielony i zmemoizowany — NIEsprawdzone (2026-09-08)
 
 User: "teraz musimy zająć się optymalizacją". Kontynuacja poprzedniego wpisu (1Hz-timer, PR

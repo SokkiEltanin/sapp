@@ -30,7 +30,16 @@ export async function drainBankNotifications(): Promise<number> {
     if (!Array.isArray(arr)) return 0;
     let n = 0;
     for (const it of arr) {
-      try { if (await ingestBankNotification(String(it?.title ?? ''), String(it?.text ?? ''))) n++; } catch {}
+      try {
+        // `pkg:postTime` — Android's `n.postTime` (the notification's ORIGINAL post time, see
+        // SappNotificationListener.kt's `append()`) is stable across repeat deliveries of the
+        // SAME event (onNotificationPosted/onNotificationRemoved/onListenerConnected's
+        // reconnect sweep can all fire for it), unlike our own ingest timestamp — this is what
+        // lets `ingestBankNotification` recognize "already processed this exact notification,
+        // no matter how long ago" instead of just "not queued in the last 3 minutes".
+        const notifKey = it?.pkg && it?.time ? `${it.pkg}:${it.time}` : undefined;
+        if (await ingestBankNotification(String(it?.title ?? ''), String(it?.text ?? ''), notifKey)) n++;
+      } catch {}
     }
     return n;
   } catch {
