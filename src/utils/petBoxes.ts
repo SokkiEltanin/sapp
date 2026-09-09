@@ -9,6 +9,17 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 
 export type BoxId = 'sardine' | 'iron' | 'gold' | 'divine';
 
+// Grafiki slotów skrzynek na Rynku (2026-09-09, user dostarczył — "dodałem CI skrzynki
+// grafiki: assets/chests/skrzynka_zlota.png itp, dodaj je do rynku naszego"). Oryginały
+// 1536×1024 (ChatGPT-owy rozmiar, ~1.5-2.4MB/szt) przeskalowane do 300×200 (ten sam docelowy
+// rozmiar co reszta ikon-slotów w `assets/ekwipunek/`, PIL LANCZOS) — ~70-110KB/szt.
+export const BOX_ICON: Record<BoxId, any> = {
+  sardine: require('../../assets/chests/skrzynka_drewniana.png'),
+  iron: require('../../assets/chests/skrzynka_zelazna.png'),
+  gold: require('../../assets/chests/skrzynka_zlota.png'),
+  divine: require('../../assets/chests/skrzynka_boska.png'),
+};
+
 // Ranga skrzynki (0 = najtańsza, rośnie w górę) — zastępuje twarde porównania `box.id ===
 // 'gold'` rozsiane po `rollBox()` (2026-09-08, dodanie 4. tieru "Boska" — user: "miała być
 // ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"). Gdyby kiedyś doszedł 5. tier, wystarczy dopisać
@@ -21,6 +32,7 @@ export interface LootBox {
   cost: number;
   color: string;   // akcent skrzynki
   emoji: string;
+  icon?: any;       // opcjonalna grafika slotu (Rynek) — brak = `emoji` jako fallback (DAILY_BOX)
   blurb: string;
   colorChance: number;   // szansa że nagrodą jest KOLOR
   startupChance?: number; // szansa na STARTUP (kosmetyk splasha); tylko lepsze skrzynki
@@ -57,7 +69,7 @@ export interface LootBox {
 // kupowanych", procent-od-kosztu nie miałby sensu przy koszcie 0.
 export const LOOT_BOXES: LootBox[] = [
   {
-    id: 'sardine', name: 'Drewniana skrzynka', cost: 35, color: '#9AA6B2', emoji: '🪵',
+    id: 'sardine', name: 'Drewniana skrzynka', cost: 35, color: '#9AA6B2', emoji: '🪵', icon: BOX_ICON.sardine,
     blurb: 'Tania — głównie monety, czasem zwykły kolor lub item ekwipunku',
     colorChance: 0.20, freezeChance: 0.05, gearChance: 0.15, combatItemChance: 0.02,
     tierWeight: { basic: 8, rare: 2, epic: 0.4 },
@@ -67,7 +79,7 @@ export const LOOT_BOXES: LootBox[] = [
   {
     // Dawniej "silver"/"Srebrna skrzynka" — PRZEMIANOWANA (2026-09-08, user: "miała być ta
     // nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"), liczby BEZ ZMIAN, tylko nazwa/emoji/kolor.
-    id: 'iron', name: 'Żelazna skrzynka', cost: 90, color: '#8A93A8', emoji: '⚙️',
+    id: 'iron', name: 'Żelazna skrzynka', cost: 90, color: '#8A93A8', emoji: '⚙️', icon: BOX_ICON.iron,
     blurb: 'Lepsze szanse na rzadki kolor, item ekwipunku, startup + zamrożenie',
     colorChance: 0.28, startupChance: 0.10, freezeChance: 0.10, gearChance: 0.28, combatItemChance: 0.05,
     tierWeight: { basic: 4, rare: 4, epic: 1.5 },
@@ -75,7 +87,7 @@ export const LOOT_BOXES: LootBox[] = [
     coins: { min: 45, max: 270, jackpot: 90, jackpotChance: 0.04 },
   },
   {
-    id: 'gold', name: 'Złota skrzynka', cost: 200, color: '#FBBF24', emoji: '🥇',
+    id: 'gold', name: 'Złota skrzynka', cost: 200, color: '#FBBF24', emoji: '🥇', icon: BOX_ICON.gold,
     blurb: 'Bardzo dobre szanse — epicki kolor, wysokiej rzadkości ekwipunek lub startup',
     colorChance: 0.32, startupChance: 0.16, freezeChance: 0.10, gearChance: 0.38, combatItemChance: 0.08,
     tierWeight: { basic: 2, rare: 4, epic: 4.5 },
@@ -95,7 +107,7 @@ export const LOOT_BOXES: LootBox[] = [
     // Ogólna jakość i tak jest wyraźnie lepsza niż gold: wyższe `colorChance`/`startupChance`,
     // PRAWIE DWA RAZY wyższe `combatItemChance`, i `gearRarityWeight` mocno przechylone w
     // legendary/mythic. Do skorygowania po realnym teście balansu.
-    id: 'divine', name: 'Boska skrzynka', cost: 450, color: '#C4B5FD', emoji: '👑',
+    id: 'divine', name: 'Boska skrzynka', cost: 450, color: '#C4B5FD', emoji: '👑', icon: BOX_ICON.divine,
     blurb: 'Absolutny szczyt — najlepsze szanse na rzadki kolor, mitycznej jakości ekwipunek i perki bossów',
     colorChance: 0.34, startupChance: 0.18, freezeChance: 0.10, gearChance: 0.30, combatItemChance: 0.16,
     tierWeight: { basic: 1, rare: 3, epic: 6 },

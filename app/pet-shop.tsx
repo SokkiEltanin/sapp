@@ -489,7 +489,12 @@ export default function PetShop() {
                 return (
                   <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 4])]}>
                     <RadialGlow size={44} color="#000" opacity={0.55} />
-                    <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
+                    {/* Własne grafiki skrzynek (2026-09-09, user dostarczył
+                        assets/chests/skrzynka_*.png — "dodaj je do rynku naszego") — `emoji`
+                        zostaje jako fallback (BoxRevealModal, DAILY_BOX bez własnej grafiki). */}
+                    {box.icon
+                      ? <Image source={box.icon} style={[s.boxSlotImg, !afford && { opacity: 0.5 }]} resizeMode="contain" />
+                      : <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>}
                     <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </PressableScale>
                 );
@@ -702,6 +707,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   boxIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxEmoji: { fontSize: 26 },
+  boxSlotImg: { width: '68%', height: '68%' },
 
   // Scena Rynku (2026-09-05, fix "grafiki się rushają/nie na miejscu") — jeden
   // `position:relative` wrapper wokół tablicy+kotka+lady, żeby `RYNEK_BG` (pierwsze dziecko,

@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: własne grafiki 4 skrzynek zamiast emoji — NIEsprawdzone (2026-09-09)
+
+User dostarczył `assets/chests/skrzynka_{drewniana,zelazna,zlota,boska}.png` (uploadowane
+bezpośrednio na master) — "dodaj je do rynku naszego". Pełny opis w ARCHITECTURE.md §57.
+Downscale 1536×1024→300×200 (ten sam wzorzec co ekwipunek), podpięte przez nowe `LootBox.icon`
++ `BOX_ICON` w `petBoxes.ts`, `pet-shop.tsx`'s dolny rząd lady renderuje `<Image>` z
+fallbackiem na stary `emoji` (dla `BoxRevealModal`/`DAILY_BOX`, świadomie nieruszonych — user
+prosił konkretnie o Rynek).
+
+`tsc`/`jest` zielone (70 suit/900 testów — czysto wizualna zmiana).
+
+**Priorytet testu na urządzeniu**: Rynek → dolny rząd lady → 4 skrzynki mają własne grafiki,
+czytelne na `boardBg`. **User zapowiedział**: analogiczne grafiki pod POTKI (górne sloty
+tablicy) w przygotowaniu — osobne zadanie gdy dostarczy.
+
 ## 🆕 Duplikat wydatku z powtórzonego powiadomienia banku — postTime dedup — NIEsprawdzone (2026-09-09)
 
 User: zdublowana płatność za internet (P4/Play, -60 zł) — wczoraj i dziś, ta sama. Pełny opis
