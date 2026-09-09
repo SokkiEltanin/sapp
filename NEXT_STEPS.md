@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ustawienia runda 1 + rok w DatePickerField — NIEsprawdzone (2026-09-09)
+
+User: "chaotyczne... w ustawieniach bym też uklarował, eksport danych mamy w kilku miejscach"
++ "przy dacie urodzenia nie mam roku, muszę przeklinać milion razy". Pełny opis w
+ARCHITECTURE.md §64. Naprawione: (1) duplikat `id: 'personalizacja'` (dwie różne sekcje!),
+(2) kolizja nazwy "Eksportuj" między prawdziwym eksportem danych a raportem pupila w
+Diagnostyce (przemianowany), (3) Budżet/Limity na tagi przeniesione obok Saldo/Wypłata (klaster
+finansowy razem, nie rozbity Powiadomieniami), (4) `DatePickerField` (19 miejsc użycia w apce) —
+nagłówek tappable → siatka lat, koniec z przeklikiwaniem miesięcy o dekady.
+
+**Następny front (osobno, user: "musimy ogarniać to po kolei")**: zakładka Praca —
+przebudowa "jak w banku", z obsługą zmiany pracodawcy/prefiksu. NIE zaczęte.
+
+`tsc`/`jest` zielone (70 suit/905 testów).
+
+**Priorytet testu na urządzeniu**: Ustawienia → sprawdź kolejność sekcji i że "Dane osobowe"/
+"Personalizacja" są wyraźnie rozdzielone; dowolna data (np. urodzenia) → tapnij nagłówek
+miesiąca → wybierz rok z siatki.
+
 ## 🆕 Rynek — wypełnienia brązowe/itemy jako niezależne warstwy edytora — NIEsprawdzone (2026-09-09)
 
 User: "daj mi opcje ustawienia tez indywidualnie tych wypełnień brązowych bo zjebałeś znowu,

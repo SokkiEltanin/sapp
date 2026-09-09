@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, ScrollView } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -36,10 +36,24 @@ function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+// 2026-09-09, user (dopytany o sekcję "Dane osobowe" w Ustawieniach — data urodzenia): "jak
+// klikam datę urodzenia to mam tylko opcje przeklikiwania miesięcy a nie mam roku przez co
+// muszę przeklinać milion razy" — same strzałki miesiąc-po-miesiącu (`prevMonth`/`nextMonth`)
+// wymagały dziesiątek tapnięć żeby cofnąć się o dekady (data urodzenia to skrajny przypadek,
+// ale komponent jest współdzielony w 19 miejscach — długi/krótki, przyszły/przeszły zakres
+// wszędzie inny). Naprawa: nagłówek miesiąca/roku jest teraz tappable — przełącza na siatkę
+// LAT (`YEARS`, `CURRENT-100`…`CURRENT+15`, malejąco — bliskie/przyszłe lata u góry, bo to
+// częstszy przypadek dla dat zadań/długów niż urodzeń), wybór roku wraca do siatki dni z tym
+// samym miesiącem. Strzałki miesiąca zostają BEZ zmian — to rozwiązuje TYLKO brakujący skok
+// po latach, nie zastępuje istniejącej nawigacji.
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS: number[] = Array.from({ length: (CURRENT_YEAR + 15) - (CURRENT_YEAR - 100) + 1 }, (_, i) => (CURRENT_YEAR + 15) - i);
+
 export default function DatePickerField({ value, onChange, placeholder, style }: Props) {
   const c = useColors();
   const dp = useMemo(() => makeDp(c), [c]);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'days' | 'years'>('days');
   const today = todayIso();
 
   const [vy, vm] = useMemo(() => {
@@ -62,7 +76,13 @@ export default function DatePickerField({ value, onChange, placeholder, style }:
     const p = src.split('-').map(Number);
     setViewYear(p[0]);
     setViewMonth(p[1] - 1);
+    setMode('days');
     setOpen(true);
+  };
+
+  const selectYear = (y: number) => {
+    setViewYear(y);
+    setMode('days');
   };
 
   const prevMonth = () => {
@@ -95,39 +115,64 @@ export default function DatePickerField({ value, onChange, placeholder, style }:
         <View style={dp.modal} pointerEvents="box-none">
           <View style={dp.inner}>
             <View style={dp.header}>
-              <TouchableOpacity onPress={prevMonth} style={dp.navBtn}>
-                <ChevronLeft size={18} color={c.text.secondary} />
+              <TouchableOpacity onPress={prevMonth} style={dp.navBtn} disabled={mode === 'years'}>
+                <ChevronLeft size={18} color={mode === 'years' ? 'transparent' : c.text.secondary} />
               </TouchableOpacity>
-              <Text style={dp.monthTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
-              <TouchableOpacity onPress={nextMonth} style={dp.navBtn}>
-                <ChevronRight size={18} color={c.text.secondary} />
+              {/* Tappable nagłówek → siatka lat (patrz komentarz przy `YEARS` u góry pliku) —
+                  jedyny sposób na skok o dekady, bez którego cofnięcie się np. do roku
+                  urodzenia wymagało dziesiątek tapnięć strzałki miesiąca. */}
+              <TouchableOpacity onPress={() => setMode(m => m === 'days' ? 'years' : 'days')} activeOpacity={0.7}>
+                <Text style={dp.monthTitle}>{mode === 'days' ? `${MONTH_NAMES[viewMonth]} ${viewYear}` : 'Wybierz rok'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={nextMonth} style={dp.navBtn} disabled={mode === 'years'}>
+                <ChevronRight size={18} color={mode === 'years' ? 'transparent' : c.text.secondary} />
               </TouchableOpacity>
             </View>
 
-            <View style={dp.dayLabels}>
-              {DAY_LABELS.map(d => <Text key={d} style={dp.dayLabel}>{d}</Text>)}
-            </View>
+            {mode === 'years' ? (
+              <ScrollView style={dp.yearScroll} contentContainerStyle={dp.yearGrid}>
+                {YEARS.map(y => {
+                  const isSelected = y === viewYear;
+                  const isCurrent = y === CURRENT_YEAR;
+                  return (
+                    <TouchableOpacity key={y} style={dp.yearCell} onPress={() => selectYear(y)} activeOpacity={0.75}>
+                      <View style={[dp.yearChip, isSelected && dp.cellSel, isCurrent && !isSelected && dp.cellToday]}>
+                        <Text style={[dp.cellText, isSelected && dp.cellTextSel, isCurrent && !isSelected && { color: c.text.primary }]}>
+                          {y}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <>
+                <View style={dp.dayLabels}>
+                  {DAY_LABELS.map(d => <Text key={d} style={dp.dayLabel}>{d}</Text>)}
+                </View>
 
-            <View style={dp.grid}>
-              {cells.map((day, i) => {
-                if (!day) return <View key={i} style={dp.cell} />;
-                const iso = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
-                const isSelected = iso === value;
-                const isToday = iso === today;
-                return (
-                  <TouchableOpacity
-                    key={i} style={dp.cell}
-                    onPress={() => selectDay(day)} activeOpacity={0.75}
-                  >
-                    <View style={[dp.dayCircle, isSelected && dp.cellSel, isToday && !isSelected && dp.cellToday]}>
-                      <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: c.text.primary }]}>
-                        {day}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                <View style={dp.grid}>
+                  {cells.map((day, i) => {
+                    if (!day) return <View key={i} style={dp.cell} />;
+                    const iso = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
+                    const isSelected = iso === value;
+                    const isToday = iso === today;
+                    return (
+                      <TouchableOpacity
+                        key={i} style={dp.cell}
+                        onPress={() => selectDay(day)} activeOpacity={0.75}
+                      >
+                        <View style={[dp.dayCircle, isSelected && dp.cellSel, isToday && !isSelected && dp.cellToday]}>
+                          <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: c.text.primary }]}>
+                            {day}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
             <TouchableOpacity onPress={() => { onChange(today); setOpen(false); }} style={dp.todayBtn}>
               <Text style={dp.todayBtnText}>Dziś</Text>
@@ -179,6 +224,15 @@ const makeDp = themedStyles((c: typeof colors) => StyleSheet.create({
   cellToday: { borderWidth: 1, borderColor: c.text.primary },
   cellText: { fontSize: 13, fontWeight: '500', color: c.text.primary },
   cellTextSel: { color: c.bg.primary, fontWeight: '800' },
+
+  // Siatka lat (2026-09-09) — ten sam wzorzec chipów co dni, ale 4 kolumny (zamiast 7) i
+  // prostokątne chipy (nie kołowe) — rok to 4 cyfry, kółko byłoby albo za ciasne albo
+  // rozciągnięte do owalu. `yearScroll` ma STAŁĄ wysokość (nie rośnie z siatką dni pod spodem
+  // — jest sam, bez `dayLabels`), żeby modal nie skakał rozmiarem między trybami dzień/rok.
+  yearScroll: { maxHeight: 260 },
+  yearGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  yearCell: { width: '25%', paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
+  yearChip: { width: '86%', paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
 
   todayBtn: {
     alignSelf: 'center', paddingHorizontal: spacing[5], paddingVertical: spacing[2],

@@ -693,7 +693,14 @@ export default function SettingsScreen() {
       ],
     },
     {
-      id: 'personalizacja', title: 'Personalizacja', icon: LucideIcons.UserRound, color: '#F472B6', defaultOpen: false,
+      // 2026-09-09, user: chaos w Ustawieniach — ta sekcja i "Personalizacja" (theme/dashboard,
+      // niżej w pliku) dzieliły DOKŁADNIE ten sam `id: 'personalizacja'`. Realny bug, nie tylko
+      // nazewnictwo: duplikat id psuje React key (dwa różne obiekty w tej samej liście z tym
+      // samym key) i każde ewentualne `sections.find(id === 'personalizacja')` zawsze trafiało
+      // w PIERWSZĄ z nich. Ta sekcja to dane osobowe (wiek/płeć/trening) do kalibracji questów
+      // pupila — nic wspólnego z personalizacją WYGLĄDU apki (ta druga), więc dostała WŁASNY,
+      // opisowy id/title zamiast dzielić nazwę.
+      id: 'dane-osobowe', title: 'Dane osobowe', icon: LucideIcons.UserRound, color: '#F472B6', defaultOpen: false,
       keywords: ['wiek', 'data urodzenia', 'płeć', 'trening', 'poziom treningowy', 'pompki', 'przysiady', 'rower', 'questy pupila'],
       items: [
         {
@@ -1042,6 +1049,159 @@ export default function SettingsScreen() {
       ],
     },
     {
+      id: 'budzet', title: 'Budżet miesięczny', icon: LucideIcons.PiggyBank, color: '#2AC68F', defaultOpen: false,
+      keywords: ['limity', 'kategorie wydatków'],
+      headerRight: (
+        <PressableScale onPress={handleSaveBudgets} style={styles.saveBudgetBtn}>
+          <Check size={14} color={colors.accent.success} />
+          <Text style={styles.saveBudgetText}>Zapisz</Text>
+        </PressableScale>
+      ),
+      items: [
+        {
+          id: 'budget-categories', title: 'Budżety na kategorie',
+          keywords: ['budżet', 'kategorie', 'limit miesięczny', 'wydatki', 'kategoria'],
+          control: { kind: 'custom', render: () => (
+            <>
+              {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][])
+                .filter(([cat]) => cat !== 'other')
+                .map(([cat, meta], i) => {
+                  const IconComp = (LucideIcons as any)[meta.icon];
+                  return (
+                    <View
+                      key={cat}
+                      style={[styles.budgetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}
+                    >
+                      <View style={[styles.iconWrap, { backgroundColor: meta.color + '18' }]}>
+                        {IconComp && <IconComp size={14} color={meta.color} />}
+                      </View>
+                      <Text style={styles.rowLabel}>{meta.label}</Text>
+                      <TextInput
+                        value={budgetInputs[cat] ?? ''}
+                        onChangeText={v => setBudgetInputs(prev => ({ ...prev, [cat]: v }))}
+                        placeholder="—"
+                        placeholderTextColor={colors.text.muted}
+                        keyboardType="decimal-pad"
+                        style={styles.budgetInput}
+                      />
+                      <Text style={styles.budgetCur}>zł</Text>
+                    </View>
+                  );
+                })}
+            </>
+          ) },
+        },
+      ],
+    },
+    {
+      id: 'tagi', title: 'Limity na tagi', icon: LucideIcons.Tag, color: '#FBBF24', defaultOpen: false,
+      keywords: ['tag', 'reguła', 'słodycze', 'przekąski'],
+      items: [
+        {
+          id: 'tag-budget-rules', title: 'Reguły limitów na tagi',
+          keywords: ['tagi', 'limit', 'reguła', 'tag', 'słodycze', 'przekąski', 'budżet na tag'],
+          control: { kind: 'custom', render: () => (
+            <>
+              {tagRules.map((rule, i) => (
+                <View key={rule.id} style={[styles.budgetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
+                  <View style={[styles.iconWrap, { backgroundColor: colors.accent.purple + '18' }]}>
+                    <Tag size={13} color={colors.accent.purple} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowLabel}>{ruleLabel(rule)}</Text>
+                    <Text style={styles.rowSub}>{rule.period === 'week' ? 'tygodniowo' : 'miesięcznie'}</Text>
+                  </View>
+                  <Text style={[styles.rowLabel, { color: colors.accent.amber }]}>{rule.limit} zł</Text>
+                  <PressableScale onPress={() => handleDeleteTagRule(rule.id)} style={{ padding: 6, marginLeft: 4 }}>
+                    <Trash2 size={14} color={colors.accent.danger} />
+                  </PressableScale>
+                </View>
+              ))}
+
+              <View style={{ paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2] }}>
+                <Text style={styles.rowSub}>Dotknij tag (kilka = wspólny limit):</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  <PressableScale onPress={() => setNewTag('słodycze + przekąski')}
+                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
+                      backgroundColor: colors.accent.purple + '20', borderWidth: 1, borderColor: colors.accent.purple + '55' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accent.purple }}>słodycze + przekąski</Text>
+                  </PressableScale>
+                  {SUGGESTED_TAGS.map(t => (
+                    <PressableScale key={t} onPress={() => setNewTag(prev => {
+                      const parts = prev.split(/[+,]/).map(x => x.trim().toLowerCase()).filter(Boolean);
+                      if (parts.includes(t)) return prev;
+                      return parts.length ? `${prev.trim()} + ${t}` : t;
+                    })}
+                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
+                        backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default }}>
+                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>{t}</Text>
+                    </PressableScale>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ padding: spacing[4], gap: spacing[3], borderTopWidth: tagRules.length > 0 ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                  <TextInput
+                    value={newTag}
+                    onChangeText={setNewTag}
+                    placeholder="tag, kilka przez +"
+                    placeholderTextColor={colors.text.muted}
+                    style={[styles.budgetInput, { flex: 2, textAlign: 'left', paddingHorizontal: spacing[3],
+                      backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
+                  />
+                  <TextInput
+                    value={newTagLimit}
+                    onChangeText={setNewTagLimit}
+                    placeholder="limit zł"
+                    placeholderTextColor={colors.text.muted}
+                    keyboardType="decimal-pad"
+                    style={[styles.budgetInput, { flex: 1, textAlign: 'right', paddingHorizontal: spacing[3],
+                      backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
+                  />
+                </View>
+                {payers.length >= 2 && (
+                  <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted }}>Dla:</Text>
+                    {[null, ...payers].map(p => {
+                      const on = newTagPerson === p;
+                      return (
+                        <PressableScale key={p ?? 'all'} onPress={() => setNewTagPerson(p)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full,
+                            backgroundColor: on ? colors.accent.purple + '22' : colors.bg.elevated,
+                            borderWidth: 1, borderColor: on ? colors.accent.purple : colors.border.default }}>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: on ? colors.accent.purple : colors.text.secondary }}>
+                            {p ?? 'Wszyscy'}
+                          </Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
+                )}
+                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                  {(['week', 'month'] as const).map(p => (
+                    <PressableScale key={p} onPress={() => setNewTagPeriod(p)}
+                      style={{ flex: 1, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: newTagPeriod === p ? colors.accent.purple + '22' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: newTagPeriod === p ? colors.accent.purple : colors.border.default }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: newTagPeriod === p ? colors.accent.purple : colors.text.secondary }}>
+                        {p === 'week' ? 'Tygodniowo' : 'Miesięcznie'}
+                      </Text>
+                    </PressableScale>
+                  ))}
+                  <PressableScale onPress={handleAddTagRule}
+                    style={{ paddingHorizontal: spacing[4], paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
+                      backgroundColor: colors.accent.purple + '22', borderWidth: 1, borderColor: colors.accent.purple + '50' }}>
+                    <Plus size={16} color={colors.accent.purple} />
+                  </PressableScale>
+                </View>
+              </View>
+            </>
+          ) },
+        },
+      ],
+    },
+    {
       id: 'powiadomienia', title: 'Powiadomienia', icon: LucideIcons.Bell, color: '#A78BFA', defaultOpen: false,
       keywords: ['notyfikacje', 'przypomnienia'],
       items: [
@@ -1211,159 +1371,6 @@ export default function SettingsScreen() {
               <BellOff size={14} color={colors.accent.danger} />
               <Text style={[styles.dangerText, { color: colors.accent.danger }]}>Anuluj wszystkie powiadomienia</Text>
             </PressableScale>
-          ) },
-        },
-      ],
-    },
-    {
-      id: 'budzet', title: 'Budżet miesięczny', icon: LucideIcons.PiggyBank, color: '#2AC68F', defaultOpen: false,
-      keywords: ['limity', 'kategorie wydatków'],
-      headerRight: (
-        <PressableScale onPress={handleSaveBudgets} style={styles.saveBudgetBtn}>
-          <Check size={14} color={colors.accent.success} />
-          <Text style={styles.saveBudgetText}>Zapisz</Text>
-        </PressableScale>
-      ),
-      items: [
-        {
-          id: 'budget-categories', title: 'Budżety na kategorie',
-          keywords: ['budżet', 'kategorie', 'limit miesięczny', 'wydatki', 'kategoria'],
-          control: { kind: 'custom', render: () => (
-            <>
-              {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][])
-                .filter(([cat]) => cat !== 'other')
-                .map(([cat, meta], i) => {
-                  const IconComp = (LucideIcons as any)[meta.icon];
-                  return (
-                    <View
-                      key={cat}
-                      style={[styles.budgetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}
-                    >
-                      <View style={[styles.iconWrap, { backgroundColor: meta.color + '18' }]}>
-                        {IconComp && <IconComp size={14} color={meta.color} />}
-                      </View>
-                      <Text style={styles.rowLabel}>{meta.label}</Text>
-                      <TextInput
-                        value={budgetInputs[cat] ?? ''}
-                        onChangeText={v => setBudgetInputs(prev => ({ ...prev, [cat]: v }))}
-                        placeholder="—"
-                        placeholderTextColor={colors.text.muted}
-                        keyboardType="decimal-pad"
-                        style={styles.budgetInput}
-                      />
-                      <Text style={styles.budgetCur}>zł</Text>
-                    </View>
-                  );
-                })}
-            </>
-          ) },
-        },
-      ],
-    },
-    {
-      id: 'tagi', title: 'Limity na tagi', icon: LucideIcons.Tag, color: '#FBBF24', defaultOpen: false,
-      keywords: ['tag', 'reguła', 'słodycze', 'przekąski'],
-      items: [
-        {
-          id: 'tag-budget-rules', title: 'Reguły limitów na tagi',
-          keywords: ['tagi', 'limit', 'reguła', 'tag', 'słodycze', 'przekąski', 'budżet na tag'],
-          control: { kind: 'custom', render: () => (
-            <>
-              {tagRules.map((rule, i) => (
-                <View key={rule.id} style={[styles.budgetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
-                  <View style={[styles.iconWrap, { backgroundColor: colors.accent.purple + '18' }]}>
-                    <Tag size={13} color={colors.accent.purple} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowLabel}>{ruleLabel(rule)}</Text>
-                    <Text style={styles.rowSub}>{rule.period === 'week' ? 'tygodniowo' : 'miesięcznie'}</Text>
-                  </View>
-                  <Text style={[styles.rowLabel, { color: colors.accent.amber }]}>{rule.limit} zł</Text>
-                  <PressableScale onPress={() => handleDeleteTagRule(rule.id)} style={{ padding: 6, marginLeft: 4 }}>
-                    <Trash2 size={14} color={colors.accent.danger} />
-                  </PressableScale>
-                </View>
-              ))}
-
-              <View style={{ paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2] }}>
-                <Text style={styles.rowSub}>Dotknij tag (kilka = wspólny limit):</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                  <PressableScale onPress={() => setNewTag('słodycze + przekąski')}
-                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
-                      backgroundColor: colors.accent.purple + '20', borderWidth: 1, borderColor: colors.accent.purple + '55' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accent.purple }}>słodycze + przekąski</Text>
-                  </PressableScale>
-                  {SUGGESTED_TAGS.map(t => (
-                    <PressableScale key={t} onPress={() => setNewTag(prev => {
-                      const parts = prev.split(/[+,]/).map(x => x.trim().toLowerCase()).filter(Boolean);
-                      if (parts.includes(t)) return prev;
-                      return parts.length ? `${prev.trim()} + ${t}` : t;
-                    })}
-                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
-                        backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default }}>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>{t}</Text>
-                    </PressableScale>
-                  ))}
-                </View>
-              </View>
-
-              <View style={{ padding: spacing[4], gap: spacing[3], borderTopWidth: tagRules.length > 0 ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.05)' }}>
-                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-                  <TextInput
-                    value={newTag}
-                    onChangeText={setNewTag}
-                    placeholder="tag, kilka przez +"
-                    placeholderTextColor={colors.text.muted}
-                    style={[styles.budgetInput, { flex: 2, textAlign: 'left', paddingHorizontal: spacing[3],
-                      backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
-                  />
-                  <TextInput
-                    value={newTagLimit}
-                    onChangeText={setNewTagLimit}
-                    placeholder="limit zł"
-                    placeholderTextColor={colors.text.muted}
-                    keyboardType="decimal-pad"
-                    style={[styles.budgetInput, { flex: 1, textAlign: 'right', paddingHorizontal: spacing[3],
-                      backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
-                  />
-                </View>
-                {payers.length >= 2 && (
-                  <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted }}>Dla:</Text>
-                    {[null, ...payers].map(p => {
-                      const on = newTagPerson === p;
-                      return (
-                        <PressableScale key={p ?? 'all'} onPress={() => setNewTagPerson(p)}
-                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full,
-                            backgroundColor: on ? colors.accent.purple + '22' : colors.bg.elevated,
-                            borderWidth: 1, borderColor: on ? colors.accent.purple : colors.border.default }}>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: on ? colors.accent.purple : colors.text.secondary }}>
-                            {p ?? 'Wszyscy'}
-                          </Text>
-                        </PressableScale>
-                      );
-                    })}
-                  </View>
-                )}
-                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-                  {(['week', 'month'] as const).map(p => (
-                    <PressableScale key={p} onPress={() => setNewTagPeriod(p)}
-                      style={{ flex: 1, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
-                        backgroundColor: newTagPeriod === p ? colors.accent.purple + '22' : colors.bg.elevated,
-                        borderWidth: 1, borderColor: newTagPeriod === p ? colors.accent.purple : colors.border.default }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: newTagPeriod === p ? colors.accent.purple : colors.text.secondary }}>
-                        {p === 'week' ? 'Tygodniowo' : 'Miesięcznie'}
-                      </Text>
-                    </PressableScale>
-                  ))}
-                  <PressableScale onPress={handleAddTagRule}
-                    style={{ paddingHorizontal: spacing[4], paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
-                      backgroundColor: colors.accent.purple + '22', borderWidth: 1, borderColor: colors.accent.purple + '50' }}>
-                    <Plus size={16} color={colors.accent.purple} />
-                  </PressableScale>
-                </View>
-              </View>
-            </>
           ) },
         },
       ],
@@ -1819,9 +1826,14 @@ export default function SettingsScreen() {
           } },
         },
         {
-          id: 'diag-pet-export', title: 'Eksportuj postęp pupila', subtitle: 'Poziom, staty, pokonani bossowie, log walk — do analizy balansu bossów',
+          // 2026-09-09, user: "eksport danych mamy w kilku miejscach" — ta pozycja nazywała się
+          // "Eksportuj postęp pupila", TA SAMA nazwa co prawdziwy eksport danych (sekcja "Dane"
+          // → BackupSection niżej), mimo że to zupełnie inna rzecz: raport balansu bossów do
+          // wysłania mi na czacie, nie eksport DANYCH usera. Zmiana nazwy (nie przeniesienie —
+          // to diagnostyczne narzędzie, dobrze umiejscowione TU) usuwa kolizję nazewniczą.
+          id: 'diag-pet-export', title: 'Udostępnij raport postępu pupila', subtitle: 'Poziom, staty, pokonani bossowie, log walk — do analizy balansu bossów',
           icon: LucideIcons.Swords, accentColor: '#F59E0B',
-          keywords: ['pupil', 'bossy', 'walka', 'balans', 'eksport', 'poziom', 'log', 'kotek'],
+          keywords: ['pupil', 'bossy', 'walka', 'balans', 'raport', 'poziom', 'log', 'kotek'],
           control: { kind: 'link', onPress: async () => {
             haptic.tap();
             const report = buildBossProgressReport(usePetStore.getState());
