@@ -50,6 +50,50 @@ const DEFAULT_DELAY_MS = 600;
 interface Pending { value: StorageValue<unknown>; timer: ReturnType<typeof setTimeout> }
 const pending = new Map<string, Pending>();
 
+// 2026-09-09, user: "dawaj dalej optymalizacje" → zaproponowany kandydat #2 (dzielenie
+// dużych blobów typu expensesStore/foodStore na kawałki, żeby zapis nie przepisywał całej
+// historii) — user wybrał BEZPIECZNY wariant zamiast ryzykownej migracji formatu zapisu:
+// najpierw ZMIERZ rzeczywistą skalę na prawdziwym urządzeniu, zanim cokolwiek się przepisze.
+// Czysto w pamięci (zero nowego zapisu na dysk, reset co cold start) — per-klucz bajty
+// ostatniego stringify + jego czas, widoczne w Ustawienia → Diagnostyka → "Rozmiar
+// zapisywanych danych". Jeśli po dniach realnego użytku żaden klucz nie zbliża się do
+// rozmiaru, przy którym stringify zaczyna być odczuwalny (dziesiątki ms), partycjonowanie
+// zostaje odłożone jako niepotrzebne — to WŁAŚNIE ten pomiar ma rozstrzygnąć, a nie zgadywanie.
+export interface StorageWriteStat {
+  bytes: number;         // JSON.stringify(value).length ostatniego zapisu
+  stringifyMs: number;   // czas TEGO stringify
+  writes: number;        // ile razy ten klucz był zapisany w tej sesji
+  maxBytes: number;
+  maxStringifyMs: number;
+  lastAt: number;
+}
+const writeStats = new Map<string, StorageWriteStat>();
+
+function recordWriteStat(key: string, bytes: number, stringifyMs: number) {
+  const prev = writeStats.get(key);
+  writeStats.set(key, {
+    bytes, stringifyMs,
+    writes: (prev?.writes ?? 0) + 1,
+    maxBytes: Math.max(bytes, prev?.maxBytes ?? 0),
+    maxStringifyMs: Math.max(stringifyMs, prev?.maxStringifyMs ?? 0),
+    lastAt: Date.now(),
+  });
+}
+
+// Migawka z tej sesji (od ostatniego cold startu) — do Ustawienia → Diagnostyka, żeby
+// zdecydować NA PODSTAWIE LICZB, czy partycjonowanie dużych store'ów (expenses/food) w ogóle
+// ma sens, zamiast zgadywać.
+export function getStorageWriteStats(): Record<string, StorageWriteStat> {
+  return Object.fromEntries(writeStats);
+}
+
+function stringifyTimed(key: string, value: unknown): string {
+  const t0 = Date.now();
+  const json = JSON.stringify(value);
+  recordWriteStat(key, json.length, Date.now() - t0);
+  return json;
+}
+
 export function throttledPersistStorage<S>(delayMs: number = DEFAULT_DELAY_MS): PersistStorage<S> {
   return {
     getItem: async (name) => {
@@ -67,7 +111,7 @@ export function throttledPersistStorage<S>(delayMs: number = DEFAULT_DELAY_MS): 
       if (existing) clearTimeout(existing.timer);
       const timer = setTimeout(() => {
         pending.delete(name);
-        AsyncStorage.setItem(name, JSON.stringify(value)).catch(() => {});
+        AsyncStorage.setItem(name, stringifyTimed(name, value)).catch(() => {});
       }, delayMs);
       pending.set(name, { value: value as StorageValue<unknown>, timer });
       return Promise.resolve();
@@ -83,7 +127,7 @@ export function flushThrottledStorage(): Promise<void> {
   const writes: Promise<void>[] = [];
   for (const [key, { value, timer }] of pending) {
     clearTimeout(timer);
-    writes.push(AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => {}));
+    writes.push(AsyncStorage.setItem(key, stringifyTimed(key, value)).catch(() => {}));
   }
   pending.clear();
   return Promise.all(writes).then(() => undefined);
