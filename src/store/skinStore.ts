@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 // Which dashboard skin is equipped. 'auto' = follow the time-of-day theme.
 interface SkinState {
@@ -14,6 +14,6 @@ export const useSkinStore = create<SkinState>()(
       active: 'auto',
       setActive: (active) => set({ active }),
     }),
-    { name: 'skin-active-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
+    { name: 'skin-active-v1', storage: throttledPersistStorage() },
   ),
 );

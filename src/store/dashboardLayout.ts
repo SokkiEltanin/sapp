@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { throttledAsyncStorage } from '@/utils/throttledStorage';
+import { persist } from 'zustand/middleware';
+import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 // Lets the user reorder, hide/show and add custom tiles to the dashboard. The
 // hero/briefing card + the "in progress" lifebar stay fixed at the top; every
@@ -287,7 +287,7 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
     }),
     {
       name: 'dashboard-layout-v1',
-      storage: createJSONStorage(() => throttledAsyncStorage()),
+      storage: throttledPersistStorage(),
       partialize: (s) => ({ order: s.order, hidden: s.hidden, customTiles: s.customTiles }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
