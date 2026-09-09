@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 `useShallow` w Pupilu/Rynku/Walce — mniej zbędnych re-renderów — NIEsprawdzone (2026-09-09)
+
+Pełny opis w ARCHITECTURE.md §62. `boss-fight.tsx`/`pet.tsx`/`pet-shop.tsx` woływały
+`usePetStore()` bez selektora — każda zmiana w tym wspólnym, dużym store (questy/ekwipunek/
+streaki/walka razem) re-renderowała cały ciężki komponent, nie tylko na zmiany faktycznie
+użytych pól. Naprawione przez `useShallow` z jawnie wymienionymi polami per plik.
+
+`tsc`/`jest` zielone (70 suit/905 testów, bez zmiany logiki — czysta optymalizacja renderów).
+
+**Priorytet testu na urządzeniu**: kilka rund walki z bossem pod rząd — mniej szarpania/lagów;
+sprawdź że WSZYSTKO działa identycznie (customizacja, sklep, ekwipunek, misje) — zero zmiany
+w danych/logice, tylko re-render.
+
 ## 🆕 Pomiar rozmiaru zapisywanych blobów (Diagnostyka) — NIEsprawdzone (2026-09-09)
 
 User wybrał bezpieczny wariant zamiast ryzykownej migracji na partycje per rok (`foodStore` nie

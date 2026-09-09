@@ -17,6 +17,7 @@ import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
@@ -60,11 +61,29 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
+  // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, "dawaj dalej
+  // optymalizacje", ten sam wzorzec co boss-fight.tsx) — bez selektora subskrypcja re-renderuje
+  // CAŁY ekran Pupila na KAŻDĄ zmianę w petStore (współdzielonym z questami/walką/streakami),
+  // nawet niezwiązaną z tym co tu wyświetlane.
   const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem, grantOrLevelCombatItem,
-    equippedGear, ownedGear, activePotion, syncPotionExpiry } = usePetStore();
+    equippedGear, ownedGear, activePotion, syncPotionExpiry } = usePetStore(useShallow((s) => ({
+    name: s.name, xp: s.xp, coins: s.coins, careTick: s.careTick, catColor: s.catColor, catStripes: s.catStripes,
+    catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor, catWhiskers: s.catWhiskers,
+    catLegStripes: s.catLegStripes, petCat: s.petCat, affection: s.affection, affectionDay: s.affectionDay,
+    pendingCrates: s.pendingCrates, ownedItems: s.ownedItems, claimDailyBox: s.claimDailyBox,
+    dayClaims: s.dayClaims, buyItem: s.buyItem, grantStartup: s.grantStartup, grantGear: s.grantGear,
+    addCoins: s.addCoins, onboarded: s.onboarded, missionStartedAt: s.missionStartedAt,
+    missionEndsAt: s.missionEndsAt, startMission: s.startMission, cancelMission: s.cancelMission,
+    catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, buyMaxHp: s.buyMaxHp, buyAtkStat: s.buyAtkStat,
+    ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
+    upgradeCombatItem: s.upgradeCombatItem, equipCombatItem: s.equipCombatItem,
+    unequipCombatItem: s.unequipCombatItem, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
+    equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion,
+    syncPotionExpiry: s.syncPotionExpiry,
+  })));
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
   // Misja (utils/missions.ts, 2026-08-15) — tik co 1s (było 30s) żeby napędzić dokładny

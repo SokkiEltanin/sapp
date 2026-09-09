@@ -13,6 +13,7 @@ import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { POTIONS, PotionKind, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
@@ -150,9 +151,17 @@ function fmtShopRefresh(): string {
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, ten sam wzorzec co
+  // boss-fight.tsx/pet.tsx) — bez selektora re-renderuje cały Rynek na każdą zmianę petStore.
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, grantStartup,
     dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
-    ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore();
+    ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore(useShallow((s) => ({
+    coins: s.coins, xp: s.xp, ownedItems: s.ownedItems, buyItem: s.buyItem, addCoins: s.addCoins,
+    spendCoins: s.spendCoins, grantStartup: s.grantStartup, dayClaims: s.dayClaims, grantGear: s.grantGear,
+    buyDailyGear: s.buyDailyGear, equippedGear: s.equippedGear, ownedGear: s.ownedGear,
+    ownedCombatItems: s.ownedCombatItems, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
+    activePotion: s.activePotion, buyPotion: s.buyPotion,
+  })));
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);

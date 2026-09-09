@@ -15,6 +15,7 @@ import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import { attackPng, arenaBgFor } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, effectiveCatMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { potionAtkBonus } from '@/utils/potions';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
@@ -92,6 +93,13 @@ export default function BossFight() {
 
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, "dawaj dalej
+  // optymalizacje") — petStore.ts to WSPÓLNY store dla całego systemu pupila (questy,
+  // ekwipunek, customizacja, streaki...), a walka to NAJCZĘŚCIEJ mutujący go ekran (HP/coiny/
+  // XP co rundę) — subskrypcja bez selektora (jak było) re-renderowała CAŁY ten ciężki,
+  // animowany komponent na KAŻDĄ zmianę w petStore, nawet zupełnie niezwiązaną z walką (np.
+  // tick questa gdzieś indziej w tle). Shallow-compare na wybranym podzbiorze pól ogranicza
+  // re-render do faktycznie użytych tu wartości.
   const {
     xp, energy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
@@ -103,7 +111,22 @@ export default function BossFight() {
     dayClaims, claimQuestFight, markTrainingDay,
     missionStartedAt, missionEndsAt, missionProfile, claimMission, cancelMission,
     catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
-  } = usePetStore();
+  } = usePetStore(useShallow((s) => ({
+    xp: s.xp, energy: s.energy, eventEnergy: s.eventEnergy, ownedItems: s.ownedItems,
+    defeatedBosses: s.defeatedBosses, defeatBoss: s.defeatBoss, defeatedMadBosses: s.defeatedMadBosses,
+    defeatMadBoss: s.defeatMadBoss, logFightAttempt: s.logFightAttempt, catHp: s.catHp,
+    catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, damageCat: s.damageCat, resetCatHp: s.resetCatHp,
+    spendEnergy: s.spendEnergy, ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
+    equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion, raidWeek: s.raidWeek,
+    raidHp: s.raidHp, raidWon: s.raidWon, raidEnsure: s.raidEnsure, raidAttack: s.raidAttack,
+    raidClaim: s.raidClaim, eventWon: s.eventWon, spendEventEnergy: s.spendEventEnergy, eventClaim: s.eventClaim,
+    menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure, menaceAttack: s.menaceAttack,
+    menaceClaim: s.menaceClaim, dayClaims: s.dayClaims, claimQuestFight: s.claimQuestFight,
+    markTrainingDay: s.markTrainingDay, missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt,
+    missionProfile: s.missionProfile, claimMission: s.claimMission, cancelMission: s.cancelMission,
+    catColor: s.catColor, catStripes: s.catStripes, catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor,
+    catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
+  })));
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
