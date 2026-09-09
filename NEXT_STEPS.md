@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ręczny paragon: autouzupełnianie znanych produktów z historii — NIEsprawdzone (2026-09-09)
+
+User: "produkty które już istnieją jak wpisuje żeby się pokazywały szybciej bo od razu tag
+cena i wgle wskoczy". Pełny opis w ARCHITECTURE.md §59. `productMemory.ts` miał od dawna
+3 magazyny (kategoria/tagi/cena per produkt), zapisywane/czytane TYLKO przez zeskanowany
+paragon (`scan.tsx`) — ręczny (`manual.tsx`) nigdy z nich nie korzystał. Podpięte: wpisując
+znaną nazwę, kategoria/tagi/cena wskakują same (zielony chip "Rozpoznano: ..."), bez
+nadpisywania pól które user już ręcznie dotknął. Zamknięta pętla: ręczne paragony TERAZ też
+uczą tę samą pamięć na zapisie (dotąd uczył tylko skan).
+
+`tsc`/`jest` zielone (70 suit/902 testy — bez nowych, brak pokrycia UI-ekranów jak reszta apki).
+
+**Priorytet testu na urządzeniu**: Wydatki → dodaj ręcznie → wpisz nazwę produktu już
+kiedyś kupionego (zeskanowanego lub wcześniej wpisanego ręcznie) → kategoria/tagi/cena
+powinny wskoczyć same; nowy produkt bez historii dalej dostaje starą, statyczną podpowiedź
+kategorii (tap-to-apply, bez zmian).
+
 ## 🆕 throttledStorage: JSON.stringify przeniesiony do debounce'a (wszystkie 19 store'ów) — NIEsprawdzone (2026-09-09)
 
 User dał zielone światło na punkt 1 z listy "co byś jeszcze zoptymalizował" (§55). Pełny opis

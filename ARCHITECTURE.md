@@ -5019,6 +5019,47 @@ rzuca).
 nie powinno być zauważalnego zacinania się UI; żadne dane nie giną (to samo okno utraty przy
 force-kill co wcześniej, 600ms, zaakceptowane od dawna w §10).
 
+## 59. Ręczny paragon: autouzupełnianie znanych produktów z historii zakupów — 2026-09-09
+
+User: *"jeszcze taki pomysł luźny żeby paragony jak dodaje ręcznie to żeby produkty które już
+istnieją jak wpisuje żeby się pokazywały szybciej bo od razu tag cena i wgle wskoczy"*.
+
+**Prawdziwa luka**: `productMemory.ts` ma OD DAWNA trzy magazyny pamięci per produkt —
+`ProductMemory` (kategoria), `TagMemory` (tagi), `PriceMemory` (`{n, mean, min, max, last}`
+typowej ceny) — ZAPISYWANE po każdym zeskanowanym paragonie (`scan.tsx`'s `saveProductCategories`/
+`saveTagMemory`/`savePriceMemory` na zapisie) i CZYTANE tam samo (`applyProductMemory`/
+`applyTagMemory`/`priceFor` przy parsowaniu OCR). Ręczny paragon (`app/expenses/manual.tsx`)
+nigdy z TEGO SAMEGO magazynu nie korzystał — miał tylko statyczny `categorize(name)` (zgadywanie
+po słowach-kluczach, tap-to-apply chip), zero pamięci o KONKRETNYCH, już kupowanych produktach.
+
+**Naprawa — podpięcie istniejącej infrastruktury, nie nowy system**: `ManualReceiptScreen`
+ładuje wszystkie trzy magazyny raz przy wejściu na ekran. `ItemRow`'s `handleNameChange`
+(już miał debounce 300ms dla `categorize()`) rozszerzony: PO debounce najpierw sprawdza pamięć
+(`applyProductMemory`/`applyTagMemory`/`priceFor` z 1-elementową tablicą `[{name}]`) — jeśli
+trafienie, automatycznie wypełnia kategorię/tagi/cenę (bez tapnięcia, bo to konkretny,
+rozpoznany produkt, mocniejszy sygnał niż zgadywanie po słowach) i pokazuje zielony, WYŁĄCZNIE
+informacyjny chip "Rozpoznano: {kategoria} · ostatnio {cena} zł" — statyczny `categorize()`
+fallback zostaje bez zmian dla NOWYCH produktów bez historii.
+
+**Nie nadpisuje świadomych wyborów usera**: nowe pola `Item.catTouched`/`tagsTouched`/
+`priceTouched` — ustawiane w handlerach `CategoryPicker`/`toggleTag`/custom-tag/cena — jeśli
+user już RĘCZNIE dotknął pole, auto-uzupełnienie z pamięci go nie nadpisze nawet gdy nazwa
+później dopasuje się do czegoś w magazynie (np. user zmienia kategorię, PÓŹNIEJ dopisuje resztę
+nazwy produktu).
+
+**Druga połowa — zamknięcie pętli**: ręczne paragony dotąd w OGÓLE nie uczyły tej pamięci (tylko
+zeskanowane) — user musiałby najpierw zeskanować produkt, żeby przyszły ręczny wpis go rozpoznał.
+Na `save()` dodane te same trzy wywołania co `scan.tsx` (`saveProductCategories`/`saveTagMemory`/
+`savePriceMemory`) na WSZYSTKICH pozycjach paragonu — teraz ręczne wpisywanie też uczy, nie tylko
+korzysta z tego czego nauczył skan.
+
+`tsc`/`jest` zielone (70 suit/902 testy — bez nowych testów: ten sam brak jednostkowego
+pokrycia UI-ekranów co reszta apki, `productMemory.ts`'s funkcje same w sobie niezmienione,
+tylko nowe miejsce ich wywołania). **Priorytet testu na urządzeniu**: Wydatki → dodaj ręcznie
+→ wpisz nazwę produktu, który już kiedyś kupiłeś (zeskanowany LUB wcześniej wpisany ręcznie po
+tej zmianie) → kategoria/tagi/cena powinny wskoczyć same, z zielonym potwierdzeniem pod nazwą;
+zupełnie nowy produkt dalej dostaje starą, statyczną podpowiedź kategorii (tap-to-apply).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
