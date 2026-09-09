@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { ParsedBankTx } from '@/utils/bankNotification';
 import { ExpenseCategory } from '@/types';
 
@@ -88,6 +88,6 @@ export const useBankQueue = create<BankQueueState>()(
       remove: (id) => set((s) => ({ pending: s.pending.filter(p => p.id !== id) })),
       clear: () => set({ pending: [] }),
     }),
-    { name: 'bank-queue-v1', storage: throttledPersistStorage() },
+    { name: 'bank-queue-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
   ),
 );
