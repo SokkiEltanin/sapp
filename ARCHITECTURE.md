@@ -5096,6 +5096,33 @@ ekranów). **Priorytet testu na urządzeniu (WYMAGA nowego builda APK, nie sameg
 płynniejsze pierwsze wejście na ekran po restarcie apki (mniej "popcornu" przy ładowaniu ikon),
 zero wizualnych regresji (proporcje/aspect ratio identyczne jak przed zmianą).
 
+## 61. Pomiar rozmiaru zapisywanych blobów — bezpieczny wariant zamiast ryzykownej partycji — 2026-09-09
+
+User: *"dawaj dalej optymalizacje"* → kandydat #2 z listy ("partycja expensesStore/foodStore").
+Po głębszym sprawdzeniu okazało się, że `foodStore` (posiłki/produkty) NIE ma kopii w Firestore
+(w przeciwieństwie do `expensesStore` — tylko lokalny AsyncStorage), więc błąd w migracji formatu
+zapisu mógłby namieszać w historii jedzenia bez łatwego auto-odzysku z chmury — zaproponowałem
+usera wybór, wybrał **bezpieczny wariant**: zmierzyć rzeczywistą skalę, zanim cokolwiek ryzykownego
+się przepisze, zamiast zgadywać czy chunking po latach w ogóle jest wart tego ryzyka.
+
+**Co dodane**: `throttledStorage.ts`'s `stringifyTimed()` — owija każdy faktyczny zapis
+(debounced timer ORAZ `flushThrottledStorage`) pomiarem bajtów (`JSON.stringify(...).length`)
+i czasu tego stringify, trzymanym w pamięci (`Map<key, StorageWriteStat>`, `getStorageWriteStats()`)
+— **zero nowego zapisu na dysk**, reset co cold start, zero ryzyka dla persystowanych danych.
+Widoczne w Ustawienia → Diagnostyka → "Rozmiar zapisywanych danych" (największy blob + najdłuższy
+stringify + licznik zapisów, per store, posortowane malejąco po rozmiarze).
+
+**Decyzja o partycjonowaniu ODŁOŻONA do czasu realnych liczb z tego panelu** — jeśli po dniach
+zwykłego użytku żaden store (najbardziej podejrzane: `expenses-store-v1`, `food-store-v1`) nie
+zbliża się do rozmiaru, przy którym stringify robi się odczuwalny (dziesiątki ms), chunking per
+rok zostaje odłożony jako niepotrzebny — to dokładnie ten pomiar ma o tym zdecydować, nie kolejne
+zgadywanie (jak w §35/§58).
+
+`tsc`/`jest` zielone (70 suit/905 testów, +3 nowe dla `getStorageWriteStats`). **Priorytet testu
+na urządzeniu**: poużywaj apki chwilę (kilka wydatków, posiłków, walka z bossem), potem
+Ustawienia → Diagnostyka → "Rozmiar zapisywanych danych" — sprawdź czy któryś store ma
+niepokojący rozmiar/czas; jeśli tak, wróć do tematu partycjonowania z konkretnymi liczbami.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

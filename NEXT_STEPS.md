@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Pomiar rozmiaru zapisywanych blobów (Diagnostyka) — NIEsprawdzone (2026-09-09)
+
+User wybrał bezpieczny wariant zamiast ryzykownej migracji na partycje per rok (`foodStore` nie
+ma kopii w Firestore — błąd w migracji mógłby namieszać w historii jedzenia bez auto-odzysku).
+Pełny opis w ARCHITECTURE.md §61. Dodane: `throttledStorage.ts` mierzy bajty + czas stringify
+per store, w pamięci (zero nowego zapisu na dysk), widoczne w Ustawienia → Diagnostyka →
+"Rozmiar zapisywanych danych". **Do zrobienia**: poużywać apkę kilka dni, sprawdzić panel —
+jeśli `expenses-store-v1`/`food-store-v1` faktycznie rosną do rozmiaru z odczuwalnym stringify
+(dziesiątki ms), wrócić do tematu partycjonowania z konkretnymi liczbami; jeśli nie, zamknąć
+temat jako niepotrzebny.
+
+`tsc`/`jest` zielone (70 suit/905 testów, +3 nowe).
+
 ## 🆕 `expo-image` w Rynku/Pupilu/Walce — cache grafik — NIEsprawdzone, WYMAGA nowego builda APK (2026-09-09)
 
 User: "dawaj dalej optymalizacje" → wybrał oba zaproponowane kandydaty. Pełny opis w

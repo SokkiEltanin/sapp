@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { throttledPersistStorage, flushThrottledStorage } from '@/utils/throttledStorage';
+import { throttledPersistStorage, flushThrottledStorage, getStorageWriteStats } from '@/utils/throttledStorage';
 
 // 2026-08-25 (perf pass, "zapisz wszystko i wszystko rob"): zustand `persist` writes to
 // AsyncStorage on EVERY state change — throttled so rapid writes to the SAME key coalesce
@@ -121,5 +121,41 @@ describe('flushThrottledStorage — wymusza natychmiastowy zapis wszystkich ocze
 
   test('flush bez żadnych oczekujących zapisów jest no-opem (nie rzuca)', async () => {
     await expect(flushThrottledStorage()).resolves.toBeUndefined();
+  });
+});
+
+// 2026-09-09 (perf pass, "dawaj dalej optymalizacje" — bezpieczny wariant zamiast ryzykownej
+// partycji expensesStore/foodStore): pomiar bajtów/czasu stringify per klucz, żeby zdecydować
+// NA PODSTAWIE LICZB z realnego urządzenia, nie zgadywania. Czysto w pamięci tej sesji.
+describe('getStorageWriteStats — pomiar bajtów/czasu per klucz (in-memory, ta sesja)', () => {
+  test('po zapisie zwraca rozmiar i czas stringify dla danego klucza', async () => {
+    const storage = throttledPersistStorage(600);
+    await storage.setItem('stat-key', sv(123));
+    await jest.advanceTimersByTimeAsync(600);
+    const stats = getStorageWriteStats();
+    expect(stats['stat-key']).toBeDefined();
+    expect(stats['stat-key'].bytes).toBe(JSON.stringify(sv(123)).length);
+    expect(stats['stat-key'].writes).toBeGreaterThanOrEqual(1);
+    expect(stats['stat-key'].stringifyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test('kolejne zapisy tego samego klucza zwiększają licznik writes i śledzą maxBytes', async () => {
+    const storage = throttledPersistStorage(600);
+    await storage.setItem('stat-key-2', sv(1));
+    await jest.advanceTimersByTimeAsync(600);
+    const before = getStorageWriteStats()['stat-key-2'].writes;
+
+    await storage.setItem('stat-key-2', sv(123456789)); // dłuższy JSON niż `sv(1)`
+    await jest.advanceTimersByTimeAsync(600);
+    const after = getStorageWriteStats()['stat-key-2'];
+    expect(after.writes).toBe(before + 1);
+    expect(after.maxBytes).toBeGreaterThanOrEqual(after.bytes);
+  });
+
+  test('flushThrottledStorage też zapisuje statystyki (nie tylko debounced timer)', async () => {
+    const storage = throttledPersistStorage(600);
+    await storage.setItem('stat-flush', sv(9));
+    await flushThrottledStorage();
+    expect(getStorageWriteStats()['stat-flush'].bytes).toBe(JSON.stringify(sv(9)).length);
   });
 });

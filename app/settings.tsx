@@ -41,6 +41,7 @@ import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
+import { getStorageWriteStats } from '@/utils/throttledStorage';
 import { haptic } from '@/utils/haptics';
 import { runSelfTest } from '@/utils/selfTest';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
@@ -1789,6 +1790,31 @@ export default function SettingsScreen() {
               `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms`,
               `1. klatka / w pełni gotowy (ze wszystkimi widgetami). Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms.\n\nHistoria (najnowsze u góry):\n${lines.join('\n')}`,
               [{ text: 'Wyczyść historię', onPress: () => clearPerfLog() }, { text: 'OK' }],
+            );
+          } },
+        },
+        {
+          id: 'diag-storage-stats', title: 'Rozmiar zapisywanych danych', subtitle: 'Ile waży i jak długo trwa zapis każdego store\'u — od ostatniego uruchomienia apki',
+          icon: LucideIcons.HardDrive, accentColor: '#8A93A8',
+          keywords: ['rozmiar', 'storage', 'wydajność', 'zapis', 'blob', 'optymalizacja', 'partycja'],
+          control: { kind: 'link', onPress: () => {
+            haptic.tap();
+            // 2026-09-09, user: "dawaj dalej optymalizacje" → wybrał BEZPIECZNY wariant
+            // (zmierz, nie zgaduj) zamiast ryzykownej migracji na chunki per rok — patrz
+            // throttledStorage.ts's `getStorageWriteStats`. Czysto w pamięci tej sesji,
+            // resetuje się co cold start — otwórz to PO trochę realnego użycia (kilka
+            // wydatków/posiłków/walk), nie zaraz po starcie.
+            const stats = getStorageWriteStats();
+            const rows = Object.entries(stats).sort(([, a], [, b]) => b.maxBytes - a.maxBytes);
+            if (rows.length === 0) {
+              Alert.alert('Rozmiar zapisywanych danych', 'Brak zapisów jeszcze w tej sesji — użyj apki chwilę (dodaj wydatek, posiłek, zrób coś w Pupilu), potem wróć tu.');
+              return;
+            }
+            const lines = rows.map(([key, s]) =>
+              `${key}: ${(s.maxBytes / 1024).toFixed(1)} KB, stringify ${s.maxStringifyMs}ms (×${s.writes} zapisów)`);
+            Alert.alert(
+              'Rozmiar zapisywanych danych (ta sesja)',
+              `Największy blob i najdłuższy stringify per store — jeśli żaden nie zbliża się do dziesiątek ms, dzielenie na kawałki nie jest jeszcze potrzebne.\n\n${lines.join('\n')}`,
             );
           } },
         },
