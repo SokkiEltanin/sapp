@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
@@ -36,7 +36,7 @@ import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
 import { ageFrom, DAILY_EXERCISE_COUNT } from '@/utils/personalQuests';
 import { CATEGORY_META } from '@/utils/categories';
-import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
+import { ExpenseCategory, DEFAULT_WORK_SETTINGS, Employer } from '@/types';
 import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
@@ -343,6 +343,55 @@ export default function SettingsScreen() {
     }).catch(() => {});
   }, []);
 
+  // ── Pracodawcy (2026-09-10, user: "żeby dało się zmienić prefiks w razie czego i
+  // działał jak zmienię pracę" + "wyłączyć stare żeby one były ale widzieć tylko z nowej
+  // pracy") — patrz workService.ts/types/index.ts. Pola edytowane niżej (prefiks/tryb/
+  // godziny/wypłata) ZOSTAJĄ jak były — edytują WorkSettings bezpośrednio, bez zmian —
+  // `syncActiveEmployerFromSettings` w każdym z 4 handlerów poniżej tylko DOGRYWA tę samą
+  // zmianę do rekordu aktywnego pracodawcy, żeby lista się nie rozjechała.
+  const [employers, setEmployers] = useState<Employer[]>([]);
+  const [activeEmployerId, setActiveEmployerId] = useState<string | null>(null);
+  const [newEmployerName, setNewEmployerName] = useState('');
+  const loadEmployers = useCallback(async () => {
+    const [list, activeId] = await Promise.all([workService.getEmployers(), workService.getActiveEmployerId()]);
+    setEmployers(list);
+    setActiveEmployerId(activeId);
+  }, []);
+  useEffect(() => { loadEmployers(); }, [loadEmployers]);
+
+  const addEmployer = async () => {
+    const name = newEmployerName.trim();
+    if (!name) return;
+    haptic.tap();
+    const emp = await workService.addEmployer({
+      name, workMode: 'calendar',
+      monthlySalary: DEFAULT_WORK_SETTINGS.monthlySalary, hoursPerMonth: DEFAULT_WORK_SETTINGS.hoursPerMonth,
+    });
+    setNewEmployerName('');
+    // Od razu aktywuj nową pracę — user dodaje ją bo WŁAŚNIE zmienił pracę, ma od razu
+    // edytować JEJ prefiks/stawkę w polach niżej, nie starej.
+    await activateEmployer(emp.id);
+  };
+
+  const activateEmployer = async (id: string) => {
+    haptic.tap();
+    await workService.setActiveEmployer(id);
+    const s = await workService.getSettings();
+    setWorkSettings(s);
+    setWorkPrefix(s.workPrefix ?? '');
+    setHoursOvrField(s.hoursOverride != null ? String(s.hoursOverride) : '');
+    setSalaryOvrField(s.salaryOverride != null ? String(s.salaryOverride) : '');
+    setManualHoursField(String(s.hoursPerMonth ?? DEFAULT_WORK_SETTINGS.hoursPerMonth));
+    setManualSalaryField(String(s.monthlySalary ?? DEFAULT_WORK_SETTINGS.monthlySalary));
+    await loadEmployers();
+  };
+
+  const toggleEmployerHidden = async (id: string) => {
+    haptic.tap();
+    const list = await workService.toggleEmployerHidden(id);
+    setEmployers(list);
+  };
+
   // Save / clear an override for hours or salary. Empty input clears it (back to
   // the auto-read value).
   const saveOverride = async (field: 'hoursOverride' | 'salaryOverride', raw: string) => {
@@ -351,14 +400,14 @@ export default function SettingsScreen() {
     if (raw.trim() === '' || isNaN(v) || v <= 0) delete newS[field];
     else newS[field] = v;
     setWorkSettings(newS);
-    try { await workService.saveSettings(newS); } catch {}
+    try { await workService.saveSettings(newS); await workService.syncActiveEmployerFromSettings(newS); } catch {}
   };
 
   const saveWorkPrefix = async (prefix: string) => {
     const trimmed = prefix.trim();
     const newS = { ...workSettings, workPrefix: trimmed || undefined };
     setWorkSettings(newS);
-    try { await workService.saveSettings(newS); } catch {}
+    try { await workService.saveSettings(newS); await workService.syncActiveEmployerFromSettings(newS); await loadEmployers(); } catch {}
   };
 
   const saveManualHours = async (raw: string) => {
@@ -367,7 +416,7 @@ export default function SettingsScreen() {
     setManualHoursField(String(hours));
     const newS = { ...workSettings, hoursPerMonth: hours };
     setWorkSettings(newS);
-    try { await workService.saveSettings(newS); } catch {}
+    try { await workService.saveSettings(newS); await workService.syncActiveEmployerFromSettings(newS); } catch {}
   };
 
   const saveManualSalary = async (raw: string) => {
@@ -376,7 +425,7 @@ export default function SettingsScreen() {
     setManualSalaryField(String(salary));
     const newS = { ...workSettings, monthlySalary: salary };
     setWorkSettings(newS);
-    try { await workService.saveSettings(newS); } catch {}
+    try { await workService.saveSettings(newS); await workService.syncActiveEmployerFromSettings(newS); } catch {}
   };
 
   // Toggling to 'manual' clears workPrefix/workColor — useWorkEarnings (the shared
@@ -394,7 +443,7 @@ export default function SettingsScreen() {
       setWorkPrefix('');
     }
     setWorkSettings(newS);
-    try { await workService.saveSettings(newS); } catch {}
+    try { await workService.saveSettings(newS); await workService.syncActiveEmployerFromSettings(newS); } catch {}
   };
 
   const [googleUser, setGoogleUser]   = useState<string | null>(null);
@@ -794,8 +843,94 @@ export default function SettingsScreen() {
     },
     {
       id: 'praca', title: 'Praca', icon: LucideIcons.Briefcase, color: '#60A5FA', defaultOpen: false,
-      keywords: ['zmiana', 'kalendarz', 'zarobki', 'stawka godzinowa', 'tryb ręczny', 'bez kalendarza'],
+      keywords: ['zmiana', 'kalendarz', 'zarobki', 'stawka godzinowa', 'tryb ręczny', 'bez kalendarza', 'pracodawca', 'zmiana pracy'],
       items: [
+        {
+          // 2026-09-10, user: "żeby dało się zmienić prefiks w razie czego i działał jak
+          // zmienię pracę" + "wyłączyć stare żeby one były ale widzieć tylko z nowej pracy" —
+          // lista pracodawców NAD polami edycji niżej (te pola ZAWSZE edytują "aktywnego").
+          // Pusta lista = user jeszcze nic nie skonfigurował ANI nie zdążył się zmigrować
+          // (patrz workService.getEmployers) — wtedy ten blok po prostu się nie pokazuje,
+          // istniejące pola niżej działają dokładnie jak wcześniej.
+          id: 'employers-list', title: 'Pracodawcy',
+          keywords: ['pracodawca', 'praca', 'zmiana pracy', 'firma', 'historia'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
+                  <LucideIcons.Building2 size={16} color="#60A5FA" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Pracodawcy</Text>
+                  <Text style={styles.rowSub}>Dodaj nową pracę przy zmianie zatrudnienia — stara zostaje w historii, możesz ją schować z łącznych statystyk</Text>
+                </View>
+              </View>
+
+              {employers.length > 0 && (
+                <View style={{ gap: spacing[2] }}>
+                  {employers.map(emp => {
+                    const isActive = emp.id === activeEmployerId;
+                    return (
+                      <View key={emp.id} style={{
+                        flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+                        padding: spacing[2], borderRadius: radius.md,
+                        backgroundColor: isActive ? '#60A5FA14' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: isActive ? '#60A5FA55' : colors.border.default,
+                      }}>
+                        <PressableScale onPress={() => !isActive && activateEmployer(emp.id)} style={{ flex: 1 }} disabled={isActive}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text.primary }} numberOfLines={1}>{emp.name}</Text>
+                            {isActive && (
+                              <View style={{ backgroundColor: '#60A5FA', borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: '#0B0E1A' }}>AKTYWNA</Text>
+                              </View>
+                            )}
+                            {emp.hidden && <LucideIcons.EyeOff size={11} color={colors.text.muted} />}
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.text.muted, marginTop: 1 }} numberOfLines={1}>
+                            {emp.workMode === 'manual' ? 'Ręcznie' : (emp.workPrefix ? `Prefiks „${emp.workPrefix}"` : 'Bez prefiksu')}
+                            {' · '}{emp.monthlySalary.toFixed(0)} zł / {emp.hoursPerMonth.toFixed(0)} h
+                          </Text>
+                        </PressableScale>
+                        {!isActive && (
+                          <PressableScale onPress={() => toggleEmployerHidden(emp.id)} style={{ padding: 6 }}>
+                            {emp.hidden ? <LucideIcons.Eye size={15} color={colors.text.muted} /> : <LucideIcons.EyeOff size={15} color={colors.text.muted} />}
+                          </PressableScale>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center' }}>
+                <TextInput
+                  value={newEmployerName}
+                  onChangeText={setNewEmployerName}
+                  placeholder="Nazwa nowej pracy, np. Firma X"
+                  placeholderTextColor={colors.text.muted}
+                  style={{
+                    flex: 1, fontSize: 13, color: colors.text.primary,
+                    paddingHorizontal: spacing[3], paddingVertical: 8,
+                    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
+                    borderWidth: 1, borderColor: colors.border.default,
+                  }}
+                />
+                <PressableScale onPress={addEmployer} style={{
+                  paddingHorizontal: spacing[3], paddingVertical: 9, borderRadius: radius.md,
+                  backgroundColor: '#60A5FA22', borderWidth: 1, borderColor: '#60A5FA55',
+                }}>
+                  <Plus size={16} color="#60A5FA" />
+                </PressableScale>
+              </View>
+              {employers.length > 0 && (
+                <Text style={[styles.rowSub, { fontSize: 10.5 }]}>
+                  Nowa praca staje się od razu aktywna — pola prefiksu/godzin/wypłaty niżej zaczynają ją dotyczyć.
+                </Text>
+              )}
+            </View>
+          ) },
+        },
         {
           id: 'work-mode', title: 'Tryb liczenia godzin',
           subtitle: workMode === 'manual'
