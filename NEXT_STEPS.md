@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek — finalna scena zablokowana, edytor wyłączony, ciemniejsza lada — NIEsprawdzone (2026-09-10)
+
+User wkleił finalny eksport z edytora sceny + poprosił o usunięcie triggera edytora z UI
+(kod zostaje, "na wszelki") i ciemniejszy kolor wypełnienia POD LADĄ konkretnie (tablica
+zostaje jaśniejsza). Pełny opis w ARCHITECTURE.md §65.
+
+`tsc`/`jest` zielone (70 suit/905 testów).
+
+**Priorytet testu na urządzeniu**: Rynek → brak ikony edytora w headerze, scena zgodna z
+finalnym układem, lada wyraźnie ciemniejsza niż tablica.
+
 ## 🆕 Ustawienia runda 1 + rok w DatePickerField — NIEsprawdzone (2026-09-09)
 
 User: "chaotyczne... w ustawieniach bym też uklarował, eksport danych mamy w kilku miejscach"

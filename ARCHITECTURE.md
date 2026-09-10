@@ -5241,6 +5241,32 @@ to teraz dwie WYRAŹNIE różne sekcje; DatePickerField → dowolne pole daty (n
 
 ---
 
+## 65. Rynek — finalne ustawienie sceny zablokowane, edytor wyłączony z UI, ciemniejsza lada
+
+User: *"to już jest finalne ustawienie pupilowego rynku dodaj i wywal mi opcje zmiany, ale
+zostaw w kodzie na wszelki... zmień na pewno sam kolor wypełnień za ladą na bardziej
+pasujący do obrazka i ciemniejszy"* + wkleił finalny eksport z edytora (wszystkie 9 warstw:
+`bg`/`top`/`topSlots`/`cat`/`bottom`/`bottomSlots`/`boardBgTop`/`boardBgBottom`/`items`).
+
+**Zmiana**:
+- `DEFAULT_ADJUST` w `pet-shop.tsx` zastąpiony 1:1 wklejonym eksportem usera — to nowa,
+  finalna geometria sceny Rynku.
+- Trigger edytora (ikona `SlidersHorizontal` w headerze, `setEditScene(true)`) USUNIĘTY z
+  JSX — `editScene` nigdy nie ustawia się na `true`, więc cały blok edytora (`{editScene &&
+  (...)}`, panel z suwakami, `stepImgAdjust`, eksport) jest teraz martwym, ale NIENARUSZONYM
+  kodem — dokładnie "zostaw w kodzie na wszelki". Żeby przywrócić: odkomentować
+  `TouchableOpacity` w headerze.
+- Wypełnienie POD LADĄ (`boardBgBottom`) dostało WŁASNY, ciemniejszy kolor
+  (`boardBgBottomFill`, `#2E2114F5` — próbka z najciemniejszych cieni drewna na
+  `LADADOL.png`, wcześniej dzielone `#4A3420F0` z tablicą). Tablica (`boardBgTop`) zostaje
+  na starym, jaśniejszym kolorze — user poprosił konkretnie o ladę, nie o obie warstwy.
+
+`tsc`/`jest` zielone (70 suit/905 testów — czysto wizualna zmiana, bez nowej logiki).
+**Priorytet testu na urządzeniu**: Rynek → sprawdź że scena wygląda zgodnie z finalnym
+układem (żadnej ikony edytora w headerze), lada wyraźnie ciemniejsza niż tablica.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
