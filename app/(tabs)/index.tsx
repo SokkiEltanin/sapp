@@ -84,7 +84,6 @@ import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
-import SleepChartCard from '@/components/dashboard/SleepChartCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -110,7 +109,7 @@ import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
-import { fixedVariableMonths, fixedBreakdown } from '@/utils/fixedVariable';
+import { fixedVariableMonths, fixedBreakdown, fixedDeviations, topVariableContributors, workBudgetProgress } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
@@ -374,7 +373,6 @@ export default function DashboardScreen() {
   // (stan rozwinięcia wariantów przeniesiony do TopProductsSection — patrz memo poniżej)
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [workHoursChart, setWorkHoursChart] = useState(false);
-  const [sleepDashRange, setSleepDashRange] = useState<7 | 30>(30);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
@@ -501,6 +499,16 @@ export default function DashboardScreen() {
   const fvFixedItems = useMemo(() => {
     const cur = fvMonths[fvMonths.length - 1];
     return cur ? fixedBreakdown(expenses, cur.month) : [];
+  }, [expenses, fvMonths]);
+  // 2026-09-10, user: "rozbudowany widget który pokazywał dane miesięcy porównania wydatków
+  // stałych (odchylen), jedzenia, i zmiennych pokazujacych np co przeważyło (z odniesieniem)".
+  const fvDeviations = useMemo(() => {
+    const cur = fvMonths[fvMonths.length - 1];
+    return cur ? fixedDeviations(expenses, cur.month) : [];
+  }, [expenses, fvMonths]);
+  const fvTopVariable = useMemo(() => {
+    const cur = fvMonths[fvMonths.length - 1];
+    return cur ? topVariableContributors(expenses, cur.month) : [];
   }, [expenses, fvMonths]);
   const [cardPeak, setCardPeak] = useState(0);
   useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
@@ -1484,6 +1492,14 @@ export default function DashboardScreen() {
     [expenses, allEvents, workSettings.workPrefix, workSettings.workColor, workSettings.excludedPayMonths],
   );
   const workAvg = useMemo(() => payMonthsSummary(workPayMonths), [workPayMonths]);
+  // 2026-09-10, user: "w pracy dodać widget jak zarabiam na ten moment... ile muszę uzbierać
+  // na stałych wydatkach i śr. jedzenia... paski jakby skarbonki" — `workMonthly.workedEarnings`
+  // (godziny przepracowane DO TERAZ w tym miesiącu × stawka) rozdzielone po kolei na potrzeby
+  // z `fvMonths` (ten sam widget co "Na co idą pieniądze").
+  const workBudget = useMemo(
+    () => workBudgetProgress(workMonthly?.workedEarnings ?? 0, fvMonths),
+    [workMonthly, fvMonths],
+  );
 
   // Collectible "Wrapped" month cards — one per month, newest first.
   const monthCards = useMemo(
@@ -2700,35 +2716,12 @@ export default function DashboardScreen() {
               <CountdownsCard countdowns={activeCountdowns} cardBg={cardBgDark} accentColor={accentColor} />
             );
 
-            // Sleep — total-minutes bars only, no phase breakdown: readHealthRange() (which
-            // feeds `healthDays`) doesn't carry sleep-stage data, and it's unverified whether
-            // Samsung Health even exports stages for this watch (see the "Diagnostyka faz
-            // snu" probe in the Zdrowie tab). Reuses `healthDays`, already loaded below for
-            // correlations/records — no new fetch for this card.
-            const sleepDays30 = Array.from({ length: 30 }, (_, i) => {
-              const d = new Date(); d.setDate(d.getDate() - (29 - i));
-              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              return { date: key, sleepMinutes: healthDays[key]?.sleepMinutes ?? 0 };
-            });
-            const sleepDaysShown = sleepDashRange === 7 ? sleepDays30.slice(-7) : sleepDays30;
-            const sleepMaxMin = Math.max(...sleepDays30.map(d => d.sleepMinutes), 1);
-            const sleepNights = sleepDays30.filter(d => d.sleepMinutes > 0);
-            const sleepAvgMin = sleepNights.length ? Math.round(sleepNights.reduce((sum, d) => sum + d.sleepMinutes, 0) / sleepNights.length) : 0;
-            // Wyciągnięte do SleepChartCard.tsx (2026-08-26) — ternary, nie `warunek && (...)`,
-            // więc BRAK guardu do zostawienia tutaj (node zawsze prawdziwy, patrz komentarz
-            // w nowym pliku). `sleepDashRange` zostaje jako stan w index.tsx.
-            nodes['sleep-chart'] = (
-              <SleepChartCard
-                sleepNights={sleepNights}
-                sleepDaysShown={sleepDaysShown}
-                sleepMaxMin={sleepMaxMin}
-                sleepAvgMin={sleepAvgMin}
-                sleepDashRange={sleepDashRange}
-                onToggleRange={() => setSleepDashRange(r => r === 7 ? 30 : 7)}
-                cardBg={cardBgDark}
-                accentColor={accentColor}
-              />
-            );
+            // sleep-chart (nodes['sleep-chart']/SleepChartCard) USUNIĘTE (2026-09-10, user:
+            // "wywalić z dashboardu śr.sen ten co ma tydzień/miesiąc bo tam nie ma danych
+            // tylko dni tyg. bez sensu mam to w zakladce zdrowie") — sen zostaje wyłącznie w
+            // zakładce Zdrowie. `sleep-chart` usunięty też z DEFAULT_DASHBOARD_SECTIONS w
+            // dashboardLayout.ts; `effectiveOrder()` tam automatycznie odfiltrowuje ten id ze
+            // starych, już zapisanych layoutów userów (patrz komentarz przy tej funkcji).
 
             nodes['bank-queue'] = bankPendingCount > 0 && (
               <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.85}
@@ -3166,7 +3159,7 @@ export default function DashboardScreen() {
 
             nodes['fixed-variable'] = fvMonths.length > 0
               && (fvMonths[fvMonths.length - 1].fixed + fvMonths[fvMonths.length - 1].variable + fvMonths[fvMonths.length - 1].food) > 0
-              && <FixedVariableSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} fvMonths={fvMonths} fvFixedItems={fvFixedItems} />;
+              && <FixedVariableSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} fvMonths={fvMonths} fvFixedItems={fvFixedItems} fvDeviations={fvDeviations} fvTopVariable={fvTopVariable} />;
 
             nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) &&
               <SpendByDaySection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekdayAvg={weekdayAvg} />;
@@ -3553,6 +3546,24 @@ export default function DashboardScreen() {
                       {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text>{' do teraz'}</> : null}
                     </Text>
                   </View>
+
+                  {/* ── Skarbonki: zarobek do teraz rozdzielony na potrzeby (2026-09-10) ── */}
+                  {hasRate && workBudget.some(b => b.target > 0) && (
+                    <View style={[s.wpLeftCard, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[3] }]}>
+                      <Text style={s.wxSection}>Zarobek do teraz vs potrzeby</Text>
+                      {workBudget.map(b => (
+                        <View key={b.label} style={s.wbBucket}>
+                          <View style={s.wbBucketHead}>
+                            <Text style={s.wbBucketLbl} numberOfLines={1}>{b.label}</Text>
+                            <Text style={s.wbBucketAmt}>{Math.round(b.filled).toLocaleString('pl-PL')} / {Math.round(b.target).toLocaleString('pl-PL')} zł</Text>
+                          </View>
+                          <View style={s.wbBarTrack}>
+                            <View style={{ width: `${Math.min(b.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: b.pct >= 1 ? WORK_WORKED : WORK_ACCENT }} />
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
                   {/* ── WAŻNE NA GÓRZE: ile zostało do przepracowania ── */}
                   {(wm.plannedDays > 0 || wm.plannedH > 0) && (
@@ -4615,7 +4626,6 @@ const buildStyles = (c: any) => StyleSheet.create({
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
 
-  // sleepEmptyIcon/Title/Btn/BtnText PRZENIESIONE do SleepChartCard.tsx (2026-08-26).
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
@@ -4643,6 +4653,19 @@ const buildStyles = (c: any) => StyleSheet.create({
   fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
   fvAvg: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[2], textAlign: 'center' },
+  fvDevBox: { gap: 5, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  fvDevRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fvDevLbl: { flex: 1, fontSize: 12, color: c.text.secondary },
+  fvDevPct: { fontSize: 11.5, fontWeight: '800' },
+  fvDevAmt: { fontSize: 10.5, color: c.text.muted },
+  fvTip: { fontSize: 11, color: c.text.secondary, lineHeight: 15, marginTop: spacing[1] },
+  fvTipB: { fontWeight: '800', color: c.text.primary },
+  // ── Praca — "skarbonki" (workBudgetProgress) ──
+  wbBucket: { gap: 4 },
+  wbBucketHead: { flexDirection: 'row', alignItems: 'baseline' },
+  wbBucketLbl: { flex: 1, fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  wbBucketAmt: { fontSize: 11.5, fontWeight: '700', color: c.text.muted },
+  wbBarTrack: { height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: c.fill.subtle },
   // ── Stat widgets ──
   statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
   statNumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },

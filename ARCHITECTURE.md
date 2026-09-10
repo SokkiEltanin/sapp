@@ -5446,6 +5446,98 @@ listy tagów, nie tylko nastrojowe.
 
 ---
 
+## 70. Usuń widget snu z dashboardu + rozbuduj "Na co idą pieniądze" (odchylenia/atrybucja) + skarbonki w Pracy
+
+User (dwuczęściowy ask): *"I potrzebuje wywalić z dashboardu śr.sen ten co ma tydzień/miesiąc
+bo tam nie ma danych tylko dni tyg. bez sensu mam to w zakladce zdrowie, natomiast potrzebuje
+rozbudowanego widgetu który. Edzie pokazywał dane miesięcy porównania wydatków stałych
+(odchylen) jedzenia, i zmiennych pokazujacych np co przeważyło np zakup wiatraka (z
+odniesieniem) I tez w pracy dodac zeby byl widget jak zarabiam na ten moment ile w miesiącu to
+zeby pokazywalo na stałych wydatkach i na sr jedzenia ile muszę uzbierać i pokazuje sie takie
+paski wypełniając sie moze jakby takie skarbonki ile na mieszkanie+prad+internet, a ile na
+jedzenie a ile sr na zmienne wydaje"*.
+
+### 70a. Usunięcie `sleep-chart`
+
+Sprawdzone PRZED ruszeniem kodu: `sleepAvg` (custom stat-tile z `statWidgets.ts`) to NIE ten
+widget — to była ślepa uliczka we wstępnej hipotezie. Prawdziwy winowajca: `nodes['sleep-chart']`
+/ `SleepChartCard.tsx` — SEKCJA DOMYŚLNA (żywa, w `DEFAULT_DASHBOARD_SECTIONS`), z dokładnie
+opisanym przez usera przełącznikiem Tydzień/Miesiąc. Usunięta CAŁKOWICIE:
+- `'sleep-chart'` wyleciał z `DEFAULT_DASHBOARD_SECTIONS` + `SECTION_TITLES`/`SECTION_DESC`/
+  `SECTION_GROUP` w `dashboardLayout.ts`.
+- `nodes['sleep-chart']`, `sleepDays30`/`sleepDaysShown`/`sleepMaxMin`/`sleepNights`/
+  `sleepAvgMin` (lokalne, nigdzie indziej nieużywane — zweryfikowane grepem) i stan
+  `sleepDashRange` USUNIĘTE z `app/(tabs)/index.tsx`.
+- `src/components/dashboard/SleepChartCard.tsx` USUNIĘTY (był używany WYŁĄCZNIE tu).
+
+Stare, już zapisane layouty userów (`useDashboardLayout.order`) NIE wymagają migracji ręcznej —
+`effectiveOrder()` w `dashboardLayout.ts` filtruje `order` po `known(id)` (`DEFAULTS.includes(id)
+|| customIds.has(id)`), więc zniknięty z `DEFAULT_DASHBOARD_SECTIONS` id po prostu wypada przy
+najbliższym odczycie, bez żadnego dodatkowego kodu migracyjnego.
+
+### 70b. "Na co idą pieniądze" — odchylenia stałych + atrybucja zmiennych
+
+Widget ("Na co idą pieniądze", `FixedVariableSection.tsx`) już ISTNIAŁ w dojrzałej formie
+(miesiąc bieżący, top-4 stałe, trend 4 mies. + średnia) — user chciał go ROZBUDOWAĆ, nie
+zbudować od zera. Dwie nowe czyste funkcje w `src/utils/fixedVariable.ts`:
+
+- `fixedDeviations(expenses, month, lookback=3)` — porównuje nazwane rachunki stałe tego
+  miesiąca (to samo grupowanie co `fixedBreakdown`) z ich WŁASNĄ historyczną średnią z
+  poprzednich miesięcy. Próg ≥15% ORAZ ≥20 zł (odcina szum typu zużyciowy prąd), rachunek bez
+  ŻADNEJ historii pomijany (nie fałszywy 100%-owy skok). Zwraca posortowane malejąco po
+  `|deltaPct|`.
+- `topVariableContributors(expenses, month, n=2)` — największe pojedyncze zakupy zmienne
+  (bez stałych/jedzenia) tego miesiąca, zgrupowane po nazwie/sklepie jak `fixedBreakdown` (żeby
+  powtórzone zakupy w tym samym miejscu się sumowały). To jest "co przeważyło np zakup wiatraka".
+
+W `FixedVariableSection.tsx`: nowy blok "odchylenia" (do 3, ikona trend + kolor: pomarańcz =
+wyżej niż zwykle, zielony = niżej) pod itemizacją stałych; nowa linia "Zmienne wyżej niż zwykle
+(śr. X zł) — głównie: Y zł" POD warunkiem że bieżące zmienne > 1.15× średniej ORAZ jest co
+pokazać (`fvTopVariable.length > 0`) — inaczej cisza (żaden fałszywy alarm gdy nic nie
+przeważyło). Nowe propy (`fvDeviations`, `fvTopVariable`) liczone w `index.tsx` obok istniejącego
+`fvMonths`/`fvFixedItems`, zero nowego fetchowania danych (te same `expenses`).
+
+### 70c. "Skarbonki" w Pracy — zarobek do teraz vs potrzeby
+
+Nowa czysta funkcja `workBudgetProgress(earnings, fvMonths)` w `fixedVariable.ts` — rozdziela
+podany zarobek PO KOLEI (waterfall, priorytet: stałe → jedzenie → zmienne) na 3 "skarbonki",
+każda wypełniana do swojego celu (śr. z poprzednich nie-zerowych miesięcy `fvMonths`, bez
+historii cel = ten miesiąc) zanim nadwyżka przechodzi dalej — DOKŁADNIE model "ile muszę
+uzbierać" z prośby usera (najpierw pokryj czynsz+prąd+internet, potem jedzenie, reszta to
+"wolne" zmienne).
+
+`earnings` = `workMonthly.workedEarnings` — JUŻ istniejąca, dojrzała liczba w `index.tsx`
+(godziny przepracowane DO TERAZ w tym miesiącu × stawka, ten sam wzór co "≈ do teraz" w
+istniejącym panelu Pracy) — zero nowej logiki liczenia zarobku, tylko nowe zestawienie z
+`fvMonths`. Widget wstawiony do ISTNIEJĄCEGO modala "Praca" (`workPanel` w `index.tsx`), zaraz
+po bloku "przepracowane w tym miesiącu", przed "ile zostało do przepracowania" — 3 paski
+(`s.wbBarTrack`/wypełnienie proporcjonalne do `pct`, kolor zielony gdy `pct>=1` inaczej
+niebieski jak reszta karty Pracy), każdy z etykietą "wypełniono / cel zł". Guard: `hasRate &&
+workBudget.some(b => b.target > 0)` — bez stawki lub bez żadnej historii wydatków sekcja się
+nie renderuje (nie ma czym wypełnić pasków).
+
+Świadomie NIE zrobione: osobny ekran/kafelek na dashboardzie dla skarbonek (user powiedział
+"w pracy", istniejący panel Pracy to najbliższe miejsce koncepcyjnie — `app/work/history.tsx`
+zostaje ekranem stricte historycznym/miesiąc-po-miesiącu, niezmieniony); próg/model odchyleń to
+prosta heurystyka (mediana z `fixedCosts.ts`/`detectFixedCosts` byłaby bardziej wyrafinowana,
+ale operuje na INNYM zbiorze — auto-wykrytych rachunkach z całej historii, nie na już
+skategoryzowanych `isFixedExpense` z bieżącego miesiąca — zostawione jako odrębne narzędzie,
+nie zmieszane).
+
+`tsc`/`jest` zielone (71 suit/926 testów, +9 nowych w `__tests__/fixedVariable.test.ts` dla
+`fixedDeviations`/`topVariableContributors`/`workBudgetProgress`, w tym waterfall-alokacja i
+brak-historii guard).
+
+**Priorytet testu na urządzeniu**: (1) dashboard → sprawdź że sekcji "Sen" już nie ma (ani w
+liście, ani w edytorze dashboardu) — sen zostaje w Zdrowiu; (2) "Na co idą pieniądze" → jeśli
+jakiś stały rachunek (np. Prąd) wyraźnie odbiega od poprzednich miesięcy, powinna pojawić się
+linia odchylenia; jeśli zmienne w tym miesiącu są wyraźnie wyższe niż średnia, powinna pojawić
+się linia "głównie: ..." wskazująca największy zakup; (3) panel Pracy (stuknij kafelek/sekcję
+Praca) → sprawdź że 3 paski "skarbonek" wypełniają się sensownie względem zarobku do teraz i że
+suma wypełnień nie przekracza zarobku (waterfall, nie 3× ten sam zarobek).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

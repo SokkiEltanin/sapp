@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Dashboard: usunięty sleep-chart + rozbudowa "Na co idą pieniądze" + skarbonki w Pracy — NIEsprawdzone (2026-09-10)
+
+User: *"wywalić z dashboardu śr.sen ten co ma tydzień/miesiąc... rozbudowanego widgetu który
+pokazywał dane miesięcy porównania wydatków stałych (odchylen) jedzenia, i zmiennych...co
+przeważyło np zakup wiatraka (z odniesieniem)... w pracy dodać widget jak zarabiam na ten
+moment... skarbonki ile na mieszkanie+prąd+internet, a ile na jedzenie, a ile śr. na zmienne"*.
+Pełny opis w ARCHITECTURE.md §70.
+
+- Usunięty `sleep-chart` (sekcja + `SleepChartCard.tsx`, w całości) z dashboardu — sen zostaje
+  wyłącznie w zakładce Zdrowie.
+- "Na co idą pieniądze" (`FixedVariableSection.tsx`) rozbudowany o `fixedDeviations()`
+  (odchylenia rachunków stałych vs własna historia) i `topVariableContributors()` ("co
+  przeważyło" zmienne).
+- Nowy widget "skarbonek" w panelu Pracy (`workPanel` modal, `index.tsx`) —
+  `workBudgetProgress()` rozdziela zarobek do-teraz waterfallem na stałe → jedzenie → zmienne.
+
+`tsc`/`jest` zielone (71 suit/926 testów, +9 nowych w `fixedVariable.test.ts`).
+
+**Priorytet testu na urządzeniu**: (1) dashboard → sekcji "Sen" już nie ma, ani w edytorze
+dashboardu; (2) jeśli masz stały rachunek wyraźnie wyższy niż zwykle (np. Prąd) — powinna się
+pojawić linia odchylenia w "Na co idą pieniądze"; jeśli zmienne > zwykłej średniej — linia "co
+przeważyło"; (3) panel Pracy → 3 paski skarbonek wypełniają się sensownie względem zarobku do
+teraz (suma wypełnień ≤ zarobek, nie 3×).
+
 ## 📌 Potki: pozwolić na 2 naraz, 3. wymaga anulowania (albo auto-anuluje najstarszą) — ODŁOŻONE (2026-09-10)
 
 User: *"na później zapisz ogarnąć żeby można było mieć 2 eliksiry na raz i jak chcesz 3 kupić
