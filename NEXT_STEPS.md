@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Code-review runda (PR #163–#177) — dwa bugi naprawione — NIEsprawdzone (2026-09-10)
+
+User poprosił o rundę sprawdzenia błędów w całej pracy z sesji. Znalezione i naprawione:
+(1) `app/expenses/manual.tsx` — niedotknięta domyślna kategoria ('groceries') zapisywała się
+do wspólnej pamięci produktów tak samo jak świadomy wybór, zanieczyszczając przyszłe
+auto-podpowiedzi (skan + ręczne); (2) `settings.tsx`/`workService.ts` — wyścig przy pierwszej
+migracji pracodawców, świeżo zmigrowany pracodawca renderował się bez odznaki "AKTYWNA" do
+czasu ponownego wejścia na ekran. Pełny opis w ARCHITECTURE.md §68.
+
+`tsc`/`jest` zielone (70 suit/909 testów).
+
+**Priorytet testu na urządzeniu**: (1) dodaj ręcznie NOWY produkt bez dotykania kategorii,
+zapisz, wpisz tę samą nazwę ponownie — nie powinna wskoczyć fałszywa kategoria; (2) świeża
+Praca (jeden zmigrowany pracodawca) — Ustawienia → Praca pokazuje "AKTYWNA" od razu.
+
 ## 🆕 Praca front 2: ekran "Historia pracy" — NIEsprawdzone (2026-09-10)
 
 User: "historia ostatnich miesięcy z wypłatami i średnia gdzie mogę kliknąć na każdy miesiąc

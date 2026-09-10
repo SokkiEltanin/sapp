@@ -544,6 +544,12 @@ export default function ManualReceiptScreen() {
         return ri;
       };
 
+      // Równoległa do `receiptItems` — jedyny sposób żeby wiedzieć, dla i-tego WYNIKOWEGO
+      // wiersza (po grupowaniu/dzieleniu cen wspólnych, patrz niżej), czy user faktycznie
+      // DOTKNĄŁ kategorię, skoro `receiptItems[i]` nie odpowiada 1:1 `items[i]` (grupy
+      // wspólnej ceny rozbijają się na wiele wpisów z jednego `items` indeksu, inne wcale
+      // się nie kwalifikują). Patrz użycie przy `saveProductCategories` niżej.
+      const catTouchedFlags: boolean[] = [];
       const receiptItems: ReceiptItem[] = [];
       for (const g of groups) {
         const leader = items[g[0]];
@@ -553,13 +559,14 @@ export default function ManualReceiptScreen() {
           const named = g.filter(idx => items[idx].name.trim());
           if (leaderPrice <= 0 || named.length === 0) continue;
           const shares = splitEven(leaderPrice, named.length);
-          named.forEach((idx, si) => receiptItems.push(makeItemRecord(items[idx], shares[si], 1)));
+          named.forEach((idx, si) => { receiptItems.push(makeItemRecord(items[idx], shares[si], 1)); catTouchedFlags.push(!!items[idx].catTouched); });
         } else {
           const it = items[g[0]];
           const unitPrice = parseFloat(it.price.replace(',', '.')) || 0;
           if (!it.name.trim() || unitPrice <= 0) continue;
           const qty = Math.max(1, parseFloat(it.quantity) || 1);
           receiptItems.push(makeItemRecord(it, unitPrice * qty, qty));
+          catTouchedFlags.push(!!it.catTouched);
         }
       }
 
@@ -568,13 +575,25 @@ export default function ManualReceiptScreen() {
       // czytany też tutaj przy wpisywaniu nazwy (patrz `handleNameChange`). Bez tego
       // ręcznie dodany, nowy produkt nigdy by się sam nie "nauczył" — user musiałby go
       // najpierw zeskanować, żeby przyszłe ręczne wpisy go rozpoznały.
+      //
+      // Naprawiony bug (code review, 2026-09-10): przekazywanie `{}` jako `parsed` sprawiało,
+      // że `saveProductCategories` traktowało KAŻDĄ kategorię jako "świadomie inną od
+      // rozpoznanej" (patrz `cat !== parsedCat` w productMemory.ts, `parsed[idx]` zawsze
+      // `undefined`) — więc NIEDOTKNIĘTA domyślna kategoria nowego wiersza (`makeItem()` →
+      // 'groceries') zapisywała się do WSPÓLNEJ pamięci tak samo jak świadomy wybór usera,
+      // zanieczyszczając przyszłe sugestie (tu i w `scan.tsx`) niepotwierdzonym zgadywaniem.
+      // Naprawa: `parsedCat[i] = it.category` (czyli "parsed == cat", więc zapis pomijany)
+      // dla WSZYSTKICH pozycji, których `catTouched` jest fałszywe — zapisuje się TYLKO to,
+      // co user faktycznie wybrał (CategoryPicker) lub co przyszło z rozpoznania po nazwie.
       const catPatch: Record<number, ExpenseCategory> = {};
+      const parsedCat: Record<number, ExpenseCategory> = {};
       const tagPatch: Record<number, string[]> = {};
       receiptItems.forEach((it, i) => {
         catPatch[i] = it.category;
+        if (!catTouchedFlags[i]) parsedCat[i] = it.category;
         if (it.tags.length > 0) tagPatch[i] = it.tags;
       });
-      saveProductCategories(receiptItems, catPatch, {}).catch(() => {});
+      saveProductCategories(receiptItems, catPatch, parsedCat).catch(() => {});
       saveTagMemory(receiptItems, tagPatch).catch(() => {});
       savePriceMemory(receiptItems.filter(it => it.unitPrice > 0).map(it => ({ name: it.name, unitPrice: it.unitPrice }))).catch(() => {});
 

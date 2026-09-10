@@ -353,7 +353,15 @@ export default function SettingsScreen() {
   const [activeEmployerId, setActiveEmployerId] = useState<string | null>(null);
   const [newEmployerName, setNewEmployerName] = useState('');
   const loadEmployers = useCallback(async () => {
-    const [list, activeId] = await Promise.all([workService.getEmployers(), workService.getActiveEmployerId()]);
+    // SEKWENCYJNIE, nie Promise.all (naprawiony bug, code review 2026-09-10) — pierwsze
+    // wywołanie NA URZĄDZENIU bez zapisanej listy migruje z legacy `WorkSettings`
+    // WEWNĄTRZ `getEmployers()` (getItem→miss→getSettings→saveEmployers→setItem
+    // ACTIVE_EMPLOYER_KEY, kilka awaitowanych kroków), a `getActiveEmployerId()` to
+    // pojedynczy `getItem`. Równolegle ten drugi kończył się ZANIM migracja zdążyła
+    // zapisać klucz aktywnego pracodawcy, więc świeżo zmigrowany (jedyny) pracodawca
+    // renderował się bez odznaki "AKTYWNA" do czasu ponownego otwarcia ekranu.
+    const list = await workService.getEmployers();
+    const activeId = await workService.getActiveEmployerId();
     setEmployers(list);
     setActiveEmployerId(activeId);
   }, []);
