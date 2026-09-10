@@ -3,6 +3,45 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 📌 Potki: pozwolić na 2 naraz, 3. wymaga anulowania (albo auto-anuluje najstarszą) — ODŁOŻONE (2026-09-10)
+
+User: *"na później zapisz ogarnąć żeby można było mieć 2 eliksiry na raz i jak chcesz 3 kupić
+to możesz ale anulować musisz jakiś albo anuluje się pierwszy kupiony"*. NIE zaimplementowane
+teraz — świadomie odłożone na przyszłą sesję, tylko zapisane żeby nie zgubić.
+
+**Stan obecny** (`petStore.ts`'s `buyPotion`, linia ~1002): `activePotion: ActivePotion | null`
+— JEDEN slot na cały pupil. Kupienie nowej potki (`POTIONS.hp`/`atk`/`xp`, `src/utils/potions.ts`)
+CICHO PODMIENIA poprzednią, bez potwierdzenia i bez zwrotu monet za niewykorzystany czas
+(komentarz w kodzie to już dziś jawnie stwierdza — user chce to zmienić).
+
+**Do zrobienia, w skrócie**: `activePotion` → `activePotions: ActivePotion[]` (limit 2).
+Kupno 1./2. potki — po prostu dokłada do listy (jeśli innego `kind` niż już aktywne — czy
+DUPLIKAT tego samego `kind` ma się liczyć jako "2 naraz" czy nadpisywać swój odpowiednik, do
+ustalenia z userem przy realizacji). Kupno 3. — user musi ręcznie anulować jedną AKTYWNĄ
+(nowy UI wyboru) LUB auto-anuluje się najstarsza (`endsAt`/czas zakupu najwcześniejszy) — user
+podał OBIE opcje jako akceptowalne, dopytać przy realizacji którą wybiera jako domyślną.
+
+**Miejsca do dotknięcia** (nie kompletna lista, do zweryfikowania przy realizacji):
+`isPotionActive`/`potionFlatHp`/`potionAtkBonus`/`potionXpMult` (potions.ts, dziś biorą
+pojedynczy `ActivePotion | null`), `effectiveCatMaxHp`/`xpWithPotion` (petStore.ts, call sites
+`s.activePotion`), `syncPotionExpiry` (dziś zeruje jedno pole, musi filtrować listę), UI w
+`pet-shop.tsx`/`pet.tsx`/`boss-fight.tsx` (badge odliczania na slocie potki — dziś zakłada
+JEDNĄ aktywną).
+
+## 🆕 Check-in humoru — tagi po energii, nie tylko nastroju — NIEsprawdzone (2026-09-10)
+
+User: "te tagi ulepszyć na bazie tego też ile mam energii lub połączenia że jestem szczęśliwy
+ale nie wyspany". Pełny opis w ARCHITECTURE.md §69. Nowy `src/utils/moodTags.ts` — sortowanie
+podpowiedzi tagów w check-inie teraz łączy DWIE niezależne osie (nastrój + energia)
+addytywnie, zamiast patrzeć wyłącznie na nastrój. Nowy tag `niewyspany`. `zmęczony` wyleciał z
+`NEGATIVE_TAGS` (to stan energii, nie nastroju — zostawienie w obu zerowało jego trafność
+dokładnie w kombinacji "szczęśliwy ale zmęczony").
+
+`tsc`/`jest` zielone (71 suit/918 testów, +9 nowych).
+
+**Priorytet testu na urządzeniu**: Check-in humoru → Nastrój=Świetnie, Energia=Wyczerpany →
+sprawdź że "szczęśliwy" I "zmęczony"/"niewyspany" oba są blisko góry listy tagów.
+
 ## 🆕 Code-review runda (PR #163–#177) — dwa bugi naprawione — NIEsprawdzone (2026-09-10)
 
 User poprosił o rundę sprawdzenia błędów w całej pracy z sesji. Znalezione i naprawione:
