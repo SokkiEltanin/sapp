@@ -1,12 +1,14 @@
 import { memo } from 'react';
 import { View, Text } from 'react-native';
-import { Wallet } from 'lucide-react-native';
+import { Wallet, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { FixedDeviation, VariableContributor } from '@/utils/fixedVariable';
 
 function FixedVariableSection(
-  { s, cardBg, accentColor, colors, fvMonths, fvFixedItems }:
+  { s, cardBg, accentColor, colors, fvMonths, fvFixedItems, fvDeviations, fvTopVariable }:
   { s: any; cardBg: string; accentColor: string; colors: any;
     fvMonths: { month: string; fixed: number; variable: number; food: number }[];
-    fvFixedItems: { label: string; amount: number }[] },
+    fvFixedItems: { label: string; amount: number }[];
+    fvDeviations: FixedDeviation[]; fvTopVariable: VariableContributor[] },
 ) {
   const cur = fvMonths[fvMonths.length - 1];
   if (!cur) return null;
@@ -52,6 +54,30 @@ function FixedVariableSection(
           ))}
           {fvFixedItems.length > 4 && <Text style={s.fvFixMore}>+{fvFixedItems.length - 4} więcej</Text>}
         </View>
+      )}
+      {fvDeviations.length > 0 && (
+        <View style={s.fvDevBox}>
+          {fvDeviations.slice(0, 3).map(d => {
+            const up = d.deltaPct > 0;
+            const Icon = up ? TrendingUp : TrendingDown;
+            const col = up ? '#F59E0B' : '#4CA96B';
+            return (
+              <View key={d.label} style={s.fvDevRow}>
+                <Icon size={11} color={col} />
+                <Text style={s.fvDevLbl} numberOfLines={1}>{d.label}</Text>
+                <Text style={[s.fvDevPct, { color: col }]}>{up ? '+' : ''}{Math.round(d.deltaPct * 100)}%</Text>
+                <Text style={s.fvDevAmt}>{fmt(d.amount)} (śr. {fmt(d.avgAmount)}) zł</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {prev.length > 0 && cur.variable > avg(m => m.variable) * 1.15 && fvTopVariable.length > 0 && (
+        <Text style={s.fvTip}>
+          Zmienne wyżej niż zwykle (śr. {fmt(avg(m => m.variable))} zł) — głównie: {fvTopVariable.map((c, i) => (
+            <Text key={c.label} style={s.fvTipB}>{i > 0 ? ', ' : ''}{c.label} {fmt(c.amount)} zł</Text>
+          ))}
+        </Text>
       )}
       {prev.length > 0 && (
         <>
