@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Edycja pozycji paragonu — podpowiedzi tagów po nazwie ("makaron" → tag "makaron") — NIEsprawdzone (2026-09-10)
+
+User (screenshot, edycja "Makaron bez glutenu" w `[id].tsx`): *"jak mam w nazwie makaron to
+niech poleca taki tag... jak zna podobne produkty czy uczył sie na targach [paragonach]"*.
+Pełny opis w ARCHITECTURE.md §71.
+
+Ten ekran zapisywał tagi do pamięci, ale nigdy jej nie czytał przy edycji — zawsze płaska
+lista. Teraz: znany tag, którego SŁOWO pojawia się w nazwie (lub które trafia w
+`applyTagMemory` na całą nazwę), wyskakuje na początek listy z przerywaną zieloną ramką —
+tylko podpowiada, nie ustawia automatycznie (to edycja już otagowanej pozycji).
+
+`tsc`/`jest` zielone (71 suit/933 testy, +7 nowych).
+
+**Priorytet testu na urządzeniu**: Wydatki → otwórz istniejący paragon z pozycjami → edytuj
+nazwę pozycji tak, żeby zawierała słowo będące znanym tagiem → sprawdź że ten tag wyskakuje na
+początek z zieloną przerywaną ramką (nie zaznacza się sam).
+
 ## 🆕 Dashboard: usunięty sleep-chart + rozbudowa "Na co idą pieniądze" + skarbonki w Pracy — NIEsprawdzone (2026-09-10)
 
 User: *"wywalić z dashboardu śr.sen ten co ma tydzień/miesiąc... rozbudowanego widgetu który

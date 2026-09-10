@@ -233,6 +233,30 @@ export async function saveCustomTagsToMemory(
 
 // ─── Tag frequency ────────────────────────────────────────────────────────────
 
+// Wszystkie tagi, jakich user KIEDYKOLWIEK użył (unia wartości z pamięci tagów) — nie
+// tylko domyślna lista ITEM_TAGS, też własne, ręcznie dopisane (np. "makaron").
+export function allKnownTags(memory: TagMemory): string[] {
+  const set = new Set<string>();
+  for (const tags of Object.values(memory)) for (const t of tags) set.add(t);
+  return [...set];
+}
+
+// 2026-09-10, user (edytując pozycję paragonu): "jak mam w nazwie makaron to niech
+// poleca taki tag... jak zna podobne produkty czy uczył się na paragonach" — pełne
+// dopasowanie nazwy w `applyTagMemory` wymaga >=60% podobieństwa CAŁEGO stringa
+// (trigram), więc "Lubella Makaron 5jaj" (skąd user wcześniej dodał tag "makaron")
+// nie łapie "Makaron bez glutenu" mimo wspólnego, jednoznacznego słowa — za mało
+// wspólnych trigramów na tle różniącej się reszty nazwy. To osobny, SŁABSZY sygnał:
+// czy jakiś ZNANY tag (czy to domyślny, czy własny z historii) pojawia się jako
+// całe słowo/fraza w bieżącej nazwie — niezależnie od podobieństwa całego produktu.
+export function tagsMatchingWords(name: string, knownTags: string[]): string[] {
+  const hay = ` ${normalizeProductName(name)} `;
+  return knownTags.filter(t => {
+    const needle = normalizeProductName(t);
+    return needle.length >= 3 && hay.includes(` ${needle} `);
+  });
+}
+
 export async function getTagFrequency(): Promise<Record<string, number>> {
   const memory = await loadTagMemory();
   const freq: Record<string, number> = {};

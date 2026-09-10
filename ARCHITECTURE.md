@@ -5538,6 +5538,54 @@ suma wypełnień nie przekracza zarobku (waterfall, nie 3× ten sam zarobek).
 
 ---
 
+## 71. Edycja pozycji paragonu (post-save) — podpowiedzi tagów po nazwie, nie płaska lista
+
+User (ekran `app/expenses/[id].tsx`, edycja pozycji "Makaron bez glutenu", screenshot): *"jak
+tak edytuje to jak mam w nazwie makaron to niech poleca taki tag, albo pasujące jakby bo
+zobacz poleca mi wszystko jak nie zna to okej ale jak zna podobne produkty czy uczył sie na
+targach"* (= "uczył się na paragonach" — czy korzysta z historii zeskanowanych/wpisanych
+paragonów).
+
+**Prawdziwa luka**: `ItemEditor` w `[id].tsx` (edycja pozycji JUŻ ZAPISANEGO wydatku — inny
+ekran niż `manual.tsx`/`scan.tsx`) ZAPISYWAŁ tagi do pamięci przy zapisie
+(`saveCustomTagsToMemory`), ale NIGDY jej nie CZYTAŁ z powrotem przy edycji nazwy — lista tagów
+to zawsze był płaski, statyczny `[...new Set([...ITEM_TAGS, ...tags])]`, bez żadnego
+rozróżnienia "to pasuje" vs "to nie pasuje". `manual.tsx` i `scan.tsx` MIAŁY już taką logikę
+(`applyTagMemory` przy zmianie nazwy / zaraz po OCR) — `[id].tsx` był jedynym z trzech edytorów
+pozycji bez niej.
+
+**Naprawa** — dwie nowe czyste funkcje w `src/utils/productMemory.ts`:
+- `allKnownTags(memory)` — unia WSZYSTKICH tagów, jakich user kiedykolwiek użył (nie tylko
+  domyślna lista `ITEM_TAGS` — też własne, ręcznie dopisane jak "makaron").
+- `tagsMatchingWords(name, knownTags)` — który ze znanych tagów pojawia się jako CAŁE
+  słowo/fraza (nie podciąg) w bieżącej nazwie. To osobny, SŁABSZY sygnał niż pełne
+  dopasowanie nazwy w `applyTagMemory` (które wymaga ≥60% podobieństwa CAŁEGO stringa przez
+  trigramy) — "Lubella Makaron 5jaj" (skąd user dodał tag "makaron") NIE łapie fuzzy-podobne
+  "Makaron bez glutenu" (za dużo różnicy w reszcie nazwy), ale słowo "makaron" pasuje wprost.
+
+W `ItemEditor`: `suggestedTags` = unia (a) trafień `applyTagMemory` na CAŁĄ nazwę i (b)
+`tagsMatchingWords`, przeliczane z 250ms debounce przy zmianie `name` (ten sam wzorzec co
+`manual.tsx`'s `handleNameChange`). Świadomie TYLKO podpowiada (wyróżnienie — przerywana
+zielona ramka, pierwszeństwo w kolejności listy) zamiast auto-ustawiać tagi: to edycja JUŻ
+otagowanej, zapisanej pozycji, więc cicha zmiana danych przy samym wpisywaniu nazwy byłaby
+zaskakująca (inaczej niż w `manual.tsx`, gdzie auto-apply dotyczy świeżo wpisywanej, jeszcze
+nieotagowanej pozycji i jest zablokowane flagą `tagsTouched`).
+
+Świadomie NIE ruszone: `scan.tsx` (już ma `applyTagMemory` bulk przy OCR + sortowanie
+`TagPicker` po frekwencji — inny mechanizm, ale już adresuje ten sam problem) i `manual.tsx`
+(już ma pełną logikę `handleNameChange`, patrz kod z wcześniejszej sesji) — `[id].tsx` był
+jedynym brakującym ogniwem.
+
+`tsc`/`jest` zielone (71 suit/933 testy, +7 nowych w `productMemory.test.ts` dla
+`allKnownTags`/`tagsMatchingWords`, w tym granica słowa — "nabiał" nie łapie "nabiałowy").
+
+**Priorytet testu na urządzeniu**: Otwórz istniejący wydatek z pozycjami → edytuj pozycję,
+wpisz nazwę zawierającą słowo, które jest znanym tagiem (np. zmień nazwę na coś z "makaron" w
+środku, o ile ten tag był kiedyś użyty) → tag powinien wyskoczyć na początek listy z przerywaną
+zieloną ramką, gotowy do jednego tapnięcia (nie ustawiony automatycznie).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

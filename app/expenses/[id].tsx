@@ -25,7 +25,7 @@ import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
 import { vehiclesService } from '@/services/vehiclesService';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
-import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
+import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases, loadTagMemory, applyTagMemory, allKnownTags, tagsMatchingWords } from '@/utils/productMemory';
 import { isFoodItem, NONFOOD_TAGS, removeNonFood } from '@/utils/food';
 import { getPayers, addPayer } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -75,6 +75,33 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
   const [customTag, setCustomTag] = useState('');
   const [payers, setPayers]     = useState<string[]>([]);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
+
+  // 2026-09-10, user (edytując nazwę na tym ekranie): "jak mam w nazwie makaron to niech
+  // poleca taki tag... jak zna podobne produkty czy uczył się na paragonach" — do teraz
+  // ten ekran WYSYŁAŁ tagi do pamięci przy zapisie (`saveCustomTagsToMemory` niżej), ale
+  // nigdy jej nie CZYTAŁ z powrotem przy edycji — stąd zawsze płaska, pełna lista bez
+  // żadnych podpowiedzi. `suggestedTags` = (a) tagi pamięci CAŁEJ nazwy (silniejszy
+  // sygnał, ale wymaga >=60% podobieństwa całego stringa) + (b) tagi, których SŁOWO
+  // dosłownie pojawia się w nazwie (słabszy, ale łapie "Makaron bez glutenu" mimo że
+  // cała nazwa nie przypomina niczego zapamiętanego). Tylko PODPOWIADA (wyróżnienie +
+  // pierwszeństwo w liście) — nie ustawia automatycznie, edytujesz istniejącą, już
+  // otagowaną pozycję, więc cichej zmiany tagów tu robić nie chcemy.
+  const [tagMemory, setTagMemory] = useState<Record<string, string[]>>({});
+  useEffect(() => { loadTagMemory().then(setTagMemory).catch(() => {}); }, []);
+  const knownTags = useMemo(() => [...new Set([...ITEM_TAGS, ...allKnownTags(tagMemory)])], [tagMemory]);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+  const suggTagTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (suggTagTimer.current) clearTimeout(suggTagTimer.current);
+    const key = name.trim();
+    if (key.length < 3) { setSuggestedTags([]); return; }
+    suggTagTimer.current = setTimeout(async () => {
+      const memHit = (await applyTagMemory([{ name: key }], tagMemory).then(r => r[0])) ?? [];
+      const wordHit = tagsMatchingWords(key, knownTags);
+      setSuggestedTags([...new Set([...memHit, ...wordHit])]);
+    }, 250);
+    return () => { if (suggTagTimer.current) clearTimeout(suggTagTimer.current); };
+  }, [name, tagMemory, knownTags]);
 
   const toggleTag = (t: string) =>
     setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -176,19 +203,26 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
         })}
       </View>
 
-      {/* Food sub-tags */}
+      {/* Food sub-tags — dopasowane do nazwy (pamięć tagów) idą na początek, wyróżnione,
+          reszta zostaje jak była (patrz komentarz przy `suggestedTags` wyżej). */}
       <Text style={ie.sectionLabel}>Tagi</Text>
       <View style={ie.tagsRow}>
-        {[...new Set([...ITEM_TAGS, ...tags])].map(t => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => toggleTag(t)}
-            style={[ie.tagChip, tags.includes(t) && ie.tagChipSel]}
-            activeOpacity={0.7}
-          >
-            <Text style={[ie.tagChipText, tags.includes(t) && ie.tagChipTextSel]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
+        {[...new Set([...ITEM_TAGS, ...tags, ...suggestedTags])]
+          .sort((a, b) => (tags.includes(b) ? 2 : suggestedTags.includes(b) ? 1 : 0) - (tags.includes(a) ? 2 : suggestedTags.includes(a) ? 1 : 0))
+          .map(t => {
+            const sel = tags.includes(t);
+            const sugg = !sel && suggestedTags.includes(t);
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => toggleTag(t)}
+                style={[ie.tagChip, sel && ie.tagChipSel, sugg && ie.tagChipSugg]}
+                activeOpacity={0.7}
+              >
+                <Text style={[ie.tagChipText, sel && ie.tagChipTextSel, sugg && ie.tagChipTextSugg]}>{t}</Text>
+              </TouchableOpacity>
+            );
+          })}
         <View style={[ie.tagChip, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
           <LucideIcons.Plus size={10} color={colors.text.muted} />
           <TextInput
@@ -280,8 +314,10 @@ const makeIe = themedStyles((c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.border.default,
   },
   tagChipSel: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue + '60' },
+  tagChipSugg: { backgroundColor: c.accent.green + '15', borderColor: c.accent.green + '70', borderStyle: 'dashed' },
   tagChipText: { fontSize: 10, color: c.text.muted },
   tagChipTextSel: { color: c.accent.blue, fontWeight: '600' },
+  tagChipTextSugg: { color: c.accent.green, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: spacing[2], justifyContent: 'flex-end' },
   cancelBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,

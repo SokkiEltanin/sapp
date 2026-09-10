@@ -1,6 +1,7 @@
 import {
   normalizeProductName, productGroupKey, productGroupLabel, productNameSimilarity,
   canonicalProductName, brandTag, parseWeightFromName, priceAnomaly, suggestSimilarName,
+  allKnownTags, tagsMatchingWords,
   PriceStat,
 } from '@/utils/productMemory';
 
@@ -117,6 +118,41 @@ describe('productMemory — priceAnomaly', () => {
   });
   test('niska (promocyjna) cena nigdy nie jest oznaczana', () => {
     expect(priceAnomaly(3, stat({ max: 12, mean: 10 }))).toBeNull();
+  });
+});
+
+// 2026-09-10, user (edytując pozycję paragonu, ekran app/expenses/[id].tsx): "jak mam w
+// nazwie makaron to niech poleca taki tag... jak zna podobne produkty czy uczył się na
+// paragonach" — ten ekran zapisywał tagi do pamięci, ale nigdy jej nie czytał z powrotem
+// przy edycji nazwy, więc zawsze pokazywał płaską listę bez żadnych podpowiedzi.
+describe('productMemory — allKnownTags', () => {
+  test('unia wszystkich tagów kiedykolwiek użytych, bez duplikatów', () => {
+    const mem = { 'lubella makaron 5jaj': ['makaron'], 'mleko 2': ['nabiał'], 'ser gouda': ['nabiał'] };
+    expect(allKnownTags(mem).sort()).toEqual(['makaron', 'nabiał']);
+  });
+  test('pusta pamięć → pusta lista', () => {
+    expect(allKnownTags({})).toEqual([]);
+  });
+});
+
+describe('productMemory — tagsMatchingWords', () => {
+  test('łapie znany tag jako CAŁE słowo w nazwie, nawet gdy cała nazwa jest inna', () => {
+    // "Lubella Makaron 5jaj" (skąd user dodał tag "makaron") NIE jest fuzzy-podobne do
+    // "Makaron bez glutenu" (za mało wspólnych trigramów), ale słowo "makaron" pasuje.
+    expect(tagsMatchingWords('Makaron bez glutenu', ['makaron', 'nabiał'])).toEqual(['makaron']);
+  });
+  test('dopasowuje tag wielowyrazowy jako spójną frazę', () => {
+    expect(tagsMatchingWords('Kurczak w sosie curry dania gotowe', ['dania gotowe'])).toEqual(['dania gotowe']);
+  });
+  test('nie łapie tagu jako podciągu DŁUŻSZEGO słowa (granice słów, nie substring)', () => {
+    // "nabiał" nie powinien pasować do "Nabiałowy" — to inne słowo, nie granica " nabiał ".
+    expect(tagsMatchingWords('Zestaw nabiałowy', ['nabiał'])).toEqual([]);
+  });
+  test('zbyt krótki tag (<3 znaki) nigdy nie jest sugerowany (unika szumu)', () => {
+    expect(tagsMatchingWords('Kabanosy', ['ab'])).toEqual([]);
+  });
+  test('brak dopasowań → pusta lista', () => {
+    expect(tagsMatchingWords('Zupełnie coś innego', ['makaron', 'nabiał'])).toEqual([]);
   });
 });
 
