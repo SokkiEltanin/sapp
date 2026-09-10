@@ -1,5 +1,5 @@
 import { Expense, CalendarEvent, WorkSettings, Employer } from '@/types';
-import { isWorkEvent, shiftHours } from '@/utils/workEvents';
+import { isWorkEvent, shiftHours, shiftClockRange } from '@/utils/workEvents';
 import { isPaycheck } from '@/hooks/useWorkEarnings';
 import { paycheckTargetMonth } from '@/utils/paycheck';
 
@@ -82,4 +82,37 @@ export function employerPayMonthsSummary(
   rows: EmployerPayMonthRow[], opts: { includeHidden?: boolean } = {},
 ): { avgRate: number | null; includedCount: number; totalEarned: number } {
   return payMonthsSummary(opts.includeHidden ? rows : rows.filter(r => !r.employerHidden));
+}
+
+export interface EmployerShift {
+  id: string;
+  title: string;
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // HH:mm (from title range, falls back to event's own times)
+  endTime: string;
+  hours: number;
+}
+
+// 2026-09-10, "mini-kalendarz pokazujący jak pracowałem i ile zarobiłem" (user, przy
+// dopytywaniu o ekran Pracy) — pojedyncze zmiany danego pracodawcy w danym miesiącu, ten sam
+// kształt/wzorzec co `shiftsIn` w settings.tsx (Ustawienia → Praca → "Wyliczona stawka i
+// zmiany"), tylko sparametryzowany po `Employer` zamiast globalnego `WorkSettings`, żeby dało
+// się pokazać zmiany DOWOLNEGO pracodawcy, nie tylko aktywnego.
+export function shiftsForEmployerInMonth(
+  events: CalendarEvent[], employer: Pick<Employer, 'workPrefix' | 'workColor'>, ym: string,
+): EmployerShift[] {
+  const wp = (employer.workPrefix ?? '').trim().toLowerCase();
+  const wc = employer.workColor;
+  if (!wp && !wc) return [];
+  return events
+    .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && (e.date ?? '').slice(0, 7) === ym)
+    .map(e => {
+      const r = shiftClockRange(e);
+      return {
+        id: e.id, title: e.title ?? '', date: (e.date ?? '').slice(0, 10),
+        startTime: r?.start ?? e.startTime ?? '', endTime: r?.end ?? e.endTime ?? '',
+        hours: shiftHours(e),
+      };
+    })
+    .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 }

@@ -1,4 +1,4 @@
-import { payMonthsSummary, computePayMonthsForEmployers, employerPayMonthsSummary } from '@/utils/workSummary';
+import { payMonthsSummary, computePayMonthsForEmployers, employerPayMonthsSummary, shiftsForEmployerInMonth } from '@/utils/workSummary';
 import { Employer, Expense, CalendarEvent } from '@/types';
 
 const row = (o: any) => ({ month: '2026-08', amount: 0, hours: 0, excluded: false, date: '2026-08-01', count: 1, ...o });
@@ -96,5 +96,32 @@ describe('workSummary — computePayMonthsForEmployers / employerPayMonthsSummar
 
     const withHidden = employerPayMonthsSummary(rows, { includeHidden: true });
     expect(withHidden.totalEarned).toBe(7000); // oba, na żądanie
+  });
+});
+
+// 2026-09-10 (ekran "Historia pracy" — mini-kalendarz dni roboczych, user: "sprawdzić czy
+// dobrze złapało dni jak pracowałem, taki mini kalendarz").
+describe('workSummary — shiftsForEmployerInMonth', () => {
+  const shift = (o: Partial<CalendarEvent>): CalendarEvent => ({
+    id: `c-${Math.random()}`, title: '', date: '2026-01-01', allDay: false, priority: 'normal', createdAt: '', ...o,
+  } as CalendarEvent);
+
+  test('zwraca tylko zmiany TEGO pracodawcy (prefiks) w PODANYM miesiącu, posortowane', () => {
+    const events = [
+      shift({ title: '[JD] 08:00 - 16:00', date: '2026-08-10' }),
+      shift({ title: '[JD] 09:00 - 17:00', date: '2026-08-03' }),  // wcześniej w miesiącu → pierwsza po sortowaniu
+      shift({ title: '[JD] 08:00 - 16:00', date: '2026-09-01' }),  // inny miesiąc → wykluczona
+      shift({ title: '[NOWA] 08:00 - 16:00', date: '2026-08-10' }), // inny prefiks → wykluczona
+    ];
+    const rows = shiftsForEmployerInMonth(events, { workPrefix: '[JD]' }, '2026-08');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].date).toBe('2026-08-03');
+    expect(rows[1].date).toBe('2026-08-10');
+    expect(rows[0].hours).toBe(8);
+  });
+
+  test('pracodawca bez prefiksu/koloru → pusta lista (nic by fałszywie nie dopasowało)', () => {
+    const events = [shift({ title: '[JD] 08:00 - 16:00', date: '2026-08-10' })];
+    expect(shiftsForEmployerInMonth(events, {}, '2026-08')).toEqual([]);
   });
 });
