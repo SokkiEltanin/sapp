@@ -361,6 +361,37 @@ export const DEFAULT_WORK_SETTINGS: WorkSettings = {
   workColor: undefined,
 };
 
+// 2026-09-10, user: "praca zakładkę bym od nowa zbudował... żeby dało się zmienić prefiks w
+// razie czego i działał jak zmienię pracę" + "żebym mógł sprawdzić i wyłączyć stare żeby one
+// były ale widzieć np tylko z nowej pracy" — dotąd `WorkSettings` zakładał JEDNĄ, globalną
+// pracę na zawsze (jeden `workPrefix`/`monthlySalary`/`hoursPerMonth`). `Employer` to lekka
+// warstwa NAD tym, nie zastąpienie: pełna lista prac w historii, każda ze SWOIM
+// prefiksem/stawką i WŁASNYMI polami do liczenia miesięcy (mirror pól z `WorkSettings`
+// istotnych per-praca — currency/notifyEveryMinutes zostają globalne, nie per-pracodawca).
+// Jedna z nich jest "aktywna" (`useEmployersStore.activeEmployerId`) — JEJ dane są
+// zwierciadlane do globalnego `WorkSettings` (przez `workService.setActiveEmployer`), więc
+// wszystkie ISTNIEJĄCE miejsca czytające `workSettings.workPrefix` (dashboard, auto-wydatki
+// z banku, osiągnięcia...) działają bez zmian — zawsze widzą "aktualną" pracę. Nowy ekran
+// Pracy (i generalizacja `computePayMonths`) czyta CAŁĄ listę, żeby pokazać/filtrować
+// historię łącznie z archiwalnymi (nieaktywnymi, `hidden`) pracodawcami.
+export interface Employer {
+  id: string;
+  name: string;                // np. "Firma X" — user sam nazywa
+  workMode?: 'calendar' | 'manual';
+  workColor?: string;
+  workPrefix?: string;
+  monthlySalary: number;
+  hoursPerMonth: number;
+  rateOverride?: number;
+  monthRateOverride?: Record<string, number>;
+  hoursOverride?: number;
+  salaryOverride?: number;
+  confirmedMonths?: Record<string, { salary: number; hours: number; excluded?: boolean }>;
+  excludedPayMonths?: string[];
+  hidden?: boolean;   // wyłączona z ŁĄCZNYCH statystyk (dane zostają, user może odkryć z powrotem)
+  createdAt: number;
+}
+
 // ─── Habits ───────────────────────────────────────────────────────────────────
 
 export const HABIT_COLORS = [

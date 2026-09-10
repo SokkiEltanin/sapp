@@ -1,4 +1,4 @@
-import { Expense, CalendarEvent, WorkSettings } from '@/types';
+import { Expense, CalendarEvent, WorkSettings, Employer } from '@/types';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { isPaycheck } from '@/hooks/useWorkEarnings';
 import { paycheckTargetMonth } from '@/utils/paycheck';
@@ -48,4 +48,38 @@ export function payMonthsSummary(rows: PayMonthRow[]): { avgRate: number | null;
     if (!r.excluded && r.hours > 0) { sal += r.amount; hrs += r.hours; cnt++; }
   }
   return { avgRate: hrs > 0 ? sal / hrs : null, includedCount: cnt, totalEarned: total };
+}
+
+// 2026-09-10, "Pracodawcy" (patrz Employer w types/index.ts, user: "żeby dało się zmienić
+// prefiks... i działał jak zmienię pracę" + "wyłączyć stare żeby one były ale widzieć tylko z
+// nowej pracy") — łączy `computePayMonths` PER pracodawca (każdy ma własny prefiks/nadpisania,
+// dokładnie ten sam kształt pól co `WorkSettings`, więc funkcja niżej wywołuje ISTNIEJĄCĄ
+// `computePayMonths` bez zmian w jej wnętrzu) w jedną, otagowaną listę — ekran Pracy filtruje
+// po `employerId`/`employerName`, ukryci (`hidden`) pracodawcy są WYŁĄCZENI z domyślnego
+// (łącznego) widoku, ale ich wiersze ZOSTAJĄ w zwróconej liście (nie znikają z danych —
+// wywołujący decyduje czy je pokazać, np. gdy user chce "odkryć" starą pracę).
+export interface EmployerPayMonthRow extends PayMonthRow {
+  employerId: string;
+  employerName: string;
+  employerHidden: boolean;
+}
+
+export function computePayMonthsForEmployers(
+  expenses: Expense[], events: CalendarEvent[], employers: Employer[],
+): EmployerPayMonthRow[] {
+  const rows: EmployerPayMonthRow[] = [];
+  for (const emp of employers) {
+    const empRows = computePayMonths(expenses, events, emp as unknown as WorkSettings);
+    for (const r of empRows) rows.push({ ...r, employerId: emp.id, employerName: emp.name, employerHidden: !!emp.hidden });
+  }
+  return rows.sort((a, b) => b.month.localeCompare(a.month));
+}
+
+// Jak `payMonthsSummary`, ale liczy TYLKO po widocznych (nie `hidden`) pracodawcach —
+// domyślny widok "łącznie" na nowym ekranie Pracy. Przekaż `includeHidden: true` żeby user
+// mógł chwilowo zobaczyć WSZYSTKO (odkryte + ukryte), bez trwałego odkrywania w ustawieniach.
+export function employerPayMonthsSummary(
+  rows: EmployerPayMonthRow[], opts: { includeHidden?: boolean } = {},
+): { avgRate: number | null; includedCount: number; totalEarned: number } {
+  return payMonthsSummary(opts.includeHidden ? rows : rows.filter(r => !r.employerHidden));
 }

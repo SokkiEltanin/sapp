@@ -5267,6 +5267,62 @@ układem (żadnej ikony edytora w headerze), lada wyraźnie ciemniejsza niż tab
 
 ---
 
+## 66. Praca, front 1 — fundament "Pracodawcy" (wiele prac, zmiana zatrudnienia, filtr widoczności)
+
+User: *"praca zakładkę bym od nowa zbudował... żeby dało się zmienić prefiks w razie czego i
+działał jak zmienię pracę"* + *"żebym mógł sprawdzić i wyłączyć stare żeby one były ale
+widzieć np tylko z nowej pracy jak będę chciał"*. Duży, wieloczęściowy front (user: "musimy
+ogarniać to po kolei") — dopytałem trzema pytaniami: gdzie ma żyć nowy ekran (osobny ekran
+spod dashboardu/ustawień, NIE nowa zakładka w pasku), jak obsłużyć zmianę pracy (lista
+pracodawców z historią + możliwość schowania starych z łącznych statystyk bez kasowania),
+i co ma pokazywać główny widget (średnia zarobków + stawka zł/h, historia miesięcy klikalna →
+szczegóły z mini-kalendarzem dni roboczych). **TA runda to WYŁĄCZNIE fundament danych** — nowy
+ekran "Praca" (widgety, historia, mini-kalendarz) to ŚWIADOMIE OSOBNY, kolejny front.
+
+**Problem**: `WorkSettings` (types/index.ts) zakładał JEDNĄ, globalną pracę na zawsze — jeden
+`workPrefix`/`monthlySalary`/`hoursPerMonth`. Zmiana pracodawcy nadpisywała te pola bezpowrotnie
+— stare miesiące dalej liczyłyby się poprawnie w historii (paragony/eventy mają swój `date`),
+ale NIE dało się już pokazać "ile zarabiałem w starej pracy" osobno, ani wyłączyć starej pracy
+z łącznej średniej bez utraty danych.
+
+**Naprawa — nowy typ `Employer`** (types/index.ts): pełna lista prac w historii, KAŻDA ze
+SWOIM prefiksem/stawką i własnymi nadpisaniami (mirror pól `WorkSettings` istotnych per-praca).
+Jedna jest "aktywna" — `workService.setActiveEmployer(id)` zwierciadli JEJ dane do globalnego
+`WorkSettings`, więc WSZYSTKIE istniejące miejsca czytające `workSettings.workPrefix` (dashboard,
+auto-wydatki z banku, osiągnięcia, eksport analizy — **19 plików, ZERO zmian w nich**) automatycznie
+zaczynają liczyć nową pracę. To właśnie rozwiązuje "działał jak zmienię pracę".
+
+**Filtr widoczności** (nie usuwanie): `Employer.hidden` — `workService.toggleEmployerHidden(id)`
+wyłącza pracodawcę z ŁĄCZNYCH statystyk (nowy `employerPayMonthsSummary`), dane zostają w 100%
+nietknięte, można odkryć z powrotem w każdej chwili. Usuwanie pracodawcy z danymi świadomie
+NIE zaimplementowane — zbyt ryzykowne dla realnych zarobków bez wyraźnego asku.
+
+**Migracja**: `workService.getEmployers()` — pierwsze wywołanie bez zapisanej listy migruje
+jednorazowo, idempotentnie z istniejącego `WorkSettings` (jeśli user go w ogóle skonfigurował;
+pusty prefiks + domyślne wartości = nic do migrowania). Migracja NIE kasuje/zmienia
+`WorkSettings` — zostaje jako zwierciadło aktywnej pracy.
+
+**Generalizacja obliczeń** (`workSummary.ts`): `computePayMonthsForEmployers` woła ISTNIEJĄCĄ
+`computePayMonths` per pracodawca (bez zmian w jej wnętrzu — `Employer` ma te same nazwy pól co
+`WorkSettings` dla prefiksu/nadpisań, więc przechodzi strukturalnie) i łączy w jedną, otagowaną
+(`employerId`/`employerName`/`employerHidden`) listę, posortowaną malejąco po miesiącu.
+`employerPayMonthsSummary` domyślnie liczy tylko widocznych pracodawców, `includeHidden: true`
+pokazuje wszystko na żądanie.
+
+**Ustawienia → Praca**: nowa sekcja "Pracodawcy" NAD istniejącymi polami (prefiks/tryb/godziny/
+wypłata) — lista z odznaką "AKTYWNA", przełącznik widoczności (oko), dodawanie nowego (od razu
+aktywuje). Istniejące pola ZOSTAJĄ bez zmian wizualnych — edytują `WorkSettings` jak dawniej,
+tylko KAŻDY z 4 handlerów zapisu dogrywa teraz tę samą zmianę do aktywnego pracodawcy
+(`syncActiveEmployerFromSettings`), żeby lista się nie rozjechała z tym co faktycznie w użyciu.
+
+`tsc`/`jest` zielone (70 suit/907 testów, +2 nowe dla `computePayMonthsForEmployers`/
+`employerPayMonthsSummary`, weryfikujące multi-pracodawcę i filtr `hidden`). **Priorytet testu
+na urządzeniu**: Ustawienia → Praca → dodaj drugiego pracodawcę z innym prefiksem, sprawdź że
+staje się aktywny i pola prefiksu/stawki się zmieniają, że dashboard/auto-wydatki z banku
+zaczynają liczyć NOWY prefiks, i że schowanie starego pracodawcy (oko) nie kasuje jego danych.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

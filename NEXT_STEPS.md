@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Praca front 1: fundament "Pracodawcy" — NIEsprawdzone (2026-09-10)
+
+User: "praca zakładkę bym od nowa zbudował... żeby dało się zmienić prefiks i działał jak
+zmienię pracę" + "wyłączyć stare żeby były ale widzieć tylko z nowej pracy". Pełny opis w
+ARCHITECTURE.md §66. TA runda to fundament danych: nowy `Employer` (types/index.ts) — pełna
+lista prac, każda ze swoim prefiksem/stawką, jedna "aktywna" (zwierciadlona do `WorkSettings`,
+zero zmian w 19 plikach które go czytają). `Employer.hidden` filtruje z łącznych statystyk bez
+kasowania. Migracja z istniejącego `WorkSettings` jednorazowa, idempotentna. Ustawienia → Praca
+ma teraz listę pracodawców (dodaj/aktywuj/schowaj) nad istniejącymi polami.
+
+**Następny front**: nowy ekran "Praca" (widgety średniej/stawki, historia miesięcy klikalna,
+mini-kalendarz dni roboczych per miesiąc) — osobny ekran spod dashboardu/ustawień, NIE nowa
+zakładka w pasku. NIE zaczęte.
+
+`tsc`/`jest` zielone (70 suit/907 testów, +2 nowe).
+
+**Priorytet testu na urządzeniu**: Ustawienia → Praca → dodaj drugiego pracodawcę z innym
+prefiksem → sprawdź że aktywuje się sam i dashboard/bank zaczynają liczyć nowy prefiks;
+schowanie starego (oko) nie kasuje danych.
+
 ## 🆕 Rynek — finalna scena zablokowana, edytor wyłączony, ciemniejsza lada — NIEsprawdzone (2026-09-10)
 
 User wkleił finalny eksport z edytora sceny + poprosił o usunięcie triggera edytora z UI
