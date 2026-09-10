@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Check-in humoru — tagi po energii, nie tylko nastroju — NIEsprawdzone (2026-09-10)
+
+User: "te tagi ulepszyć na bazie tego też ile mam energii lub połączenia że jestem szczęśliwy
+ale nie wyspany". Pełny opis w ARCHITECTURE.md §69. Nowy `src/utils/moodTags.ts` — sortowanie
+podpowiedzi tagów w check-inie teraz łączy DWIE niezależne osie (nastrój + energia)
+addytywnie, zamiast patrzeć wyłącznie na nastrój. Nowy tag `niewyspany`. `zmęczony` wyleciał z
+`NEGATIVE_TAGS` (to stan energii, nie nastroju — zostawienie w obu zerowało jego trafność
+dokładnie w kombinacji "szczęśliwy ale zmęczony").
+
+`tsc`/`jest` zielone (71 suit/918 testów, +9 nowych).
+
+**Priorytet testu na urządzeniu**: Check-in humoru → Nastrój=Świetnie, Energia=Wyczerpany →
+sprawdź że "szczęśliwy" I "zmęczony"/"niewyspany" oba są blisko góry listy tagów.
+
 ## 🆕 Code-review runda (PR #163–#177) — dwa bugi naprawione — NIEsprawdzone (2026-09-10)
 
 User poprosił o rundę sprawdzenia błędów w całej pracy z sesji. Znalezione i naprawione:

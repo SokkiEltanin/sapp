@@ -15,28 +15,10 @@ import { MoodEntry, MoodLevel, MOOD_COLORS } from '@/types';
 import { moodService } from '@/services/moodService';
 import { useMoodStore } from '@/store/moodStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { PRESET_TAGS, sortMoodTags } from '@/utils/moodTags';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-
-const PRESET_TAGS = [
-  'skupiony', 'zmęczony', 'niespokojny', 'radosny', 'smutny',
-  'produktywny', 'rozproszony', 'spokojny', 'motywowany', 'przytłoczony',
-  'wdzięczny', 'zestresowany', 'szczęśliwy', 'sfrustrowany', 'zrelaksowany',
-  'podekscytowany', 'samotny', 'pełen energii', 'bez motywacji', 'zadowolony',
-  'przygnębiony', 'towarzyski', 'twórczy', 'zaniepokojony', 'pewny siebie',
-];
-
-const POSITIVE_TAGS = new Set([
-  'skupiony', 'radosny', 'produktywny', 'spokojny', 'motywowany',
-  'wdzięczny', 'szczęśliwy', 'zrelaksowany', 'podekscytowany',
-  'pełen energii', 'zadowolony', 'towarzyski', 'twórczy', 'pewny siebie',
-]);
-const NEGATIVE_TAGS = new Set([
-  'zmęczony', 'niespokojny', 'smutny', 'rozproszony', 'przytłoczony',
-  'zestresowany', 'sfrustrowany', 'samotny', 'bez motywacji', 'przygnębiony',
-  'zaniepokojony',
-]);
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -83,36 +65,10 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     return map;
   }, [allEntries]);
 
-  // Sort tags: by sentiment (based on current mood) then by frequency
-  const sortedPresetTags = useMemo(() => {
-    const byFreq = (a: string, b: string) => (tagFrequency.get(b) ?? 0) - (tagFrequency.get(a) ?? 0);
-    const positive = PRESET_TAGS.filter(t => POSITIVE_TAGS.has(t));
-    const negative = PRESET_TAGS.filter(t => NEGATIVE_TAGS.has(t));
-    const neutral  = PRESET_TAGS.filter(t => !POSITIVE_TAGS.has(t) && !NEGATIVE_TAGS.has(t));
-
-    let ordered: string[];
-    if (!mood) {
-      ordered = [...PRESET_TAGS].sort(byFreq);
-    } else if (mood <= 2) {
-      // Bad mood → negative first
-      ordered = [
-        ...negative.sort(byFreq),
-        ...neutral.sort(byFreq),
-        ...positive.sort(byFreq),
-      ];
-    } else if (mood >= 4) {
-      // Good mood → positive first
-      ordered = [
-        ...positive.sort(byFreq),
-        ...neutral.sort(byFreq),
-        ...negative.sort(byFreq),
-      ];
-    } else {
-      // Neutral mood → pure frequency sort
-      ordered = [...PRESET_TAGS].sort(byFreq);
-    }
-    return ordered;
-  }, [mood, tagFrequency]);
+  // Sortowanie po DWÓCH niezależnych osiach (nastrój + energia), nie tylko nastroju —
+  // patrz `sortMoodTags`/komentarz w moodTags.ts (user: "te tagi ulepszyć na bazie tego
+  // też ile mam energii lub połączenia że jestem szczęśliwy ale nie wyspany").
+  const sortedPresetTags = useMemo(() => sortMoodTags(mood, energy, tagFrequency), [mood, energy, tagFrequency]);
 
   useEffect(() => {
     if (visible) {

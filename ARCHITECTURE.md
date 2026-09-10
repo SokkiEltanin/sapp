@@ -5402,6 +5402,50 @@ dane Pracy → Ustawienia → Praca → sprawdź że jedyny (zmigrowany) pracoda
 
 ---
 
+## 69. Check-in humoru — tagi sortowane też po energii, nie tylko nastroju
+
+User: *"przyjrzyj się wpisywaniu humoru dokładnie żeby te tagi ulepszyć na bazie tego też ile
+mam energii lub połączenia że jestem szczęśliwy ale nie wyspany"*.
+
+**Prawdziwa luka**: `MoodEntry` ma OD DAWNA dwa niezależne pola — `mood` i `energy` — oba
+zbierane w `MoodCheckInModal` (`MoodPicker` dla każdego z osobna). Ale sortowanie podpowiedzi
+tagów (`sortedPresetTags`) patrzyło WYŁĄCZNIE na `mood` (pozytywne/negatywne wg sentymentu) —
+`energy` był zbierany i zapisywany, ale nigdy nie wpływał na to, JAKIE tagi user widzi na
+górze listy. Efekt: przy "szczęśliwy ale niewyspany" (dobry `mood`, niska `energy`) tag
+"zmęczony" — mimo że trafnie opisujący stan — lądował na końcu, bo sortowanie "dobry nastrój
+→ pozytywne na górę" traktowało go jako czysto negatywny sentyment, ignorując że user ma
+akurat dobry nastrój i tylko niską energię.
+
+**Naprawa** — nowy `src/utils/moodTags.ts` (wydzielony z `MoodCheckInModal.tsx`, żeby dało
+się jednostkowo przetestować): druga, NIEZALEŻNA oś trafności (`HIGH_ENERGY_TAGS`/
+`LOW_ENERGY_TAGS`), łączona ADDYTYWNIE z istniejącą osią nastroju (`tagRelevance = moodScore
+× moodSignal + energyScore × energySignal`). Tag pasujący do KTÓREJKOLWIEK z dwóch aktualnych
+sygnałów dostaje wysoką trafność — więc "szczęśliwy ale niewyspany" wypycha na górę OBA typy
+tagów naraz (`szczęśliwy` z osi nastroju, `zmęczony`/`niewyspany` z osi energii), zamiast
+zagrzebywać energetyczne pod nastrojowymi.
+
+**`zmęczony` świadomie WYLECIAŁ z `NEGATIVE_TAGS`** (był tam wcześniej) — to przede wszystkim
+stan ENERGII, nie nastroju (można być zmęczonym i całkiem zadowolonym); zostawienie go w obu
+zbiorach ZEROWAŁOBY jego trafność dokładnie w tej kombinacji (-1 nastrój × +1 sygnał dobrego
+nastroju = -1, +1 energia (bo w LOW_ENERGY) × -1 sygnał niskiej energii = +1, suma = 0) —
+dokładnie ten bug, który user zgłosił.
+
+**Nowy tag `niewyspany`** dodany do `PRESET_TAGS` — user nazwał go wprost jako przykład, a
+brak snu to inny, konkretniejszy stan niż ogólne "zmęczony" (może być z wysiłku, nie tylko
+niewyspania).
+
+`tsc`/`jest` zielone (71 suit/918 testów, +9 nowych dla `sortMoodTags`/`tagRelevance` w
+`__tests__/moodTags.test.ts` — w tym test dokładnie odtwarzający przykład usera). Świadomie
+NIE ruszony ekran statystyk (`app/(tabs)/mood.tsx`) — ask dotyczył WPISYWANIA (check-in), nie
+analizy historycznej; korelacje typu "częściej zmęczony mimo dobrego nastroju" to osobny,
+większy temat (widget/insight), nie coś do wciśnięcia przy okazji sortowania tagów.
+
+**Priorytet testu na urządzeniu**: Check-in humoru → wybierz Nastrój=Świetnie, Energia=Wyczerpany
+→ sprawdź że zarówno "szczęśliwy"/"radosny" JAK I "zmęczony"/"niewyspany" siedzą blisko góry
+listy tagów, nie tylko nastrojowe.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
