@@ -5359,6 +5359,49 @@ drugiego w §66) sprawdź filtr chipsów i "pokaż schowanych".
 
 ---
 
+## 68. Runda code-review PR #163–#177 — dwa realne bugi znalezione i naprawione
+
+User: *"pozniej posprawdzaj błędy możesz rundę wszystko co się da"* — poproszony przegląd
+całej pracy z tej sesji (dashboard perf, bank dedup, Rynek, throttledStorage, expo-image,
+useShallow, Ustawienia, DatePickerField, fundament Pracodawców + Historia pracy). Dwa realne,
+potwierdzone (nie zgadywane — odtworzone w kodzie) bugi:
+
+**1. `app/expenses/manual.tsx` — niedotknięta domyślna kategoria zanieczyszczała pamięć
+produktów.** `save()` wołał `saveProductCategories(receiptItems, catPatch, {})` — pusty
+`parsed` oznaczał, że KAŻDA kategoria (nawet niedotknięta, wciąż na domyślnym `'groceries'`
+z `makeItem()`) była traktowana jako "świadomie inna od rozpoznanej" (`cat !== parsedCat`,
+`parsed[idx]` zawsze `undefined`) i zapisywana do WSPÓLNEJO magazynu (czytanego też przez
+`scan.tsx`). Efekt: wpisanie nazwy nowego produktu i zapisanie paragonu BEZ dotknięcia
+kategorii uczyło pamięć błędnego `'groceries'` na stałe — kolejne wystąpienia tej nazwy (skan
+LUB kolejny ręczny wpis) dostawały fałszywą auto-podpowiedź. Naprawa: nowa równoległa tablica
+`catTouchedFlags[]` (śledzi `Item.catTouched` przez grupowanie/dzielenie cen wspólnych, gdzie
+`receiptItems[i]` nie odpowiada 1:1 `items[i]`) — `parsedCat[i] = it.category` dla KAŻDEJ
+NIEDOTKNIĘTEJ pozycji (czyli "parsed == cat", zapis pomijany), zapisuje się tylko to, co user
+faktycznie wybrał albo co przyszło z rozpoznania po nazwie (a to już I TAK jest w pamięci,
+zapis no-opem).
+
+**2. `workService.ts`/`settings.tsx` — wyścig przy pierwszej migracji pracodawców.**
+`loadEmployers()` wołał `Promise.all([getEmployers(), getActiveEmployerId()])`. Na urządzeniu
+bez zapisanej listy `getEmployers()` migruje WEWNĄTRZ siebie z legacy `WorkSettings`
+(getItem→miss→getSettings→saveEmployers→setItem ACTIVE_EMPLOYER_KEY — kilka awaitowanych
+kroków), podczas gdy `getActiveEmployerId()` to POJEDYNCZY `getItem`, który w równoległym
+wyścigu kończył się ZANIM migracja zdążyła zapisać klucz aktywnego pracodawcy. Efekt: świeżo
+zmigrowany (jedyny) pracodawca renderował się BEZ odznaki "AKTYWNA" i pozwalał tapnąć
+"aktywuj" coś, co już było aktywne — do czasu ponownego otwarcia ekranu (drugie wywołanie
+czyta już zapisany klucz). Naprawa: sekwencyjne `await` zamiast `Promise.all` — `getEmployers()`
+(z ewentualną migracją) kończy się PRZED odczytem aktywnego id.
+
+`tsc`/`jest` zielone (70 suit/909 testów — bez nowych testów: oba bugi żyją w UI-ekranach
+bez istniejącego pokrycia komponentowego, ten sam brak co reszta apki; podstawowa logika
+`saveProductCategories`/`workService` sama w sobie niezmieniona, tylko poprawione dane
+wejściowe od wywołujących). **Priorytet testu na urządzeniu**: (1) dodaj ręcznie produkt o
+NOWEJ nazwie, NIE dotykaj kategorii, zapisz paragon → wpisz tę samą nazwę ponownie (ręcznie
+lub przez skan) → NIE powinna wskoczyć fałszywa kategoria; (2) świeża instalacja/wyczyszczone
+dane Pracy → Ustawienia → Praca → sprawdź że jedyny (zmigrowany) pracodawca ma odznakę
+"AKTYWNA" od razu, bez konieczności ponownego wejścia na ekran.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
