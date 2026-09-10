@@ -5323,6 +5323,42 @@ zaczynają liczyć NOWY prefiks, i że schowanie starego pracodawcy (oko) nie ka
 
 ---
 
+## 67. Praca, front 2 — ekran "Historia pracy" (miesiąc-po-miesiącu + mini-kalendarz)
+
+User (dopytany wcześniej o §66): *"historia ostatnich miesięcy z wypłatami i średnia gdzie
+mogę kliknąć na każdy miesiąc sprawdzić szczegóły i czy dobrze złapało dni jak pracowałem
+taki mini kalendarz pokazujący jak pracowałem i ile zarobiłem"* — główny widget: "wydaje mi
+się że średnia zarobków, a tak to reszta to godziny per zarobek".
+
+**Nowy ekran** `app/work/history.tsx` — osobny (user: "osobny ekran spod dashboardu/ustawień",
+NIE nowa zakładka w pasku), dostępny z dwóch miejsc: Ustawienia → Praca (nowy link "Historia
+pracy", obok listy pracodawców z §66) i z panelu "Praca" na dashboardzie (`workPanel` modal w
+`(tabs)/index.tsx` — nowy link "Zobacz pełną historię i mini-kalendarz →" na dole, ZAMYKA
+panel i nawiguje, żeby nie zostawić dwóch nałożonych warstw modal/ekran).
+
+**Czysto widok, zero nowej logiki liczenia** — buduje na fundamencie §66:
+- Hero: średnia zarobków/miesiąc (główny widget, jak user poprosił) + średnia stawka zł/h +
+  suma łączna, liczone TYLKO z widocznych (nie `hidden`) pracodawców.
+- Filtr chipsów pracodawców (tylko gdy user ma więcej niż jednego — u jednego pracodawcy
+  chipsy byłyby martwym UI) + przełącznik "pokaż schowanych" (patrz §66 `hidden`).
+- Lista miesięcy (`computePayMonthsForEmployers`, malejąco) — kwota, godziny, stawka, nazwa
+  pracodawcy (gdy >1). Tap → modal szczegółów.
+- **Modal szczegółów miesiąca** — nowa `shiftsForEmployerInMonth` (workSummary.ts, generalizacja
+  identycznego `shiftsIn` z Ustawień → Praca, tylko sparametryzowana po `Employer` zamiast
+  globalnego `WorkSettings`) + `MiniCalendar` (lokalny komponent w tym samym pliku) — siatka
+  dni miesiąca, dni z dopasowaną zmianą podświetlone i podpisane liczbą godzin. To wprost
+  odpowiada na "czy dobrze złapało dni jak pracowałem" — user widzi na oko, bez przeklikiwania
+  każdego eventu z osobna. Pod spodem lista pojedynczych zmian (tytuł/godziny), tap → edycja w
+  `/calendar/[id]` (istniejąca funkcja, bez zmian).
+
+`tsc`/`jest` zielone (70 suit/909 testów, +2 nowe dla `shiftsForEmployerInMonth`).
+**Priorytet testu na urządzeniu**: Ustawienia → Praca → "Historia pracy" ORAZ dashboard →
+panel "Praca" → link na dole — oba wejścia działają; kliknij miesiąc → mini-kalendarz
+pokazuje faktycznie przepracowane dni zgodnie z kalendarzem; z wieloma pracodawcami (dodaj
+drugiego w §66) sprawdź filtr chipsów i "pokaż schowanych".
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

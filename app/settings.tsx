@@ -932,6 +932,16 @@ export default function SettingsScreen() {
           ) },
         },
         {
+          // 2026-09-10, drugi front przebudowy Pracy — nowy ekran "Historia pracy" (miesiąc-po-
+          // miesiącu + mini-kalendarz dni roboczych, patrz ARCHITECTURE.md §67). Link tu, obok
+          // zarządzania pracodawcami, bo to naturalne miejsce żeby z config'u przejść do
+          // przeglądu — drugi link z dashboardowego panelu "Praca" (index.tsx).
+          id: 'work-history-link', title: 'Historia pracy', subtitle: 'Miesiąc po miesiącu, ze średnią i mini-kalendarzem dni roboczych',
+          icon: LucideIcons.History, accentColor: '#60A5FA',
+          keywords: ['historia', 'praca', 'miesiące', 'kalendarz', 'średnia', 'zarobki'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/work/history' as any); } },
+        },
+        {
           id: 'work-mode', title: 'Tryb liczenia godzin',
           subtitle: workMode === 'manual'
             ? 'Ręcznie — bez tagowania kalendarza'

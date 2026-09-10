@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Praca front 2: ekran "Historia pracy" — NIEsprawdzone (2026-09-10)
+
+User: "historia ostatnich miesięcy z wypłatami i średnia gdzie mogę kliknąć na każdy miesiąc
+sprawdzić szczegóły i czy dobrze złapało dni jak pracowałem taki mini kalendarz". Pełny opis w
+ARCHITECTURE.md §67. Nowy `app/work/history.tsx` — hero (średnia zarobków/mies. + stawka +
+suma), filtr pracodawców, lista miesięcy klikalna → modal ze `MiniCalendar` (dni z dopasowaną
+zmianą podświetlone + godziny) i listą zmian (tap → edycja w kalendarzu). Linki z Ustawienia →
+Praca i z panelu "Praca" na dashboardzie. Czysto widok — zero nowej logiki liczenia, buduje na
+§66 (`computePayMonthsForEmployers`).
+
+**To zamyka przebudowę Pracy z obu frontów** (fundament + ekran) — kolejne prośby o tę
+zakładkę to już finetuning/UI-polish, nie nowa architektura.
+
+`tsc`/`jest` zielone (70 suit/909 testów, +2 nowe dla `shiftsForEmployerInMonth`).
+
+**Priorytet testu na urządzeniu**: Ustawienia → Praca → "Historia pracy" i dashboard → panel
+"Praca" → link na dole — oba wejścia; kliknij miesiąc → sprawdź czy mini-kalendarz zgadza się
+z realnym grafikiem; z >1 pracodawcą sprawdź filtr chipsów i "pokaż schowanych".
+
 ## 🆕 Praca front 1: fundament "Pracodawcy" — NIEsprawdzone (2026-09-10)
 
 User: "praca zakładkę bym od nowa zbudował... żeby dało się zmienić prefiks i działał jak

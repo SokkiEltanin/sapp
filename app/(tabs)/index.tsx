@@ -3709,6 +3709,17 @@ export default function DashboardScreen() {
                     {wm.bestMonth && wm.bestMonth.hours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy miesiąc</Text><Text style={s.wxChipV}>{wm.bestMonth.label} {wm.bestMonth.year} · {Math.round(wm.bestMonth.hours)} h{hasRate ? ` · ${wm.bestMonth.earnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
                     {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{wm.yearHours.toFixed(0)} h{hasRate ? ` · ${wm.yearEarnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
                   </View>
+
+                  {/* Link do nowego ekranu "Historia pracy" (2026-09-10, drugi front
+                      przebudowy Pracy, ARCHITECTURE.md §67) — ten panel pokazuje TEN
+                      miesiąc + uśrednione fakty, pełna, klikalna historia miesiąc-po-
+                      miesiącu (+ mini-kalendarz dni roboczych, świadomość wielu
+                      pracodawców) żyje na osobnym ekranie, nie tutaj. */}
+                  {workPayMonths.length > 0 && (
+                    <TouchableOpacity onPress={() => { haptic.tap(); setWorkPanel(false); router.push('/work/history' as any); }} style={s.wpHistoryLink}>
+                      <Text style={s.wpHistoryLinkTxt}>Zobacz pełną historię i mini-kalendarz →</Text>
+                    </TouchableOpacity>
+                  )}
                 </ScrollView>
               );
             })()}
@@ -4729,6 +4740,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpAheadDays: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginRight: spacing[3] },
   wpAheadH: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
   wpAheadHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6, lineHeight: 14 },
+  wpHistoryLink: { alignItems: 'center', paddingVertical: spacing[3], marginTop: spacing[2] },
+  wpHistoryLinkTxt: { fontSize: 12.5, fontWeight: '700', color: WORK_ACCENT },
   wpLive: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.xl, backgroundColor: '#2AC68F14', borderWidth: 1, borderColor: '#2AC68F44' },
   wpLiveTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   wpLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2AC68F' },
