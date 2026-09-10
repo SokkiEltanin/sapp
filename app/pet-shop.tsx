@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, X, SlidersHorizontal, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, X, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -91,15 +91,20 @@ const DEFAULT_IMG: ImgAdjust = { x: 0, y: 0, scale: 1 };
 // itemów Sklepu dnia (`s.artSlotImg`) też dostały własny x/y/scale (dotąd stałe 62%/62%, zero
 // regulacji) — jeden wspólny suwak dla wszystkich 4 itemów naraz (nie per-item — user
 // poprosił o regulację "itemów", nie o osobny suwak KAŻDEGO z osobna).
+// 2026-09-10, user: "to już jest finalne ustawienie pupilowego rynku" — ostatni eksport z
+// edytora sceny, wklejony 1:1. Edytor sam (patrz `editScene`/trigger w headerze niżej) jest
+// od teraz WYŁĄCZONY z normalnego UI ("wywal mi opcje zmiany ale zostaw w kodzie na
+// wszelki") — kod edytora ZOSTAJE nietknięty (modal, `stepImgAdjust`, `IMG_GROUPS` itd.),
+// tylko nie ma już jak go otworzyć z normalnego ekranu Rynku.
 const DEFAULT_ADJUST: ArtAdjust = {
   bg: { x: 0, y: 0, scale: 1.02 },
-  top: { x: -116, y: 44, scale: 0.5 },
-  topSlots: { x: -4, y: 100, scale: 1.08 },
+  top: { x: -4, y: -28, scale: 1.06 },
+  topSlots: { x: -4, y: -32, scale: 1.08 },
   cat: { x: 0, y: 104, scale: 1.6 },
-  bottom: { x: -112, y: -144, scale: 0.46 },
+  bottom: { x: 4, y: -12, scale: 1.1 },
   bottomSlots: { x: 4, y: -16, scale: 1.1 },
-  boardBgTop: { x: -116, y: 44, scale: 0.5 },
-  boardBgBottom: { x: -112, y: -144, scale: 0.46 },
+  boardBgTop: { x: -12, y: -68, scale: 0.88 },
+  boardBgBottom: { x: 8, y: 108, scale: 0.9 },
   items: { x: 0, y: 0, scale: 1 },
 };
 const ADJUST_KEY = 'rynek_art_adjust_v3';
@@ -340,10 +345,11 @@ export default function PetShop() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
         <View style={s.coinPill}><Coins size={13} color="#FBBF24" /><Text style={s.coinTxt}>{coins}</Text></View>
-        {/* Edytor sceny (2026-09-06) — ukryty za ikoną, nie przeszkadza w normalnym sklepie. */}
-        <TouchableOpacity onPress={() => { haptic.tap(); setEditScene(true); }} hitSlop={10} style={{ marginLeft: spacing[2] }}>
-          <SlidersHorizontal size={18} color={c.text.muted} />
-        </TouchableOpacity>
+        {/* Trigger edytora sceny USUNIĘTY z UI (2026-09-10, user: "to już jest finalne
+            ustawienie pupilowego rynku... wywal mi opcje zmiany, ale zostaw w kodzie na
+            wszelki") — sam edytor (stan `editScene`, modal niżej, `stepImgAdjust` itd.)
+            ZOSTAJE w pliku nietknięty, tylko nie ma już jak go otworzyć z normalnego ekranu.
+            Odkomentuj ten TouchableOpacity, żeby go z powrotem wpiąć. */}
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -464,7 +470,7 @@ export default function PetShop() {
             {/* Warstwa WYPEŁNIENIA — WŁASNY x/y/scale (`adjust.boardBgBottom`), rozprzęgnięty
                 od obrazka niżej — patrz identyczny komentarz przy tablicy wyżej. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.boardBgBottom.x }, { translateY: adjust.boardBgBottom.y }, { scale: adjust.boardBgBottom.scale }] }]}>
-              <View style={s.boardBg} />
+              <View style={s.boardBgBottomFill} />
             </View>
             {/* Warstwa OBRAZKA lady — patrz identyczny komentarz przy tablicy wyżej. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
@@ -780,6 +786,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // kontrastu" — itemy/ikonki na nim słabo widoczne) — poprzedni `#2A1B0EF0` był niemal
   // czarny, nowy `#4A3420F0` to ten sam ciepły odcień, wyraźnie jaśniejszy.
   boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#4A3420F0' },
+  // Ciemniejszy, lepiej dopasowany do drewna lady (2026-09-10, user: "zmień na pewno sam
+  // kolor wypełnień za ladą na bardziej pasujący do obrazka i ciemniejszy") — próbka z
+  // najciemniejszych cieni drewna na LADADOL.png (nie ta sama, jaśniejsza barwa co tablica
+  // wyżej — user poprosił konkretnie o ladę).
+  boardBgBottomFill: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#2E2114F5' },
   // Miękki cień ZA ikoną/emoji slotu (2026-09-08, user: "ikonki mają nie mieć tła, tylko
   // lekki cień z tyłu") — CELOWO nie natywny `shadowColor`/`elevation` na samej ikonie:
   // ikony to przezroczyste SVG (lucide), a natywny cień RN liczy się z PROSTOKĄTA layoutu
