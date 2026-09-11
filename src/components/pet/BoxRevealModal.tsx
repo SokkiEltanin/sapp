@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
-import { Snowflake } from 'lucide-react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
 import { RARITY_META, gearById } from '@/utils/gear';
@@ -73,22 +72,14 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
       setPhase('revealed');
       haptic.success();
       Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-      // cząstki: ❄ dla zamrożenia LECĄ Z BOKÓW do środka; reszta wybucha na zewnątrz
-      if (reward.type === 'freeze') {
-        const n = 14;
-        setFlies(Array.from({ length: n }).map((_, i) => {
-          const left = i % 2 === 0;
-          return { id: i, sx: (left ? -1 : 1) * (150 + Math.random() * 70), sy: -60 + Math.random() * 120,
-            ex: (Math.random() - 0.5) * 40, ey: -20 + (Math.random() - 0.5) * 40, emoji: '❄️', size: 20 + Math.random() * 12 };
-        }));
-      } else {
-        const isDupe = reward.type === 'gear' && !!dupeCoins;
-        const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
-        const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
-        setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
-          sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
-          emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
-      }
+      // 2026-09-11: 'freeze' USUNIĘTY z BoxReward (patrz petBoxes.ts) — cząstki zawsze
+      // wybuchają na zewnątrz, brak już osobnej "❄ z boków" ścieżki dla zamrożenia.
+      const isDupe = reward.type === 'gear' && !!dupeCoins;
+      const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
+      const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
+      setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
+        sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
+        emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
     });
   };
 
@@ -100,9 +91,6 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
 
   const isDupe = reward?.type === 'gear' && !!dupeCoins;
   const rewardTitle = isDupe ? 'MASZ JUŻ TEN PRZEDMIOT'
-    : reward?.type === 'color' ? 'NOWY KOLOR!'
-    : reward?.type === 'startup' ? 'NOWY STARTUP!'
-    : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII'
     : reward?.type === 'gear' ? 'EKWIPUNEK!'
     : reward?.type === 'combatItem' ? (reward.isUpgrade ? 'PERK ULEPSZONY!' : 'NOWY PERK BOSSA!')
     : 'MONETY';
@@ -130,22 +118,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
                 {flies.map(f => <Fly key={f.id} sx={f.sx} sy={f.sy} ex={f.ex} ey={f.ey} emoji={f.emoji} size={f.size} />)}
                 <Animated.View style={[st.card, { borderColor: meta.color, transform: [{ scale: cardScale }] }]}>
                   <Text style={[st.tier, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
-                  {reward?.type === 'color' ? (
-                    <>
-                      <View style={[st.swatch, { backgroundColor: reward.swatch }]} />
-                      <Text style={st.rewardName}>{reward.name}</Text>
-                    </>
-                  ) : reward?.type === 'startup' ? (
-                    <>
-                      <View style={st.startupSwatch}><Text style={[st.startupMark, { color: reward.ink }]}>Sapp</Text></View>
-                      <Text style={st.rewardName}>{reward.name}</Text>
-                    </>
-                  ) : reward?.type === 'freeze' ? (
-                    <>
-                      <Snowflake size={40} color="#7DD3FC" />
-                      <Text style={st.rewardName}>+{reward.count} zamrożenie</Text>
-                    </>
-                  ) : reward?.type === 'gear' && isDupe ? (
+                  {reward?.type === 'gear' && isDupe ? (
                     <>
                       <Text style={st.coins}>+{dupeCoins} 🪙</Text>
                       <Text style={st.rewardName}>{reward.name} (już masz)</Text>
@@ -192,9 +165,6 @@ const st = StyleSheet.create({
   glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110 },
   card: { minWidth: 190, paddingHorizontal: 26, paddingVertical: 20, borderRadius: 20, backgroundColor: '#161A1A', borderWidth: 2, alignItems: 'center', gap: 8 },
   tier: { fontSize: 13, fontWeight: '900', letterSpacing: 2 },
-  swatch: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
-  startupSwatch: { width: 96, height: 46, borderRadius: 10, backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  startupMark: { fontSize: 20, fontWeight: '900', letterSpacing: 1 },
   coins: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
   gearImg: { width: 44, height: 44, borderRadius: 10, borderWidth: 2 },
   rewardName: { fontSize: 16, fontWeight: '800', color: '#fff' },
