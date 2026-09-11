@@ -31,6 +31,12 @@ export const BOX_ICON: Record<BoxId, any> = {
   divine: require('../../assets/chests/skrzynka_boska.png'),
 };
 
+// Grafika Skrzynki dnia (2026-09-11, user: "wrzuciłem ci tam jeszcze daily skrzynkę" —
+// `assets/chests/chest_daily.png`, ten sam ChatGPT-owy rozmiar 1536×1024 co reszta,
+// przeskalowane tym samym przepisem PIL LANCZOS do 300×200). Osobna stała, bo `DAILY_BOX`
+// NIE jest w `LOOT_BOXES`/`BOX_ICON` (nie jest na sprzedaż, patrz komentarz przy `DAILY_BOX`).
+export const DAILY_BOX_ICON = require('../../assets/chests/chest_daily.png');
+
 // Ranga skrzynki (0 = najtańsza, rośnie w górę) — zastępuje twarde porównania `box.id ===
 // 'gold'` rozsiane po `rollBox()` (2026-09-08, dodanie 4. tieru "Boska" — user: "miała być
 // ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"). Gdyby kiedyś doszedł 5. tier, wystarczy dopisać
@@ -116,7 +122,7 @@ export function boxById(id: BoxId): LootBox {
 // patrz komentarz na górze pliku) z 0.10 do 0.28 — dokładnie o tyle, ile zabierały usunięte
 // colorChance(0.10)+freezeChance(0.08).
 export const DAILY_BOX: LootBox = {
-  id: 'sardine', name: 'Skrzynka dnia', cost: 0, color: '#FBBF24', emoji: '🎁',
+  id: 'sardine', name: 'Skrzynka dnia', cost: 0, color: '#FBBF24', emoji: '🎁', icon: DAILY_BOX_ICON,
   blurb: 'Za darmo, raz dziennie',
   gearChance: 0.28,
   gearRarityWeight: { common: 75, rare: 20, epic: 4, legendary: 0.9, mythic: 0.1 },

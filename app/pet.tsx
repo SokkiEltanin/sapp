@@ -708,6 +708,7 @@ export default function Pet() {
         reward={boxReveal?.reward ?? null}
         boxColor={boxReveal?.box.color ?? '#FBBF24'}
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
+        boxIcon={boxReveal?.box.icon}
         dupeCoins={boxReveal?.dupeCoins}
         onClose={() => setBoxReveal(null)}
       />
