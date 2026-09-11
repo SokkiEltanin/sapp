@@ -3,6 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 5 mniejszych poprawek (walka/Rynek/Pupil/Sklep) — NIEsprawdzone/częściowo NIEzweryfikowane wizualnie (2026-09-11)
+
+User zgłosił naraz kilka rzeczy ze screenshotami. Pełny opis w ARCHITECTURE.md §73:
+1. Arena walki: pupil/boss przesunięci niżej (`SPRITE_GROUND_SHIFT`) + mocniejszy cień pod
+   nimi (`GroundShadow` opacity 0.4→0.5).
+2. Rynek: `boardBg` (tablica, pod potkami) ujednolicony kolorem z `boardBgBottomFill` (lada).
+3. Rynek: 4 itemy Sklepu dnia pokazują teraz cenę NA slocie, przed kliknięciem.
+4. Pupil → Umiejętności bossów: opisy mają teraz DOKŁADNĄ, aktualną wartość (%) zależną od
+   poziomu (`combatItemStatText`), nie generyczny opis.
+5. Sklep: naprawiony ucięty tytuł itemu w podglądzie (`title2` dostał `lineHeight: 22`) —
+   Android czasem maluje pogrubiony tekst wyżej niż jego box, więc pasek rzadkości pod spodem
+   ucinał dół liter.
+
+`tsc`/`jest` zielone (71 suit/938 testów, +5 nowych). Punkty 1/2/3/5 NIE zweryfikowane
+wizualnie na urządzeniu (środowisko bez podglądu RN) — priorytet #1 do sprawdzenia.
+
+**Odłożone, jeszcze niezrobione z tej samej serii próśb usera** (kolejność jak podał):
+- Rynek/skrzynki: wywalić z puli dropów zamrożenie serii + kolory + startupy, zostawić SAM
+  ekwipunek + ulepszenia ogólne; nowa animacja otwierania (rozpad skrzynki jak w Boom Beach/
+  Clash-style chestach, LUB "przelatujące itemy zatrzymujące się na jednym" jak w CS-case
+  + przycisk "otwórz"). To NAJWIĘKSZY, osobny kawałek roboty — jeszcze nie zaczęty.
+- Duże pytanie (nr 3/7 w oryginalnej numeracji usera, ale okazało się TYM SAMYM co punkt 5
+  powyżej — connected/rozwiązane razem, patrz §73e) — jeśli po fixie user pokaże, że to jednak
+  COŚ INNEGO, wróć tu.
+
+**Priorytet testu na urządzeniu**: patrz ARCHITECTURE.md §73, sekcja "Priorytet testu".
+
 ## 🆕 Panel "Praca" na dashboardzie — spójne karty, skrócona lista wypłat — NIEsprawdzone/NIEzweryfikowane wizualnie (2026-09-11)
 
 User (3 screenshoty): *"dawaj upieksz te zakladek pracy bo teraz zobacz taka zbyt niejasna

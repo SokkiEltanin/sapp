@@ -5646,6 +5646,73 @@ wyjątkiem celowo powinno być "Zaplanowane naprzód" (niebieski akcent); sprawd
 
 ---
 
+## 73. Walka: pupil/boss "niżej" + cień; Rynek: cena przed kliknięciem + spójny kolor tablicy/lady; Pupil: dokładne staty umiejętności; naprawiony ucięty tytuł w podglądzie sklepu
+
+Seria mniejszych poprawek zgłoszonych naraz (screenshoty):
+
+**73a. Arena walki — sprite'y "lewitowały"**. User: *"podczas walki żeby pupil i boss byli
+troszeczkę niżej bo jakby lewitowali teraz w powietrzu... realistyczny zbudowany cień"*.
+`GroundShadow` (miękki, eliptyczny cień) już ISTNIAŁ pod obydwoma sprite'ami — prawdziwy
+problem: oba są WYŚRODKOWANE w `tilePortrait` (wspólna wysokość obu kolumn, gwarantuje ten sam
+pionowy środek niezależnie od różnicy rozmiarów kotek/boss), co zostawia sporo pustej
+przestrzeni PONIŻEJ (zwłaszcza bossa, mniejszego niż `CAT_PORTRAIT_SIZE`) — para sprite+cień
+floatuje wysoko nad wizualną "podłogą" (blisko paska HP). Naprawa: nowa stała
+`SPRITE_GROUND_SHIFT = 14`, `transform: translateY` na `spriteBoxCat`/`spriteBoxBoss` (przesuwa
+sprite RAZEM z jego `GroundShadow`, bo oba są w tym samym boxie) — czysto wizualny `transform`,
+NIE dotyka layoutu/`tilePortrait.height`, więc `projectile.top` (pozycja lecącego pocisku
+między sprite'ami, liczona z pionowego środka `tilePortrait`) dostał dokładnie taką samą
+poprawkę (+14), żeby cios dalej trafiał w realny, teraz niższy środek obu sprite'ów. Cień
+(`GroundShadow`) dostał `opacity={0.5}` (z domyślnych 0.4) dla mocniejszego kontaktu z podłożem.
+
+**73b. Rynek — spójny kolor tablicy/lady**. User: *"ogarnij kolor wypełnienia tego pod potkami
+na taki sam jak na dole jest teraz"*. `boardBg` (wypełnienie POD potkami/zamrożeniem na
+tablicy) miało jaśniejszy `#4A3420F0`, podczas gdy `boardBgBottomFill` (lada, ekwipunek+
+skrzynki) dostała ciemniejszy `#2E2114F5` w poprzedniej sesji (§65). Ujednolicone — `boardBg`
+dzieli teraz DOKŁADNIE ten sam kolor co lada.
+
+**73c. Rynek — cena itemów Sklepu dnia przed kliknięciem**. User: *"dodaj zeby bylo widac ceny
+przedmiotów, przed kliknięciem"*. 4 itemy ekwipunku w "Sklepie dnia" (na ladzie) jako JEDYNE
+(zamrożenie/potki/skrzynki już to miały, `artCostPill`) nie pokazywały ceny bez otwierania
+`GearPreviewModal`. Dodana ta sama plakietka `artCostPill` (przyciemniona gdy nie stać) —
+ukryta, gdy item już kupiony/posiadany (checkmark zamiast tego, cena do zapłaty nie ma sensu).
+
+**73d. Pupil — dokładne staty umiejętności bossów**. User: *"jak są te umiejętności... żeby
+pokazywało co one robią lepiej ze statystykami dokładnie ile czego"*. `def.desc` (opis w
+`COMBAT_ITEMS`) był generyczny i STAŁY niezależnie od poziomu itemu, mimo że mechanika realnie
+skaluje się z poziomem (np. Unik: 5% na lvl1 → 17% na lvl4, `dodgeChanceAt`). Nowa funkcja
+`combatItemStatText(id, level)` w `combatItems.ts` — liczy i formatuje DOKŁADNĄ, aktualną
+wartość z istniejących formuł (`dodgeChanceAt`/`reflectPctAt`/`executeThresholdAt`/
+`fireProcChanceAt`/stałe procentowe) zamiast generycznego opisu. Użyta w `app/pet.tsx` w
+miejscu `def.desc` dla POSIADANYCH itemów (nieznane/`???` zostają bez zmian).
+
+**73e. Sklep — ucięty tytuł itemu w podglądzie**. User (zbliżenie): *"zobacz jak od dołu
+przycina napis Kamizelka ten pasek widac ledwie połowę napisu jakby byl za horyzontem"*. Root
+cause: `title2` (tytuł w `GearPreviewModal`) nie miał jawnego `lineHeight` — pogrubiony (800)
+tekst na Androidzie czasem realnie maluje się WYŻEJ niż jego wyliczony box (metryki fontu przy
+dużej wadze liter), więc kolejny element w tej samej kolumnie (`rarityUnderline`, malowany PO
+tytule = na wierzchu w z-order) zaczynał się WEWNĄTRZ realnych, za dużych liter i wizualnie
+ucinał ich dolną połowę — dokładnie efekt "za horyzontem" ze zrzutu. Naprawa: jawny, hojny
+`lineHeight: 22` na `title2`, gwarantujący boxowi dość miejsca niezależnie od metryk fontu.
+
+Świadomie NIE naprawione w tej rundzie: punkt 3 z oryginalnej listy usera ("nazwy po
+kliknięciu w item ucina na dole") okazał się TYM SAMYM zgłoszeniem co 73e (to samo zbliżenie) —
+połączone w jedną naprawę, nie osobny punkt.
+
+`tsc`/`jest` zielone (71 suit/938 testów, +5 nowych w `combatItems.test.ts` dla
+`combatItemStatText`, w tym sprawdzenie że tekst faktycznie zmienia się z poziomem).
+**73a/73b/73c/73e nie zweryfikowane wizualnie na urządzeniu** (środowisko bez podglądu RN).
+
+**Priorytet testu na urządzeniu**: (1) walka z bossem/questem → sprite'y pupila i przeciwnika
+powinny wyglądać zauważalnie bardziej "na ziemi", cień wyraźniejszy; (2) Rynek → tablica z
+potkami i lada z ekwipunkiem powinny mieć TEN SAM odcień brązu; 4 itemy Sklepu dnia powinny
+pokazywać cenę na slocie, zanim się w nie stuknie; (3) Pupil → "Umiejętności bossów" → opis
+każdej posiadanej umiejętności powinien zawierać konkretną liczbę (%), nie ogólnik; dla Uniku/
+Odbicia/Podpalenia/Egzekucji liczba powinna się różnić między poziomami po ulepszeniu; (4)
+Sklep → kliknij dowolny item Sklepu dnia (zwłaszcza z dłuższą nazwą) → tytuł w popupie powinien
+być w pełni czytelny, bez ucięcia dołu liter przez pasek rzadkości pod spodem.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

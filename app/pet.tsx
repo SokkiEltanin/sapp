@@ -21,7 +21,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
-import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
+import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
@@ -654,7 +654,12 @@ export default function Pet() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.cellName}>{owned ? def.name : '???'}</Text>
-                  <Text style={s.cellState} numberOfLines={2}>{owned ? def.desc : 'Nieznaleziony — spróbuj skrzynki z głaskania'}</Text>
+                  {/* 2026-09-11, user: "żeby pokazywało co one robią lepiej ze statystykami
+                      dokładnie ile czego" — `def.desc` był generyczny i nie zmieniał się z
+                      poziomem mimo że mechanika realnie skaluje się z nim (np. Unik: 5% na
+                      lvl1 → 17% na lvl4). `combatItemStatText` liczy DOKŁADNĄ, aktualną
+                      wartość dla obecnego poziomu itemu. */}
+                  <Text style={s.cellState} numberOfLines={2}>{owned ? combatItemStatText(id, level) : 'Nieznaleziony — spróbuj skrzynki z głaskania'}</Text>
                   {owned && def.maxLevel > 1 && <Text style={s.itemLevel}>poziom {level}/{def.maxLevel}</Text>}
                 </View>
                 {owned && (
