@@ -3511,6 +3511,26 @@ export default function DashboardScreen() {
               <Text style={[s.factText, { marginTop: spacing[2] }]}>Ustaw kolor lub prefiks pracy w kalendarzu, aby liczyć godziny i zarobek.</Text>
             ) : (() => {
               const wm = workMonthly; const hasRate = wm.rate > 0;
+              const lp = workPayMonths[0];
+              const lastRate = lp && lp.hours > 0 ? lp.amount / lp.hours : null;
+              const nowYM = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+              const rateOverridden = !!(workSettings.monthRateOverride?.[nowYM] || (workSettings.rateOverride && workSettings.rateOverride > 0));
+              const rateHint = rateOverridden
+                ? 'stawka ustawiona ręcznie'
+                : (workAvg.includedCount <= 1 && lp && lp.hours > 0
+                    ? `${Math.round(lp.amount).toLocaleString('pl-PL')} zł (za ${MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]}) ÷ ${Math.round(lp.hours)} h`
+                    : `średnia z ${workAvg.includedCount} ${workAvg.includedCount === 1 ? 'wypłaty' : 'wypłat'} · Σ zł ÷ Σ godzin`);
+              const paychecks = expenses.filter(e => isPaycheck(e, workSettings.workPrefix));
+              const jdTotal = paychecks.reduce((sum, e) => sum + e.amount, 0);
+              // 2026-09-11, user (screenshoty panelu): "zbyt niejasna nie?? i nie
+              // dopasowana" — panel narósł sesja po sesji z osobnych próśb, aż stał się
+              // stertą różnych stylów kart (raz obramowana karta, raz goły tekst, raz
+              // lista wierszy) BEZ jednego wspólnego języka wizualnego — i pełną listą
+              // WSZYSTKICH wypłat, która 1:1 dubluje ekran „Historia pracy" (patrz link
+              // na dole). Przeprojektowane: JEDEN wspólny wrapper `s.wpCard` na każdą
+              // sekcję (ta sama karta co Skarbonki — dobrze przyjęte, "bankowe") +
+              // jednolita etykieta `s.wpCardLabel`, pełna lista wypłat ŚCIĘTA do jednej
+              // linii "ostatnia + łącznie" (reszta jest o kliknięcie dalej, w historii).
               return (
                 <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
                   {/* ── NA ŻYWO: jesteś w pracy → zarobek na sekundę (tyka co sekundę) ── */}
@@ -3538,19 +3558,43 @@ export default function DashboardScreen() {
                       </Text>
                     </View>
                   )}
-                  {/* ── Ten miesiąc: fakt = godziny z kalendarza [JD] ── */}
-                  <View style={{ marginTop: spacing[2] }}>
-                    <Text style={[s.wpBig, { color: WORK_WORKED }]}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
+
+                  {/* ── TEN MIESIĄC: godziny do teraz + (jeśli jest stawka) ile zostało/prognoza w TEJ SAMEJ karcie zamiast dwóch osobnych ── */}
+                  <View style={[s.wpCard, { marginTop: spacing[2] }]}>
+                    <Text style={s.wpCardLabel}>Ten miesiąc</Text>
+                    <Text style={[s.wpBig, { color: WORK_WORKED, marginTop: 0 }]}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
                     <Text style={s.wpSub}>
-                      przepracowane w tym miesiącu
+                      przepracowane
                       {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text>{' do teraz'}</> : null}
                     </Text>
+                    {(wm.plannedDays > 0 || wm.plannedH > 0) && (
+                      <View style={s.wpStatsRow}>
+                        <View style={s.wpLeftItem}>
+                          <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedDays}</Text>
+                          <Text style={s.wpLeftLbl}>dni zostało</Text>
+                        </View>
+                        <View style={s.wpLeftDivider} />
+                        <View style={s.wpLeftItem}>
+                          <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedH.toFixed(0)}<Text style={s.wpLeftUnit}> h</Text></Text>
+                          <Text style={s.wpLeftLbl}>do przepracowania</Text>
+                        </View>
+                        {hasRate && (
+                          <>
+                            <View style={s.wpLeftDivider} />
+                            <View style={s.wpLeftItem}>
+                              <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
+                              <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    )}
                   </View>
 
                   {/* ── Skarbonki: zarobek do teraz rozdzielony na potrzeby (2026-09-10) ── */}
                   {hasRate && workBudget.some(b => b.target > 0) && (
-                    <View style={[s.wpLeftCard, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[3] }]}>
-                      <Text style={s.wxSection}>Zarobek do teraz vs potrzeby</Text>
+                    <View style={[s.wpCard, { gap: spacing[3] }]}>
+                      <Text style={s.wpCardLabel}>Zarobek do teraz vs potrzeby</Text>
                       {workBudget.map(b => (
                         <View key={b.label} style={s.wbBucket}>
                           <View style={s.wbBucketHead}>
@@ -3565,31 +3609,37 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* ── WAŻNE NA GÓRZE: ile zostało do przepracowania ── */}
-                  {(wm.plannedDays > 0 || wm.plannedH > 0) && (
-                    <View style={s.wpLeftCard}>
-                      <View style={s.wpLeftItem}>
-                        <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedDays}</Text>
-                        <Text style={s.wpLeftLbl}>dni zostało</Text>
-                      </View>
-                      <View style={s.wpLeftDivider} />
-                      <View style={s.wpLeftItem}>
-                        <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedH.toFixed(0)}<Text style={s.wpLeftUnit}> h</Text></Text>
-                        <Text style={s.wpLeftLbl}>do przepracowania</Text>
-                      </View>
-                      {hasRate && (
-                        <>
-                          <View style={s.wpLeftDivider} />
-                          <View style={s.wpLeftItem}>
-                            <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
-                            <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
+                  {/* ── Stawka: JEDNA liczba, ta sama co live earnings, + porównanie w tej samej karcie ── */}
+                  <View style={s.wpCard}>
+                    <Text style={s.wpCardLabel}>Stawka</Text>
+                    {hasRate ? (
+                      <>
+                        <Text style={[s.wpRateVal, { color: WORK_MONEY }]}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
+                        <Text style={s.wpRateHint}>{rateHint}</Text>
+                        {(workAvg.avgRate != null || lastRate != null) && (
+                          <View style={s.wpStatsRow}>
+                            {workAvg.avgRate != null && (
+                              <View style={s.wpLeftItem}>
+                                <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{workAvg.avgRate.toFixed(2)}</Text>
+                                <Text style={s.wpLeftLbl}>zł/h ogółem</Text>
+                              </View>
+                            )}
+                            {workAvg.avgRate != null && lastRate != null && <View style={s.wpLeftDivider} />}
+                            {lastRate != null && (
+                              <View style={s.wpLeftItem}>
+                                <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{lastRate.toFixed(2)}</Text>
+                                <Text style={s.wpLeftLbl}>zł/h · {MONTH_SHORT[Number(lp!.month.slice(5, 7)) - 1]} {lp!.month.slice(2, 4)}</Text>
+                              </View>
+                            )}
                           </View>
-                        </>
-                      )}
-                    </View>
-                  )}
+                        )}
+                      </>
+                    ) : (
+                      <Text style={s.wpRateHint}>Dodaj wypłatę oznaczoną „{workSettings.workPrefix || '[JD]'}", aby policzyć stawkę zł/h.</Text>
+                    )}
+                  </View>
 
-                  {/* ── ZAPLANOWANE NAPRZÓD: grafik przyszłych miesięcy (weryfikacja) ── */}
+                  {/* ── ZAPLANOWANE NAPRZÓD: grafik przyszłych miesięcy (weryfikacja) — celowo INNY, akcentowany kolor: to jedyna sekcja z akcją "sprawdź czy się zgadza", nie tylko fakt ── */}
                   {wm.upcoming.length > 0 && (
                     <View style={s.wpAheadCard}>
                       <View style={s.wpAheadHead}>
@@ -3608,127 +3658,79 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* ── Średnie z przeszłości ── */}
-                  {wm.avgHours > 0 && (
-                    <Text style={s.wpAvgLine}>
-                      Średnio <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={[s.wpAvgB, { color: WORK_MONEY }]}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
-                      {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.projectedH.toFixed(0)} h</Text></> : null}
-                    </Text>
-                  )}
-
-                  {/* ── Stawka: JEDNA liczba, ta sama co live earnings ── */}
-                  {hasRate ? (() => {
-                    const nowYM = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
-                    const overridden = !!(workSettings.monthRateOverride?.[nowYM] || (workSettings.rateOverride && workSettings.rateOverride > 0));
-                    const lp = workPayMonths[0];
-                    const hint = overridden
-                      ? 'stawka ustawiona ręcznie'
-                      : (workAvg.includedCount <= 1 && lp && lp.hours > 0
-                          ? `${Math.round(lp.amount).toLocaleString('pl-PL')} zł (za ${MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]}) ÷ ${Math.round(lp.hours)} h`
-                          : `średnia z ${workAvg.includedCount} ${workAvg.includedCount === 1 ? 'wypłaty' : 'wypłat'} · Σ zł ÷ Σ godzin`);
-                    // Ogólnie vs ostatni miesiąc, BEZ zaokrąglenia do zera miejsc po przecinku
-                    // jak reszta karty (2026-08-28, user: "ile średnio na godzinę ogólnie ile
-                    // średnio ze ostatniego miesiąca, bez zaokrąglone") — `wm.rate` wyżej to
-                    // JEDNA, już-wybrana liczba (ręczna nadpisanie > wypłaty > potwierdzone
-                    // miesiące > kalendarz, patrz useWorkEarnings), tu obok niej stawiamy OBA
-                    // składowe rozbite osobno: `workAvg.avgRate` (Σzł ÷ Σh po wszystkich
-                    // uwzględnionych miesiącach, ten sam wzór co `hint` wyżej) i realna stawka
-                    // z NAJNOWSZEJ wypłaty (`workPayMonths[0]`), obie do 2 miejsc po przecinku.
-                    const lastRate = lp && lp.hours > 0 ? lp.amount / lp.hours : null;
-                    return (
-                      <>
-                        <View style={s.wpRateCard}>
-                          <Text style={[s.wpRateVal, { color: WORK_MONEY }]}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
-                          <Text style={s.wpRateHint}>{hint}</Text>
-                        </View>
-                        {(workAvg.avgRate != null || lastRate != null) && (
-                          <View style={s.wpLeftCard}>
-                            {workAvg.avgRate != null && (
-                              <View style={s.wpLeftItem}>
-                                <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{workAvg.avgRate.toFixed(2)}</Text>
-                                <Text style={s.wpLeftLbl}>zł/h ogółem</Text>
-                              </View>
-                            )}
-                            {workAvg.avgRate != null && lastRate != null && <View style={s.wpLeftDivider} />}
-                            {lastRate != null && (
-                              <View style={s.wpLeftItem}>
-                                <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{lastRate.toFixed(2)}</Text>
-                                <Text style={s.wpLeftLbl}>zł/h · {MONTH_SHORT[Number(lp!.month.slice(5, 7)) - 1]} {lp!.month.slice(2, 4)}</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </>
-                    );
-                  })() : (
-                    <Text style={[s.factText, { marginTop: spacing[2] }]}>Dodaj wypłatę oznaczoną „{workSettings.workPrefix || '[JD]'}", aby policzyć stawkę zł/h.</Text>
-                  )}
-
-                  {/* ── Wypłaty: realne dane, jedna na miesiąc (wypłata = za poprzedni) ── */}
-                  {workPayMonths.length > 0 && (
-                    <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
-                      <Text style={s.wxSection}>Wypłaty · stawka = wypłata ÷ godziny miesiąca</Text>
-                      {workPayMonths.map(r => {
-                        const rate = r.hours > 0 ? r.amount / r.hours : null;
-                        const inAvg = !r.excluded && r.hours > 0;
-                        return (
-                          <View key={r.month} style={s.wmRow}>
-                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : (r.count > 1 ? ` · ${r.count}×` : '')}</Text>
-                            <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount).toLocaleString('pl-PL')} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
-                            <Text style={[s.wmZl, { color: inAvg ? WORK_MONEY : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
-                          </View>
-                        );
-                      })}
-                      {(() => {
-                        const paychecks = expenses.filter(e => isPaycheck(e, workSettings.workPrefix));
-                        const jdTotal = paychecks.reduce((sum, e) => sum + e.amount, 0);
-                        return jdTotal > 0 ? (
-                          <View style={s.wpTotalRow}>
-                            <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
-                            <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
-                          </View>
-                        ) : null;
-                      })()}
-                      <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[1] }]}>Kolumna po prawej = zł/h. Miesiące bez godzin w kalendarzu wypadają ze średniej — włącz/wyłącz je w Ustawienia → Praca.</Text>
-                    </View>
-                  )}
-
                   {/* ── Godziny: ostatnie 6 miesięcy (najpewniejszy sygnał) ── */}
-                  <Text style={s.wxSection}>Godziny — ostatnie 6 miesięcy</Text>
-                  <View style={s.waveValues}>
-                    {wm.months.map((m, i) => (
-                      <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
-                        {m.hours > 0 ? `${Math.round(m.hours)}h` : ''}
+                  <View style={s.wpCard}>
+                    <Text style={s.wpCardLabel}>Godziny — ostatnie 6 miesięcy</Text>
+                    <View style={s.waveValues}>
+                      {wm.months.map((m, i) => (
+                        <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                          {m.hours > 0 ? `${Math.round(m.hours)}h` : ''}
+                        </Text>
+                      ))}
+                    </View>
+                    <WaveChart data={wm.months.map(m => m.hours)} color={accentColor} />
+                    <View style={s.waveLabels}>
+                      {wm.months.map((m, i) => (
+                        <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
+                      ))}
+                    </View>
+                    {wm.avgHours > 0 && (
+                      <Text style={s.wpAvgLine}>
+                        Średnio <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={[s.wpAvgB, { color: WORK_MONEY }]}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
+                        {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.projectedH.toFixed(0)} h</Text></> : null}
                       </Text>
-                    ))}
-                  </View>
-                  <WaveChart data={wm.months.map(m => m.hours)} color={accentColor} />
-                  <View style={s.waveLabels}>
-                    {wm.months.map((m, i) => (
-                      <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
-                    ))}
+                    )}
                   </View>
 
                   {/* ── Rok / porównania: fakty łączne ── */}
-                  <View style={s.wxChips}>
-                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy (mies.)</Text><Text style={s.wxChipV}>{wm.daysWorked}{wm.avgPerDay > 0 ? ` · ${wm.avgPerDay.toFixed(1)} h/dzień` : ''}</Text></View>}
-                    {wm.avgHours > 0 && (() => {
-                      const diff = Math.round(wm.projectedH - wm.avgHours);
-                      const pct = Math.round((wm.projectedH / wm.avgHours - 1) * 100);
-                      return <View style={s.wxChip}><Text style={s.wxChipK}>Ten mies. vs średnia</Text><Text style={[s.wxChipV, { color: diff >= 0 ? '#34D399' : '#F87171' }]}>{diff >= 0 ? '+' : ''}{diff} h ({pct >= 0 ? '+' : ''}{pct}%)</Text></View>;
-                    })()}
-                    {wm.bestMonth && wm.bestMonth.hours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy miesiąc</Text><Text style={s.wxChipV}>{wm.bestMonth.label} {wm.bestMonth.year} · {Math.round(wm.bestMonth.hours)} h{hasRate ? ` · ${wm.bestMonth.earnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
-                    {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{wm.yearHours.toFixed(0)} h{hasRate ? ` · ${wm.yearEarnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
+                  <View style={s.wpCard}>
+                    <Text style={s.wpCardLabel}>W liczbach</Text>
+                    <View style={[s.wxChips, { marginTop: 0 }]}>
+                      {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy (mies.)</Text><Text style={s.wxChipV}>{wm.daysWorked}{wm.avgPerDay > 0 ? ` · ${wm.avgPerDay.toFixed(1)} h/dzień` : ''}</Text></View>}
+                      {wm.avgHours > 0 && (() => {
+                        const diff = Math.round(wm.projectedH - wm.avgHours);
+                        const pct = Math.round((wm.projectedH / wm.avgHours - 1) * 100);
+                        return <View style={s.wxChip}><Text style={s.wxChipK}>Ten mies. vs średnia</Text><Text style={[s.wxChipV, { color: diff >= 0 ? '#34D399' : '#F87171' }]}>{diff >= 0 ? '+' : ''}{diff} h ({pct >= 0 ? '+' : ''}{pct}%)</Text></View>;
+                      })()}
+                      {wm.bestMonth && wm.bestMonth.hours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy miesiąc</Text><Text style={s.wxChipV}>{wm.bestMonth.label} {wm.bestMonth.year} · {Math.round(wm.bestMonth.hours)} h{hasRate ? ` · ${wm.bestMonth.earnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
+                      {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{wm.yearHours.toFixed(0)} h{hasRate ? ` · ${wm.yearEarnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
+                    </View>
                   </View>
 
-                  {/* Link do nowego ekranu "Historia pracy" (2026-09-10, drugi front
-                      przebudowy Pracy, ARCHITECTURE.md §67) — ten panel pokazuje TEN
-                      miesiąc + uśrednione fakty, pełna, klikalna historia miesiąc-po-
-                      miesiącu (+ mini-kalendarz dni roboczych, świadomość wielu
-                      pracodawców) żyje na osobnym ekranie, nie tutaj. */}
+                  {/* ── Wypłaty: TYLKO ostatnia + łącznie — pełna lista miesiąc-po-miesiącu
+                      dubluje 1:1 ekran „Historia pracy" (patrz przycisk niżej), więc zamiast
+                      wypisywać KAŻDY miesiąc tutaj (dawniej `workPayMonths.map(...)`, realny
+                      powód "za dużo/niejasne" ze screenshotów usera), panel pokazuje tylko
+                      punkt odniesienia + link dalej. ── */}
                   {workPayMonths.length > 0 && (
-                    <TouchableOpacity onPress={() => { haptic.tap(); setWorkPanel(false); router.push('/work/history' as any); }} style={s.wpHistoryLink}>
-                      <Text style={s.wpHistoryLinkTxt}>Zobacz pełną historię i mini-kalendarz →</Text>
+                    <View style={s.wpCard}>
+                      <Text style={s.wpCardLabel}>Wypłaty</Text>
+                      {lp && (
+                        <View style={s.wpLastRow}>
+                          <Text style={s.wpTotalLabel}>Ostatnia · {MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]} {lp.month.slice(2, 4)}</Text>
+                          <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(lp.amount).toLocaleString('pl-PL')} zł{lastRate != null ? ` · ${lastRate.toFixed(1)} zł/h` : ''}</Text>
+                        </View>
+                      )}
+                      {jdTotal > 0 && (
+                        <View style={[s.wpLastRow, { marginTop: spacing[2] }]}>
+                          <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
+                          <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Przycisk do ekranu "Historia pracy" (2026-09-10, drugi front przebudowy
+                      Pracy, ARCHITECTURE.md §67) — ten panel pokazuje TEN miesiąc + uśrednione
+                      fakty, pełna, klikalna historia miesiąc-po-miesiącu (+ mini-kalendarz dni
+                      roboczych, świadomość wielu pracodawców) żyje na osobnym ekranie.
+                      Podniesiony z gołego tekstowego linku do pełnego przycisku (2026-09-11) —
+                      to jedyne miejsce, gdzie user dotrze do PEŁNEJ listy wypłat, więc powinno
+                      być wyraźnie klikalne, nie ledwo widoczne. */}
+                  {workPayMonths.length > 0 && (
+                    <TouchableOpacity onPress={() => { haptic.tap(); setWorkPanel(false); router.push('/work/history' as any); }} style={s.wpHistoryBtn} activeOpacity={0.85}>
+                      <Text style={s.wpHistoryBtnTxt}>Pełna historia i mini-kalendarz</Text>
+                      <ChevronRight size={15} color={WORK_ACCENT} />
                     </TouchableOpacity>
                   )}
                 </ScrollView>
@@ -4741,11 +4743,20 @@ const buildStyles = (c: any) => StyleSheet.create({
   wxDayLbl: { fontSize: 11, color: c.text.secondary, fontWeight: '700' },
   wxHi: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
   wxLo: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
-  // ── Praca (pilot „clean": oddech + jeden akcent = WORK_ACCENT) ──
+  // ── Praca (przeprojektowane 2026-09-11, user: "zbyt niejasna nie?? i nie
+  // dopasowana" — JEDEN wspólny wrapper `wpCard` + `wpCardLabel` dla każdej
+  // sekcji zamiast osobnych, niespójnych stylów (goły tekst / karta / lista
+  // wierszy) narosłych sesja po sesji; `wpAheadCard` zostaje jedyną CELOWO
+  // inną, akcentowaną kartą — to jedyna sekcja z akcją "sprawdź", nie faktem) ──
+  wpCard: { marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
+  wpCardLabel: { fontSize: 10.5, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: spacing[2] },
+  wpStatsRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[4], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  wpLastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  wpHistoryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: spacing[4], paddingVertical: spacing[3], borderRadius: radius.lg, backgroundColor: WORK_ACCENT + '14', borderWidth: 1, borderColor: WORK_ACCENT + '40' },
+  wpHistoryBtnTxt: { fontSize: 13, fontWeight: '800', color: WORK_ACCENT },
   wpBig: { fontSize: 44, fontWeight: '900', color: c.text.primary, letterSpacing: -1.4, marginTop: spacing[2] },
   wpUnit: { fontSize: 19, fontWeight: '700', color: c.text.muted },
   wpSub: { fontSize: 13, color: c.text.secondary, marginTop: 4, lineHeight: 18 },
-  wpLeftCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, paddingVertical: spacing[4], paddingHorizontal: spacing[2], borderWidth: 1, borderColor: c.border.subtle },
   wpLeftItem: { flex: 1, alignItems: 'center', gap: 5 },
   wpLeftVal: { fontSize: 24, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
   wpLeftUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
@@ -4754,7 +4765,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpAvgLine: { fontSize: 12.5, color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
   wpAvgB: { fontWeight: '800', color: c.text.primary },
   // „Zaplanowane naprzód" — grafik przyszłych miesięcy
-  wpAheadCard: { marginTop: spacing[4], backgroundColor: WORK_ACCENT + '12', borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: WORK_ACCENT + '3A' },
+  wpAheadCard: { marginTop: spacing[3], backgroundColor: WORK_ACCENT + '12', borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: WORK_ACCENT + '3A' },
   wpAheadHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   wpAheadTitle: { fontSize: 11.5, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   wpAheadTotal: { marginLeft: 'auto', fontSize: 15, fontWeight: '900', color: WORK_ACCENT, letterSpacing: -0.3 },
@@ -4763,8 +4774,6 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpAheadDays: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginRight: spacing[3] },
   wpAheadH: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
   wpAheadHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6, lineHeight: 14 },
-  wpHistoryLink: { alignItems: 'center', paddingVertical: spacing[3], marginTop: spacing[2] },
-  wpHistoryLinkTxt: { fontSize: 12.5, fontWeight: '700', color: WORK_ACCENT },
   wpLive: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.xl, backgroundColor: '#2AC68F14', borderWidth: 1, borderColor: '#2AC68F44' },
   wpLiveTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   wpLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2AC68F' },
@@ -4775,17 +4784,11 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpEmpty: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.lg, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
   wpEmptyTitle: { fontSize: 13, fontWeight: '800', color: c.text.primary, marginBottom: 4 },
   wpEmptyBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
-  wpRateCard: { marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
   wpRateVal: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.6 },
   wpRateUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },
   wpRateHint: { fontSize: 11.5, color: c.text.muted, marginTop: 4 },
-  wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
   wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   wpTotalVal: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4 },
-  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 },
-  wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
-  wmH: { width: 118, textAlign: 'right', fontSize: 12.5, fontWeight: '700', color: c.text.primary },
-  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },

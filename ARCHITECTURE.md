@@ -5586,6 +5586,66 @@ zieloną ramką, gotowy do jednego tapnięcia (nie ustawiony automatycznie).
 
 ---
 
+## 72. Panel "Praca" na dashboardzie — przeprojektowanie wizualne (spójne karty, skrócona lista wypłat)
+
+User (3 screenshoty panelu Praca): *"I dawaj upieksz te zakladek pracy bo teraz zobacz taka
+zbyt niejasna nie?? i nie dopasowana"*.
+
+**Diagnoza (bez pytania o zakres — user: "sam zdecyduj")**: `workPanel` (Modal w
+`app/(tabs)/index.tsx`, otwierany z kafelka "Praca") narósł przez WIELE osobnych sesji/próśb
+(live zarobek, "ile zostało", "zaplanowane naprzód", stawka, PEŁNA lista wypłat, wykres 6 mies.,
+"rok/porównania", a najnowsze — skarbonki §70c) — każda sekcja dostała styl pasujący do
+ówczesnego "pilotu", bez wspólnego języka wizualnego: raz goła Text bez karty (`wpBig`/`wpSub`),
+raz osobno obramowana karta (`wpRateCard`, `wpLeftCard` — DWIE prawie identyczne, tylko różne
+nazwy), raz lista surowych wierszy (`wmRow` — jeden wiersz NA KAŻDY miesiąc wypłaty, bez
+paginacji). Ten OSTATNI punkt to też CZYSTA DUPLIKACJA — pełna lista wypłat miesiąc-po-miesiącu
+to dokładnie to, co robi ekran „Historia pracy" (`/work/history`, §67), tylko bez mini-kalendarza
+i bez ładnego stylu — więc było to jednocześnie najbardziej "niejasne" (screenshot 2 usera) I
+zbędne (ten sam widok już istnieje gdzie indziej, lepiej zrobiony).
+
+**Naprawa**:
+- JEDEN wspólny wrapper `s.wpCard` (bg `fill.subtle`, `radius.xl`, border, padding) +
+  `s.wpCardLabel` (jednolita etykieta sekcji, uppercase) — zastępuje dawne `wpRateCard`,
+  jeden z dwóch `wpLeftCard` (drugi, `wpLeftCard`-jako-row-statystyk, żyje dalej jako
+  `s.wpStatsRow`, ale TERAZ zagnieżdżony WEWNĄTRZ `wpCard` zamiast być własną, osobno
+  obramowaną kartą — łączy np. "Ten miesiąc" + "ile zostało/prognoza" w JEDNĄ kartę zamiast
+  dwóch stackowanych osobno).
+- `wpAheadCard` ("Zaplanowane naprzód") ŚWIADOMIE zostaje jedyną INNĄ, akcentowaną (kolor
+  `WORK_ACCENT`) kartą — to jedyna sekcja z akcją ("sprawdź czy grafik się zgadza"), reszta to
+  czyste fakty, więc wyróżnienie ma sens i nie jest przypadkowe niedopasowanie.
+- Pełna lista `workPayMonths.map(...)` (jeden wiersz NA KAŻDĄ wypłatę) USUNIĘTA z panelu —
+  zastąpiona dwoma liniami: "Ostatnia · {miesiąc} → {kwota} zł · {stawka} zł/h" i "Łącznie
+  ({prefiks}) · N wypł. → {suma} zł". Cała reszta (przeglądalna historia, mini-kalendarz,
+  filtr pracodawców) zostaje TAM gdzie już jest — `/work/history`.
+- Link do historii podniesiony z gołego tekstu (`wpHistoryLink`/`Txt`) do pełnego,
+  obramowanego przycisku (`wpHistoryBtn`/`Txt`, tinted `WORK_ACCENT`, z `ChevronRight`) — to
+  teraz JEDYNE miejsce dotarcia do pełnej listy wypłat z tego panelu, więc musi być wyraźnie
+  klikalne.
+- Skarbonki (§70c) zostają wizualnym WZORCEM dla reszty — to ich karta (bg/radius/border) stała
+  się `s.wpCard`, bo to najnowsza i najlepiej przyjęta sekcja ("bankowy" wygląd, o który user
+  prosił wielokrotnie w tej sesji Pracy).
+- Usunięte martwe style: `wpLeftCard` (stary, row-only wariant), `wpRateCard`, `wpHistoryLink`/
+  `Txt`, `wmRow`/`Month`/`H`/`Zl`, `wpTotalRow` (wszystkie 0 użyć po refaktorze, zweryfikowane
+  grepem PRZED usunięciem).
+
+Świadomie NIE ruszone: `/work/history` (ekran docelowy dla pełnej historii — to on ma zostać
+jedynym miejscem z pełną listą, nie kopiować jej z powrotem tutaj), logika liczenia
+(`workMonthly`/`workEarnings`/`workBudget`/`workAvg`/`workPayMonths` — zero zmian, czysto
+wizualny refaktor JSX/stylów).
+
+`tsc`/`jest` zielone (71 suit/933 testy — bez nowych testów, to czysto wizualna zmiana
+istniejącego, niezmienionego stanu/logiki; brak pokrycia komponentowego dla tego ekranu jak
+reszty dashboardu). **Nie zweryfikowane wizualnie na urządzeniu/emulatorze** (RN, brak
+łatwego podglądu w tym środowisku) — tylko przez czytanie kodu/struktury JSX.
+
+**Priorytet testu na urządzeniu**: Otwórz panel "Praca" z dashboardu → sprawdź że wszystkie
+sekcje (Ten miesiąc, Skarbonki, Stawka, Zaplanowane naprzód, Godziny, W liczbach, Wypłaty)
+wyglądają SPÓJNIE (ten sam kolor tła/obramowania kart, ta sama etykieta sekcji) — jedynym
+wyjątkiem celowo powinno być "Zaplanowane naprzód" (niebieski akcent); sprawdź że przycisk
+"Pełna historia i mini-kalendarz" na dole jest wyraźnie widoczny i prowadzi do `/work/history`.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
