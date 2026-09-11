@@ -5713,6 +5713,56 @@ być w pełni czytelny, bez ucięcia dołu liter przez pasek rzadkości pod spod
 
 ---
 
+## 74. Skrzynki na Rynku — usunięcie koloru/startupu/zamrożenia z puli dropów
+
+User: *"ze skrzynek na rynku wywalmy zamrożenie serii oraz kolory i startupy, zostaje sam
+ekwipunek do dropnięcia oraz te ulepszenia ogólne"*.
+
+**Zakres**: WYŁĄCZNIE `rollBox()` (`petBoxes.ts`) — czyli skrzynki KUPOWANE (`LOOT_BOXES`:
+sardine/iron/gold/divine, sklep Rynku) i darmowa `DAILY_BOX` (skrzynka dnia, odbierana z hero
+na `/pet`). Świadomie NIE ruszone: `openCrate()`/`menaceClaim()` w `petStore.ts` — te mają
+CAŁKOWICIE NIEZALEŻNĄ, własną pulę (gear+combatItem+coins, zweryfikowane przed zmianą — nigdy
+nie dawały koloru/startupu/zamrożenia), więc "ze skrzynek na rynku" ich nie dotyczyło; kupno
+zamrożenia WPROST za monety (`FREEZE_COST`, osobny przycisk w Rynku obok potek) też zostaje —
+to nie jest skrzynka/losowanie, tylko bezpośredni zakup, poza zakresem prośby.
+
+**Naprawa**: `colorChance`/`startupChance`/`freezeChance`/`tierWeight` usunięte z `LootBox`
+(interfejs + wszystkie 4 wpisy `LOOT_BOXES` + `DAILY_BOX`), `'color'`/`'startup'`/`'freeze'`
+usunięte z `BoxReward`. `rollBox()` stracił parametry `colors`/`ownedIds` (potrzebne WYŁĄCZNIE
+do tamtych dwóch gałęzi) — sygnatura teraz `rollBox(box, level, ownedCombatItems?)`, oba call
+site'y (`pet-shop.tsx`, `pet.tsx`) zaktualizowane, martwe importy/bindingi (`SHOP_COLORS`,
+`buyItem`, `grantStartup`, w `pet.tsx` też `addFreezes`/`useStreakFreezeStore`) usunięte.
+`BoxRevealModal.tsx` stracił odpowiadające gałęzie renderu (swatch koloru, "startup mark",
+płatek ❄) + martwe style.
+
+**`gearChance` KAŻDEJ skrzynki podniesiona** o DOKŁADNIE tyle, ile zabierały usunięte
+kategorie (colorChance+startupChance+freezeChance) — np. sardine 0.15→0.40, gold 0.38→0.96.
+Świadomy wybór zamiast wymyślania nowych liczb: CAŁKOWITA szansa "coś ciekawego wypadło"
+(gear+combatItem) per skrzynka jest DOKŁADNIE taka sama jak przed zmianą, tylko cała idzie
+teraz w ekwipunek zamiast być dzielona z usuniętymi kategoriami. `combatItemChance`
+("ulepszenia ogólne"/umiejętności bossów) celowo NIETKNIĘTA — user nie prosił o zmianę jej
+rzadkości, tylko o usunięcie trzech innych kategorii.
+
+**Świadomie NIE zrobione w tej rundzie** (druga połowa tej samej prośby usera): nowa animacja
+otwierania skrzynki. User zaproponował DWA alternatywne kierunki: (a) "rozpadanie się"
+skrzynki jak w chestach Boom Beach/Clash-style, (b) reel jak w case'ach CS — przelatujące
+itemy zwalniające i zatrzymujące się na WYLOSOWANYM (już ustalonym przez `rollBox()`) itemie,
+z osobnym przyciskiem "Otwórz" uruchamiającym losowanie. To osobna, większa robota
+projektowo-implementacyjna (wybór stylu, fizyka animacji, dopasowanie do już-wylosowanej
+nagrody) — zapisana w NEXT_STEPS.md jako gotowa do podjęcia w kolejnej sesji, nie zgadywana na
+szybko przy okazji trymowania puli dropów.
+
+`tsc`/`jest` zielone (71 suit/934 testy — `__tests__/petBoxes.test.ts` przepisany pod nową
+sygnaturę `rollBox()` i nowe progi, testy koloru/startupu/zamrożenia usunięte jako
+nierelewantne, reszta zachowana 1:1). **Nie zweryfikowane wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**: Otwórz dowolną skrzynkę na Rynku (i skrzynkę dnia z /pet)
+kilka razy → upewnij się że NIGDY nie wypada kolor/startup/zamrożenie, tylko ekwipunek, perk
+bossa albo monety; sprawdź że modal `BoxRevealModal` wciąż wygląda poprawnie (bez połamanych
+gałęzi po usunięciu koloru/startupu/zamrożenia).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

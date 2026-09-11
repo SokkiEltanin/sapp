@@ -17,7 +17,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { POTIONS, PotionKind, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { SHOP_COLORS } from '@/utils/petShop';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
@@ -172,19 +171,21 @@ function fmtShopRefresh(): string {
 // jednym miejscu. Ten ekran zostaje czysto "co kupić za gold": skrzynki (gacha) + sklep dnia
 // (4 konkretne itemy ekwipunku, gwarantowany zakup, roluje się co dzień) — jedna zakładka
 // "Rynek", bez kategorii-przełącznika (miał sens tylko przy 3 zakładkach, przy jednej to
-// martwy UI). `grantStartup` (nagroda ze skrzynki) ZOSTAJE — startupy dalej dropują z gaczy,
-// tylko wybór/zakup przeniósł się do PetCustomizeModal.
+// martwy UI). Startupy/kolory ze skrzynek USUNIĘTE (2026-09-11, patrz komentarz w
+// petBoxes.ts) — wybór/zakup zostaje WYŁĄCZNIE w PetCustomizeModal, za monety wprost.
 
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, ten sam wzorzec co
   // boss-fight.tsx/pet.tsx) — bez selektora re-renderuje cały Rynek na każdą zmianę petStore.
-  const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, grantStartup,
+  // `ownedItems`/`buyItem`/`grantStartup` USUNIĘTE z tego selektora (2026-09-11) — jedyne ich
+  // użycie tu było w gałęziach 'color'/'startup' skrzynek, wyciętych z puli dropów.
+  const { coins, xp, addCoins, spendCoins,
     dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
     ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore(useShallow((s) => ({
-    coins: s.coins, xp: s.xp, ownedItems: s.ownedItems, buyItem: s.buyItem, addCoins: s.addCoins,
-    spendCoins: s.spendCoins, grantStartup: s.grantStartup, dayClaims: s.dayClaims, grantGear: s.grantGear,
+    coins: s.coins, xp: s.xp, addCoins: s.addCoins,
+    spendCoins: s.spendCoins, dayClaims: s.dayClaims, grantGear: s.grantGear,
     buyDailyGear: s.buyDailyGear, equippedGear: s.equippedGear, ownedGear: s.ownedGear,
     ownedCombatItems: s.ownedCombatItems, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
     activePotion: s.activePotion, buyPotion: s.buyPotion,
@@ -289,15 +290,15 @@ export default function PetShop() {
     // Kafelek-okno na tablicy Rynku (2026-09-05) nie ma już miejsca na blurb/odds jak dawny
     // pełnoszerokościowy wiersz — obie linijki idą teraz do ConfirmDialog, żeby user dalej
     // widział je PRZED zakupem, nie tylko rozmiar/emoji skrzynki.
-    const odds = `${box.blurb}\nekwipunek ${Math.round(box.gearChance * 100)}% · kolor ${Math.round(box.colorChance * 100)}% · ❄ ${Math.round(box.freezeChance * 100)}% · reszta monety`;
+    // 2026-09-11, user: "ze skrzynek na rynku wywalmy zamrożenie serii oraz kolory i
+    // startupy, zostaje sam ekwipunek do dropnięcia oraz te ulepszenia ogólne" — odds string
+    // dopasowany do nowej (dwu-kategoriowej) puli, patrz petBoxes.ts.
+    const odds = `${box.blurb}\nekwipunek ${Math.round(box.gearChance * 100)}% · umiejętność ${Math.round((box.combatItemChance ?? 0) * 100)}% · reszta monety`;
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
-      const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel, ownedCombatItems);
+      const reward = rollBox(box, petLevel, ownedCombatItems);
       let dupeCoins: number | undefined;
-      if (reward.type === 'color') buyItem(reward.colorId, 0);
-      else if (reward.type === 'startup') grantStartup(reward.startupId);
-      else if (reward.type === 'coins') addCoins(reward.coins);
-      else if (reward.type === 'freeze') addFreezes(reward.count);
+      if (reward.type === 'coins') addCoins(reward.coins);
       else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
       else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
       haptic.success();

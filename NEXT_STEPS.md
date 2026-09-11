@@ -3,6 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Skrzynki Rynku: usunięty kolor/startup/zamrożenie z dropów — NIEsprawdzone (2026-09-11)
+
+User: *"ze skrzynek na rynku wywalmy zamrożenie serii oraz kolory i startupy, zostaje sam
+ekwipunek do dropnięcia oraz te ulepszenia ogólne"*. Pełny opis w ARCHITECTURE.md §74.
+
+`rollBox()`/`LOOT_BOXES`/`DAILY_BOX` (jedyne dwa miejsca korzystające z tej puli — NIE
+`openCrate()`/`menaceClaim()`, te mają zupełnie inną, niezależną pulę) tracą kolor/startup/
+zamrożenie z dropów. `gearChance` każdej skrzynki podniesiona o dokładnie tyle ile zabierały —
+identyczna CAŁKOWITA szansa "coś wypadło" co przed zmianą.
+
+`tsc`/`jest` zielone (71 suit/934 testy). NIE zweryfikowane wizualnie na urządzeniu.
+
+**Odłożone — DRUGA połowa tej samej prośby, jeszcze NIE zaczęta**: nowa, lepsza animacja
+otwierania skrzynki. User zaproponował 2 kierunki do wyboru (albo połączenia):
+- (a) "rozpadanie się" skrzynki — jak chesty w Boom Beach / Clash-style (skrzynka pęka,
+  ujawnia nagrodę).
+- (b) reel jak w case-openingach CS:GO — pasek przelatujących itemów zwalniający i
+  zatrzymujący się na już-wylosowanym (przez `rollBox()`) itemie, osobny przycisk "Otwórz"
+  startujący sekwencję.
+Obecny `BoxRevealModal.tsx` ma "shake→burst+cząstki" (bob/shake/spring/Fly) — działa, ale to
+NIE jest żaden z dwóch stylów, o które user pytał. Wymaga realnej decyzji projektowej (który
+styl, ile trwa, jak wygląda wizualnie skrzynka/reel) — NIE zgadywać przy okazji, zapytać usera
+o preferencję ALBO zaprojektować konkretną propozycję na start kolejnej sesji.
+
+**Priorytet testu na urządzeniu**: Otwórz kilka skrzynek (różne tiery) na Rynku i skrzynkę
+dnia z /pet → sprawdź że NIGDY nie wypada kolor/startup/zamrożenie.
+
 ## 🆕 5 mniejszych poprawek (walka/Rynek/Pupil/Sklep) — NIEsprawdzone/częściowo NIEzweryfikowane wizualnie (2026-09-11)
 
 User zgłosił naraz kilka rzeczy ze screenshotami. Pełny opis w ARCHITECTURE.md §73:

@@ -15,8 +15,6 @@ import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
 import GearPanel from '@/components/pet/GearPanel';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
-import { SHOP_COLORS } from '@/utils/petShop';
-import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
@@ -65,7 +63,9 @@ export default function Pet() {
   // optymalizacje", ten sam wzorzec co boss-fight.tsx) — bez selektora subskrypcja re-renderuje
   // CAŁY ekran Pupila na KAŻDĄ zmianę w petStore (współdzielonym z questami/walką/streakami),
   // nawet niezwiązaną z tym co tu wyświetlane.
-  const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
+  // `buyItem`/`grantStartup`/`addFreezes` USUNIĘTE (2026-09-11) — jedyne ich użycie tu było w
+  // gałęziach 'color'/'startup'/'freeze' skrzynki dnia, wyciętych z puli dropów (petBoxes.ts).
+  const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, grantGear, addCoins, onboarded,
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem, grantOrLevelCombatItem,
@@ -74,7 +74,7 @@ export default function Pet() {
     catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor, catWhiskers: s.catWhiskers,
     catLegStripes: s.catLegStripes, petCat: s.petCat, affection: s.affection, affectionDay: s.affectionDay,
     pendingCrates: s.pendingCrates, ownedItems: s.ownedItems, claimDailyBox: s.claimDailyBox,
-    dayClaims: s.dayClaims, buyItem: s.buyItem, grantStartup: s.grantStartup, grantGear: s.grantGear,
+    dayClaims: s.dayClaims, grantGear: s.grantGear,
     addCoins: s.addCoins, onboarded: s.onboarded, missionStartedAt: s.missionStartedAt,
     missionEndsAt: s.missionEndsAt, startMission: s.startMission, cancelMission: s.cancelMission,
     catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, buyMaxHp: s.buyMaxHp, buyAtkStat: s.buyAtkStat,
@@ -84,7 +84,6 @@ export default function Pet() {
     equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion,
     syncPotionExpiry: s.syncPotionExpiry,
   })));
-  const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
   // Misja (utils/missions.ts, 2026-08-15) — tik co 1s (było 30s) żeby napędzić dokładny
   // licznik M:SS na pasku (2026-08-26, user: "zamiast niego w pasku będzie dokładny czas w
@@ -222,12 +221,11 @@ export default function Pet() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, lvl.level, ownedCombatItems);
+    const reward = rollBox(DAILY_BOX, lvl.level, ownedCombatItems);
     let dupeCoins: number | undefined;
-    if (reward.type === 'color') buyItem(reward.colorId, 0);
-    else if (reward.type === 'startup') grantStartup(reward.startupId);
-    else if (reward.type === 'coins') addCoins(reward.coins);
-    else if (reward.type === 'freeze') addFreezes(reward.count);
+    // 2026-09-11: 'color'/'startup'/'freeze' USUNIĘTE z BoxReward (patrz petBoxes.ts) — te
+    // gałęzie miały ich obsłużyć, teraz rollBox() nigdy ich nie zwraca.
+    if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     haptic.success();
