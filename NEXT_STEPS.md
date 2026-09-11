@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Grafika Skrzynki dnia (DAILY_BOX_ICON) + globalny fix BoxRevealModal — NIEsprawdzone (2026-09-11)
+
+User: *"wrzuciłem ci tam jeszcze daily skrzynkę, a dawaj dalej wszystko"* — dostarczony
+`assets/chests/chest_daily.png` przeskalowany 1536×1024→300×200 (jak reszta chest PNG-ów).
+Pełny opis w ARCHITECTURE.md §76.
+
+Skrzynka dnia dostała własną grafikę (`DAILY_BOX_ICON`, przypięta do `DAILY_BOX.icon` w
+`petBoxes.ts`). Przy okazji naprawiony szerszy bug: `BoxRevealModal` (faza `closed`, ekran
+przed kliknięciem "Otwórz") NIGDY nie pokazywał żadnej z 5 grafik skrzynek, zawsze samo emoji
+— nowy prop `boxIcon` to naprawia dla WSZYSTKICH skrzynek (4×Rynek + dnia), nie tylko nowej.
+
+`tsc`/`jest` zielone (71 suit/934 testy, bez nowych — czysto wizualne). **NIE zweryfikowane
+wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**: Otwórz Skrzynkę dnia z /pet ORAZ jedną skrzynkę z Rynku →
+w obu, faza "zamknięta" (przed "Otwórz") powinna pokazywać prawdziwy obrazek skrzynki, nie 🎁
+ani inne emoji.
+
 ## 🆕 Skrzynki Rynku: usunięty kolor/startup/zamrożenie z dropów — NIEsprawdzone (2026-09-11)
 
 User: *"ze skrzynek na rynku wywalmy zamrożenie serii oraz kolory i startupy, zostaje sam

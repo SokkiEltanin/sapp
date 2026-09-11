@@ -541,7 +541,8 @@ export default function PetShop() {
                     <RadialGlow size={44} color="#000" opacity={0.55} />
                     {/* Własne grafiki skrzynek (2026-09-09, user dostarczył
                         assets/chests/skrzynka_*.png — "dodaj je do rynku naszego") — `emoji`
-                        zostaje jako fallback (BoxRevealModal, DAILY_BOX bez własnej grafiki). */}
+                        zostaje jako fallback. DAILY_BOX ma teraz też własną grafikę
+                        (`DAILY_BOX_ICON`, 2026-09-11), patrz `BoxRevealModal` niżej. */}
                     {box.icon
                       ? <Image source={box.icon} style={[s.boxSlotImg, !afford && { opacity: 0.5 }]} contentFit="contain" />
                       : <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>}
@@ -573,6 +574,7 @@ export default function PetShop() {
         reward={reveal?.reward ?? null}
         boxColor={reveal?.box.color ?? '#9AA6B2'}
         boxEmoji={reveal?.box.emoji ?? '🎁'}
+        boxIcon={reveal?.box.icon}
         dupeCoins={reveal?.dupeCoins}
         onClose={() => setReveal(null)}
       />

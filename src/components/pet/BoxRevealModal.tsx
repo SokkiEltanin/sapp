@@ -83,8 +83,8 @@ function buildReel(reward: BoxReward, dupeCoins?: number): ReelCell[] {
 // widziałby że "dostał" item, którego naprawdę nie ma w ekwipunku. Ten prop przełącza kartę
 // na uczciwą wersję: monety zamiast ikony/nazwy itemu, ta sama logika cząstek co przy
 // zwykłej wygranej monet.
-export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, dupeCoins, onClose }: {
-  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; dupeCoins?: number; onClose: () => void;
+export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, dupeCoins, onClose }: {
+  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any; dupeCoins?: number; onClose: () => void;
 }) {
   const [phase, setPhase] = useState<'closed' | 'spinning' | 'revealed'>('closed');
   const [reel, setReel] = useState<ReelCell[]>([]);
@@ -157,8 +157,9 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
             <>
               <Animated.View style={{ transform: [{ translateY: bobY }] }}>
                 <View style={[st.box, { borderColor: boxColor }]}>
-                  <View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} />
-                  <Text style={st.boxEmoji}>{boxEmoji}</Text>
+                  {boxIcon
+                    ? <Image source={boxIcon} style={st.boxImg} resizeMode="contain" />
+                    : (<><View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} /><Text style={st.boxEmoji}>{boxEmoji}</Text></>)}
                 </View>
               </Animated.View>
               <Pressable onPress={doOpen} style={[st.openBtn, { backgroundColor: boxColor }]} hitSlop={10}>
@@ -233,6 +234,9 @@ const st = StyleSheet.create({
   box: { width: 128, height: 104, borderRadius: 16, backgroundColor: '#161A1A', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   boxLid: { position: 'absolute', top: 0, left: 0, right: 0, height: 30 },
   boxEmoji: { fontSize: 48, marginTop: 12 },
+  // Grafika skrzynki (2026-09-11) — gdy `boxIcon` podane (LOOT_BOXES/DAILY_BOX mają własne
+  // PNG), zastępuje `boxLid`+`boxEmoji` całkowicie (jedna spójna grafika zamiast dwóch warstw).
+  boxImg: { width: '100%', height: '100%' },
   openBtn: { paddingHorizontal: 30, paddingVertical: 13, borderRadius: 14 },
   openBtnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
 

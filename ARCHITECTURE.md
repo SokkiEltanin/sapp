@@ -5818,6 +5818,42 @@ wskaźnikiem/trójkątem na środku; (3) ikona pod wskaźnikiem PO ZATRZYMANIU z
 faktycznie dostałeś na następnej karcie (to ta sama nagroda, reel jej nie zmienia); (4) cała
 sekwencja (spin + reveal) nie trwa absurdalnie długo ani nie ucina się w połowie.
 
+## 76. Grafika Skrzynki dnia (DAILY_BOX_ICON) — punkt 8 z serii
+
+User: *"wrzuciłem ci tam jeszcze daily skrzynkę, a dawaj dalej wszystko"* — dostarczony
+`assets/chests/chest_daily.png` (bezpośredni upload na `master`, ten sam wzorzec co reszta
+grafik skrzynek w §49/167: ChatGPT-owy rozmiar 1536×1024, ~2.2MB). Skrzynka dnia (`DAILY_BOX`
+w `petBoxes.ts`) jako jedyna z pięciu (4×`LOOT_BOXES` + ta) nie miała własnej grafiki —
+`icon` pole było `undefined`, wszędzie fallback na `emoji: '🎁'`.
+
+**Fix**:
+- Przeskalowane do 300×200 (PIL LANCZOS, ten sam przepis co `skrzynka_*.png` w §49) →
+  92KB, w linii z resztą (65-110KB/szt).
+- Nowa stała `DAILY_BOX_ICON` w `petBoxes.ts` (osobna od `BOX_ICON: Record<BoxId, any>`, bo
+  `DAILY_BOX` NIE jest w `LOOT_BOXES` — nie jest na sprzedaż, patrz istniejący komentarz przy
+  `DAILY_BOX`) → przypięta jako `DAILY_BOX.icon`.
+- **`BoxRevealModal.tsx` dostał nowy prop `boxIcon?: any`** — dotąd faza `closed` ZAWSZE
+  renderowała emoji (`boxEmoji`) w środku skrzynki-ikony, NIEZALEŻNIE od tego czy dana
+  `LootBox` miała własną grafikę na Rynku (`box.icon`) czy nie — modal po prostu nigdy nie
+  dostawał tego propa. Teraz: gdy `boxIcon` podane, `Image` wypełnia całą `st.box` (zastępuje
+  `boxLid`+`boxEmoji` warstwy), inaczej stary fallback emoji bez zmian. Dotyczy WSZYSTKICH
+  skrzynek (4×Rynek + dnia), nie tylko nowej grafiki — do tej pory żadna skrzynka nie
+  pokazywała swojej prawdziwej ikony w momencie otwierania, tylko na Rynku PRZED kliknięciem.
+- Oba wołania (`app/pet-shop.tsx` — skrzynki Rynku, `app/pet.tsx` — skrzynka dnia) przekazują
+  teraz `boxIcon={reveal?.box.icon}` / `boxIcon={boxReveal?.box.icon}`.
+
+Explicite NIE zrobione: dodatkowe warianty animacji dla skrzynki dnia (reel z §75 już
+uniwersalny, działa identycznie dla wszystkich 5 skrzynek bez zmian).
+
+`tsc`/`jest` zielone (71 suit/934 testy, bez nowych — czysto wizualna zmiana, brak nowej
+logiki do przetestowania jednostkowo). **Nie zweryfikowane wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**: Odbierz Skrzynkę dnia (przycisk Gift w headerze /pet) →
+sprawdź że w fazie "zamknięta" (przed "Otwórz") widać prawdziwą grafikę skrzynki zamiast 🎁;
+przy okazji sprawdź też jedną skrzynkę z Rynku (np. drewnianą) — jej `closed`-faza w modalu też
+powinna teraz pokazywać obrazek skrzynki (wcześniej była tam emoji nawet dla skrzynek z
+grafiką na Rynku).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
