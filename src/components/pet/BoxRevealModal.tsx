@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
-import { RARITY_META, gearById } from '@/utils/gear';
-import { itemById } from '@/utils/combatItems';
+import { RARITY_META, gearById, GEAR_ITEMS } from '@/utils/gear';
+import { itemById, COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { haptic } from '@/utils/haptics';
 
-// Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz, ❄ z boków do środka.
+// Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz.
 function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => { Animated.timing(a, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(); }, []);
@@ -21,8 +21,60 @@ function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: numb
   );
 }
 
-// Odsłona nagrody ze skrzynki. Nagroda jest JUŻ wylosowana i przyznana — tu tylko
-// celebracja: stuknij → skrzynka się trzęsie → wybuch + cząstki + karta z nagrodą.
+// 2026-09-11, user: "zrobić animacje jakby jej rozpadania... zrobić jak w ceesie tez z
+// animacja tylko jeszcze dodać przycisk otwórz i wtedy losuje sie jak w ceesie... ze
+// przelatują te itemy tak i zatrzymuje sie na jednym" — reel jak w case-openingach: pasek
+// ikon przelatuje, zwalnia i zatrzymuje się DOKŁADNIE na już-wylosowanej (przez rollBox(),
+// PRZED tą animacją) nagrodzie pod wskaźnikiem na środku. `REEL_ITEM_W` = pełny "pitch" (skok)
+// jednej komórki (szerokość + odstępy razem), nie tylko widoczny box — matematyka
+// przesunięcia (`finalX` w `doOpen`) musi liczyć w tych samych jednostkach.
+const REEL_ITEM_W = 78;
+const REEL_WINDOW_W = 264;
+const REEL_LENGTH = 40;
+const REEL_TARGET_INDEX = 34; // kilka komórek zapasu PO celu na jitter (patrz `doOpen`)
+
+interface ReelCell { key: string; icon?: any; emoji?: string; color: string }
+
+// Pula "wypełniaczy" reela — NIE prawdziwe kandydatury na nagrodę (ta jest już ustalona przez
+// rollBox() PRZED animacją), czysto wizualny szum żeby pasek wyglądał jak prawdziwy gacha-case.
+// Mieszanka ikon ekwipunku (GEAR_ITEMS, wszystkie sloty/rarity na raz — sam wygląd, nie realna
+// rzadkość) + ikon umiejętności bossów (COMBAT_ITEMS, poziom 1) + kilku monet.
+const FILLER_ICONS: { icon?: any; emoji?: string }[] = [
+  ...GEAR_ITEMS.map(g => ({ icon: g.icon })),
+  ...(Object.keys(COMBAT_ITEMS) as CombatItemId[]).map(id => ({ icon: COMBAT_ITEMS[id].icons[0] })),
+  { emoji: '🪙' }, { emoji: '🪙' }, { emoji: '🪙' },
+];
+// Głównie common/rare obwódki, rzadki błysk epickiego/legendarnego/mitycznego dla smaku —
+// czysto kosmetyczne, nie powiązane z realną rzadkością danego wypełniacza.
+const FILLER_COLORS = [RARITY_META.common.color, RARITY_META.common.color, RARITY_META.common.color,
+  RARITY_META.rare.color, RARITY_META.rare.color, RARITY_META.epic.color, RARITY_META.legendary.color, RARITY_META.mythic.color];
+
+function rewardCell(reward: BoxReward, dupeCoins?: number): ReelCell {
+  const isDupe = reward.type === 'gear' && !!dupeCoins;
+  if (reward.type === 'gear') {
+    const g = gearById(reward.itemId);
+    return { key: 'reward', icon: g?.icon, color: isDupe ? RARITY_META.common.color : RARITY_META[reward.rarity].color };
+  }
+  if (reward.type === 'combatItem') {
+    const def = itemById(reward.itemId);
+    return { key: 'reward', icon: def.icons[Math.min(reward.level, def.icons.length) - 1], color: CRATE_META[reward.rarity].color };
+  }
+  return { key: 'reward', emoji: '🪙', color: CRATE_META[reward.rarity].color };
+}
+
+function buildReel(reward: BoxReward, dupeCoins?: number): ReelCell[] {
+  const cells: ReelCell[] = [];
+  for (let i = 0; i < REEL_LENGTH; i++) {
+    if (i === REEL_TARGET_INDEX) { cells.push(rewardCell(reward, dupeCoins)); continue; }
+    const f = FILLER_ICONS[Math.floor(Math.random() * FILLER_ICONS.length)];
+    const color = FILLER_COLORS[Math.floor(Math.random() * FILLER_COLORS.length)];
+    cells.push({ key: `f${i}`, icon: f.icon, emoji: f.emoji, color });
+  }
+  return cells;
+}
+
+// Odsłona nagrody ze skrzynki. Nagroda jest JUŻ wylosowana i przyznana — tu tylko celebracja:
+// "Otwórz" → reel przelatuje i zwalnia na wylosowanym itemie → wybuch + cząstki + karta.
 //
 // `dupeCoins` (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu
 // nic nie dostałem") — gdy wylosowany gear to duplikat (już posiadany w ≥ tej rzadkości),
@@ -34,15 +86,16 @@ function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: numb
 export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, dupeCoins, onClose }: {
   visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; dupeCoins?: number; onClose: () => void;
 }) {
-  const [phase, setPhase] = useState<'closed' | 'revealed'>('closed');
+  const [phase, setPhase] = useState<'closed' | 'spinning' | 'revealed'>('closed');
+  const [reel, setReel] = useState<ReelCell[]>([]);
   const [flies, setFlies] = useState<{ id: number; sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }[]>([]);
-  const shake = useRef(new Animated.Value(0)).current;
+  const reelX = useRef(new Animated.Value(0)).current;
   const bob = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
-    setPhase('closed'); setFlies([]); shake.setValue(0); burst.setValue(0);
+    setPhase('closed'); setFlies([]); setReel([]); reelX.setValue(0); burst.setValue(0);
   }, [visible]);
 
   useEffect(() => {
@@ -62,18 +115,20 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
   const doOpen = () => {
     if (phase !== 'closed' || !reward) return;
     haptic.medium();
-    Animated.sequence([
-      Animated.timing(shake, { toValue: 1, duration: 70, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: -1, duration: 90, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 1, duration: 90, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: -1, duration: 90, useNativeDriver: true }),
-      Animated.timing(shake, { toValue: 0, duration: 80, useNativeDriver: true }),
-    ]).start(() => {
+    setReel(buildReel(reward, dupeCoins));
+    reelX.setValue(0);
+    setPhase('spinning');
+    // Lekki losowy jitter (±30% szerokości komórki) — reel nie zatrzymuje się co do piksela w
+    // TYM SAMYM miejscu za każdym razem, ale zawsze w granicach komórki nagrody (bezpieczne,
+    // bo target ma 5 komórek zapasu PO sobie w REEL_LENGTH, patrz stałe wyżej).
+    const jitter = (Math.random() - 0.5) * REEL_ITEM_W * 0.6;
+    const finalX = REEL_WINDOW_W / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
+    Animated.timing(reelX, {
+      toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
+    }).start(() => {
       setPhase('revealed');
       haptic.success();
       Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-      // 2026-09-11: 'freeze' USUNIĘTY z BoxReward (patrz petBoxes.ts) — cząstki zawsze
-      // wybuchają na zewnątrz, brak już osobnej "❄ z boków" ścieżki dla zamrożenia.
       const isDupe = reward.type === 'gear' && !!dupeCoins;
       const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
       const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
@@ -83,7 +138,6 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
     });
   };
 
-  const rot = shake.interpolate({ inputRange: [-1, 1], outputRange: ['-9deg', '9deg'] });
   const bobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
   const glowScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
@@ -99,19 +153,39 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={st.overlay} onPress={phase === 'revealed' ? onClose : undefined}>
         <View style={st.center} pointerEvents="box-none">
-          {phase !== 'revealed' ? (
+          {phase === 'closed' && (
             <>
-              <Pressable onPress={doOpen} hitSlop={20}>
-                <Animated.View style={{ transform: [{ translateY: bobY }, { rotate: rot }] }}>
-                  <View style={[st.box, { borderColor: boxColor }]}>
-                    <View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} />
-                    <Text style={st.boxEmoji}>{boxEmoji}</Text>
-                  </View>
-                </Animated.View>
+              <Animated.View style={{ transform: [{ translateY: bobY }] }}>
+                <View style={[st.box, { borderColor: boxColor }]}>
+                  <View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} />
+                  <Text style={st.boxEmoji}>{boxEmoji}</Text>
+                </View>
+              </Animated.View>
+              <Pressable onPress={doOpen} style={[st.openBtn, { backgroundColor: boxColor }]} hitSlop={10}>
+                <Text style={st.openBtnTxt}>Otwórz</Text>
               </Pressable>
-              <Text style={st.hint}>Stuknij, żeby otworzyć skrzynkę</Text>
             </>
-          ) : (
+          )}
+          {phase === 'spinning' && (
+            <View style={st.reelWindow}>
+              <Animated.View style={[st.reelStrip, { transform: [{ translateX: reelX }] }]}>
+                {reel.map(cell => (
+                  <View key={cell.key} style={st.reelCellOuter}>
+                    <View style={[st.reelCell, { borderColor: cell.color }]}>
+                      {cell.icon
+                        ? <Image source={cell.icon} style={st.reelCellImg} resizeMode="contain" />
+                        : <Text style={st.reelCellEmoji}>{cell.emoji}</Text>}
+                    </View>
+                  </View>
+                ))}
+              </Animated.View>
+              <View style={st.reelFadeL} pointerEvents="none" />
+              <View style={st.reelFadeR} pointerEvents="none" />
+              <View style={st.reelPointerTri} pointerEvents="none" />
+              <View style={st.reelPointerBar} pointerEvents="none" />
+            </View>
+          )}
+          {phase === 'revealed' && (
             <>
               <View style={st.revealWrap}>
                 <Animated.View style={[st.glow, { backgroundColor: meta.color, transform: [{ scale: glowScale }], opacity: glowOp }]} />
@@ -159,7 +233,29 @@ const st = StyleSheet.create({
   box: { width: 128, height: 104, borderRadius: 16, backgroundColor: '#161A1A', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   boxLid: { position: 'absolute', top: 0, left: 0, right: 0, height: 30 },
   boxEmoji: { fontSize: 48, marginTop: 12 },
-  hint: { color: '#E7EAEA', fontSize: 13.5, fontWeight: '700', textAlign: 'center', maxWidth: 240 },
+  openBtn: { paddingHorizontal: 30, paddingVertical: 13, borderRadius: 14 },
+  openBtnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
+
+  // Reel (2026-09-11) — okno stałej szerokości (REEL_WINDOW_W) z `overflow:'hidden'`, pasek
+  // komórek (`reelStrip`, `flexDirection:'row'`) jedzie pod spodem przez `translateX`.
+  // `reelCellOuter` = pełny "pitch" komórki (REEL_ITEM_W, BEZ marginesów — cała matematyka
+  // przesunięcia w `doOpen` liczy w tej jednostce), `reelCell` = mniejszy, wycentrowany box
+  // wizualny w środku (zostawia "szczelinę" między komórkami bez psucia pitcha).
+  reelWindow: { width: REEL_WINDOW_W, height: 92, overflow: 'hidden', position: 'relative', borderRadius: 16, backgroundColor: '#0E1113' },
+  reelStrip: { flexDirection: 'row', height: '100%', alignItems: 'center' },
+  reelCellOuter: { width: REEL_ITEM_W, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  reelCell: { width: REEL_ITEM_W - 10, height: 76, borderRadius: 12, borderWidth: 2, backgroundColor: '#161A1A', alignItems: 'center', justifyContent: 'center' },
+  reelCellImg: { width: 44, height: 44 },
+  reelCellEmoji: { fontSize: 30 },
+  // Winieta po bokach okna — sygnalizuje "tu ikony wjeżdżają/wyjeżdżają", nie twardą krawędź.
+  reelFadeL: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 28, backgroundColor: '#0E1113', opacity: 0.85 },
+  reelFadeR: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28, backgroundColor: '#0E1113', opacity: 0.85 },
+  reelPointerBar: { position: 'absolute', left: REEL_WINDOW_W / 2 - 1.5, top: 0, bottom: 0, width: 3, backgroundColor: '#FBBF24' },
+  reelPointerTri: {
+    position: 'absolute', left: REEL_WINDOW_W / 2 - 7, top: -2, width: 0, height: 0,
+    borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FBBF24',
+  },
 
   revealWrap: { width: 240, height: 220, alignItems: 'center', justifyContent: 'center' },
   glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110 },

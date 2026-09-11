@@ -15,20 +15,21 @@ identyczna CAŁKOWITA szansa "coś wypadło" co przed zmianą.
 
 `tsc`/`jest` zielone (71 suit/934 testy). NIE zweryfikowane wizualnie na urządzeniu.
 
-**Odłożone — DRUGA połowa tej samej prośby, jeszcze NIE zaczęta**: nowa, lepsza animacja
-otwierania skrzynki. User zaproponował 2 kierunki do wyboru (albo połączenia):
-- (a) "rozpadanie się" skrzynki — jak chesty w Boom Beach / Clash-style (skrzynka pęka,
-  ujawnia nagrodę).
-- (b) reel jak w case-openingach CS:GO — pasek przelatujących itemów zwalniający i
-  zatrzymujący się na już-wylosowanym (przez `rollBox()`) itemie, osobny przycisk "Otwórz"
-  startujący sekwencję.
-Obecny `BoxRevealModal.tsx` ma "shake→burst+cząstki" (bob/shake/spring/Fly) — działa, ale to
-NIE jest żaden z dwóch stylów, o które user pytał. Wymaga realnej decyzji projektowej (który
-styl, ile trwa, jak wygląda wizualnie skrzynka/reel) — NIE zgadywać przy okazji, zapytać usera
-o preferencję ALBO zaprojektować konkretną propozycję na start kolejnej sesji.
+**DRUGA połowa tej samej prośby — ZROBIONA teraz (2026-09-11)**: nowa animacja otwierania
+skrzynki, styl reel jak w case-openingach (wybrany z 2 opcji usera bez dopytywania — "sam
+zdecyduj"). Pełny opis w ARCHITECTURE.md §75. `BoxRevealModal.tsx`: nowa faza `spinning` —
+przycisk "Otwórz" → pasek ~40 ikon przelatuje i zwalnia, zatrzymując się DOKŁADNIE na
+już-wylosowanej (przez `rollBox()`, przed animacją) nagrodzie pod wskaźnikiem na środku. Stary
+`shake` (trzęsienie skrzynki) usunięty, zastąpiony reelem. Faza `revealed` (karta+burst+
+cząstki) bez zmian.
+
+`tsc`/`jest` zielone (71 suit/934 testy — bez nowych, brak pokrycia komponentowego jak reszta
+warstwy animacji). **NIE zweryfikowane wizualnie na urządzeniu** — priorytet #1.
 
 **Priorytet testu na urządzeniu**: Otwórz kilka skrzynek (różne tiery) na Rynku i skrzynkę
-dnia z /pet → sprawdź że NIGDY nie wypada kolor/startup/zamrożenie.
+dnia z /pet → sprawdź że NIGDY nie wypada kolor/startup/zamrożenie; sprawdź że reel płynnie
+zwalnia i zatrzymuje się pod wskaźnikiem na TEJ SAMEJ ikonie, którą dostajesz na karcie zaraz
+po nim (reel jej nie zmienia, tylko celebruje).
 
 ## 🆕 5 mniejszych poprawek (walka/Rynek/Pupil/Sklep) — NIEsprawdzone/częściowo NIEzweryfikowane wizualnie (2026-09-11)
 
