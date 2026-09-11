@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Panel "Praca" na dashboardzie — spójne karty, skrócona lista wypłat — NIEsprawdzone/NIEzweryfikowane wizualnie (2026-09-11)
+
+User (3 screenshoty): *"dawaj upieksz te zakladek pracy bo teraz zobacz taka zbyt niejasna
+nie?? i nie dopasowana"*. Pełny opis w ARCHITECTURE.md §72.
+
+Panel narósł przez wiele sesji do sterty niespójnych stylów kart + pełnej listy wypłat 1:1
+dublującej `/work/history`. Ujednolicone pod jeden wrapper `s.wpCard`/`s.wpCardLabel`, pełna
+lista wypłat ścięta do "ostatnia + łącznie" (reszta = przycisk do `/work/history`).
+
+`tsc`/`jest` zielone (71 suit/933 testy, bez nowych — czysto wizualny refaktor).
+**WAŻNE: nie zweryfikowane wizualnie na urządzeniu** (środowisko bez podglądu RN) — tylko
+przez czytanie kodu/JSX. Priorytet #1 do sprawdzenia na telefonie.
+
+**Priorytet testu na urządzeniu**: Otwórz panel Praca z dashboardu → oceń czy faktycznie
+wygląda spójniej/jaśniej niż wcześniej (to była subiektywna ocena usera, więc to on ostatecznie
+weryfikuje czy trafiło) → sprawdź przycisk "Pełna historia i mini-kalendarz" na dole.
+
 ## 🆕 Edycja pozycji paragonu — podpowiedzi tagów po nazwie ("makaron" → tag "makaron") — NIEsprawdzone (2026-09-10)
 
 User (screenshot, edycja "Makaron bez glutenu" w `[id].tsx`): *"jak mam w nazwie makaron to
