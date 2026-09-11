@@ -5763,6 +5763,63 @@ gałęzi po usunięciu koloru/startupu/zamrożenia).
 
 ---
 
+## 75. Nowa animacja otwierania skrzynki — reel jak w case-openingach (BoxRevealModal)
+
+User (druga połowa §74, dokończona teraz): *"możesz zrobic lepsza animacje wtedy ze jest to
+zdjęcie skrzynki co mamy aktualne otwieranej zrobic animacje jakby jej rozpadania (jak w bloon
+monkey city chesty)... lub zrobic jak w ceesie tez z animacja tylko jeszcze dodać przycisk
+otwórz i wtedy losuje sie jak w ceesie) ze przelatują te itemy tak i zatrzymuje sie na
+jednym"*. Wybrany kierunek (bez dopytywania — kontynuacja "sam zdecyduj" z §72/§74): styl
+CS-case (reel), bo to WYRAŹNIEJSZA zmiana wizualna niż wariant "rozpad skrzynki" (obecny
+`BoxRevealModal` już miał shake→burst, blisko konceptu "rozpadania" — reel to coś realnie
+nowego, nie tylko dopieszczenie istniejącego).
+
+**Mechanika** (`BoxRevealModal.tsx`, 3 fazy zamiast dawnych 2 — `closed → spinning →
+revealed`):
+- `closed`: skrzynka (bez zmian wizualnych — bujająca się `bob`), ALE zamiast "stuknij żeby
+  otworzyć" na samej skrzynce — osobny przycisk **"Otwórz"** pod spodem (user: "dodać przycisk
+  otwórz"), zgodnie z dosłowną prośbą.
+- `spinning`: pasek ~40 ikon (`buildReel()`) przelatuje poziomo w oknie stałej szerokości
+  (`overflow:'hidden'`), zwalniając (`Easing.bezier(0.1, 0.7, 0.2, 1)`, 3.4s) i zatrzymując się
+  DOKŁADNIE na już-wylosowanej (przez `rollBox()`, PRZED tą animacją — nic się tu nie losuje
+  na nowo, to czysto wizualna celebracja) nagrodzie pod wskaźnikiem (trójkąt+pionowy pasek) na
+  środku okna. Reszta paska to "wypełniacze" (`FILLER_ICONS` — losowa mieszanka ikon
+  `GEAR_ITEMS`/`COMBAT_ITEMS`/monety, KOSMETYCZNE obwódki losowej rzadkości, zero związku z
+  realnym prawdopodobieństwem) — dokładnie jak w case-openingach: pasek NIE reprezentuje puli
+  dropów, tylko robi wrażenie "mogło wypaść cokolwiek".
+- `revealed`: BEZ ZMIAN — istniejąca karta+burst+cząstki (`Fly`), ten sam kod co przed zmianą,
+  tylko trigger przeniesiony z końca sekwencji shake na koniec animacji reela.
+
+**Matematyka przesunięcia** (`finalX` w `doOpen`): `REEL_ITEM_W` = pełny "pitch" komórki
+(szerokość + miejsce na odstęp, NIE sam widoczny box — box jest węższy, wycentrowany w środku
+przez `reelCellOuter`/`reelCell`), więc `finalX = windowCenter − (targetIndex×itemW +
+itemW/2) + jitter`. `REEL_TARGET_INDEX=34` z `REEL_LENGTH=40` (5 komórek zapasu PO celu) —
+losowy `jitter` (±30% szerokości komórki) sprawia że pasek nie zatrzymuje się co do piksela w
+tym samym miejscu za każdym razem, bezpiecznie w granicach zapasu.
+
+**Usunięty stary `shake` (trzęsienie skrzynki przy tapnięciu)** — zastąpiony CAŁKOWICIE przez
+fazę `spinning`; `Animated.Value` `shake`/`rot` martwe, usunięte.
+
+Świadomie NIE zrobione: haptyczne "tiki" przy przelatywaniu kolejnych komórek reela (dodatkowa
+złożoność — nasłuchiwanie `Animated.Value` z częstymi wywołaniami — pominięte, `haptic.medium()`
+na start + `haptic.success()` na koniec wystarczają); wariant "rozpad skrzynki" (user dał
+wybór, wybrany drugi kierunek — jeśli user wolałby jednak pierwszy, to osobna, przyszła zmiana,
+nie strata pracy, bo faza `revealed` i tak zostaje wspólna dla obu stylów).
+
+`tsc`/`jest` zielone (71 suit/934 testy — bez nowych, `BoxRevealModal.tsx` nie ma dotąd
+pokrycia komponentowego jak reszta warstwy animacji/UI w tej apce). **Nie zweryfikowane
+wizualnie na urządzeniu** — to czysto animacyjna zmiana, priorytet #1 do oceny "czy faktycznie
+wygląda jak case-opening" na telefonie.
+
+**Priorytet testu na urządzeniu**: Otwórz dowolną skrzynkę (Rynek lub skrzynka dnia) →
+sprawdź: (1) przycisk "Otwórz" pojawia się pod bujającą się skrzynką; (2) po tapnięciu pasek
+ikon przelatuje i PŁYNNIE zwalnia (bez szarpnięć), zatrzymując się pod żółtym
+wskaźnikiem/trójkątem na środku; (3) ikona pod wskaźnikiem PO ZATRZYMANIU zgadza się z tym co
+faktycznie dostałeś na następnej karcie (to ta sama nagroda, reel jej nie zmienia); (4) cała
+sekwencja (spin + reveal) nie trwa absurdalnie długo ani nie ucina się w połowie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
