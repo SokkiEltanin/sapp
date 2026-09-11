@@ -1,6 +1,6 @@
 import {
   COMBAT_ITEMS, HEADSHOT_CHANCE, HEAL_ONCE_PCT, dodgeChanceAt, reflectPctAt,
-  executeThresholdAt, fireProcChanceAt, FIRE_DOT_PCT, itemById,
+  executeThresholdAt, fireProcChanceAt, FIRE_DOT_PCT, itemById, combatItemStatText,
 } from '@/utils/combatItems';
 
 describe('combatItems — katalog', () => {
@@ -44,5 +44,38 @@ describe('combatItems — formuły zgodne z opisem usera', () => {
   test('dodge: rośnie z poziomem, mieści się w rozsądnym zakresie (TODO-balance)', () => {
     expect(dodgeChanceAt(1)).toBeLessThan(dodgeChanceAt(4));
     expect(dodgeChanceAt(4)).toBeLessThan(1); // nigdy pewny unik
+  });
+});
+
+// 2026-09-11, user (ekran Pupil): "żeby pokazywało co one robią lepiej ze statystykami
+// dokładnie ile czego" — `def.desc` był generyczny i nie zmieniał się z poziomem.
+describe('combatItems — combatItemStatText (opis z DOKŁADNĄ, aktualną wartością)', () => {
+  test('poziom-niezależne itemy pokazują stałą wartość', () => {
+    expect(combatItemStatText('headshot', 1)).toContain('0.5%');
+    expect(combatItemStatText('heal', 1)).toContain('5%');
+    expect(combatItemStatText('shield', 1)).toContain('5%');
+    expect(combatItemStatText('thorn', 1)).toContain('2%');
+    expect(combatItemStatText('mindcontrol', 1)).toContain('3%');
+  });
+
+  test('dodge: tekst zmienia się z poziomem (5% → 17%), zgodnie z dodgeChanceAt', () => {
+    expect(combatItemStatText('dodge', 1)).toContain('5%');
+    expect(combatItemStatText('dodge', 4)).toContain('17%');
+    expect(combatItemStatText('dodge', 1)).not.toBe(combatItemStatText('dodge', 4));
+  });
+
+  test('reflect: tekst rośnie z poziomem (1% → 5%), zgodnie z reflectPctAt', () => {
+    expect(combatItemStatText('reflect', 1)).toContain('1%');
+    expect(combatItemStatText('reflect', 4)).toContain('5%');
+  });
+
+  test('execute: próg rośnie z poziomem (poziom 2 = 3%, jak w opisie usera)', () => {
+    expect(combatItemStatText('execute', 2)).toContain('3%');
+  });
+
+  test('fire: szansa rośnie z poziomem (poziom 2 = 4%) i zawiera stały DoT (2%)', () => {
+    const t = combatItemStatText('fire', 2);
+    expect(t).toContain('4%');
+    expect(t).toContain('2%');
   });
 });

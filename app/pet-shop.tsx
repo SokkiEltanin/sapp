@@ -486,11 +486,12 @@ export default function PetShop() {
                 </View>
               )}
               {dailySlots.map((slot, i) => {
-                const { item, rarity, value } = slot;
+                const { item, rarity, value, cost } = slot;
                 const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
                 const bought = !!dayClaims[dayKey];
                 const owned = alreadyOwnGear(item.id, rarity, value);
                 const meta = RARITY_META[rarity];
+                const afford = coins >= cost;
                 return (
                   <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
                     {/* Płaskie TŁO slotu USUNIĘTE (2026-09-08, user: "pod itemami w sklepiku
@@ -508,10 +509,17 @@ export default function PetShop() {
                         możesz [dać regulację]") — jeden wspólny suwak dla wszystkich 4 itemów
                         Sklepu dnia naraz, dotąd sztywne 62%/62% bez regulacji. */}
                     <Image source={item.icon} style={[s.artSlotImg, { transform: [{ translateX: adjust.items.x }, { translateY: adjust.items.y }, { scale: adjust.items.scale }] }]} contentFit="contain" />
-                    {(bought || owned) && (
+                    {(bought || owned) ? (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
                         <Check size={11} color="#0B0E1A" strokeWidth={3} />
                       </View>
+                    ) : (
+                      /* 2026-09-11, user: "dodaj zeby bylo widac ceny przedmiotów, przed
+                         kliknięciem" — te 4 itemy Sklepu dnia jako JEDYNE (zamrożenie/potki/
+                         skrzynki już to mają, patrz `artCostPill` wyżej) nie pokazywały ceny
+                         bez otwierania podglądu. Ukryta, gdy już kupione/posiadane — cena do
+                         zapłaty nie ma sensu na czymś co już masz. */
+                      <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>
                     )}
                   </PressableScale>
                 );
@@ -784,12 +792,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // przebijającej ruchliwej sceny Rynku pod spodem.
   // Jaśniejszy brąz (2026-09-08, user po teście: "możesz te brązowe tło jaśniejsze zrobić dla
   // kontrastu" — itemy/ikonki na nim słabo widoczne) — poprzedni `#2A1B0EF0` był niemal
-  // czarny, nowy `#4A3420F0` to ten sam ciepły odcień, wyraźnie jaśniejszy.
-  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#4A3420F0' },
+  // czarny, `#4A3420F0` był ten sam ciepły odcień, wyraźnie jaśniejszy. UJEDNOLICONE
+  // (2026-09-11, user: "ogarnij kolor wypełnienia tego pod potkami na taki sam jak na dole
+  // jest teraz") — ten sam ciemniejszy brąz co `boardBgBottomFill` (lada), żeby tablica z
+  // potkami/zamrożeniem i lada z ekwipunkiem/skrzynkami wyglądały jak JEDEN spójny sklep, nie
+  // dwa różne odcienie drewna.
+  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#2E2114F5' },
   // Ciemniejszy, lepiej dopasowany do drewna lady (2026-09-10, user: "zmień na pewno sam
   // kolor wypełnień za ladą na bardziej pasujący do obrazka i ciemniejszy") — próbka z
-  // najciemniejszych cieni drewna na LADADOL.png (nie ta sama, jaśniejsza barwa co tablica
-  // wyżej — user poprosił konkretnie o ladę).
+  // najciemniejszych cieni drewna na LADADOL.png; `boardBg` (tablica, wyżej) TERAZ dzieli
+  // dokładnie ten sam kolor (2026-09-11), żeby cała lada+tablica wyglądały spójnie.
   boardBgBottomFill: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#2E2114F5' },
   // Miękki cień ZA ikoną/emoji slotu (2026-09-08, user: "ikonki mają nie mieć tła, tylko
   // lekki cień z tyłu") — CELOWO nie natywny `shadowColor`/`elevation` na samej ikonie:
@@ -834,7 +846,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
   previewSheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[3] },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title2: { fontSize: 16, fontWeight: '800', color: c.text.primary, flex: 1, marginRight: spacing[2] },
+  // `lineHeight` DODANY (2026-09-11, user ze zbliżeniem: "przycina napis... widać ledwie
+  // połowę napisu jakby był za horyzontem") — bez jawnego `lineHeight`, pogrubiony (800) tekst
+  // na Androidzie czasem realnie maluje się WYŻEJ niż jego wyliczony box (metryki fontu przy
+  // dużej wadze), więc kolejny element w tej samej kolumnie (`rarityUnderline`, malowany PO
+  // tytule = na wierzchu) zaczyna się wewnątrz realnych, za dużych liter i wizualnie ucina ich
+  // dolną połowę. Jawny, hojny `lineHeight` gwarantuje boxowi dość miejsca niezależnie od
+  // metryk konkretnego fontu/wagi.
+  title2: { fontSize: 16, fontWeight: '800', color: c.text.primary, flex: 1, marginRight: spacing[2], lineHeight: 22 },
   previewTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   previewStat: { fontSize: 13, color: c.text.primary, fontWeight: '700', marginTop: 4 },
   deltaTxt: { fontSize: 11, fontWeight: '700', marginTop: 3 },

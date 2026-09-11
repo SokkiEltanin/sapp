@@ -113,6 +113,27 @@ export const THORN_PCT = 0.02;             // gwarantowane -2% hp bossa co rund�
 
 export function itemById(id: CombatItemId): CombatItemDef { return COMBAT_ITEMS[id]; }
 
+// 2026-09-11, user (ekran Pupil, "umiejętności bossów"): "żeby pokazywało co one robią lepiej
+// ze statystykami dokładnie ile czego" — `def.desc` jest generyczny ("szansa na unik", bez
+// liczby) i NIE zmienia się z poziomem, mimo że mechanika (`dodgeChanceAt`/`reflectPctAt`/…)
+// realnie skaluje się z poziomem. Ta funkcja formatuje DOKŁADNĄ, aktualną wartość dla danego
+// poziomu — używana w UI ZAMIAST `def.desc` dla posiadanych itemów (desc zostaje jako
+// fallback/skrót gdzie indziej, np. `bossProgressReport.ts`).
+export function combatItemStatText(id: CombatItemId, level: number): string {
+  const pct = (n: number) => `${(n * 100).toFixed(n * 100 % 1 === 0 ? 0 : 1)}%`;
+  switch (id) {
+    case 'headshot':     return `${pct(HEADSHOT_CHANCE)} szansy/rundę na cios ×2`;
+    case 'heal':         return `Pierwszy raz HP kotka <50% w walce → lecz ${pct(HEAL_ONCE_PCT)} (raz na walkę)`;
+    case 'dodge':        return `${pct(dodgeChanceAt(level))} szansy na całkowity unik kontrataku bossa`;
+    case 'fire':         return `${pct(fireProcChanceAt(level))} szansy na podpalenie → +${pct(FIRE_DOT_PCT)} obrażeń/rundę, dopóki trwa`;
+    case 'execute':      return `HP bossa poniżej ${pct(executeThresholdAt(level))} → natychmiastowy finisz`;
+    case 'reflect':      return `${pct(reflectPctAt(level))} szansy na odbicie części obrażeń na bossa`;
+    case 'mindcontrol':  return `${pct(MIND_CONTROL_CHANCE)} szansy, że boss pominie kontratak tej rundy`;
+    case 'shield':       return `Stałe -${pct(SHIELD_REDUCTION_PCT)} wszystkich obrażeń przychodzących`;
+    case 'thorn':        return `Gwarantowane -${pct(THORN_PCT)} HP bossa co rundę (bez szansy — zawsze)`;
+  }
+}
+
 // Ulepszanie itemów bojowych za monety (UI w app/pet.tsx) — taniej niż HP/ATK w
 // sklepie, bo te itemy trzeba NAJPIERW wylosować ze skrzynki (COMBAT_ITEM_DROP_CHANCE_BY_TIER
 // w crates.ts), więc samo posiadanie już jest rzadkie. DRUGI, RÓWNOLEGŁY tor ulepszania

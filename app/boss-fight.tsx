@@ -56,6 +56,18 @@ const PORTRAIT_SIZE = 130;
 // PORTRAIT_SIZE, bo oba portrety dzielą tę samą wysokość kafelka (`tilePortrait`, patrz
 // niżej) — zbyt duży skok zacząłby wychodzić poza scenę areny (ma `overflow:'hidden'`).
 const CAT_PORTRAIT_SIZE = 175;
+// 2026-09-11, user (zrzut z "Misja"): "podczas walki żeby pupil i boss byli troszeczkę niżej
+// bo jakby lewitowali teraz w powietrzu". Root cause: oba sprite'y są WYŚRODKOWANE w
+// `tilePortrait` (wspólna wysokość dla obu kolumn, patrz komentarz przy `tilePortrait` niżej)
+// — środek jest ZAWSZE ten sam niezależnie od rozmiaru sprite'a, ale to zostawia sporo pustej
+// przestrzeni PONIŻEJ (zwłaszcza bossa — `PORTRAIT_SIZE` jest mniejszy od `CAT_PORTRAIT_SIZE`),
+// więc `GroundShadow` (już istniejący, patrz komponent) siada tuż pod stopami sprite'a, ale ta
+// para (sprite+cień) floatuje wysoko nad wizualną "podłogą" areny (blisko paska HP). Przesuwa
+// OBA sprite'y (razem z ich `GroundShadow`, bo transform jest na WSPÓLNYM boxie) o tę samą
+// wartość w dół przez `transform`, więc geometria layoutu (środek dla pocisku, patrz
+// `projectile.top` niżej) zostaje nietknięta — tylko dolicz `SPRITE_GROUND_SHIFT` tam, gdzie
+// coś zależy od realnego, pomalowanego środka sprite'a.
+const SPRITE_GROUND_SHIFT = 14;
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
@@ -753,7 +765,7 @@ export default function BossFight() {
                         jest akurat grafika areny za nim. `GroundShadow` (cień pod łapkami)
                         zostaje bez zmian, to DODATKOWA, osobna poświata za całym sprite'em. */}
                     <RadialGlow size={CAT_PORTRAIT_SIZE * 1.5} color={palette.coat} opacity={0.22} />
-                    <GroundShadow width={CAT_PORTRAIT_SIZE * 0.62} height={CAT_PORTRAIT_SIZE * 0.18} />
+                    <GroundShadow width={CAT_PORTRAIT_SIZE * 0.62} height={CAT_PORTRAIT_SIZE * 0.18} opacity={0.5} />
                     <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
                       {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
                           statyczny bez animacji, bo teraz jest w pełni z głaskaniem
@@ -797,7 +809,7 @@ export default function BossFight() {
                         bossa (`WEAK_COLOR`, już używanym przy etykiecie/motywie), więc poświata
                         nie jest przypadkowa — czyta się jak sygnatura elementu bossa. */}
                     <RadialGlow size={PORTRAIT_SIZE * 1.6} color={WEAK_COLOR[target.weakness] ?? '#F87171'} opacity={0.25} />
-                    <GroundShadow width={PORTRAIT_SIZE * 0.62} height={PORTRAIT_SIZE * 0.18} />
+                    <GroundShadow width={PORTRAIT_SIZE * 0.62} height={PORTRAIT_SIZE * 0.18} opacity={0.5} />
                     {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
                         chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
                         się pokazuje, nic więcej). Per-bossowy burst-image (bomby/ogień/…) USUNIĘTY
@@ -1087,8 +1099,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // Box DOKŁADNIE rozmiaru danego sprite'a (nie całej `tilePortrait`) — patrz komentarz przy
   // użyciu w JSX: `GroundShadow` wewnątrz siada `bottom:0` względem TEGO boxa, więc cień
   // trafia pod faktyczne łapki sprite'a, nie pod pusty margines wspólnego, wyższego kafelka.
-  spriteBoxCat: { width: CAT_PORTRAIT_SIZE, height: CAT_PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center' },
-  spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center' },
+  spriteBoxCat: { width: CAT_PORTRAIT_SIZE, height: CAT_PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: SPRITE_GROUND_SHIFT }] },
+  spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: SPRITE_GROUND_SHIFT }] },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
   bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center' },
@@ -1139,6 +1151,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // (etykieta+HP przeniesione pod spód, patrz JSX), więc jego pionowy środek to już tylko
   // `tile.padding-top + tilePortrait.height/2`, bez zgadywania wysokości linijek tekstu, co
   // wcześniej stało nad nim: 8 (padding spacing[2]) + 193/2 (tilePortrait, patrz wyżej) -
-  // 14 (połowa wysokości samej ikony pocisku, 28px) = 90.5 → 91.
-  projectile: { position: 'absolute', top: 91, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // 14 (połowa wysokości samej ikony pocisku, 28px) = 90.5 → 91. +14 (91→105, 2026-09-11) —
+  // `SPRITE_GROUND_SHIFT` przesuwa OBA sprite'y (transform, patrz `spriteBoxCat`/`Boss`) o tyle
+  // w dół, więc realny, POMALOWANY środek jest teraz niżej o tę samą wartość — bez tego pocisk
+  // leciałby nad, nie przez, przesunięte sprite'y.
+  projectile: { position: 'absolute', top: 91 + SPRITE_GROUND_SHIFT, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));
