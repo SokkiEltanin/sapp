@@ -9,7 +9,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, BackupMeta } from '@/services/backupService';
+import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, exportExpensesToCsv, BackupMeta } from '@/services/backupService';
 
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
@@ -34,7 +34,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [backups, setBackups] = useState<BackupMeta[]>([]);
-  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | null>('load');
+  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | 'csv' | null>('load');
   const [showAll, setShowAll] = useState(false);
   const protectedByGoogle = !!googleUser;
 
@@ -70,6 +70,21 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
     } catch (e: any) {
       haptic.error();
       toast.error('Nie udało się wyeksportować danych');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onExportCsv = async () => {
+    haptic.tap();
+    setBusy('csv');
+    try {
+      const { count } = await exportExpensesToCsv();
+      haptic.success();
+      toast.success(`Wyeksportowano ${count} wydatków (CSV) — wybierz, gdzie wysłać`);
+    } catch (e: any) {
+      haptic.error();
+      toast.error('Nie udało się wyeksportować wydatków');
     } finally {
       setBusy(null);
     }
@@ -150,6 +165,18 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
       </PressableScale>
       <Text style={s.exportHint}>
         Zawiera surowe dane + ustawienia (w tym dashboard) + sekcję „derived": jak apka je interpretuje (wypłaty, stawka zł/h, karty miesiąca, zdrowie) i ostrzeżenia spójności. Do wglądu/analizy.
+      </Text>
+
+      <PressableScale onPress={onExportCsv} disabled={busy != null}>
+        <View style={[s.exportBtn, busy != null && { opacity: 0.5 }]}>
+          {busy === 'csv'
+            ? <ActivityIndicator size="small" color={c.text.secondary} />
+            : <FileDown size={15} color={c.text.secondary} />}
+          <Text style={s.exportText}>{busy === 'csv' ? 'Eksportuję…' : 'Eksportuj wydatki (CSV)'}</Text>
+        </View>
+      </PressableScale>
+      <Text style={s.exportHint}>
+        Sama historia wydatków/przychodów — jedna transakcja na wiersz (data, kwota, kategoria, tagi, notatka…), do otwarcia w Excelu/Google Sheets.
       </Text>
 
       {busy === 'load' ? (

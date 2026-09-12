@@ -18,6 +18,7 @@ import { buildDerivedAnalysis } from '@/utils/exportAnalysis';
 import { loadNameAliases } from '@/utils/productMemory';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { flushThrottledStorage } from '@/utils/throttledStorage';
+import { expensesToCsv } from '@/utils/expensesCsv';
 
 // ─── Cloud backup ─────────────────────────────────────────────────────────────
 // A backup is ONE snapshot of everything the app owns: all local config/data in
@@ -158,6 +159,22 @@ export async function exportSnapshotToFile(appBuild?: number): Promise<{ uri: st
     });
   }
   return { uri, bytes: json.length };
+}
+
+// Eksport SAMYCH wydatków do CSV (2026-09-12, user: "eksport wydatkow spoko możemy dodac
+// w ustawieniach") — osobny od `exportSnapshotToFile` powyżej: ten jest pełnym, technicznym
+// JSON-em (backup/analiza), ten tutaj to czytelna, jednowierszowa-na-transakcję tabela do
+// otwarcia w Excelu/Sheets (np. na podatki albo żeby przejrzeć historię poza apką).
+export async function exportExpensesToCsv(): Promise<{ uri: string; count: number }> {
+  const expenses = await expensesService.getAll();
+  const csv = expensesToCsv(expenses);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const uri = `${FileSystem.cacheDirectory}sapp-wydatki-${stamp}.csv`;
+  await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Eksport wydatków (CSV)', UTI: 'public.comma-separated-values-text' });
+  }
+  return { uri, count: expenses.length };
 }
 
 export async function createBackup(auto: boolean, appBuild?: number): Promise<BackupMeta> {
