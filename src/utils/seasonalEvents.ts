@@ -200,7 +200,16 @@ export function eventBossFromKey(eventKey: string): EventBoss | undefined {
 // powód co przy raidHpFor/raidSessionHpFor w raid.ts. HP podbite +50% (user: "sezonowe... mają
 // dużo HP") — wciąż bezpiecznie w skali pojedynczego starcia (patrz uwaga wyżej), tylko wyższa
 // stała bazowa/mnożnik.
-export const eventHpFor = (level: number) => 300 + Math.max(0, level) * 9;
+// PODBITE ×1.6 (2026-09-12, user przy okazji przebudowy sufitu czerwonej energii na
+// per-poziom pupila, patrz eventDailyAttempts w bosses.ts: "bosy te czerwone energii muszą
+// być o wiele trudniejsze względem realnych danych") — w odróżnieniu od raidHpFor (raid.ts),
+// TA hp idzie WPROST do counterDamage() (walka round-based do 0 HP, jak kampania), więc
+// podbicie tej stałej podbija RÓWNOCZEŚNIE liczbę potrzebnych ciosów I obrażenia z każdego
+// kontrataku (ten sam kwadratowy mechanizm co przy BOSSES, patrz komentarz tam) — ×1.6 hp to
+// realnie bliżej ~×2.5 całkowitego ryzyka walki, czyli faktycznie "o wiele trudniejsze", nie
+// kosmetyczna zmiana. Test niżej (`eventHpFor / eventAsBoss`) ma podniesiony górny próg
+// hitsNeeded zgodnie z tą przebudową.
+export const eventHpFor = (level: number) => 480 + Math.max(0, level) * 14;
 export const eventCoins = (level: number) => 40 + Math.max(0, level) * 4;
 export const eventXp   = (level: number) => 250 + Math.max(0, level) * 25;
 

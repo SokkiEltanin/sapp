@@ -3,6 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sufit czerwonej energii per poziom pupila + podbita trudność raidu/eventu + niższe sprite'y (2026-09-12)
+
+User odpowiedział na 3 otwarte pytania z poprzedniej rundy (§82/§83). Pełny opis w
+ARCHITECTURE.md §84. Skrót:
+- `eventDailyAttempts` (sufit "czerwonej" puli event/raid) przebudowany z `energyMult` (z
+  łupu/gear) na `level` pupila: Lv1-2→1, Lv3-5→2, Lv6-14→3, Lv15+→4 — reużywa istniejących
+  kamieni milowych gry. Naprawia mylącą pigułkę "15/2" (sufit z inwestycji nie miał związku
+  z realnym, trwałym bankiem).
+- `raidHpFor` ×1.5, `eventHpFor` ×1.6 — bo Lv15+ dostaje teraz twardy sufit 4 prób/dzień,
+  user zażądał "o wiele trudniejsze względem realnych danych". Raid: tylko dłuższy grind
+  (counterHp osobno skalowany, bez zmiany ryzyka/rundę). Event: realnie ~×2.5 ryzyka walki
+  (hp idzie wprost do counterDamage, mechanizm kwadratowy).
+- `SPRITE_GROUND_SHIFT` w boss-fight.tsx: 14→21 (+7px w dół), pasek HP/tło nietknięte.
+
+**Świadomie odłożone, jak poprzednio**: pełne skalowanie HP raidu/eventu od REALNEJ mocy
+gracza (`defeatedBosses.length`/bonuses), nie tylko `level` — głębsza zmiana, nie to o co
+user prosił teraz (prosił o bump trudności, nie redesign formuły). `weeklyReports.ts` — user
+odpowiedział "raczej nie wiem", zostaje nietknięty, NIE dotykać bez nowej prośby.
+
+`tsc`/`jest` zielone (72 suit/942 testy). **NIE zweryfikowane wizualnie na urządzeniu** —
+patrz checklist w ARCHITECTURE.md §84.
+
 ## 🆕 Samodzielny przegląd kondycji apki — downscale 15 assetów (−25.8MB) — (2026-09-12)
 
 User: *"ogarniaj dalej szukaj optymalizuj i zapisuj co mamy"*. Pełny opis w

@@ -30,22 +30,32 @@ describe('bosses — atkPower / dailyAttempts (v5 pivot: staty zamiast danych zd
   });
 });
 
-// 2026-08-17: user — "jak mam energię na bossy to energia na bossy, a mam drugą inną
-// energię łącznie na bossy eventowe" — event miał FLAT 1/dzień niezależnie od energyMult
-// (leftover inwestycja bezużyteczna akurat tam, gdzie licznik dni do końca eventu najbardziej
-// by się przydał). eventDailyAttempts skaluje WYRAŹNIE słabiej niż kampania i ma twardy cap.
-describe('bosses — eventDailyAttempts (druga, słabiej skalująca pula na bossy eventowe)', () => {
-  test('bez energyMult: baza 1, tak jak dawny flat model', () => {
+// PRZEBUDOWANE (2026-09-12, user o czerwonej energii bankującej się bez sufitu: "zauważ ile
+// mam czerwonej energii bez sensu tyle, 15/2 xd... tutaj zróbmy per level pupila po prostu
+// zaczynając od 1/1, kończąc na maksymalnie 4 stakach") — sufit rośnie teraz z POZIOMEM
+// pupila (progresja), nie z energyMult z łupu/gear (inwestycja) — patrz obszerny komentarz
+// przy `eventDailyAttempts` w bosses.ts. Progi reużywają już istniejących kamieni milowych
+// gry (Lv3/Lv6/Lv15), zamiast wymyślać nowe.
+describe('bosses — eventDailyAttempts (sufit czerwonej energii per poziom pupila)', () => {
+  test('Lv1-2: baza 1/1', () => {
+    expect(eventDailyAttempts(1)).toBe(1);
+    expect(eventDailyAttempts(2)).toBe(1);
+  });
+  test('Lv3-5: 2 (granica baby/kid)', () => {
+    expect(eventDailyAttempts(3)).toBe(2);
+    expect(eventDailyAttempts(5)).toBe(2);
+  });
+  test('Lv6-14: 3 (granica kid/teen)', () => {
+    expect(eventDailyAttempts(6)).toBe(3);
+    expect(eventDailyAttempts(14)).toBe(3);
+  });
+  test('Lv15+: 4, twardy sufit EVENT_MAX_DAILY_ATTEMPTS (odblokowanie MAD)', () => {
+    expect(eventDailyAttempts(15)).toBe(4);
+    expect(eventDailyAttempts(999)).toBe(EVENT_MAX_DAILY_ATTEMPTS);
+  });
+  test('nigdy poniżej bazy nawet przy ujemnym/zerowym poziomie', () => {
     expect(eventDailyAttempts(0)).toBe(1);
-    expect(eventDailyAttempts(-5)).toBe(1); // nigdy poniżej bazy
-  });
-  test('rośnie z energyMult, ale wolniej niż dailyAttempts (kampania) na tym samym wejściu', () => {
-    expect(eventDailyAttempts(0.5)).toBeGreaterThan(1);
-    expect(eventDailyAttempts(0.5)).toBeLessThan(dailyAttempts(0.5));
-  });
-  test('twardy cap — nigdy nie dogania kampanii nawet przy skrajnej inwestycji', () => {
-    expect(eventDailyAttempts(10)).toBe(EVENT_MAX_DAILY_ATTEMPTS);
-    expect(eventDailyAttempts(0.75)).toBeLessThanOrEqual(EVENT_MAX_DAILY_ATTEMPTS);
+    expect(eventDailyAttempts(-5)).toBe(1);
   });
 });
 

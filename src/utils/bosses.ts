@@ -454,16 +454,24 @@ export function energySpendTick(energy: number, regenAt: string | null, max: num
 // event ma FLAT 1 próbę/dzień niezależnie od tego, ile energyMult gracz uzbierał, a event ma
 // twardy termin (patrz eventEndsAt/eventDaysLeft w seasonalEvents.ts) — leftover inwestycja
 // w energyMult była bezużyteczna tam, gdzie najbardziej mogłaby pomóc zdążyć przed terminem.
-// `eventDailyAttempts` skaluje SŁABIEJ niż kampania (dailyAttempts wyżej) i ma twardy cap —
-// event ma zostać wyraźnie rzadszy niż kampania nawet przy maksymalnej inwestycji (przy
-// obecnym maksymalnym sumarycznym energyMult z całego łupu kampanii, ~0.75, kampania daje
-// round(3×1.75)=5 prób, event capuje na 3) — inwestycja się liczy, ale event nie trywializuje
-// się tak jak kampania.
-export const EVENT_BASE_DAILY_ATTEMPTS = 1;
-export const EVENT_MAX_DAILY_ATTEMPTS = 3;
-export function eventDailyAttempts(energyMult: number): number {
-  const bonus = Math.round(Math.max(0, energyMult) * 2);
-  return Math.min(EVENT_MAX_DAILY_ATTEMPTS, EVENT_BASE_DAILY_ATTEMPTS + bonus);
+// PRZEBUDOWANE na poziom pupila zamiast energyMult z łupu (2026-09-12, user o czerwonej
+// energii bankującej się bez sufitu: "zauważ ile mam czerwonej energii bez sensu tyle,
+// 15/2 xd... tutaj zróbmy per level pupila po prostu zaczynając od 1/1, kończąc na
+// maksymalnie 4 stakach") — `syncEventEnergy` w petStore.ts dolicza dzienną deltę do TRWAŁEJ
+// puli bez przycinania jej do maxa (w odróżnieniu od energii kampanii, którą `energyRegenTick`
+// twardo capuje) — bank rósł tygodniami nieużywany, a wyświetlany "sufit" (z inwestycji w
+// gear) nie miał z realnym bankiem żadnego związku, stąd myląca pigułka "15/2". Sufit rośnie
+// teraz z POZIOMEM (progresja, nie inwestycja) — progi dobrane wg już istniejących kamieni
+// milowych w grze, żeby nie wymyślać nowych: granica baby/kid (Lv3, `growthStage` w
+// petStore.ts), granica kid/teen (Lv6) i odblokowanie MAD bossów (Lv15). `energyMult` z
+// łupu/gear NIE wpływa już na tę pulę (dalej wpływa na `dailyAttempts` kampanii) —
+// świadome uproszczenie na życzenie usera, nie przeoczenie.
+export const EVENT_MAX_DAILY_ATTEMPTS = 4;
+export function eventDailyAttempts(level: number): number {
+  if (level >= 15) return 4;
+  if (level >= 6) return 3;
+  if (level >= 3) return 2;
+  return 1;
 }
 
 // ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
