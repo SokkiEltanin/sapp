@@ -109,7 +109,7 @@ import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
-import { fixedVariableMonths, fixedBreakdown, fixedDeviations, topVariableContributors, workBudgetProgress } from '@/utils/fixedVariable';
+import { fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, FvBucket } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
@@ -496,10 +496,6 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
-  const fvFixedItems = useMemo(() => {
-    const cur = fvMonths[fvMonths.length - 1];
-    return cur ? fixedBreakdown(expenses, cur.month) : [];
-  }, [expenses, fvMonths]);
   // 2026-09-10, user: "rozbudowany widget który pokazywał dane miesięcy porównania wydatków
   // stałych (odchylen), jedzenia, i zmiennych pokazujacych np co przeważyło (z odniesieniem)".
   const fvDeviations = useMemo(() => {
@@ -965,6 +961,21 @@ export default function DashboardScreen() {
     haptic.medium();
     try { await expensesService.update(item.expenseId, updates); }
     catch { haptic.error(); toast.error('Nie usunięto — sprawdź połączenie'); }
+  }, [setExpenses]);
+
+  // Ręczne przeklasyfikowanie transakcji w widgecie "Na co idą pieniądze" (2026-09-12, user:
+  // "zebym mógł kliknąć ze np cos sie zle liczy... zeby sie uczyło") — z widoku rozbicia
+  // kubła (FvBreakdownModal). Ten sam wzorzec co `removeTagItem` wyżej: czyta/zapisuje LIVE
+  // store (nie zamrożony snapshot `expenses`), snapshot dogania się sam przez efekt
+  // nasłuchujący `liveExpenses` (patrz komentarz przy `refreshStatsSnapshot`).
+  const reclassifyFvExpense = useCallback(async (expenseId: string, bucket: FvBucket | null) => {
+    const live = useExpensesStore.getState().expenses;
+    if (!live.some(x => x.id === expenseId)) return;
+    const updates: Partial<Expense> = { fvOverride: bucket };
+    setExpenses(live.map(x => x.id === expenseId ? { ...x, fvOverride: bucket } : x));
+    haptic.medium();
+    try { await expensesService.update(expenseId, updates); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   }, [setExpenses]);
 
   // Render a user-added custom tile (a pinned note, or a quick link).
@@ -3159,7 +3170,7 @@ export default function DashboardScreen() {
 
             nodes['fixed-variable'] = fvMonths.length > 0
               && (fvMonths[fvMonths.length - 1].fixed + fvMonths[fvMonths.length - 1].variable + fvMonths[fvMonths.length - 1].food) > 0
-              && <FixedVariableSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} fvMonths={fvMonths} fvFixedItems={fvFixedItems} fvDeviations={fvDeviations} fvTopVariable={fvTopVariable} />;
+              && <FixedVariableSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} expenses={expenses} fvMonths={fvMonths} fvDeviations={fvDeviations} fvTopVariable={fvTopVariable} onReclassify={reclassifyFvExpense} />;
 
             nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) &&
               <SpendByDaySection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekdayAvg={weekdayAvg} />;
@@ -4639,22 +4650,26 @@ const buildStyles = (c: any) => StyleSheet.create({
   fvRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   fvDot: { width: 9, height: 9, borderRadius: 5 },
   fvRowLbl: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
-  fvRowPct: { fontSize: 12, fontWeight: '700', color: c.text.muted, width: 40, textAlign: 'right' },
-  fvRowAmt: { fontSize: 14, fontWeight: '800', letterSpacing: -0.3, width: 92, textAlign: 'right' },
+  // Wiersz "śr. X zł · +N% vs śr." POD głównym wierszem hero (2026-09-12, user: "muszą byc
+  // stale zmienne w tym miesiacu pokazane wzgledem średniej to na głównym tle") — osobna
+  // linia zamiast upychania w JEDNYM wierszu z kwotą/chevronem, żeby nie ucinało na wąskich
+  // ekranach (dot+etykieta+kwota+chevron już zajmują większość szerokości karty).
+  fvRowSub: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginLeft: 9 + spacing[2], marginTop: 2 },
+  fvRowPct: { fontSize: 10.5, fontWeight: '600', color: c.text.muted },
+  fvRowAmt: { fontSize: 14, fontWeight: '800', letterSpacing: -0.3 },
   fvBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.fill.subtle },
-  fvFixBox: { gap: 5, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
-  fvFixHead: { fontSize: 9.5, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6 },
-  fvFixRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] },
-  fvFixLbl: { flex: 1, fontSize: 12.5, color: c.text.secondary },
-  fvFixAmt: { fontSize: 12.5, fontWeight: '700', color: c.text.primary },
-  fvFixMore: { fontSize: 11, color: c.text.muted, fontStyle: 'italic' },
   fvLegend: { flexDirection: 'row', justifyContent: 'center', gap: spacing[3] },
   fvLegItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   fvDotSm: { width: 7, height: 7, borderRadius: 4 },
   fvLegTxt: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
-  fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  // Trzy osobne, klikalne mini-wykresy trendu Stałe/Zmienne/Jedzenie (2026-09-12, user:
+  // "pod nim muszą byc wykresy stałych, zmiennych, jedzenie każdy osobno klikalny") —
+  // ZASTĘPUJĄ dawny jeden wspólny stackowany `fvTrend` (usunięty, nieklikalny, mieszał 3
+  // kolory w jednym słupku — trudno było ocenić trend POJEDYNCZEJ kategorii).
+  fvBucketChartsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  fvBucketChart: { flex: 1, gap: 5 },
+  fvBucketChartHead: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
-  fvAvg: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[2], textAlign: 'center' },
   fvDevBox: { gap: 5, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   fvDevRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   fvDevLbl: { flex: 1, fontSize: 12, color: c.text.secondary },

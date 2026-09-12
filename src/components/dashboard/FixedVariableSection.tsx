@@ -1,26 +1,56 @@
-import { memo } from 'react';
-import { View, Text } from 'react-native';
-import { Wallet, TrendingUp, TrendingDown } from 'lucide-react-native';
-import { FixedDeviation, VariableContributor } from '@/utils/fixedVariable';
+import { memo, useMemo, useState } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { Wallet, TrendingUp, TrendingDown, ChevronRight } from 'lucide-react-native';
+import { Expense } from '@/types';
+import { FixedDeviation, VariableContributor, FvBucket, bucketTransactions } from '@/utils/fixedVariable';
+import FvBreakdownModal from './FvBreakdownModal';
 
+const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+const monthLabel = (key: string) => {
+  const [y, m] = key.split('-').map(Number);
+  return `${MON[m - 1]} ${y}`;
+};
+
+// 2026-09-12, user o dotychczasowej wersji: "koncept jest spoko ale wykonanie [słabe]...
+// muszą byc stałe zmienne w tym miesiacu pokazane wzgledem średniej to na głównym tle, pod
+// nim muszą byc wykresy stałych, zmiennych, jedzenie każdy osobno klikalny z pokazaniem co
+// sie kiedy tam wlicza zebym mógł kliknąć ze np cos sie zle liczy... zeby sie uczyło".
+// Przebudowa: (1) każdy wiersz "hero" (Stałe/Zmienne/Jedzenie) pokazuje deltę WPROST przy
+// kwocie (nie dopiero w stopce jak wcześniej), (2) każdy wiersz + każdy mini-wykres trendu
+// jest klikalny → otwiera `FvBreakdownModal` z surową listą transakcji tego miesiąca w danym
+// kuble, (3) w modalu każdą transakcję można przeklasyfikować (`fvOverride`, patrz
+// fixedVariable.ts `bucketOf`) — to jest "uczenie się": raz poprawiona transakcja liczy się
+// tam gdzie user chce, NA STAŁE, niezależnie od heurystyki kategorii/tagów.
 function FixedVariableSection(
-  { s, cardBg, accentColor, colors, fvMonths, fvFixedItems, fvDeviations, fvTopVariable }:
-  { s: any; cardBg: string; accentColor: string; colors: any;
+  { s, cardBg, accentColor, colors, expenses, fvMonths, fvDeviations, fvTopVariable, onReclassify }:
+  { s: any; cardBg: string; accentColor: string; colors: any; expenses: Expense[];
     fvMonths: { month: string; fixed: number; variable: number; food: number }[];
-    fvFixedItems: { label: string; amount: number }[];
-    fvDeviations: FixedDeviation[]; fvTopVariable: VariableContributor[] },
+    fvDeviations: FixedDeviation[]; fvTopVariable: VariableContributor[];
+    onReclassify: (id: string, bucket: FvBucket | null) => void },
 ) {
+  const [openBucket, setOpenBucket] = useState<FvBucket | null>(null);
+
   const cur = fvMonths[fvMonths.length - 1];
-  if (!cur) return null;
-  const totalCur = cur.fixed + cur.variable + cur.food;
-  if (totalCur === 0) return null;
-  const prev = fvMonths.slice(0, -1).filter(m => m.fixed + m.variable + m.food > 0);
-  const avg = (sel: (m: typeof cur) => number) => prev.length ? Math.round(prev.reduce((a, m) => a + sel(m), 0) / prev.length) : sel(cur);
-  const maxMonth = Math.max(...fvMonths.map(m => m.fixed + m.variable + m.food), 1);
-  const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
-  const fixedC = '#8893A8', varC = accentColor, foodC = '#4CA96B';
-  const H = 46;
+  const total = cur ? cur.fixed + cur.variable + cur.food : 0;
+  const prev = useMemo(() => fvMonths.slice(0, -1).filter(m => m.fixed + m.variable + m.food > 0), [fvMonths]);
+  const avg = (sel: (m: NonNullable<typeof cur>) => number) =>
+    prev.length && cur ? Math.round(prev.reduce((a, m) => a + sel(m), 0) / prev.length) : (cur ? sel(cur) : 0);
   const fmt = (n: number) => n.toLocaleString('pl-PL');
+
+  const openTransactions = useMemo(
+    () => (openBucket && cur ? bucketTransactions(expenses, cur.month, openBucket) : []),
+    [openBucket, expenses, cur],
+  );
+
+  if (!cur || total === 0) return null;
+  const fixedC = '#8893A8', varC = accentColor, foodC = '#4CA96B';
+  const BUCKETS: { key: FvBucket; label: string; val: number; col: string }[] = [
+    { key: 'fixed', label: 'Stałe', val: cur.fixed, col: fixedC },
+    { key: 'variable', label: 'Zmienne', val: cur.variable, col: varC },
+    { key: 'food', label: 'Jedzenie', val: cur.food, col: foodC },
+  ];
+  const H = 40;
+
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.cardHeader}>
@@ -28,33 +58,42 @@ function FixedVariableSection(
         <Text style={s.cardTitle} numberOfLines={1}>Na co idą pieniądze</Text>
         <Text style={s.fvHint}>ten miesiąc</Text>
       </View>
-      <View style={{ gap: 7 }}>
-        {([['Stałe', cur.fixed, fixedC], ['Zmienne', cur.variable, varC], ['Jedzenie', cur.food, foodC]] as const).map(([lbl, val, col]) => (
-          <View key={lbl} style={s.fvRow}>
-            <View style={[s.fvDot, { backgroundColor: col }]} />
-            <Text style={s.fvRowLbl}>{lbl}</Text>
-            <Text style={s.fvRowPct}>{Math.round((val / totalCur) * 100)}%</Text>
-            <Text style={[s.fvRowAmt, { color: col }]}>{fmt(val)} zł</Text>
-          </View>
-        ))}
+      <View style={{ gap: 9 }}>
+        {BUCKETS.map(({ key, label, val, col }) => {
+          const avgVal = avg(m => m[key]);
+          const deltaPct = prev.length && avgVal > 0 ? (val - avgVal) / avgVal : null;
+          const up = deltaPct !== null && deltaPct > 0.03;
+          const down = deltaPct !== null && deltaPct < -0.03;
+          const DeltaIcon = up ? TrendingUp : down ? TrendingDown : null;
+          const deltaCol = up ? '#F59E0B' : down ? '#4CA96B' : colors.text.muted;
+          return (
+            <Pressable key={key} onPress={() => setOpenBucket(key)} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+              <View style={s.fvRow}>
+                <View style={[s.fvDot, { backgroundColor: col }]} />
+                <Text style={s.fvRowLbl}>{label}</Text>
+                <Text style={[s.fvRowAmt, { color: col }]}>{fmt(val)} zł</Text>
+                <ChevronRight size={14} color={colors.text.muted} />
+              </View>
+              {prev.length > 0 && (
+                <View style={s.fvRowSub}>
+                  <Text style={s.fvRowPct}>śr. {fmt(avgVal)} zł</Text>
+                  {deltaPct !== null && DeltaIcon && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                      <DeltaIcon size={10} color={deltaCol} />
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: deltaCol }}>{up ? '+' : ''}{Math.round(deltaPct * 100)}% vs śr.</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
       <View style={s.fvBar}>
         <View style={{ flex: Math.max(cur.fixed, 0.001), backgroundColor: fixedC }} />
         <View style={{ flex: Math.max(cur.variable, 0.001), backgroundColor: varC }} />
         <View style={{ flex: Math.max(cur.food, 0.001), backgroundColor: foodC }} />
       </View>
-      {fvFixedItems.length > 0 && (
-        <View style={s.fvFixBox}>
-          <Text style={s.fvFixHead}>STAŁE — SKŁADNIKI</Text>
-          {fvFixedItems.slice(0, 4).map(it => (
-            <View key={it.label} style={s.fvFixRow}>
-              <Text style={s.fvFixLbl} numberOfLines={1}>{it.label}</Text>
-              <Text style={s.fvFixAmt}>{fmt(it.amount)} zł</Text>
-            </View>
-          ))}
-          {fvFixedItems.length > 4 && <Text style={s.fvFixMore}>+{fvFixedItems.length - 4} więcej</Text>}
-        </View>
-      )}
       {fvDeviations.length > 0 && (
         <View style={s.fvDevBox}>
           {fvDeviations.slice(0, 3).map(d => {
@@ -80,27 +119,45 @@ function FixedVariableSection(
         </Text>
       )}
       {prev.length > 0 && (
-        <>
-          <View style={s.fvLegend}>
-            {([['Stałe', fixedC], ['Zmienne', varC], ['Jedzenie', foodC]] as const).map(([lbl, col]) => (
-              <View key={lbl} style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: col }]} /><Text style={s.fvLegTxt}>{lbl}</Text></View>
-            ))}
-          </View>
-          <View style={s.fvTrend}>
-            {fvMonths.map((m, i) => (
-              <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 20, height: H, justifyContent: 'flex-end', borderRadius: 4, overflow: 'hidden', backgroundColor: colors.fill.subtle }}>
-                  <View style={{ height: (m.food / maxMonth) * H, backgroundColor: foodC }} />
-                  <View style={{ height: (m.variable / maxMonth) * H, backgroundColor: varC }} />
-                  <View style={{ height: (m.fixed / maxMonth) * H, backgroundColor: fixedC }} />
+        <View style={s.fvBucketChartsRow}>
+          {BUCKETS.map(({ key, label, col }) => {
+            const vals = fvMonths.map(m => m[key]);
+            const localMax = Math.max(...vals, 1);
+            return (
+              <Pressable key={key} onPress={() => setOpenBucket(key)} style={({ pressed }) => [s.fvBucketChart, pressed && { opacity: 0.6 }]}>
+                <View style={s.fvBucketChartHead}>
+                  <View style={[s.fvDotSm, { backgroundColor: col }]} />
+                  <Text style={s.fvLegTxt}>{label}</Text>
                 </View>
-                <Text style={[s.fvMonthLbl, i === fvMonths.length - 1 && { color: accentColor, fontWeight: '800' }]}>{MON[parseInt(m.month.slice(5, 7), 10) - 1]}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={s.fvAvg}>śr. {prev.length} mies.: stałe {fmt(avg(m => m.fixed))} · zmienne {fmt(avg(m => m.variable))} · jedzenie {fmt(avg(m => m.food))} zł</Text>
-        </>
+                <View style={{ flexDirection: 'row', gap: 3, alignItems: 'flex-end' }}>
+                  {fvMonths.map((m, i) => (
+                    <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                      <View style={{ width: '100%', height: H, justifyContent: 'flex-end' }}>
+                        <View style={{
+                          height: Math.max((vals[i] / localMax) * H, 2), borderRadius: 3, backgroundColor: col,
+                          opacity: i === fvMonths.length - 1 ? 1 : 0.45,
+                        }} />
+                      </View>
+                      <Text style={[s.fvMonthLbl, i === fvMonths.length - 1 && { color: accentColor, fontWeight: '800' }]}>
+                        {MON[parseInt(m.month.slice(5, 7), 10) - 1]}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
       )}
+      <FvBreakdownModal
+        visible={!!openBucket}
+        bucket={openBucket}
+        color={openBucket ? (BUCKETS.find(b => b.key === openBucket)?.col ?? accentColor) : accentColor}
+        monthLabel={monthLabel(cur.month)}
+        transactions={openTransactions}
+        onReclassify={onReclassify}
+        onClose={() => setOpenBucket(null)}
+      />
     </View>
   );
 }

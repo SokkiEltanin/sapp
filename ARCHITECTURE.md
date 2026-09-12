@@ -5854,6 +5854,97 @@ przy okazji sprawdź też jedną skrzynkę z Rynku (np. drewnianą) — jej `clo
 powinna teraz pokazywać obrazek skrzynki (wcześniej była tam emoji nawet dla skrzynek z
 grafiką na Rynku).
 
+## 77. Finanse: wyszukiwarka własnego tagu w filtrach + przebudowa widgetu "Na co idą pieniądze" (fvOverride)
+
+User: *"1. W finansach na stronie głównej w filtrach możliwość wpisania tagu własnego (taka
+wyszukiwarka jakby) 2. Ten widget na dashboardzie NA CO IDA PIENIADZE, musimy rozbudowac
+/edytowac, bo teraz jest spoko koncept ale wykonanie [słabe]... muszą byc stale zmienne w tym
+miesiacu pokazane wzgledem średniej to na głównym tle, pod nim muszą byc wykresy stałych,
+zmiennych, jedzenie każdy osobno klikalny z pokazaniem co sie kiedy tam wlicza zebym mógł
+kliknąć ze np cos sie zle liczy itp itd zeby sie uczyło"*.
+
+### 1. Filtr po tagu — wyszukiwarka (`app/(tabs)/finances.tsx`)
+
+Dotąd filtr "Tag" w modalu Filtry pokazywał TYLKO `availableTags` — top 12 tagów wg
+częstości w całej historii. Tag spoza top 12 (rzadszy, dopiero co dodany) był
+niefiltrowalny bez ręcznego przewijania. Dodane pole tekstowe (`Search` ikona + `X` do
+czyszczenia) NAD chipami, dzielące ten sam stan `activeTagFilter` — wpisanie dokładnej
+nazwy podświetla odpowiadający chip, kliknięcie chipa wypełnia pole. Dopasowanie w
+`matches()` zmienione z `===` (ścisła równość) na `.toLowerCase().includes()`
+(case-insensitive substring) — obsługuje zarówno kliknięcie chipa (nadal działa, bo
+`tag.includes(tag)` jest zawsze `true`), jak i częściową frazę wpisaną ręcznie.
+
+### 2. "Na co idą pieniądze" — przebudowa (`FixedVariableSection.tsx`, `FvBreakdownModal.tsx` NOWY, `fixedVariable.ts`)
+
+**Nowa centralna funkcja `bucketOf(e): 'fixed'|'variable'|'food'`** w `fixedVariable.ts` —
+zastępuje powtarzany wszędzie `isFixedExpense(e) ? ... : e.category==='groceries' ? ...`.
+Sprawdza `e.fvOverride` PRZED heurystyką kategorii/tagów. Użyta teraz we WSZYSTKICH
+funkcjach: `fixedVariableMonths`, `fixedBreakdown`, `topVariableContributors`, oraz nowej
+`bucketTransactions(expenses, month, bucket): FvTransaction[]` — surowa (NIE grupowana),
+chronologiczna lista pojedynczych transakcji danego kubła w danym miesiącu, z flagą
+`overridden`.
+
+**Nowe pole `Expense.fvOverride?: 'fixed'|'variable'|'food'|null`** (`src/types/index.ts`) —
+ręczne, TRWAŁE przeklasyfikowanie JEDNEJ transakcji. `null` = jawnie wyczyszczone (wróć do
+automatu). Ten sam wzorzec co istniejące `vehicleId` (ręczny link nadpisujący auto-match).
+
+**UI — `FixedVariableSection.tsx` (przebudowany)**:
+- Wiersze hero (Stałe/Zmienne/Jedzenie) teraz DWULINIOWE i KLIKALNE: górna linia
+  dot+etykieta+kwota+chevron, DOLNA pokazuje `śr. X zł` + deltę (`↑/↓ N% vs śr.`, kolor
+  pomarańczowy/zielony, próg ±3% żeby nie migotało przy szumie) — user: "muszą byc...
+  pokazane wzgledem średniej to na głównym tle" — dotąd średnia była tylko w jednej,
+  wspólnej stopce na samym dole karty, ŁATWO przeoczana.
+- **Trzy OSOBNE, klikalne mini-wykresy trendu** (`fvBucketChartsRow`) — Stałe/Zmienne/
+  Jedzenie, każdy WŁASNYM kolorem i WŁASNĄ skalą (lokalny max, nie globalny) —
+  ZASTĘPUJĄ dawny jeden wspólny stackowany `fvTrend` (3 kolory w jednym słupku, trudno
+  ocenić trend pojedynczej kategorii, i NIEKLIKALNY).
+- Kliknięcie DOWOLNEGO wiersza hero LUB dowolnego mini-wykresu otwiera
+  `FvBreakdownModal` dla tego kubła.
+- Usunięte: `fvFixBox` ("Stałe — składniki", top-4 nazwanych rachunków) — zastąpione
+  pełnym, klikalnym rozbiciem w modalu; stary wspólny `fvTrend`+`fvAvg` (stopka
+  "śr. N mies...") — zastąpione deltą wprost w wierszu hero. Zostają bez zmian:
+  `fvBar` (proporcja), `fvDevBox` (odchylenia POJEDYNCZYCH rachunków, §70), `fvTip`
+  ("co przeważyło" w zmiennych, §70) — dalej różne, komplementarne widoki.
+
+**Nowy `FvBreakdownModal.tsx`** — rozbicie jednego kubła: nagłówek (kolor+nazwa+miesiąc),
+suma+liczba transakcji, przewijalna lista (data, nazwa, kwota, ✏️ jeśli `overridden`).
+Tap na transakcję rozwija chipy pozostałych DWÓCH kubłów (+ "Auto" gdy już
+`overridden`) — wybór woła `onReclassify(id, bucket|null)`.
+
+**"Uczenie się" = `fvOverride`, nie ML** — user: "zebym mógł kliknąć ze np cos sie zle
+liczy... zeby sie uczyło". To NIE jest model uczący się wzorców — to DETERMINISTYCZNE,
+per-transakcyjne nadpisanie zapamiętane na stałe (jak ręczne tagowanie). Świadomie
+NIE zrobione: sugerowanie podobnych transakcji do przeklasyfikowania na bazie jednej
+poprawki (prawdziwe "uczenie się" na wzorcach) — poza zakresem tej zmiany, do rozważenia
+jeśli user zgłosi że ręczne poprawianie KAŻDEJ podobnej transakcji z osobna jest zbyt
+żmudne.
+
+**`reclassifyFvExpense` w `index.tsx`** — TEN SAM wzorzec co istniejący `removeTagItem`
+(patrz §48/ARCHITECTURE §4 "Snapshot statystyk"): czyta/zapisuje LIVE store
+(`useExpensesStore.getState()`), NIE zamrożony snapshot `expenses` — snapshot dogania się
+sam (~300ms) przez istniejący efekt nasłuchujący `liveExpenses`. Zapis też do Firestore
+przez `expensesService.update(id, { fvOverride })` (ten sam call co przy `vehicleId` w
+`app/vehicles.tsx`) — `strip()` w `expensesService` filtruje TYLKO `undefined`, więc
+`fvOverride: null` (czyszczenie) DOCIERA do Firestore poprawnie.
+
+`tsc`/`jest` zielone (71 suit/940 testów, +6 nowych: `bucketOf` z override w obie strony,
+`fixedVariableMonths` respektujące override, `bucketTransactions` — chronologia +
+`overridden` flag). **Nie zweryfikowane wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**:
+1. Finanse → Filtry → wpisz w polu "Szukaj tagu" fragment tagu SPOZA widocznych chipów →
+   sprawdź że lista transakcji faktycznie filtruje się po substring, nie tylko po
+   dokładnym dopasowaniu.
+2. Dashboard → "Na co idą pieniądze" → sprawdź czytelność 2-liniowych wierszy hero na
+   wąskim telefonie (czy tekst się nie ucina/nie zawija brzydko) + czy trzy mini-wykresy
+   mieszczą się w rzędzie bez ściskania.
+3. Kliknij dowolny wiersz LUB mini-wykres → modal otwiera się z prawidłową listą
+   transakcji tego miesiąca (daty + kwoty + suma zgadzają się z kwotą w widgecie).
+4. W modalu przeklasyfikuj jedną transakcję (np. Stałe→Zmienne) → zamknij modal →
+   sprawdź że po ~1s (odśwież ręcznie jeśli trzeba) kwoty w widgecie i wykresach faktycznie
+   się przeliczyły, a ponowne otwarcie modala dla nowego kubła pokazuje tę transakcję z
+   ikoną ✏️ (overridden) i opcją "Auto" do cofnięcia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

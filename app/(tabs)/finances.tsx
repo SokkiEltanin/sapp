@@ -12,7 +12,7 @@ import { looksLikeFood } from '@/utils/calories';
 import { foodAmountOf } from '@/utils/food';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import { router, useFocusEffect } from 'expo-router';
-import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Wallet } from 'lucide-react-native';
+import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Wallet, Search } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -297,8 +297,15 @@ export default function FinancesScreen() {
       if (!isNaN(max) && e.amount > max) return false;
       if (activeBillFilter && billTagFor(e)?.tag !== activeBillFilter) return false;
       if (activeTagFilter) {
-        if ((e.tags ?? []).includes(activeTagFilter)) return true;
-        if (e.receiptItems?.some(it => (it.tags ?? []).includes(activeTagFilter))) return true;
+        // Dopasowanie CASE-INSENSITIVE substring (2026-09-12, user: "możliwość wpisania
+        // tagu własnego, taka wyszukiwarka jakby") — dotąd `activeTagFilter` szedł tylko z
+        // kliknięcia chipa (ZAWSZE dokładny string z `availableTags`, top 12 wg częstości),
+        // więc ścisła równość wystarczała. Teraz może pochodzić też z ręcznie wpisanego
+        // tekstu (patrz `fmTagSearch` niżej) — ścisła równość by nie łapała tagów spoza
+        // top 12 ani częściowych fraz, stąd `includes` zamiast `===`.
+        const q = activeTagFilter.trim().toLowerCase();
+        if ((e.tags ?? []).some(t => t.toLowerCase().includes(q))) return true;
+        if (e.receiptItems?.some(it => (it.tags ?? []).some(t => t.toLowerCase().includes(q)))) return true;
         return false;
       }
       return true;
@@ -680,23 +687,42 @@ export default function FinancesScreen() {
                 </>
               )}
 
-              {/* Tag */}
+              {/* Tag — chipy top-12 wg częstości (`availableTags`) + wyszukiwarka własnego
+                  tagu (2026-09-12, user: "możliwość wpisania tagu własnego, taka
+                  wyszukiwarka jakby" — dotąd filtr po tagu działał TYLKO przez chipy, więc
+                  tag spoza top-12 (rzadszy, albo dopiero co dodany) był niefiltrowalny bez
+                  scrollowania całej historii ręcznie). Pole i chipy dzielą ten sam stan
+                  (`activeTagFilter`) — wpisanie dokładnej nazwy tagu podświetla odpowiadający
+                  chip, kliknięcie chipa wypełnia pole. Dopasowanie substring/case-insensitive
+                  (patrz `matches()` wyżej), więc częściowa fraza też działa. */}
+              <Text style={st.fmLabel}>Tag</Text>
+              <View style={st.fmTagSearchRow}>
+                <Search size={14} color={colors.text.muted} />
+                <TextInput
+                  value={activeTagFilter ?? ''}
+                  onChangeText={(t) => setActiveTagFilter(t.length > 0 ? t : null)}
+                  placeholder="Szukaj tagu…" placeholderTextColor={colors.text.muted}
+                  style={st.fmTagSearchInput} autoCapitalize="none" autoCorrect={false}
+                />
+                {!!activeTagFilter && (
+                  <TouchableOpacity onPress={() => { haptic.tap(); setActiveTagFilter(null); }} hitSlop={8}>
+                    <X size={14} color={colors.text.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
               {availableTags.length > 0 && (
-                <>
-                  <Text style={st.fmLabel}>Tag</Text>
-                  <View style={st.fmRow}>
-                    <TouchableOpacity onPress={() => { haptic.tap(); setActiveTagFilter(null); }}
-                      style={[st.tagChip, !activeTagFilter && st.tagChipOn]} activeOpacity={0.8}>
-                      <Text style={[st.tagText, !activeTagFilter && st.tagTextOn]}>Wszystkie</Text>
+                <View style={st.fmRow}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); setActiveTagFilter(null); }}
+                    style={[st.tagChip, !activeTagFilter && st.tagChipOn]} activeOpacity={0.8}>
+                    <Text style={[st.tagText, !activeTagFilter && st.tagTextOn]}>Wszystkie</Text>
+                  </TouchableOpacity>
+                  {availableTags.map(tag => (
+                    <TouchableOpacity key={tag} onPress={() => { haptic.tap(); setActiveTagFilter(activeTagFilter === tag ? null : tag); }}
+                      style={[st.tagChip, activeTagFilter === tag && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, activeTagFilter === tag && st.tagTextOn]}>{tag}</Text>
                     </TouchableOpacity>
-                    {availableTags.map(tag => (
-                      <TouchableOpacity key={tag} onPress={() => { haptic.tap(); setActiveTagFilter(activeTagFilter === tag ? null : tag); }}
-                        style={[st.tagChip, activeTagFilter === tag && st.tagChipOn]} activeOpacity={0.8}>
-                        <Text style={[st.tagText, activeTagFilter === tag && st.tagTextOn]}>{tag}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
+                  ))}
+                </View>
               )}
               <View style={{ height: 12 }} />
             </ScrollView>
@@ -916,6 +942,12 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 15, color: c.text.primary,
   },
   fmDash: { fontSize: 15, color: c.text.muted },
+  fmTagSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.primary,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: 10, marginBottom: spacing[2],
+  },
+  fmTagSearchInput: { flex: 1, fontSize: 15, color: c.text.primary, padding: 0 },
   fmFooter: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
   fmClearBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
   fmClearText: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
