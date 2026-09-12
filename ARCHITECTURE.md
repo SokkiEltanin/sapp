@@ -6127,6 +6127,50 @@ przewiń do nowej karty "Statystyki apki" → sprawdź że liczby rosną po odwi
 zakładek i restarcie apki (persystencja); (3) sprawdź że apka NIE zwalnia zauważalnie przy
 nawigacji (throttled zapis nie powinien być odczuwalny).
 
+## 81. Usunięty martwy pipeline OCR paragonów (kamera + Google Vision) — potwierdzone jako dead code
+
+User doprecyzował poprzednie pytanie: *"Aktualnie mamy parser txt, OCR nie jest podłączone
+bo jest do dupy zle łapie tekst i produkty i będzie trzeba płacić i przechowywać zdjęcia
+poza tym crahuje często"*. Sprawdzone grepem PRZED usunięciem, żeby nie zgadywać przy
+destrukcyjnej operacji (patrz §80, gdzie odłożyłem to bez doprecyzowania):
+
+- `src/services/ocrService.ts` (`extractTextFromImage`, wołanie Google Cloud Vision API,
+  PŁATNE za request) miało **ZERO wywołań** gdziekolwiek w `app`/`src` — całkowicie
+  osierocone, dokładnie jak user opisał.
+- `app/expenses/scan.tsx` (jedyny AKTYWNY, używany flow dodawania paragonu) to WYŁĄCZNIE
+  "Wklej paragon" — `TextInput` na wklejony tekst (np. z aplikacji Lidl/Biedronka), parsowany
+  przez `receiptParser.ts`. Zero `expo-camera`/`ImagePicker`/przechwytywania zdjęcia
+  gdziekolwiek w tym pliku ani w całej apce.
+- `expo-camera` i `expo-image-picker` (biblioteki) miały ZERO importów w `app`/`src` —
+  martwe zależności, prawdopodobnie zostawione po porzuceniu tej samej funkcji.
+- `Expense.receiptImageUrl` (pole typu) nie było nigdzie ani ustawiane, ani czytane.
+- `android.permission.CAMERA` i `android.permission.READ_MEDIA_IMAGES` w `app.json` nie
+  miały już żadnego konsumenta — apka prosiła o dostęp do aparatu/galerii dla funkcji, która
+  nie miała nawet przycisku w UI.
+
+**Usunięte całkowicie** (nie przebudowane — user nie prosił o naprawę, tylko o
+usunięcie/decyzję, a wersja z płatnym, zawodnym OCR i tak nie była tym czego chce):
+`src/services/ocrService.ts`, `expo-camera`+`expo-image-picker` z `package.json` (+
+`npm install` zaktualizował `package-lock.json`, usunięte 3 pakiety), `receiptImageUrl` z
+`Expense`, oba permissiony z `app.json`.
+
+**⚠️ Permissiony w `app.json` wymagają NOWEGO BUILDU APK, nie OTA** (CLAUDE.md zasada #2)
+— usunięcie `CAMERA`/`READ_MEDIA_IMAGES` z manifestu nie zadziała przez zwykły update JS.
+Do czasu nowego builda apka na telefonie nadal ma te uprawnienia zadeklarowane (nieszkodliwe,
+po prostu nieużywane) — to nie jest pilne, ale warto uwzględnić przy najbliższym buildzie.
+
+Świadomie NIE ruszone: `receiptParser.ts` i cały flow wklejania tekstu w `scan.tsx` —
+DOKŁADNIE ta funkcja, o którą userowi chodziło jako "działająca", zero zmian.
+
+`tsc`/`jest` zielone (72 suit/940 testów — bez zmian w liczbie, żaden test nie odnosił się
+do usuniętego martwego kodu). **Nie zweryfikowane wizualnie na urządzeniu** (i tak nic
+widocznego się nie zmienia poza usuniętym promptem o dostęp do aparatu przy NASTĘPNYM
+buildzie APK).
+
+**Priorytet testu na urządzeniu**: po najbliższym nowym buildzie APK — sprawdź że apka NIE
+prosi już o dostęp do aparatu/galerii przy pierwszym uruchomieniu, i że wklejanie paragonu
+(`/expenses/scan`) dalej działa bez zmian (to jedyna ścieżka, która ma teraz znaczenie).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
