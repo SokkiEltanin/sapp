@@ -70,7 +70,6 @@ import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
-import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import SpendDelta from '@/components/dashboard/SpendDelta';
 import DualWaveChart from '@/components/dashboard/DualWaveChart';
@@ -98,7 +97,6 @@ import FunFactsSection from '@/components/dashboard/FunFactsSection';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
 import { buildRecords } from '@/utils/personalRecords';
 import { BOSSES } from '@/utils/bosses';
-import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
 import { usePetStore, levelFromXp, loginBonusCoins } from '@/store/petStore';
@@ -167,18 +165,15 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   bike:        Bike,
 };
 // Reszta appki: SINGLE app accent = MONOCHROME (user: „akcent czarno-biały, kolory tylko
-// dodatki"). Praca jest TU jawnym wyjątkiem od tej zasady (2026-08-28, user: "tamtej
-// zakladce chaos troche możesz więcej kolorów tam użyć" — WORK_ACCENT = plain
-// `colors.text.primary` czytało się jako zupełnie płaskie/monochromatyczne, zero
-// wizualnego rozróżnienia między "już przepracowane" a "zaplanowane" a "stawka/pieniądze",
-// mimo że karta ma sporo różnych typów danych). Trzy role kolorów w Pracy, WYŁĄCZNIE tam:
-// niebieski (WORK_ACCENT, tożsamość karty + "jeszcze przed nami"/upcoming), zielony
-// (WORK_WORKED, godziny już przepracowane/zarabiane — pasuje do istniejącej zielonej kropki
-// "NA ŻYWO"), złoty (WORK_MONEY, stawka/zarobek — ten sam kolor co reszta apki używa na
-// pieniądze, np. budżet dnia). Reszta dashboardu zostaje monochromatyczna.
-const WORK_ACCENT = '#38BDF8';
-const WORK_WORKED = '#34D399';
-const WORK_MONEY  = '#FBBF24';
+// dodatki"). Praca miała (2026-08-28) trzy-kolorowy wyjątek od tej zasady (niebieski =
+// tożsamość karty, zielony = przepracowane, złoty = pieniądze/stawka) —
+// COFNIĘTE (2026-09-12, user: "te kolory w zakladce praca... za duże zamieszanie
+// wprowadzają, dajmy jakiś soft pasujacy kolor np żółty ale stonowany nie [rażący] bo zolty
+// wybrałem w ustawieniach bo jdsport ma żółte barwy [z] moja praca [logo]"). Z powrotem
+// wzorzec "monochrom + JEDEN akcent" co reszta appki — WYŁĄCZNIE tu inny odcień (stonowane,
+// musztardowe złoto zamiast czystej bieli), bo user chce żeby Praca kojarzyła się z żółtymi
+// barwami jego pracodawcy. Wszystkie trzy dawne role kolorów dzielą teraz TĘ SAMĄ wartość.
+const WORK_ACCENT = '#D8B45C';
 const WEEKS_BACK  = 8;
 
 // `metricIcon`/`STAT_METRIC_ICON`/`STAT_GROUP_ICON` przeniesione do `<StatTile>`
@@ -268,7 +263,7 @@ function todayStr() {
 const DEFERRED_SECTIONS = new Set<string>([
   'month-summary', 'weekly-insights', 'maintenance-reminders', 'pinned-notes',
   'personal-records', 'trivia', 'reflections', 'time-capsule', 'year-ago',
-  'food-breakdown', 'shops-collection', 'gablota-card', 'sweets-vs-food', 'who-ate',
+  'food-breakdown', 'shops-collection', 'gablota-card', 'sweets-vs-food',
   'fixed-variable', 'spend-by-day', 'work-hours', 'top-products', 'fun-facts',
   'correlations', 'insights-web', 'mood-cal', 'mood-wave', 'month-tasks',
 ]);
@@ -1557,12 +1552,6 @@ export default function DashboardScreen() {
     const legendary = monthCards.some(c => c.tierRank >= 4);
     AsyncStorage.setItem('skin_progress', JSON.stringify({ cards: sealed, legendary })).catch(() => {});
   }, [monthCards]);
-
-  // "Kto zjadł słodycze" — this-month consumption split between people (eaters).
-  const personConsumption = useMemo(
-    () => buildPersonConsumption(expenses, payers, nameAliases),
-    [expenses, payers, nameAliases],
-  );
 
   // ── Companion blob: live mood from today's self-care data ──────────────────
   const petName = usePetStore(st => st.name);
@@ -3164,10 +3153,6 @@ export default function DashboardScreen() {
             nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 &&
               <SweetsVsFoodSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekOverview={weekOverview} />;
 
-            nodes['who-ate'] = personConsumption.totalSweets > 0 && payers.length >= 2 && (
-              <WhoAteCard data={personConsumption} monthLabel={MONTH_SHORT[new Date().getMonth()]} />
-            );
-
             nodes['fixed-variable'] = fvMonths.length > 0
               && (fvMonths[fvMonths.length - 1].fixed + fvMonths[fvMonths.length - 1].variable + fvMonths[fvMonths.length - 1].food) > 0
               && <FixedVariableSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} expenses={expenses} fvMonths={fvMonths} fvDeviations={fvDeviations} fvTopVariable={fvTopVariable} onReclassify={reclassifyFvExpense} />;
@@ -3199,13 +3184,13 @@ export default function DashboardScreen() {
                     <>
                       <View style={s.workHeroRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.workHoursBig, { color: WORK_WORKED }]}>
+                          <Text style={[s.workHoursBig, { color: WORK_ACCENT }]}>
                             {wm.workedH.toFixed(0)}
                             <Text style={s.workHoursUnit}> h</Text>
                           </Text>
                           <Text style={s.workHoursSub}>
                             przepracowane w tym miesiącu
-                            {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text></> : null}
+                            {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text></> : null}
                           </Text>
                         </View>
                       </View>
@@ -3213,11 +3198,11 @@ export default function DashboardScreen() {
                       {wm.plannedH > 0 && (
                         <View style={{ marginTop: spacing[3] }}>
                           <View style={s.workSplitBar}>
-                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_WORKED }} />
+                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
                             <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT }} />
                           </View>
                           <Text style={s.workSplitText}>
-                            <Text style={{ color: WORK_WORKED, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
+                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
                             {'  ·  '}
                             <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>zaplanowane +{wm.plannedH.toFixed(0)} h</Text>
                           </Text>
@@ -3551,7 +3536,7 @@ export default function DashboardScreen() {
                         <View style={s.wpLiveDot} />
                         <Text style={s.wpLiveTag}>NA ŻYWO W PRACY{workEarnings.activeEventTitle ? ` · ${workEarnings.activeEventTitle}` : ''}</Text>
                       </View>
-                      <Text style={[s.wpLiveBig, { color: WORK_WORKED }]}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
+                      <Text style={[s.wpLiveBig, { color: WORK_ACCENT }]}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
                       <Text style={s.wpLiveSub}>
                         +{(workEarnings.perSecond * 100).toFixed(2)} gr/s
                         {workEarnings.perSecond > 0 ? `  ·  ${Math.round(workEarnings.perSecond * 3600).toLocaleString('pl-PL')} zł/h` : ''}
@@ -3573,10 +3558,10 @@ export default function DashboardScreen() {
                   {/* ── TEN MIESIĄC: godziny do teraz + (jeśli jest stawka) ile zostało/prognoza w TEJ SAMEJ karcie zamiast dwóch osobnych ── */}
                   <View style={[s.wpCard, { marginTop: spacing[2] }]}>
                     <Text style={s.wpCardLabel}>Ten miesiąc</Text>
-                    <Text style={[s.wpBig, { color: WORK_WORKED, marginTop: 0 }]}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
+                    <Text style={[s.wpBig, { color: WORK_ACCENT, marginTop: 0 }]}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
                     <Text style={s.wpSub}>
                       przepracowane
-                      {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text>{' do teraz'}</> : null}
+                      {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text>{' do teraz'}</> : null}
                     </Text>
                     {(wm.plannedDays > 0 || wm.plannedH > 0) && (
                       <View style={s.wpStatsRow}>
@@ -3593,7 +3578,7 @@ export default function DashboardScreen() {
                           <>
                             <View style={s.wpLeftDivider} />
                             <View style={s.wpLeftItem}>
-                              <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
+                              <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
                               <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
                             </View>
                           </>
@@ -3613,7 +3598,7 @@ export default function DashboardScreen() {
                             <Text style={s.wbBucketAmt}>{Math.round(b.filled).toLocaleString('pl-PL')} / {Math.round(b.target).toLocaleString('pl-PL')} zł</Text>
                           </View>
                           <View style={s.wbBarTrack}>
-                            <View style={{ width: `${Math.min(b.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: b.pct >= 1 ? WORK_WORKED : WORK_ACCENT }} />
+                            <View style={{ width: `${Math.min(b.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: WORK_ACCENT }} />
                           </View>
                         </View>
                       ))}
@@ -3625,7 +3610,7 @@ export default function DashboardScreen() {
                     <Text style={s.wpCardLabel}>Stawka</Text>
                     {hasRate ? (
                       <>
-                        <Text style={[s.wpRateVal, { color: WORK_MONEY }]}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
+                        <Text style={[s.wpRateVal, { color: WORK_ACCENT }]}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
                         <Text style={s.wpRateHint}>{rateHint}</Text>
                         {(workAvg.avgRate != null || lastRate != null) && (
                           <View style={s.wpStatsRow}>
@@ -3638,7 +3623,7 @@ export default function DashboardScreen() {
                             {workAvg.avgRate != null && lastRate != null && <View style={s.wpLeftDivider} />}
                             {lastRate != null && (
                               <View style={s.wpLeftItem}>
-                                <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{lastRate.toFixed(2)}</Text>
+                                <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{lastRate.toFixed(2)}</Text>
                                 <Text style={s.wpLeftLbl}>zł/h · {MONTH_SHORT[Number(lp!.month.slice(5, 7)) - 1]} {lp!.month.slice(2, 4)}</Text>
                               </View>
                             )}
@@ -3687,7 +3672,7 @@ export default function DashboardScreen() {
                     </View>
                     {wm.avgHours > 0 && (
                       <Text style={s.wpAvgLine}>
-                        Średnio <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={[s.wpAvgB, { color: WORK_MONEY }]}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
+                        Średnio <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
                         {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.projectedH.toFixed(0)} h</Text></> : null}
                       </Text>
                     )}
@@ -3719,13 +3704,13 @@ export default function DashboardScreen() {
                       {lp && (
                         <View style={s.wpLastRow}>
                           <Text style={s.wpTotalLabel}>Ostatnia · {MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]} {lp.month.slice(2, 4)}</Text>
-                          <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(lp.amount).toLocaleString('pl-PL')} zł{lastRate != null ? ` · ${lastRate.toFixed(1)} zł/h` : ''}</Text>
+                          <Text style={[s.wpTotalVal, { color: WORK_ACCENT }]}>{Math.round(lp.amount).toLocaleString('pl-PL')} zł{lastRate != null ? ` · ${lastRate.toFixed(1)} zł/h` : ''}</Text>
                         </View>
                       )}
                       {jdTotal > 0 && (
                         <View style={[s.wpLastRow, { marginTop: spacing[2] }]}>
                           <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
-                          <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                          <Text style={[s.wpTotalVal, { color: WORK_ACCENT }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
                         </View>
                       )}
                     </View>

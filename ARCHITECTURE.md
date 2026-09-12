@@ -5945,6 +5945,70 @@ przez `expensesService.update(id, { fvOverride })` (ten sam call co przy `vehicl
    się przeliczyły, a ponowne otwarcie modala dla nowego kubła pokazuje tę transakcję z
    ikoną ✏️ (overridden) i opcją "Auto" do cofnięcia.
 
+## 78. Praca: jeden stonowany żółty akcent (cofnięcie 3-kolorowego schematu) + usunięty widget "Kto zjadł słodycze"
+
+### 1. Kolory panelu Praca — z powrotem "monochrom + jeden akcent" (`app/(tabs)/index.tsx`)
+
+User: *"Te kolory w zakladce praca mi sie jednak nie podobają za duże zamieszanie
+wprowadzają dajmy jakiś soft pasujacy kolor np żółty ale stonowany nie [rażący] bo zolty
+wybrałem w ustawieniach bo jdsport ma żółte barwy [z] moja praca [logo]"*.
+
+2026-08-28 (patrz komentarz w kodzie sprzed zmiany) user PROSIŁ o odejście od appowego
+"akcent czarno-biały" na rzecz TRZECH kolorów w Pracy: niebieski `WORK_ACCENT` (tożsamość),
+zielony `WORK_WORKED` (przepracowane), złoty `WORK_MONEY` (pieniądze). Teraz ta decyzja
+COFNIĘTA — trzy nasycone barwy razem czytały się jako chaos, nie jako czytelne
+rozróżnienie. Fix: WSZYSTKIE trzy stałe scalone w JEDNĄ `WORK_ACCENT = '#D8B45C'`
+(stonowane, musztardowe złoto — świadomie NIE czysty `#FBBF24` używany gdzie indziej na
+pieniądze, bo user chciał "stonowany", nie kolejny jaskrawy odcień) i podstawione we
+wszystkich ~13 miejscach, gdzie poprzednio wybierano między trzema. Panel Praca wraca do
+tego samego wzorca co reszta dashboardu (monochrom + jeden akcent), tylko z INNYM
+odcieniem akcentu niż appowy domyślny biały — bo to jedyna sekcja, gdzie user chce
+skojarzenia z żółtymi barwami pracodawcy.
+
+Świadomie NIE ruszone: zielona kropka "NA ŻYWO" (`#2AC68F`, `wpLiveDot`/`wpLiveTag`) i
+zielono/czerwony wskaźnik "ten mies. vs średnia" (`#34D399`/`#F87171`) — to uniwersalne,
+SEMANTYCZNE kolory (żywy stan / lepiej-gorzej niż zwykle) używane tak samo gdzie indziej w
+apce, nie część skrytykowanego trio tożsamości Pracy.
+
+### 2. Usunięty widget dashboardu "Kto zjadł słodycze"
+
+User: *"wywalamy widget kto zjadl slodycze z zakładki dashbordu (nie używam go i chyba
+usunelismy funkcje tez z paragonow nie? A jak nie to usuń)"*.
+
+Widget (`WhoAteCard.tsx`, sekcja `who-ate`) usunięty w pełni wg playbooku z §12 (ARCHITECTURE
+§12): `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP` w
+`dashboardLayout.ts`, node + import + `DEFERRED_SECTIONS` wpis w `index.tsx`. Jego dedykowana
+warstwa danych `src/utils/personConsumption.ts` (`buildPersonConsumption`) była używana
+WYŁĄCZNIE przez ten jeden widget (zweryfikowane grepem) — usunięta razem z
+`__tests__/personConsumption.test.ts` (11 testów).
+
+**WAŻNE — założenie usera było błędne, NIE usunięto szerszego mechanizmu**: funkcja
+"kto jadł" per pozycję paragonu (`ReceiptItem.eaters`) NADAL ISTNIEJE i jest aktywnie
+używana w kilku miejscach niezwiązanych z tym widgetem:
+- `app/expenses/[id].tsx` i `app/expenses/scan.tsx` — sekcja "Kto jadł" przy edycji pozycji
+  paragonu (UI do zaznaczania).
+- `src/store/statsScope.ts` (`itemInScope`/`consumesInScope`) — NAPĘDZA przełącznik
+  "mine"/"wszyscy" (household scope) używany w Finansach i statystykach konsumpcji.
+- `src/utils/tagBudgets.ts` (`attributedPrice`) — dzieli koszt pozycji między jedzących,
+  używane przez limity na tagi (per-person limit bars).
+
+Usunięcie CAŁEGO mechanizmu `eaters` (nie tylko tego widgetu) zepsułoby te trzy inne,
+aktywnie działające funkcje — user prawdopodobnie mylił "widget na dashboardzie" z
+"funkcją w paragonach" myśląc że oba już zniknęły. Świadomie NIE ruszone bez
+dopytania — to byłaby destrukcyjna zmiana szerszego zakresu niż prośba.
+
+`tsc`/`jest` zielone (70 suit/929 testów — spadek z 940 to WYŁĄCZNIE usunięcie
+`personConsumption.test.ts`, żadnych regresji). **Nie zweryfikowane wizualnie na
+urządzeniu** — priorytet: czy nowy stonowany żółty rzeczywiście czyta się jako "spójny",
+nie "monotonny".
+
+**Priorytet testu na urządzeniu**: Otwórz panel Praca (kafel na dashboardzie) → sprawdź
+że WSZYSTKIE liczby/paski (zarobek na żywo, godziny, stawka, skarbonki, historia wypłat)
+używają TEGO SAMEGO stonowanego złota, bez niebieskiego/zielonego jak wcześniej; sprawdź
+że widget "Kto zjadł słodycze" faktycznie zniknął z dashboardu (i z listy sekcji w
+edytorze układu); sprawdź że "Kto jadł" przy edycji pozycji paragonu DALEJ działa (to
+CELOWO zostało).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

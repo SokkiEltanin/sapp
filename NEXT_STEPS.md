@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Praca: jeden stonowany żółty akcent + usunięty widget "Kto zjadł słodycze" — NIEsprawdzone (2026-09-12)
+
+User: *"3. Te kolory w zakladce praca mi sie jednak nie podobają... dajmy jakiś soft
+pasujacy kolor np żółty ale stonowany... bo zolty wybrałem w ustawieniach bo jdsport ma
+żółte barwy [z] moja praca [logo] 4. wywalamy widget kto zjadl slodycze z zakładki
+dashbordu"*. Pełny opis w ARCHITECTURE.md §78.
+
+1. Trzy-kolorowy schemat Pracy (niebieski/zielony/złoty, dodany 2026-08-28 na WYRAŹNĄ
+   prośbę usera) COFNIĘTY — teraz jeden stonowany musztardowy żółty (`#D8B45C`) wszędzie.
+2. Widget "Kto zjadł słodycze" usunięty z dashboardu w pełni (sekcja + dane + testy).
+   **UWAGA**: mechanizm "kto jadł" (`eaters`) w PARAGONACH zostaje — NIE usunięty, bo
+   napędza też przełącznik mine/wszyscy i limity na tagi. User zakładał że to już
+   usunięte — nieprawda, wyjaśnione w ARCHITECTURE §78, świadomie nie tknięte bez
+   dopytania (destrukcyjne, szerszy zakres niż prośba).
+
+`tsc`/`jest` zielone (70 suit/929 testów — ubytek to tylko usunięty test widgetu, zero
+regresji). **NIE zweryfikowane wizualnie na urządzeniu** — priorytet: czy nowy żółty
+faktycznie wygląda "spójnie" a nie "monotonnie" w panelu Pracy.
+
+**Priorytet testu na urządzeniu**: patrz checklist w ARCHITECTURE.md §78.
+
 ## 🆕 Finanse: wyszukiwarka tagu + przebudowa "Na co idą pieniądze" (fvOverride) — NIEsprawdzone (2026-09-12)
 
 User: *"1. tag własny (wyszukiwarka) w filtrach Finansów 2. widget Na co idą pieniądze —
