@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Modal, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,6 +58,7 @@ const MISSION_BAR_HEIGHT = 34;
 export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  const { width: windowWidth } = useWindowDimensions();
 
   // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, "dawaj dalej
   // optymalizacje", ten sam wzorzec co boss-fight.tsx) — bez selektora subskrypcja re-renderuje
@@ -290,6 +291,14 @@ export default function Pet() {
 
   const pet = useMemo(() => computePetState(input), [input]);
   const stage = growthStage(lvl.level);
+  // Kotek NIE MOŻE być szerszy niż faktycznie dostępna kolumna między slotami ekwipunku
+  // (2026-09-12, user: "obszar głaskania pupila nie wchodził na itemy" — `STAGE_SIZE[stage]
+  // + 90` (do 304px przy adult) był STAŁY, niezależny od szerokości ekranu, a `GearPanel`'s
+  // `catCol` na typowym telefonie ma tylko ~190-220px — kotek (i jego Pressable, czyli
+  // "obszar głaskania") realnie nachodził na oba flankujące sloty. Fix u ŹRÓDŁA: przelicz
+  // bezpieczny max na podstawie realnej szerokości ekranu (2× `flankCol` 68px + padding
+  // scrolla `spacing[4]*2`, patrz GearPanel.tsx/`s.scroll`) zamiast łatać nachodzenie z-indexem.
+  const catSize = Math.min(STAGE_SIZE[stage] + 90, windowWidth - spacing[4] * 2 - 68 * 2);
 
   // one passive care-XP grant per day, scaled by wellbeing
   const ticked = useRef(false);
@@ -493,7 +502,7 @@ export default function Pet() {
                     PetTileCat (patrz ARCHITECTURE.md). Ta property wymusza render do bufora
                     off-screen PRZED nałożeniem opacity, więc zachodzenie zostaje niewidoczne. */}
                 <View style={{ opacity: 0.3 }} needsOffscreenAlphaCompositing>
-                  <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={false} palette={palette} stripes={catStripes}
+                  <CatArt expression={pet.expression} size={catSize} animate={false} palette={palette} stripes={catStripes}
                     eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
                     onPress={onFightMission} />
                 </View>
@@ -510,7 +519,7 @@ export default function Pet() {
                 </Animated.View>
               </TouchableOpacity>
             ) : (
-              <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={focused} palette={palette} stripes={catStripes}
+              <CatArt expression={pet.expression} size={catSize} animate={focused} palette={palette} stripes={catStripes}
                 eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
                 onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
             )}

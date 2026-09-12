@@ -6171,6 +6171,57 @@ buildzie APK).
 prosi już o dostęp do aparatu/galerii przy pierwszym uruchomieniu, i że wklejanie paragonu
 (`/expenses/scan`) dalej działa bez zmian (to jedyna ścieżka, która ma teraz znaczenie).
 
+## 82. Kotek nie nachodzi już na sloty ekwipunku + większa, epicka animacja otwierania skrzynki
+
+### 1. Obszar głaskania pupila wchodził na sloty ekwipunku (`app/pet.tsx`)
+
+User: *"Zrob zeb obszar głaskania pupila nie wchodził na itemy jakby albo itemy dajmy nad
+nim jakby"*. Root cause zweryfikowany matematycznie przed poprawką: `CatArt` w `GearPanel`
+dostawał STAŁY `size = STAGE_SIZE[stage] + 90` (150-214 + 90 = 240-304px, niezależnie od
+szerokości ekranu), a `GearPanel.tsx` renderuje kotka w środkowej kolumnie (`catCol`,
+`flex: 1`) MIĘDZY dwiema stałymi 68px kolumnami slotów (`flankCol`) — na typowym 360-412px
+telefonie po odjęciu paddingu scrolla (`spacing[4]*2`=32) i obu `flankCol` (2×68=136)
+zostaje ok. 190-245px na kotka, czyli WYRAŹNIE mniej niż 304px przy adult stage. `CatArt`
+(i jego `Pressable`, czyli realny "obszar głaskania") nachodził więc fizycznie na oba
+sąsiednie sloty.
+
+**Fix u źródła** (nie łatanie z-indexem): nowy `catSize = Math.min(STAGE_SIZE[stage] + 90,
+windowWidth - spacing[4]*2 - 68*2)` (`useWindowDimensions()`) — kotek nigdy nie może być
+szerszy niż realnie dostępna przestrzeń w `catCol`, więc PO KONSTRUKCJI nie ma jak nachodzić
+na flankujące sloty. Podstawiony w obu miejscach wołania `CatArt` w tym pliku (zwykły widok +
+przyciemniony wariant gdy misja gotowa).
+
+Świadomie NIE ruszone: `GearPanel.tsx` sam w sobie — layout (`flankRow`/`flankCol`/`catCol`)
+był już poprawny (flex, nie absolute overlap); problem był WYŁĄCZNIE w nieograniczonym
+`size` przekazywanym z `pet.tsx`.
+
+### 2. Animacja otwierania skrzynki — powiększona + epickie przejście (`BoxRevealModal.tsx`)
+
+User: *"Animacja otwierania skrzynki możemy ja powiększyć bo jest malutka i zrobic takie
+epickie przejście po kliknięciu otworz do tego cesowego otwierania"*.
+
+- **Skrzynka powiększona** 128×104 → 192×156 (+50%), emoji-fallback 48→68px, przycisk
+  "Otwórz" proporcjonalnie większy.
+- **Nowa faza `opening`** między `closed` i `spinning` (dotąd `doOpen()` przechodziło
+  closed→spinning natychmiast, zero przejścia — user: "malutka"/"epickie przejście" to
+  dokładnie ten brak przejścia). Dwuetapowa animacja (~480ms razem):
+  1. Skrzynka trzęsie się (`shake`, oscylujący `translateX`) i "puchnie" (`openScale`→1.18)
+     przez 260ms — ładowanie energii.
+  2. Biały błysk (`flash`, rosnące koło 140px, opacity 0→1→0) NAKŁADA SIĘ z zapadaniem się
+     skrzynki (`openScale`→0) przez 220ms — DOPIERO na końcu tego kroku buduje się reel i
+     następuje `setPhase('spinning')`, więc reel "wyskakuje" z błysku zamiast się po prostu
+     podmieniać. Dodatkowy `haptic.medium()` DOKŁADNIE na granicy trzęsienie→błysk (osobne
+     wyczuwalne "uderzenie" w środku sekwencji, nie tylko na starcie).
+
+`tsc`/`jest` zielone (72 suit/940 testów — bez nowych, czysto wizualne zmiany). **Nie
+zweryfikowane wizualnie na urządzeniu** — priorytet #1 dla obu zmian w tym paragrafie.
+
+**Priorytet testu na urządzeniu**: (1) Otwórz /pet na WĄSKIM telefonie z pupilem w
+zaawansowanym stadium (adult) → sprawdź że dotyk blisko krawędzi kotka NIE trafia już w
+slot ekwipunku i odwrotnie; (2) otwórz dowolną skrzynkę → sprawdź że skrzynka realnie
+wygląda większa, i że kliknięcie "Otwórz" daje wyraźne poczucie "trzęsie się → błysk →
+reel", nie nagłą podmianę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

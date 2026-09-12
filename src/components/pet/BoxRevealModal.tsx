@@ -86,16 +86,27 @@ function buildReel(reward: BoxReward, dupeCoins?: number): ReelCell[] {
 export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, dupeCoins, onClose }: {
   visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any; dupeCoins?: number; onClose: () => void;
 }) {
-  const [phase, setPhase] = useState<'closed' | 'spinning' | 'revealed'>('closed');
+  // Nowa faza `opening` (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
+  // powiększyć bo jest malutka i zrobic takie epickie przejście po kliknięciu otworz do
+  // tego cesowego otwierania") — dotąd `doOpen()` przechodziło closed→spinning W TEJ SAMEJ
+  // klatce, zero przejścia. `opening` to krótki (~480ms) "ładowanie i wybuch": skrzynka się
+  // trzęsie i puchnie (shake+openScale), potem błysk światła (flash) podczas gdy skrzynka
+  // znika (scale→0) — DOPIERO na końcu tego cut do `spinning`, więc reel "wyskakuje" z
+  // błysku zamiast się po prostu podmieniać.
+  const [phase, setPhase] = useState<'closed' | 'opening' | 'spinning' | 'revealed'>('closed');
   const [reel, setReel] = useState<ReelCell[]>([]);
   const [flies, setFlies] = useState<{ id: number; sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }[]>([]);
   const reelX = useRef(new Animated.Value(0)).current;
   const bob = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const openScale = useRef(new Animated.Value(1)).current;
+  const flash = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) return;
     setPhase('closed'); setFlies([]); setReel([]); reelX.setValue(0); burst.setValue(0);
+    shake.setValue(0); openScale.setValue(1); flash.setValue(0);
   }, [visible]);
 
   useEffect(() => {
@@ -115,30 +126,50 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   const doOpen = () => {
     if (phase !== 'closed' || !reward) return;
     haptic.medium();
-    setReel(buildReel(reward, dupeCoins));
-    reelX.setValue(0);
-    setPhase('spinning');
-    // Lekki losowy jitter (±30% szerokości komórki) — reel nie zatrzymuje się co do piksela w
-    // TYM SAMYM miejscu za każdym razem, ale zawsze w granicach komórki nagrody (bezpieczne,
-    // bo target ma 5 komórek zapasu PO sobie w REEL_LENGTH, patrz stałe wyżej).
-    const jitter = (Math.random() - 0.5) * REEL_ITEM_W * 0.6;
-    const finalX = REEL_WINDOW_W / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
-    Animated.timing(reelX, {
-      toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
-    }).start(() => {
-      setPhase('revealed');
-      haptic.success();
-      Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-      const isDupe = reward.type === 'gear' && !!dupeCoins;
-      const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
-      const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
-      setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
-        sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
-        emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
+    setPhase('opening');
+    // Etap 1: skrzynka trzęsie się i "puchnie" (ładuje energię przed wybuchem).
+    Animated.parallel([
+      Animated.timing(shake, { toValue: 1, duration: 260, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(openScale, { toValue: 1.18, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start(() => {
+      haptic.medium();
+      // Etap 2: błysk światła + skrzynka znika (scale→0) — reel podmieniany DOKŁADNIE gdy
+      // błysk jest najjaśniejszy, więc wygląda jakby "wyskoczył" z eksplozji, nie jakby się
+      // po prostu podmienił widok.
+      Animated.parallel([
+        Animated.timing(flash, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(openScale, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ]).start(() => {
+        setReel(buildReel(reward, dupeCoins));
+        reelX.setValue(0);
+        flash.setValue(0);
+        setPhase('spinning');
+        // Lekki losowy jitter (±30% szerokości komórki) — reel nie zatrzymuje się co do piksela w
+        // TYM SAMYM miejscu za każdym razem, ale zawsze w granicach komórki nagrody (bezpieczne,
+        // bo target ma 5 komórek zapasu PO sobie w REEL_LENGTH, patrz stałe wyżej).
+        const jitter = (Math.random() - 0.5) * REEL_ITEM_W * 0.6;
+        const finalX = REEL_WINDOW_W / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
+        Animated.timing(reelX, {
+          toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
+        }).start(() => {
+          setPhase('revealed');
+          haptic.success();
+          Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
+          const isDupe = reward.type === 'gear' && !!dupeCoins;
+          const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
+          const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
+          setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
+            sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
+            emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
+        });
+      });
     });
   };
 
   const bobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+  const shakeX = shake.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -10, 10, -7, 0] });
+  const flashOpacity = flash.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 0] });
+  const flashScale = flash.interpolate({ inputRange: [0, 1], outputRange: [0.4, 2.6] });
   const glowScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
@@ -153,19 +184,28 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={st.overlay} onPress={phase === 'revealed' ? onClose : undefined}>
         <View style={st.center} pointerEvents="box-none">
-          {phase === 'closed' && (
+          {(phase === 'closed' || phase === 'opening') && (
             <>
-              <Animated.View style={{ transform: [{ translateY: bobY }] }}>
+              <Animated.View style={{ transform: [
+                { translateY: phase === 'closed' ? bobY : 0 },
+                { translateX: phase === 'opening' ? shakeX : 0 },
+                { scale: phase === 'opening' ? openScale : 1 },
+              ] }}>
                 <View style={[st.box, { borderColor: boxColor }]}>
                   {boxIcon
                     ? <Image source={boxIcon} style={st.boxImg} resizeMode="contain" />
                     : (<><View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} /><Text style={st.boxEmoji}>{boxEmoji}</Text></>)}
                 </View>
               </Animated.View>
-              <Pressable onPress={doOpen} style={[st.openBtn, { backgroundColor: boxColor }]} hitSlop={10}>
-                <Text style={st.openBtnTxt}>Otwórz</Text>
-              </Pressable>
+              {phase === 'closed' && (
+                <Pressable onPress={doOpen} style={[st.openBtn, { backgroundColor: boxColor }]} hitSlop={10}>
+                  <Text style={st.openBtnTxt}>Otwórz</Text>
+                </Pressable>
+              )}
             </>
+          )}
+          {phase === 'opening' && (
+            <Animated.View pointerEvents="none" style={[st.flash, { opacity: flashOpacity, transform: [{ scale: flashScale }] }]} />
           )}
           {phase === 'spinning' && (
             <View style={st.reelWindow}>
@@ -231,14 +271,22 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
 const st = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
   center: { alignItems: 'center', gap: 18 },
-  box: { width: 128, height: 104, borderRadius: 16, backgroundColor: '#161A1A', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  boxLid: { position: 'absolute', top: 0, left: 0, right: 0, height: 30 },
-  boxEmoji: { fontSize: 48, marginTop: 12 },
+  // Skrzynka powiększona (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
+  // powiększyć bo jest malutka") — 128×104 → 192×156 (+50%), reszta (emoji/przycisk)
+  // przeskalowana proporcjonalnie.
+  box: { width: 192, height: 156, borderRadius: 22, backgroundColor: '#161A1A', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  boxLid: { position: 'absolute', top: 0, left: 0, right: 0, height: 44 },
+  boxEmoji: { fontSize: 68, marginTop: 16 },
   // Grafika skrzynki (2026-09-11) — gdy `boxIcon` podane (LOOT_BOXES/DAILY_BOX mają własne
   // PNG), zastępuje `boxLid`+`boxEmoji` całkowicie (jedna spójna grafika zamiast dwóch warstw).
   boxImg: { width: '100%', height: '100%' },
-  openBtn: { paddingHorizontal: 30, paddingVertical: 13, borderRadius: 14 },
-  openBtnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
+  openBtn: { paddingHorizontal: 34, paddingVertical: 15, borderRadius: 16 },
+  openBtnTxt: { color: '#07160F', fontSize: 16, fontWeight: '900' },
+  // Błysk "wybuchu" między zamknięciem a reelem (2026-09-12) — rosnące, szybko gasnące
+  // koło na środku modala, DOKŁADNIE w momencie cięcia closed→spinning (patrz `doOpen`).
+  flash: {
+    position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: '#FFFFFF',
+  },
 
   // Reel (2026-09-11) — okno stałej szerokości (REEL_WINDOW_W) z `overflow:'hidden'`, pasek
   // komórek (`reelStrip`, `flexDirection:'row'`) jedzie pod spodem przez `translateX`.

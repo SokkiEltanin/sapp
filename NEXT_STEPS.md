@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kotek nie nachodzi na itemy + większa/epicka animacja skrzynki — NIEsprawdzone (2026-09-12)
+
+User (3 różne, w tej samej rozmowie): *"1. red energy 15/2 bez sensu — ODŁOŻONE, pytanie do
+usera 2. mieliśmy obniżyć trochę podczas walki pupila i bossa — ODŁOŻONE, niejasne co
+konkretnie 3. obszar głaskania pupila nie wchodził na itemy — ZROBIONE 4. animacja
+skrzynki: powiększyć + epickie przejście — ZROBIONE"*. Pełny opis (3+4) w ARCHITECTURE.md §82.
+
+1. `pet.tsx`: `catSize` teraz ograniczony realną szerokością ekranu (`useWindowDimensions`),
+   nie stałą wartością — kotek nie może już fizycznie nachodzić na flankujące sloty.
+2. `BoxRevealModal.tsx`: skrzynka +50% większa, nowa faza `opening` (trzęsie się → błysk →
+   reel) zamiast natychmiastowego cięcia closed→spinning.
+
+`tsc`/`jest` zielone (72 suit/940 testów, bez nowych). **NIE zweryfikowane wizualnie na
+urządzeniu.**
+
+**⚠️ DWA PUNKTY ODŁOŻONE do wyjaśnienia z userem (NIE zgadywane)**:
+- "Czerwona energia 15/2 bez sensu" — `eventEnergy` (raid/event) BANKUJE się bez sufitu
+  (celowo, w odróżnieniu od `energy` kampanii które jest twardo capped) — user widział 15
+  wobec dziennego limitu 2-4. Do ustalenia: capować bank (jak kampania, tracisz nadmiar) czy
+  zmienić TYLKO wyświetlanie (bank rośnie dalej, ale bez mylącego "X/Y")?
+- "Mieliśmy obniżyć trochę podczas walki pupila i bossa" — niejasne CO obniżyć (pozycję
+  sprite'ów niżej na ekranie — jak w §73a? trudność/obrażenia? coś innego?). Zapytać wprost.
+
 ## 🆕 Usunięty martwy OCR paragonów (kamera) — wymaga NOWEGO BUILDU APK (2026-09-12)
 
 User potwierdził: OCR (Google Vision, kamera) był całkowicie odłączony (zero wywołań),
