@@ -30,9 +30,11 @@ import { formatDate } from '@/utils/date';
 import { getCategoryMeta } from '@/utils/categories';
 import { billTagFor, BILL_TYPES } from '@/utils/recurringBills';
 import { Expense } from '@/types';
+import { FvBucket } from '@/utils/fixedVariable';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 
 const F = {
   card:       '#0E0707',        // near-black, slight red undertone
@@ -116,6 +118,19 @@ export default function FinancesScreen() {
     for (const e of expenses) if (e.payer) set.add(e.payer);
     return Array.from(set);
   }, [expenses]);
+
+  // Ręczna korekta Stałe/Zmienne/Jedzenie wprost z listy transakcji (2026-09-12, patrz
+  // komentarz przy BUCKET_META w ExpenseItem.tsx) — ten sam wzorzec co `reclassifyFvExpense`
+  // w dashboardzie (index.tsx): optymistyczny local update + zapis w tle, błąd cofa się
+  // tylko wizualnie przez toast (dane w Firestore nie zostały nadpisane, więc kolejny
+  // fetch i tak przywróci poprzedni stan).
+  const reclassifyExpense = useCallback(async (expenseId: string, bucket: FvBucket | null) => {
+    const live = useExpensesStore.getState().expenses;
+    if (!live.some(x => x.id === expenseId)) return;
+    setExpenses(live.map(x => x.id === expenseId ? { ...x, fvOverride: bucket } : x));
+    try { await expensesService.update(expenseId, { fvOverride: bucket }); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
+  }, [setExpenses]);
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
@@ -558,6 +573,7 @@ export default function FinancesScreen() {
                 expense={item}
                 index={index}
                 onPress={e => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }}
+                onReclassify={reclassifyExpense}
               />
             </View>
           )}

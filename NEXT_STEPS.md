@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Odznaka Stałe/Zmienne/Jedzenie na liście wydatków (audyt) — NIEsprawdzone (2026-09-12)
+
+User: *"ulepsz oznaczanie żebym mógł jano widzieć na wydatkach co jest jedzeniem co jest
+nie jedzeniem co stałym wydatkiem a co zmiennym zeby widzieć czy dobrze łapie"*. Pełny opis
+w ARCHITECTURE.md §86. Skrót: każdy wydatek na liście w Finansach ma teraz małą kolorową
+odznakę (Stałe/Zmienne/Jedzenie, kolory jak w widgecie dashboardu) — tap otwiera inline
+korektę (fvOverride) bez wchodzenia w osobny modal. Przychody i self-transfery (oszczędności)
+celowo bez odznaki.
+
+**NIE zweryfikowane wizualnie na urządzeniu** — priorytet: (1) czy klasyfikacja faktycznie
+zgadza się z oczekiwaniami usera (to jest właśnie cel tej zmiany — jeśli okaże się że
+heurystyka `bucketOf()`/`isFixedExpense()` się myli systematycznie, to osobna naprawa, nie
+tylko `fvOverride` per transakcja), (2) czy tap na odznakę w liście nie koliduje z
+nawigacją do szczegółów wydatku.
+
 ## 🆕 Usunięto martwy weeklyReports.ts (2026-09-12)
 
 User: *"szybką decyzja wywalamy to weekly reports"*. Zero importerów, martwy generator
