@@ -6371,6 +6371,53 @@ Zero konsumentów do zaktualizowania (stąd brak zmian poza samym plikiem i doku
 własnego test suite). **Priorytet testu na urządzeniu**: brak — czysto martwy kod, zero
 powierzchni do sprawdzenia.
 
+## 86. Odznaka Stałe/Zmienne/Jedzenie na KAŻDYM wydatku (audyt klasyfikacji z listy)
+
+User: *"ulepsz oznaczanie żebym mógł jano widzieć na wydatkach co jest jedzeniem co jest
+nie jedzeniem co stałym wydatkiem a co zmiennym zeby widzieć czy dobrze łapie"*.
+
+**Root cause.** `bucketOf()` (`fixedVariable.ts`, patrz §77) i ręczna korekta `fvOverride`
+już istniały, ale były dostępne WYŁĄCZNIE przez rozbicie miesięczne widgetu "Na co idą
+pieniądze" na dashboardzie (`FvBreakdownModal`) — audyt "czy dobrze łapie" wymagał
+otwierania osobnego modala per miesiąc/kubeł zamiast po prostu przewijania głównej listy
+transakcji w Finansach.
+
+**Fix.** `ExpenseItem.tsx` — nowa odznaka pod tytułem/podtytułem KAŻDEGO wydatku (nie
+przychodu, nie self-transferu — patrz niżej): kropka + etykieta ("Stałe"/"Zmienne"/
+"Jedzenie") w tych samych kolorach co pasek widgetu (`fixedC`=#8893A8/`foodC`=#4CA96B z
+`FixedVariableSection.tsx`, `variable` dostaje nowy fiolet #BF80FF, żaden inny akcent na
+liście go dziś nie zajmuje). Ikonka ołówka obok odznaki gdy `fvOverride` jest ustawiony
+(ten sam symbol co w `FvBreakdownModal`). Odznaka jest TAPPABLE — otwiera inline 2
+pozostałe kubły + "Auto" (reset override, tylko gdy nadpisany) bez opuszczania listy ani
+otwierania modala — ten sam wzorzec korekty co dashboard (`onReclassify` → optymistyczny
+local update przez `useExpensesStore.setExpenses` + `expensesService.update(id,
+{fvOverride})` w tle, błąd → toast + haptic, bez rollbacku UI bo Firestore i tak nie
+został nadpisany). Handler `reclassifyExpense` w `finances.tsx` to niemal 1:1 kopia
+`reclassifyFvExpense` z dashboardu (index.tsx) — świadomie NIE wydzielony do wspólnego
+helpera (mała, self-contained logika w 2 miejscach; ekstrakcja na żądanie gdy pojawi się
+trzecie miejsce, zgodnie z zasadą "trzy podobne linijki > przedwczesna abstrakcja").
+
+**Self-transfer guard.** `bucket = null` dla przychodów (bucketOf() nie ma dla nich sensu)
+ORAZ dla self-transferów (`isSelfTransfer()`, oszczędności/Revolut) — te są jawnie
+wykluczone ze WSZYSTKICH trzech kubłów w każdej funkcji `fixedVariable.ts`, więc pokazanie
+im gołego wyniku `bucketOf()` (zawsze 'variable' przez fallback, bo self-transfer nie jest
+ani `isFixedExpense` ani `groceries`) wyglądałoby jak dokładnie ten błąd klasyfikacji,
+który ta odznaka ma pomóc wyłapać — pominięta zamiast mylić.
+
+**Explicite NIE zrobione**: żadna zmiana w samej heurystyce `bucketOf()`/`isFixedExpense()`
+— to czysto interfejs do AUDYTU istniejącej logiki, nie jej przeprojektowanie. Jeśli po
+przejrzeniu listy user znajdzie systematyczny błąd heurystyki (nie pojedynczy wyjątek do
+`fvOverride`), to osobna, następna zmiana.
+
+`tsc --noEmit`/`jest` czyste (72 suity/942 testy — `bucketOf()` ma już własne pokrycie w
+`fixedVariable.test.ts`, nowy UI nie ma testów jednostkowych — projekt nie testuje
+komponentów RN, tylko czystą logikę, zgodnie z ustalonym wzorcem). **Priorytet testu na
+urządzeniu**: przewiń listę Finansów i sprawdź (1) czy odznaki faktycznie zgadzają się z
+oczekiwaniami (to właśnie audyt, którego chciał user), (2) czy tap na odznakę poprawnie
+otwiera/zamyka inline wybór bez przypadkowego odpalenia nawigacji do szczegółów wydatku
+(zagnieżdżony `TouchableOpacity` w `PressableScale` — ten sam, już działający wzorzec co
+istniejący `chevronBtn` w tym samym komponencie, ale warto potwierdzić na żywym telefonie).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
