@@ -83,8 +83,10 @@ export default function Bosses() {
   const campaignEnergyMax = dailyAttempts(bonuses.energyMult);
   // Sufit eventowej puli (2026-08-21, user: "widać w prawym górnym licznik... ile na ile mam
   // np 0/5") — TA SAMA formuła co `syncEventEnergy` w `reload()` niżej, jedna prawda dla
-  // pigułki w headerze.
-  const eventEnergyMax = eventDailyAttempts(bonuses.energyMult);
+  // pigułki w headerze. PRZEBUDOWANE na `level` zamiast `bonuses.energyMult` (2026-09-12,
+  // patrz obszerny komentarz przy `eventDailyAttempts` w bosses.ts) — pula teraz per poziom
+  // pupila, nie inwestycja w łup.
+  const eventEnergyMax = eventDailyAttempts(level);
 
   // Przełącznik Kampania/MAD (2026-08-21, user: "dodaj zeby byl przełącznik pomiędzy mad
   // bosami a kampanijnymi") — obie sekcje dawniej stały jedna pod drugą, więc dotarcie do MAD
@@ -96,13 +98,14 @@ export default function Bosses() {
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
   // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
   // które minęły offline, wołane tak samo jak stary flat sync przy każdym powrocie na ekran.
-  // Wydarzenie ZOSTAJE przy starym flat dziennym modelu (`eventDailyAttempts`, skalowane
-  // energyMult z łupu) — ta zmiana dotyczy TYLKO energii kampanii. Raid (2026-08-22, patrz
-  // komentarz przy raidWeek w petStore.ts) zużywa TĘ SAMĄ pulę co wydarzenie — bez własnego
-  // sync, jeden `syncEventEnergy()` zasila oba.
+  // Wydarzenie ZOSTAJE przy flat dziennym modelu (`eventDailyAttempts`, od 2026-09-12
+  // skalowane POZIOMEM pupila zamiast energyMult z łupu — patrz komentarz w bosses.ts) — ta
+  // zmiana dotyczy TYLKO energii kampanii. Raid (2026-08-22, patrz komentarz przy raidWeek w
+  // petStore.ts) zużywa TĘ SAMĄ pulę co wydarzenie — bez własnego sync, jeden
+  // `syncEventEnergy()` zasila oba.
   const reload = useCallback(() => {
     syncEnergyRegen();
-    syncEventEnergy(eventDailyAttempts(bonuses.energyMult), 0);
+    syncEventEnergy(eventDailyAttempts(level), 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
     // Nemesis (2026-08-18): trwały bank jak raid — ensure na KAŻDY reload (no-op jeśli id się
     // nie zmienił, patrz menaceEnsure w petStore.ts). Liczone TU niezależnie od `eventBoss`
@@ -118,7 +121,7 @@ export default function Bosses() {
       sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
     });
     if (eb && eb.kind === 'menace') menaceEnsure(eb.id, menaceHpFor(level));
-  }, [bonuses.energyMult, syncEnergyRegen, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
+  }, [syncEnergyRegen, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
   useFocusEffect(reload);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu

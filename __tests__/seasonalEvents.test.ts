@@ -145,14 +145,17 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
     expect(eventHpFor(50)).toBeGreaterThan(eventHpFor(1));
   });
 
-  test('zabijalny w rozsądnej liczbie ciosów (~5-6) na bazowych statach, na kilku poziomach', () => {
+  // Górny próg podniesiony 10→13 (2026-09-12, PODBITE ×1.6 — patrz komentarz przy eventHpFor
+  // w seasonalEvents.ts, user: "bosy te czerwone energii muszą być o wiele trudniejsze
+  // względem realnych danych") — nadal skończona, jednosesyjna walka, tylko wyraźnie cięższa.
+  test('zabijalny w rozsądnej liczbie ciosów (~8-12) na bazowych statach, na kilku poziomach', () => {
     const noBonus = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
     for (const level of [2, 25, 50, 100]) {
       const hp = eventHpFor(level);
       const hit = atkPower(0, level, noBonus); // dolna granica (bez wariancji/krytu)
       const hitsNeeded = hp / hit;
       expect(hitsNeeded).toBeGreaterThan(2);   // nie trywialne
-      expect(hitsNeeded).toBeLessThan(10);     // ale realnie kończy się w jednej walce
+      expect(hitsNeeded).toBeLessThan(13);     // ale realnie kończy się w jednej walce
     }
   });
 

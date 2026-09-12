@@ -63,8 +63,18 @@ export function raidForWeek(weekKey: string): Raid {
 // %), to znany, zaakceptowany kompromis, nie przeoczenie. Właściwa naprawa endgame wymagałaby
 // policzenia HP też od `defeatedBosses.length` (osobny parametr), nie tylko poziomu — większa
 // zmiana, odłożona (patrz NEXT_STEPS.md).
+// PODBITE ×1.5 (2026-09-12, user przy okazji przebudowy sufitu czerwonej energii na
+// per-poziom pupila, patrz eventDailyAttempts w bosses.ts: "bosy te czerwone energii muszą
+// być o wiele trudniejsze względem realnych danych") — Lv15+ dostaje teraz TWARDY sufit
+// 4 prób/dzień zamiast miękkiego, inwestycją-zależnego capu, więc zaangażowany gracz mógł
+// realnie kończyć tygodniowy raid szybciej niż zamierzone. Bezpieczne dla balansu: `hp` tu to
+// TYLKO rozmiar trwałej, tygodniowej puli (ile ciosów trzeba oddać w SUMIE w ciągu tygodnia),
+// NIE ryzyko na rundę — kontratak liczy się od osobnego, bezpiecznie skalowanego
+// `raidCounterHpFor` (patrz niżej), które NIE zależy od tej stałej. Podniesienie tej wartości
+// więc wydłuża grind, nie podbija ryzyka na kotku per starcie. Znany, udokumentowany wyżej
+// kompromis (HP tylko od `level`, nie od `defeatedBosses.length`) zostaje bez zmian.
 export function raidHpFor(level: number, weekKey: string): number {
-  const base = 1000 + Math.max(0, level) * 210;
+  const base = 1500 + Math.max(0, level) * 315;
   const variance = 100 + (hashOf(weekKey, 17) % 20);   // 100..119%
   return Math.round(base * variance / 100 / 100) * 100;
 }

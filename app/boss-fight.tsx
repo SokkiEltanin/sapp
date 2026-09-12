@@ -67,7 +67,10 @@ const CAT_PORTRAIT_SIZE = 175;
 // wartość w dół przez `transform`, więc geometria layoutu (środek dla pocisku, patrz
 // `projectile.top` niżej) zostaje nietknięta — tylko dolicz `SPRITE_GROUND_SHIFT` tam, gdzie
 // coś zależy od realnego, pomalowanego środka sprite'a.
-const SPRITE_GROUND_SHIFT = 14;
+// 14→21 (2026-09-12, user: "obniżyć... pozycje w trakcie walki w wartości Y... o 7px czy coś
+// w dół", bez ruszania paska zdrowia ani tła — oba są architektonicznie odizolowane od tego
+// transformu, patrz komentarz wyżej, więc podbicie tej jednej stałej wystarcza).
+const SPRITE_GROUND_SHIFT = 21;
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };

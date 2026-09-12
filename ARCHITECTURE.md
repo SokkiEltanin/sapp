@@ -6279,6 +6279,84 @@ tak jeszcze się nie renderowały w rozmiarze który by pokazał różnicę jako
 warto rzucić okiem na ekwipunek w Rynku/Pupilu przy najbliższej sesji na telefonie, czy
 któryś z przeskalowanych obrazków nie wygląda gorzej niż przed zmianą.
 
+## 84. Sufit czerwonej energii per poziom pupila + podbita trudność raidu/eventu + niższe sprite'y w walce
+
+User (odpowiedź na status-check z §82/§83, zrzut ekranu Bossów z "15/2"): *"Czerwona energia
+raidowa (15/2) — bankuje się bez sufitu... tutaj zróbmy per level pupila po prostu
+zaczynając od 1/1, kończąc na maksymalnie 4 stakach (w tym bosy te czerwone energii muszą
+być o wiele trudniejsze względem realnych danych)"* oraz *"Obniżyć w sensie ich pozycje w
+trakcie walki w wartości Y (bez ruszania ich paska zdrowaia ani tła) możemy na ten moiment
+sróbować tak o 7px czy coś w dół"*.
+
+**Root cause (energia).** `eventDailyAttempts` (sufit `eventEnergy`, czyli "czerwonej"
+puli event/raid) był skalowany `energyMult` z łupu/gear — TRWAŁĄ inwestycją, nie progresją —
+a `syncEventEnergy` w petStore.ts dolicza dzienną deltę do tej puli BEZ przycinania jej do
+maxa (w odróżnieniu od energii kampanii, którą `energyRegenTick` twardo capuje). Efekt: bank
+rósł tygodniami nieużywany, a wyświetlany "sufit" (z inwestycji w gear) nie miał z realnym
+bankiem żadnego związku — stąd myląca pigułka "15/2".
+
+**Fix.** `eventDailyAttempts` w `src/utils/bosses.ts` przyjmuje teraz `level` zamiast
+`energyMult`, tierowane: Lv1-2→1, Lv3-5→2, Lv6-14→3, Lv15+→4 (`EVENT_MAX_DAILY_ATTEMPTS=4`,
+usunięty `EVENT_BASE_DAILY_ATTEMPTS`). Progi reużywają JUŻ ISTNIEJĄCYCH kamieni milowych gry
+(granica baby/kid `growthStage`=Lv3, kid/teen=Lv6, odblokowanie MAD=Lv15), żeby nie wymyślać
+nowych. Oba wywołania w `app/bosses.tsx` (`eventEnergyMax` w headerze, `syncEventEnergy(...)`
+w `reload()`) przełączone z `bonuses.energyMult` na `level` (już był w scope). `energyMult` z
+łupu/gear NIE wpływa już na tę pulę (dalej wpływa na `dailyAttempts` kampanii, patrz
+`campaignEnergyMax`) — świadome uproszczenie na życzenie usera, nie przeoczenie. Bank wciąż
+jest TRWAŁY (nie resetuje się codziennie, patrz `syncEventEnergy`) — samo capowanie na maxie
+to osobna sprawa, NIE zmieniona tutaj (user wybrał "zróbmy per level", nie "capuj nadmiar" —
+implicit: sufit rośnie z levelem, więc problem "sufit nie ma związku z bankiem" znika sam
+przez to że teraz sufit ZAWSZE odpowiada realnej progresji, nie inwestycji).
+
+**Fix (trudność raidu/eventu).** Ponieważ Lv15+ dostaje teraz TWARDY sufit 4 prób/dzień
+(wcześniej: miękki, zależny od inwestycji w gear, realnie rzadko maksowany), zaangażowany
+gracz mógł kończyć tygodniowy raid/event szybciej niż zamierzone — stąd użytkownik zażądał
+znacznie wyższej trudności obu torów zasilanych z tej puli:
+- `raidHpFor` (raid.ts): `1000+level×210` → `1500+level×315` (×1.5). Bezpieczne dla balansu
+  na kotku — to TYLKO rozmiar trwałej, tygodniowej puli (ile ciosów w SUMIE w ciągu tygodnia),
+  a kontratak liczy się od OSOBNEGO, bezpiecznie skalowanego `raidCounterHpFor` (patrz
+  komentarz w raid.ts) — podniesienie tej stałej wydłuża grind, nie podbija ryzyka na rundę.
+  Znany, wcześniej udokumentowany kompromis (HP tylko od `level`, nie od
+  `defeatedBosses.length`) zostaje bez zmian — osobna, większa naprawa, wciąż odłożona.
+- `eventHpFor` (seasonalEvents.ts): `300+level×9` → `480+level×14` (×1.6). W ODRÓŻNIENIU od
+  raidu, ta HP idzie WPROST do `counterDamage()` (walka round-based do 0 HP, jak kampania) —
+  podbicie jej podbija RÓWNOCZEŚNIE liczbę potrzebnych ciosów I obrażenia z każdego
+  kontrataku (ten sam kwadratowy mechanizm co przy `BOSSES`, patrz komentarz tam), więc ×1.6
+  hp to realnie bliżej ~×2.5 całkowitego ryzyka walki — faktycznie "o wiele trudniejsze", nie
+  kosmetyczna zmiana. Test-strażnik (`hitsNeeded` w `__tests__/seasonalEvents.test.ts`)
+  zaktualizowany: górny próg 10→13, wciąż skończona, jednosesyjna walka. `menaceHpFor`
+  (nemesis) NIE ruszony — nie korzysta z tej puli (nielimitowane próby, bez timera).
+
+**Fix (pozycja sprite'ów).** `SPRITE_GROUND_SHIFT` w `app/boss-fight.tsx`: `14→21` (+7px,
+dokładnie tyle ile user poprosił). Ta jedna stała przesuwa OBA sprite'y (kotek+boss) razem z
+ich `GroundShadow` (transform na wspólnym boxie) — pasek HP i tło architektonicznie
+odizolowane od tego transformu (osobne elementy poza `spriteBoxCat`/`spriteBoxBoss`), więc
+"bez ruszania paska zdrowia ani tła" spełnione automatycznie. `projectile.top` już liczony
+jako `91 + SPRITE_GROUND_SHIFT` (dynamicznie), więc podąża za zmianą bez osobnej edycji.
+Cień pod łapkami (`GroundShadow.tsx`, czarna elipsa z miękkim blurem przez SVG
+`RadialGradient`) już wcześniej pasował do specu usera ("cień w postaci kółka elipsy na
+podłodze... w kol. czarnym z lekkim blurem") — zero zmian potrzebnych w samym komponencie.
+
+**Explicite NIE zrobione**: pełna naprawa "raid/event HP powinno skalować się z REALNĄ mocą
+gracza (defeatedBosses.length/bonuses), nie tylko `level`" — to głębsza, architektoniczna
+zmiana (druga, niezależna oś progresji), już wcześniej świadomie odłożona (patrz komentarz
+przy `raidHpFor` w raid.ts) i tu też pozostaje odłożona — user poprosił o "o wiele
+trudniejsze", nie o pełny redesign formuły; ×1.5/×1.6 to wprost zmierzony, udokumentowany
+bump, nie próba naprawienia znanego kompromisu przy okazji. `weeklyReports.ts` — user
+explicite odpowiedział "raczej nie wiem", zostaje nietknięty.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/942 testy zielone (przepisany `eventDailyAttempts`
+suite w `__tests__/bosses.test.ts` pod nowe tiery poziomowe, podniesiony próg w
+`__tests__/seasonalEvents.test.ts`, `raid.test.ts` bez zmian — testował tylko relacje
+względne, nie dokładne stałe).
+
+**Priorytet testu na urządzeniu**: (1) Bossy → sprawdź że pigułka czerwonej energii w
+headerze pokazuje sensowny "X/Y" zgodny z aktualnym poziomem pupila (1/1 na niskim
+poziomie, do 4/4 po Lv15), nie znów rozjechane; (2) stocz raid/event na aktualnym poziomie i
+oceń czy trudność faktycznie odczuwalnie wzrosła, ale wciąż wygrywalna; (3) dowolna walka
+bossa (kampania/raid/event) → sprawdź czy kotek/boss stoją wizualnie niżej niż wcześniej
+(bliżej cienia/podłogi), pasek HP i tło bez zmian pozycji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
