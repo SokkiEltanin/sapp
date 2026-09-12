@@ -19,7 +19,7 @@ import {
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronDown, Trash2, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
-  PiggyBank, Utensils, Coins, Apple, ListChecks, Grid3x3,
+  PiggyBank, Utensils, Coins, Apple, ListChecks, Grid3x3, Search,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -2312,6 +2312,15 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 )}
                 <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>
+                  {/* Globalna wyszukiwarka (2026-09-12, user: "Wyszukiwanie ogarnij na ten
+                      moment") — `app/search.tsx` już ISTNIAŁ, kompletny (zadania/wydarzenia/
+                      transakcje/notatki/nawyki, z podświetlaniem i nawigacją do każdego
+                      wyniku) od refaktoru dashboardu (który go wydzielił z index.tsx), ale
+                      BEZ żadnego wejścia z UI — martwy dead-end. Tu tylko podpięty przycisk,
+                      zero zmian w samym ekranie search. */}
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/search' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                    <Search size={18} color={colors.text.muted} />
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); openCheckIn(); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Smile size={18} color={todayEntry ? colors.text.primary : colors.text.muted} />
                   </TouchableOpacity>

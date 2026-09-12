@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Globalna wyszukiwarka podpięta + lokalne statystyki użycia — NIEsprawdzone (2026-09-12)
+
+User: *"Wyszukiwanie ogarnij na ten moment... Pixel tylko w apce nigdzie nie wysyłać tego
+chce zupełnie obieg zamknięty ogarniaj teraz to"*. Pełny opis w ARCHITECTURE.md §80.
+
+1. `app/search.tsx` był już w pełni zbudowany (z wcześniejszego refaktoru dashboardu), ale
+   BEZ żadnego przycisku do niego — martwy dead-end. Naprawione: ikona lupy w nagłówku
+   dashboardu → `/search`. Zero zmian w samym ekranie search.
+2. Nowy lokalny, zamknięty-obiegowy licznik otwarć ekranów (`usageStatsStore.ts` +
+   `screenStats.ts`) — jedno miejsce zapisu w `app/_layout.tsx`, widoczny w Ustawienia →
+   "Statystyki apki". Zero sieci, dane jadą tylko przez istniejący eksport JSON jeśli user
+   zechce je podesłać.
+
+`tsc`/`jest` zielone (72 suit/940 testów, +6 nowych). **NIE zweryfikowane wizualnie na
+urządzeniu.**
+
+**⚠️ OTWARTE PYTANIE do usera (NIE zgadywane, patrz ARCHITECTURE §80)**: user napisał
+"tamto skanowanie paragonów nieużywane jest martwe do usunięcia kompletnie albo przebudowa
+pod to później" przy okazji odkładania kodów kreskowych — niejasne czy chodzi o CAŁY
+istniejący OCR-skan paragonów (`app/expenses/scan.tsx`, `ocrService.ts` — wygląda na
+aktywnie używaną, rozbudowaną funkcję wg historii ARCHITECTURE.md) czy o coś węższego.
+NIE ruszone — zbyt destrukcyjne żeby zgadywać. Dopytać zanim cokolwiek się tam usunie.
+
+**Priorytet testu na urządzeniu**: patrz checklist w ARCHITECTURE.md §80.
+
 ## 🆕 Eksport wydatków do CSV (Ustawienia) — NIEsprawdzone (2026-09-12)
 
 User: *"eksport wydatkow spoko możemy dodac w ustawieniach"*. Pełny opis w

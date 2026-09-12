@@ -6053,6 +6053,80 @@ zweryfikowane wizualnie na urządzeniu.**
 → wybierz "Otwórz w..."/zapisz plik → sprawdź że otwiera się poprawnie w Google Sheets/
 Excelu z polskimi znakami (nie krzakami) i że kwoty/kolumny są w dobrych miejscach.
 
+## 80. Globalna wyszukiwarka podpięta (dead-end fix) + lokalny licznik użycia ekranów
+
+User: *"Wyszukiwanie ogarnij na ten moment... Pixel tylko w apce nigdzie nie wysyłać tego
+chce zupełnie obieg zamknięty ogarniaj teraz to"* (kody kreskowe świadomie odłożone —
+"olewamy" — patrz NEXT_STEPS.md).
+
+### 1. Globalna wyszukiwarka — była już ZBUDOWANA, tylko osierocona
+
+Zanim zacząłem cokolwiek pisać, sprawdziłem kod i **`app/search.tsx` już istniał** — pełny,
+498-liniowy ekran przeszukujący zadania/wydarzenia/transakcje/notatki/nawyki naraz, z
+podświetlaniem dopasowań, sekcją "ostatnie" przy pustym zapytaniu i poprawną nawigacją do
+każdego wyniku (`/expenses/:id`, `/tasks/:id`, `/calendar/:id`, `/notes?noteId=`, `/habits`).
+`git log` pokazuje że powstał przy refaktorze wydzielającym kawałki z `index.tsx` — ale
+**żaden przycisk nigdzie w apce do niego nie prowadził** (zgrepowane: zero wystąpień
+`'/search'` poza samym plikiem). Klasyczny dead-end z CLAUDE.md zasady #7.
+
+**Fix**: jeden przycisk (ikona `Search`) w istniejącym rzędzie ikon nagłówka dashboardu
+(`s.headerMinRow` w `index.tsx`, obok Smile/Hourglass/Layers/Trophy) → `router.push('/search')`.
+Zero zmian w samym ekranie search — był już kompletny i poprawny.
+
+Odpowiedź na pytanie usera "nie mamy już tego w ustawieniach?": wyszukiwarka W Ustawieniach
+(`settingsSearch.ts`) i ta globalna to DWIE różne rzeczy — tamta szuka tylko opcji/przełączników,
+ta nowa szuka w danych usera. Nie kolidują.
+
+### 2. Lokalny licznik użycia ekranów ("statystyki apki")
+
+User chciał coś "ala meta pixel" ale **zamkniętego obiegu — zero wysyłki gdziekolwiek**.
+Zaimplementowana wersja jest ŚWIADOMIE lżejsza niż pełny click-stream (patrz rozmowa: pełne
+śledzenie KAŻDEGO tapnięcia wymagałoby ręcznej instrumentacji ~35 ekranów, łatwo o dziury,
+niewspółmierny koszt do zysku) — liczy **otwarcia ekranów**, nie pojedyncze kliknięcia.
+
+**`src/utils/screenStats.ts`** — `screenInfoFor(pathname)`: normalizuje surowy pathname z
+expo-router do stabilnego `screenId` + polskiej etykiety. Dynamiczne segmenty (id wydatku/
+zadania/notatki) są ZWIJANE do `:id` (heurystyka: czysto liczbowy ≥6 znaków LUB alfanumeryczny
+≥15 znaków) — inaczej store rósłby JEDNYM WPISEM NA KAŻDY otwarty rekord zamiast zostać
+płaskim zbiorem dziesiątek ekranów. Nieznany segment dostaje fallback (capitalize +
+myślnik→spacja), więc nowy ekran dodany później automatycznie ma sensowną etykietę bez
+zmiany tego pliku — brak ryzyka kolejnego dead-endu.
+
+**`src/store/usageStatsStore.ts`** — `{ screens: Record<screenId, { count, lastOpenedAt }> }`,
+persist przez istniejący `throttledPersistStorage()`. Zapisywany z **JEDNEGO miejsca**:
+`app/_layout.tsx`, `RootLayout` (komponent zamontowany przez całą sesję niezależnie od
+ekranu) — `usePathname()` + `useEffect` wołający `recordOpen()` przy każdej zmianie
+pathname. To (nie per-ekranowa instrumentacja) gwarantuje że KAŻDY obecny i przyszły ekran
+jest liczony automatycznie.
+
+**`src/components/settings/UsageStatsSection.tsx`** — nowa karta w Ustawienia → zaraz po
+`BackupSection`, lista ekranów posortowana malejąco po liczbie otwarć + "ostatnio otwarty"
++ przycisk "Wyczyść statystyki". Jawny tekst w UI: dane TYLKO lokalnie, nigdzie nie
+wysyłane; jeśli user chce mi je podesłać do analizy, jedzie to razem z resztą przez
+ISTNIEJĄCY eksport JSON (`exportSnapshotToFile` już zbiera WSZYSTKIE klucze AsyncStorage,
+więc `usage-stats-v1` ląduje w `config` automatycznie — zero dodatkowego eksportu do zrobienia).
+
+**Zamknięty obieg, zweryfikowany**: żadna nowa zależność sieciowa, żaden nowy request —
+tylko lokalny AsyncStorage. Koszt wydajnościowy: jeden throttlowany zapis PRZY NAWIGACJI
+(rzadkie zdarzenie), nie przy każdym gescie — nieodczuwalne.
+
+**Świadomie odłożone (z tej samej rozmowy, NIE zaczęte)**:
+- Kody kreskowe/skaner produktów — user: "olewamy kody kreskowe" — odłożone całkowicie.
+- Pytanie usera o "martwe/nieużywane skanowanie paragonów do usunięcia albo przebudowy" —
+  NIE zinterpretowane i NIE ruszone — zbyt niejednoznaczne żeby zgadywać przy tak
+  destrukcyjnej operacji (istniejący OCR-skan paragonów wygląda na aktywnie używaną,
+  rozbudowaną funkcję wg całej historii ARCHITECTURE.md, nie na dead code) — do
+  doprecyzowania z userem.
+
+`tsc`/`jest` zielone (72 suit/940 testów, +6 nowych dla `screenInfoFor`). **Nie
+zweryfikowane wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**: (1) Dashboard → ikona lupy w nagłówku → sprawdź że
+`/search` się otwiera i faktycznie znajduje rzeczy po wpisaniu zapytania; (2) Ustawienia →
+przewiń do nowej karty "Statystyki apki" → sprawdź że liczby rosną po odwiedzeniu kilku
+zakładek i restarcie apki (persystencja); (3) sprawdź że apka NIE zwalnia zauważalnie przy
+nawigacji (throttled zapis nie powinien być odczuwalny).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

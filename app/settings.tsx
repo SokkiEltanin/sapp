@@ -31,6 +31,7 @@ import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, ruleLabel } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
+import UsageStatsSection from '@/components/settings/UsageStatsSection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
@@ -2118,6 +2119,7 @@ export default function SettingsScreen() {
 
         <View>
           <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
+          <UsageStatsSection />
         </View>
 
         {filteredAfterBackup.map(f => (
