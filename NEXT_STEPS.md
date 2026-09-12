@@ -3,6 +3,13 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Usunięto martwy weeklyReports.ts (2026-09-12)
+
+User: *"szybką decyzja wywalamy to weekly reports"*. Zero importerów, martwy generator
+raportu tygodniowego (przed `monthlyReports.ts`, który jest realnie używany) — usunięty w
+całości, `tsc`/`jest` zielone. Pełny opis w ARCHITECTURE.md §85. **Zamknięte, nic więcej do
+zrobienia.**
+
 ## 🆕 Sufit czerwonej energii per poziom pupila + podbita trudność raidu/eventu + niższe sprite'y (2026-09-12)
 
 User odpowiedział na 3 otwarte pytania z poprzedniej rundy (§82/§83). Pełny opis w

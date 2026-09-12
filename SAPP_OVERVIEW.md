@@ -261,7 +261,6 @@ src/
 | `categories.ts` | Metadane kategorii: ikona, kolor, etykieta PL |
 | `haptics.ts` | `haptic.tap()`, `haptic.medium()`, `haptic.success()` |
 | `pomodoroHistory.ts` | AsyncStorage log ukończonych sesji Pomodoro |
-| `weeklyReports.ts` | Kalkulacje tygodniowych raportów |
 | `monthlyReports.ts` | Kalkulacje miesięcznych raportów |
 | `budgets.ts` | Budżety miesięczne per kategoria |
 | `tagBudgets.ts` | Budżety per tag żywnościowy |

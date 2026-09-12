@@ -6357,6 +6357,20 @@ oceń czy trudność faktycznie odczuwalnie wzrosła, ale wciąż wygrywalna; (3
 bossa (kampania/raid/event) → sprawdź czy kotek/boss stoją wizualnie niżej niż wcześniej
 (bliżej cienia/podłogi), pasek HP i tło bez zmian pozycji.
 
+## 85. Usunięto martwy `weeklyReports.ts`
+
+User (szybka decyzja po pytaniu z §84): *"szybką decyzja wywalamy to weekly reports"*.
+
+`src/utils/weeklyReports.ts` (247 linii, generator "raportu tygodniowego" — mood/tasks/
+expenses, patrz §83) miał **zero importerów** w `app`/`src`/`__tests__` — porzucona,
+wcześniejsza wersja tego co dziś realnie robi `monthlyReports.ts` (używany przez
+`exportAnalysis.ts`). Usunięty w całości + wpis w tabeli Utilities w `SAPP_OVERVIEW.md`.
+Zero konsumentów do zaktualizowania (stąd brak zmian poza samym plikiem i dokumentacją).
+
+`tsc --noEmit`/`jest` czyste (72 suity/942 testy — bez zmian w testach, plik nie miał
+własnego test suite). **Priorytet testu na urządzeniu**: brak — czysto martwy kod, zero
+powierzchni do sprawdzenia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
