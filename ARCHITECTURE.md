@@ -6009,6 +6009,50 @@ używają TEGO SAMEGO stonowanego złota, bez niebieskiego/zielonego jak wcześn
 edytorze układu); sprawdź że "Kto jadł" przy edycji pozycji paragonu DALEJ działa (to
 CELOWO zostało).
 
+## 79. Eksport wydatków do CSV (Ustawienia → Kopia zapasowa)
+
+Kontekst: po rundzie sugestii ulepszeń (globalna wyszukiwarka / widget na ekran główny /
+eksport CSV) user doprecyzował: *"A) Globalne wyszukiwanie super,, ale nie mamy już tego w
+ustawieniach? B) czy widget nie generował by energochlonnosci większej lagow itp? C)
+eksport wydatkow spoko możemy dodac w ustawieniach"*.
+
+**A i B — wyjaśnione, NIE zaimplementowane** (odpowiedzi w rozmowie, nie w kodzie):
+- Wyszukiwarka w Ustawieniach (`settingsSearch.ts`/`filterSections`) przeszukuje TYLKO
+  opcje/przełączniki ustawień — nie dane usera (transakcje/notatki/zadania). Prawdziwe
+  "globalne wyszukiwanie po danych" to inny, nowy zakres pracy, nie zrobiony.
+- Widget na ekran główny: żyje w OSOBNYM natywnym procesie (WidgetKit/App Widget), więc
+  NIE generuje lagów w samej apce podczas jej działania — ale realnie kosztuje baterię
+  przez cykliczne odświeżanie w tle i jest sporą dawką natywnej złożoności (a projekt
+  już ma historię kruchych buildów Androida przy zmianach natywnych, patrz CLAUDE.md
+  zasada #2). Odłożone, nie odrzucone.
+
+**C — zaimplementowane**: nowy przycisk "Eksportuj wydatki (CSV)" w `BackupSection.tsx`
+(Ustawienia → sekcja "Kopia zapasowa"), OBOK istniejącego eksportu pełnego JSON-a
+(`exportSnapshotToFile`) — to dwa różne eksporty, nie zastąpienie: JSON to techniczny
+snapshot do backupu/analizy (z sekcją `derived`), CSV to czytelna, jedna-transakcja-na-
+wiersz tabela do otwarcia w Excelu/Sheets (np. na podatki, przegląd historii poza apką).
+
+**Warstwa danych** — nowy `src/utils/expensesCsv.ts` (`expensesToCsv`, czysta funkcja,
+testowalna): kolumny Data/Typ/Kwota/Waluta/Kategoria/Tagi/Notatka/Sklep/Płatnik/Metoda
+płatności, posortowane rosnąco po dacie. Separator PRZECINEK + kwota z KROPKĄ dziesiętną
+(RFC4180/Sheets-style) — ŚWIADOMIE NIE polski format (średnik + przecinek dziesiętny), żeby
+plik otwierał się poprawnie od razu w Google Sheets I Excelu bez zmiany ustawień
+regionalnych przy imporcie. BOM (`﻿`) na początku pliku — bez tego Excel na Windows
+pokazuje polskie znaki jako krzaki. Pola z przecinkiem/cudzysłowem/nową linią poprawnie
+cudzysłowione (RFC4180 escaping).
+
+**`exportExpensesToCsv()`** w `backupService.ts` — analogiczny wzorzec do
+`exportSnapshotToFile`: `expensesService.getAll()` → `expensesToCsv()` →
+`FileSystem.writeAsStringAsync` do cache dir → `Sharing.shareAsync` (mimeType `text/csv`).
+
+`tsc`/`jest` zielone (71 suit/934 testy, +5 nowych: nagłówek+BOM, sortowanie+format kwoty,
+przychód/wydatek, gotówka/karta, RFC4180 escaping, tagi łączone średnikiem). **Nie
+zweryfikowane wizualnie na urządzeniu.**
+
+**Priorytet testu na urządzeniu**: Ustawienia → Kopia zapasowa → "Eksportuj wydatki (CSV)"
+→ wybierz "Otwórz w..."/zapisz plik → sprawdź że otwiera się poprawnie w Google Sheets/
+Excelu z polskimi znakami (nie krzakami) i że kwoty/kolumny są w dobrych miejscach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

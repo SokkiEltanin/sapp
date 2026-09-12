@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Eksport wydatków do CSV (Ustawienia) — NIEsprawdzone (2026-09-12)
+
+User: *"eksport wydatkow spoko możemy dodac w ustawieniach"*. Pełny opis w
+ARCHITECTURE.md §79.
+
+Nowy przycisk "Eksportuj wydatki (CSV)" w Ustawienia → Kopia zapasowa, obok istniejącego
+eksportu JSON (inny cel: JSON = techniczny backup, CSV = czytelna tabela do Excela/Sheets).
+
+`tsc`/`jest` zielone (71 suit/934 testy, +5 nowych). **NIE zweryfikowane wizualnie na
+urządzeniu** — priorytet: czy plik faktycznie otwiera się poprawnie (polskie znaki, kwoty)
+w Google Sheets i Excelu.
+
+**Odłożone (NIE zaczęte), z tej samej rozmowy**:
+- Globalne wyszukiwanie PO DANYCH (transakcje/notatki/zadania) — user zapytał, czy to nie
+  to samo co wyszukiwarka w Ustawieniach; NIE jest to samo (ta w Ustawieniach szuka tylko
+  opcji ustawień), ale prawdziwe globalne wyszukiwanie to osobna, nowa funkcja.
+- Natywny widget na ekran główny — user zapytał o koszt energii/lagi; wyjaśnione (osobny
+  proces, nie laguje apki, ale kosztuje baterię + duża złożoność natywna), odłożone.
+
 ## 🆕 Praca: jeden stonowany żółty akcent + usunięty widget "Kto zjadł słodycze" — NIEsprawdzone (2026-09-12)
 
 User: *"3. Te kolory w zakladce praca mi sie jednak nie podobają... dajmy jakiś soft
