@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Usunięty martwy OCR paragonów (kamera) — wymaga NOWEGO BUILDU APK (2026-09-12)
+
+User potwierdził: OCR (Google Vision, kamera) był całkowicie odłączony (zero wywołań),
+zawodny, płatny i crashujący — usunięty kompletnie. Pełny opis w ARCHITECTURE.md §81.
+
+Usunięte: `ocrService.ts`, `expo-camera`+`expo-image-picker` (npm), `Expense.receiptImageUrl`,
+`android.permission.CAMERA`+`READ_MEDIA_IMAGES` z `app.json`. Aktywny flow "Wklej paragon"
+(`app/expenses/scan.tsx` + `receiptParser.ts`) — ZERO zmian, dalej działa jak działał.
+
+`tsc`/`jest` zielone (72 suit/940 testów, bez zmian w liczbie).
+
+**⚠️ WYMAGA NOWEGO BUILDU APK** (nie OTA) żeby usunięcie permissionów faktycznie zadziałało
+na telefonie — patrz CLAUDE.md zasada #2. Do tego czasu apka ma je zadeklarowane ale
+nieużywane (nieszkodliwe). Priorytet testu PO builda: apka nie prosi już o dostęp do
+aparatu/galerii przy starcie.
+
 ## 🆕 Globalna wyszukiwarka podpięta + lokalne statystyki użycia — NIEsprawdzone (2026-09-12)
 
 User: *"Wyszukiwanie ogarnij na ten moment... Pixel tylko w apce nigdzie nie wysyłać tego

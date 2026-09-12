@@ -49,7 +49,6 @@ export interface Expense {
   tags: string[];
   note: string;
   date: string; // ISO string
-  receiptImageUrl?: string;
   storeName?: string;       // for receipt expenses
   receiptItems?: ReceiptItem[];  // products when saved as single receipt
   payer?: string;           // who paid (e.g. "Ja", "Partnerka") — counts in totals, lets you split by person
