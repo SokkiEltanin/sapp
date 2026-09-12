@@ -40,6 +40,8 @@ import { todayISO } from '@/utils/date';
 import { persistCrash } from '@/utils/crashLog';
 import { takeDanglingScanSave } from '@/utils/scanBreadcrumb';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useUsageStats } from '@/store/usageStatsStore';
+import { screenInfoFor } from '@/utils/screenStats';
 
 // Catch JS errors that escape React's render tree (async, event handlers, native
 // bridge) too — those can leave a black screen the ErrorBoundary never sees. We
@@ -203,6 +205,17 @@ export default function RootLayout() {
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
   useEffect(() => { loadNonFood().catch(() => {}); }, []);   // "to nie jedzenie" exclusions → module set
+
+  // Lokalny licznik użycia ekranów (2026-09-12, user: "coś ala meta pixel... obieg
+  // zamknięty" — patrz `usageStatsStore.ts`/`screenStats.ts` dla pełnego opisu). JEDNO
+  // miejsce, cały czas zamontowane niezależnie od aktualnego ekranu — więc nowy ekran
+  // dodany później jest liczony automatycznie, bez dopisywania instrumentacji nigdzie
+  // indziej. Zero sieci — tylko lokalny zapis (throttled) do AsyncStorage.
+  const usagePathname = usePathname();
+  useEffect(() => {
+    const info = screenInfoFor(usagePathname);
+    if (info) useUsageStats.getState().recordOpen(info.id);
+  }, [usagePathname]);
 
   // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila...
   // powiadomienie z confetti") — xp rośnie z WIELU miejsc (walki, questy, careTick), więc
