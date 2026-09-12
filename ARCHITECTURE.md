@@ -6222,6 +6222,63 @@ slot ekwipunku i odwrotnie; (2) otwórz dowolną skrzynkę → sprawdź że skrz
 wygląda większa, i że kliknięcie "Otwórz" daje wyraźne poczucie "trzęsie się → błysk →
 reel", nie nagłą podmianę.
 
+## 83. Przegląd kondycji apki (na życzenie: "ogarniaj dalej szukaj optymalizuj i zapisuj")
+
+User: *"Jak skończysz to ogarniaj dalej szukaj optymalizuj i zapisuj co mamy jak itp żebyś
+potem jak poproszę o analizę itp co dodac to będziesz wiedział"*. Samodzielny przegląd bez
+konkretnego zgłoszenia — poniżej co znalezione i (gdzie bezpieczne/jednoznaczne) od razu
+naprawione, resztę zapisane do NEXT_STEPS.md jako materiał pod przyszłe "co dodać".
+
+**Sprawdzone i CZYSTE** (żadna akcja nie potrzebna):
+- Martwe pliki w `src/services/*` — zero (wszystkie mają importerów).
+- Osierocone komponenty w `src/components/**/*.tsx` (poza `ui/`) — zero.
+- Wzorzec ANR z CLAUDE.md #1 (`StyleSheet.create`/`makeStyles(c)` świeże w renderze, bez
+  `useMemo` ani `themedStyles()`) — zero wystąpień. Style poza `useMemo`-em (kilka plików w
+  `src/components/dashboard/`, `settings/`) są BEZPIECZNE — `themedStyles()` cache'uje
+  wewnętrznie po referencji palety (`Map<Colors, T>`), więc `const s = makeS(c)` bez
+  `useMemo` to tani lookup, nie świeży `StyleSheet.create`. Stylistyczna niespójność
+  (część plików owija w `useMemo`, część nie), ale FUNKCJONALNIE nieszkodliwa — nic do
+  poprawy.
+
+**Znalezione i NAPRAWIONE od razu** (bezpieczne, ten sam sprawdzony przepis co wcześniejsze
+downscale'e w tej sesji, zero zmian w kodzie — tylko binarki):
+- **15 assetów ekwipunku/poitek nigdy nie przepuszczonych przez downscale** — 12 plików w
+  `assets/ekwipunek/{obroza,kolczyki,talizman,helm}/` (1536×1024/1024×1536, oryginalny
+  ChatGPT-owy rozmiar) + 3 w `assets/potki/` (1254×1254, jeszcze NIEWPIĘTE do kodu — potions
+  używają emoji, nie PNG, na razie). Wszystkie renderowane (albo docelowo renderowane) jako
+  małe ikony slotów (44-62px) — 1-2.5MB na plik było czystym marnotrawstwem. Przeskalowane
+  tym samym przepisem co reszta `assets/ekwipunek/*` (PIL LANCZOS, dłuższy bok→300px,
+  zachowany aspect ratio) — **27.0MB → 1.3MB (−25.8MB, −95.3%)**. Same nazwy plików/ścieżki
+  (`require()` w kodzie bez zmian) — zero ryzyka regresji funkcjonalnej.
+
+**Znalezione, ŚWIADOMIE NIE ruszone teraz** (zapisane do NEXT_STEPS.md, do decyzji z
+userem):
+- `src/utils/weeklyReports.ts` (247 linii, generator "raportu tygodniowego" — mood/tasks/
+  expenses) ma **zero importerów** w całym `app`/`src`/`__tests__` — wygląda na porzuconą,
+  wcześniejszą wersję tego co dziś robi `monthlyReports.ts` (TEN jest realnie używany, przez
+  `exportAnalysis.ts` w eksporcie JSON). Nie usunięty teraz — w odróżnieniu od `ocrService.ts`
+  (§81, user explicite potwierdził że to martwe), tu NIKT nie potwierdził że to naprawdę
+  niepotrzebne — mogło czekać na dokończenie (własny ekran "Tydzień"?), nie tylko być
+  zapomniane. Do zapytania: dokończyć (jaki UI?) czy usunąć.
+- `assets/lokalizacje/LOKACJA_KAMPANIA.png` (1.25MB) i `assets/lokalizacje/TLOSKLEPIKARZ.png`
+  (411KB) — też spore, ale to PEŁNOEKRANOWE tła (nie ikony), więc NIE zastosowany ten sam
+  agresywny downscale (ryzyko widocznej utraty jakości na dużym tle). Gdyby jednak chcieć
+  przyciąć — te dwa są kandydatami, ale wymagają osobnej, ostrożniejszej kalibracji (jaki
+  docelowy rozmiar wystarczy na największy obsługiwany ekran) niż ikony.
+- `assets/bossy/questy/osa_BOSSYuntitled.png` (321KB) i `BOSS_atakpazury_wilk.png` (373KB) —
+  PIKSELOWO w normie (600×600/600×500, zgodnie z resztą folderu), tylko cięższe od sąsiadów
+  o podobnym rozmiarze (najpewniej gorsza kompresja przy eksporcie). Próba re-save przez PIL
+  `optimize=True` (bez resize) dała **0 bajtów oszczędności** — PIL-owy `optimize` to za
+  mało, potrzebny byłby `pngquant`/`oxipng` (niedostępne w tym środowisku). Pominięte —
+  niewielki potencjalny zysk (kilkaset KB) nie uzasadnia dociągania zewnętrznych narzędzi bez
+  proszenia.
+
+`tsc` czyste. Testy bez zmian (940, żadna z tych zmian nie dotyka logiki testowanej
+jednostkowo — same binarki assetów). **Priorytet testu na urządzeniu**: NISKI — te ikony i
+tak jeszcze się nie renderowały w rozmiarze który by pokazał różnicę jakości (44-62px), ale
+warto rzucić okiem na ekwipunek w Rynku/Pupilu przy najbliższej sesji na telefonie, czy
+któryś z przeskalowanych obrazków nie wygląda gorzej niż przed zmianą.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

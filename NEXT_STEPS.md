@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Samodzielny przegląd kondycji apki — downscale 15 assetów (−25.8MB) — (2026-09-12)
+
+User: *"ogarniaj dalej szukaj optymalizuj i zapisuj co mamy"*. Pełny opis w
+ARCHITECTURE.md §83. Skrót:
+- 15 nieprzepuszczonych przez downscale assetów ekwipunku/potek (1-2.5MB/szt, renderowane
+  jako 44-62px ikony) przeskalowanych tym samym przepisem co reszta — 27.0MB → 1.3MB.
+- `src/services/*` i `src/components/**` (poza `ui/`) — bez martwych plików.
+- Wzorzec ANR ze `StyleSheet.create` w renderze — zero wystąpień, healthy.
+
+**Do decyzji z userem, nie ruszone**:
+- `src/utils/weeklyReports.ts` (247 linii, generator raportu tygodniowego) — ZERO importerów
+  w całej apce. Dokończyć (jaki ekran?) czy usunąć jak `ocrService.ts` w §81?
+- `assets/lokalizacje/LOKACJA_KAMPANIA.png`(1.25MB)/`TLOSKLEPIKARZ.png`(411KB) — spore, ale
+  to pełnoekranowe tła, nie ikony — potrzebują ostrożniejszej kalibracji rozmiaru niż proste
+  "300px długi bok" jak ikony. Kandydat do przycięcia PRZY OKAZJI, nie pilne.
+
+**Kandydaci pod przyszłe "co dodać"** (z wcześniejszych rund sugestii w tej rozmowie, wciąż
+odłożone, patrz historia wyżej w tym pliku): eksport CSV — ZROBIONE; globalna wyszukiwarka —
+ZROBIONE (podpięta); natywny widget na ekran główny — odłożony (koszt baterii + złożoność
+natywna); skaner kodów kreskowych — odłożony explicite przez usera ("olewamy").
+
 ## 🆕 Kotek nie nachodzi na itemy + większa/epicka animacja skrzynki — NIEsprawdzone (2026-09-12)
 
 User (3 różne, w tej samej rozmowie): *"1. red energy 15/2 bez sensu — ODŁOŻONE, pytanie do
