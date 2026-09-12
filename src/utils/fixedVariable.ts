@@ -13,6 +13,21 @@ export function isFixedExpense(e: Expense): boolean {
   return looksLikeBill(`${e.note ?? ''} ${(e.tags ?? []).join(' ')}`);
 }
 
+export type FvBucket = 'fixed' | 'variable' | 'food';
+
+// Klasyfikacja JEDNEGO wydatku do kubła Stałe/Zmienne/Jedzenie — CENTRALNA funkcja
+// (2026-09-12, refaktor przy okazji `e.fvOverride`), używana teraz wszędzie zamiast
+// osobno powtarzanego `isFixedExpense(e) ? ... : e.category === 'groceries' ? ...`
+// w każdej funkcji niżej. `fvOverride` (ręczne przeklasyfikowanie z widoku rozbicia
+// widgetu "Na co idą pieniądze" — user: "zebym mógł kliknąć ze np cos sie zle liczy...
+// zeby sie uczyło") ma ZAWSZE pierwszeństwo przed heurystyką kategorii/tagów.
+export function bucketOf(e: Expense): FvBucket {
+  if (e.fvOverride === 'fixed' || e.fvOverride === 'variable' || e.fvOverride === 'food') return e.fvOverride;
+  if (isFixedExpense(e)) return 'fixed';
+  if (e.category === 'groceries') return 'food';
+  return 'variable';
+}
+
 export interface FVMonth {
   month: string;   // YYYY-MM
   fixed: number;
@@ -31,8 +46,9 @@ export function fixedVariableMonths(expenses: Expense[], n = 4, now = new Date()
       if (e.type === 'income') continue;
       if (isSelfTransfer(e)) continue;
       if ((e.date ?? '').slice(0, 7) !== key) continue;
-      if (isFixedExpense(e)) fixed += e.amount;
-      else if (e.category === 'groceries') food += e.amount;
+      const b = bucketOf(e);
+      if (b === 'fixed') fixed += e.amount;
+      else if (b === 'food') food += e.amount;
       else variable += e.amount;
     }
     out.push({ month: key, fixed: Math.round(fixed), variable: Math.round(variable), food: Math.round(food) });
@@ -91,7 +107,7 @@ export function topVariableContributors(expenses: Expense[], month: string, n = 
   for (const e of expenses) {
     if (e.type === 'income' || isSelfTransfer(e)) continue;
     if ((e.date ?? '').slice(0, 7) !== month) continue;
-    if (isFixedExpense(e) || e.category === 'groceries') continue;
+    if (bucketOf(e) !== 'variable') continue;
     const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
     map[label] = (map[label] ?? 0) + e.amount;
   }
@@ -137,11 +153,32 @@ export function fixedBreakdown(expenses: Expense[], month: string): FixedItem[] 
   for (const e of expenses) {
     if (e.type === 'income' || isSelfTransfer(e)) continue;
     if ((e.date ?? '').slice(0, 7) !== month) continue;
-    if (!isFixedExpense(e)) continue;
+    if (bucketOf(e) !== 'fixed') continue;
     const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
     map[label] = (map[label] ?? 0) + e.amount;
   }
   return Object.entries(map)
     .map(([label, amount]) => ({ label, amount: Math.round(amount) }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+export interface FvTransaction { id: string; label: string; amount: number; date: string; overridden: boolean; }
+
+// Chronologiczna (najnowsze pierwsze) lista POJEDYNCZYCH transakcji faktycznie liczonych
+// w danym kuble (fixed/variable/food) w danym miesiącu — do widoku rozbicia widgetu
+// "Na co idą pieniądze" (2026-09-12, user: "muszą byc... wykresy stałych, zmiennych,
+// jedzenie każdy osobno klikalny z pokazaniem co sie kiedy tam wlicza"). Celowo SUROWA
+// lista, NIE grupowana jak `fixedBreakdown`/`topVariableContributors` — każda transakcja
+// osobno, żeby dało się ją pojedynczo przeklasyfikować (`fvOverride`, `overridden` flaguje
+// już ręcznie poprawione, żeby UI mógł je wyróżnić).
+export function bucketTransactions(expenses: Expense[], month: string, bucket: FvBucket): FvTransaction[] {
+  const out: FvTransaction[] = [];
+  for (const e of expenses) {
+    if (e.type === 'income' || isSelfTransfer(e)) continue;
+    if ((e.date ?? '').slice(0, 7) !== month) continue;
+    if (bucketOf(e) !== bucket) continue;
+    const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
+    out.push({ id: e.id, label, amount: Math.round(e.amount), date: e.date, overridden: !!e.fvOverride });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
 }

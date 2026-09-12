@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Finanse: wyszukiwarka tagu + przebudowa "Na co idą pieniądze" (fvOverride) — NIEsprawdzone (2026-09-12)
+
+User: *"1. tag własny (wyszukiwarka) w filtrach Finansów 2. widget Na co idą pieniądze —
+koncept spoko, wykonanie [słabe]... stałe/zmienne wzgledem średniej NA GŁÓWNYM TLE, pod nim
+wykresy stałych/zmiennych/jedzenia OSOBNO KLIKALNE z pokazaniem co i kiedy się liczy, żebym
+mógł kliknąć że coś się źle liczy, żeby się uczyło"*. Pełny opis w ARCHITECTURE.md §77.
+
+1. Finanse → Filtry → Tag: nowe pole tekstowe (substring, case-insensitive) NAD chipami top-12
+   — łapie tagi spoza top 12, nie tylko dokładne dopasowania.
+2. Widget dashboardu przebudowany: wiersze hero teraz 2-liniowe (kwota + `śr. X zł` + delta
+   %) i KLIKALNE; 3 osobne mini-wykresy trendu (Stałe/Zmienne/Jedzenie) zastąpiły jeden
+   wspólny stackowany; kliknięcie OTWIERA `FvBreakdownModal` — pełna lista transakcji tego
+   miesiąca w danym kuble, KAŻDĄ da się przeklasyfikować (nowe pole `Expense.fvOverride`,
+   trwałe, ma pierwszeństwo przed heurystyką kategorii — to jest "uczenie się", NIE ML).
+
+`tsc`/`jest` zielone (71 suit/940 testów, +6 nowych). **NIE zweryfikowane wizualnie na
+urządzeniu** — priorytet #1, zwłaszcza czy 2-liniowe wiersze hero + 3 mini-wykresy w rzędzie
+mieszczą się czytelnie na wąskim telefonie.
+
+**Priorytet testu na urządzeniu**: patrz checklist w ARCHITECTURE.md §77 (4 punkty: substring
+search w filtrach, czytelność nowego layoutu widgetu, poprawność modala rozbicia, i że
+przeklasyfikowanie transakcji faktycznie przelicza widget + zapamiętuje się między sesjami).
+
 ## 🆕 Grafika Skrzynki dnia (DAILY_BOX_ICON) + globalny fix BoxRevealModal — NIEsprawdzone (2026-09-11)
 
 User: *"wrzuciłem ci tam jeszcze daily skrzynkę, a dawaj dalej wszystko"* — dostarczony

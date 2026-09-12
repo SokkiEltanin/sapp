@@ -1,4 +1,4 @@
-import { isFixedExpense, fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, FVMonth } from '@/utils/fixedVariable';
+import { isFixedExpense, fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, bucketOf, bucketTransactions, FVMonth } from '@/utils/fixedVariable';
 import { Expense } from '@/types';
 
 const e = (o: Partial<Expense>): Expense => ({
@@ -85,6 +85,59 @@ describe('fixedVariable — topVariableContributors', () => {
       e({ category: 'entertainment', note: 'Steam', amount: 20, date: '2026-08-15T09:00:00' }),
     ];
     expect(topVariableContributors(exps, '2026-08', 1)).toEqual([{ label: 'Steam', amount: 50 }]);
+  });
+});
+
+// 2026-09-12, user: "zebym mógł kliknąć ze np cos sie zle liczy... zeby sie uczyło" — ręczne
+// przeklasyfikowanie (`fvOverride`) MUSI mieć pierwszeństwo przed heurystyką kategorii/tagów,
+// we WSZYSTKICH funkcjach niżej (przez wspólny `bucketOf`).
+describe('fixedVariable — bucketOf (fvOverride ma pierwszeństwo)', () => {
+  test('bez override: standardowa heurystyka (housing=fixed, groceries=food, reszta=variable)', () => {
+    expect(bucketOf(e({ category: 'housing', amount: 1000 }))).toBe('fixed');
+    expect(bucketOf(e({ category: 'groceries', amount: 100 }))).toBe('food');
+    expect(bucketOf(e({ category: 'entertainment', amount: 50 }))).toBe('variable');
+  });
+
+  test('fvOverride nadpisuje heurystykę w obie strony', () => {
+    expect(bucketOf(e({ category: 'housing', amount: 1000, fvOverride: 'variable' }))).toBe('variable');
+    expect(bucketOf(e({ category: 'entertainment', amount: 50, fvOverride: 'fixed' }))).toBe('fixed');
+    expect(bucketOf(e({ category: 'groceries', amount: 50, fvOverride: 'variable' }))).toBe('variable');
+  });
+
+  test('fvOverride: null (wyczyszczone) wraca do heurystyki', () => {
+    expect(bucketOf(e({ category: 'housing', amount: 1000, fvOverride: null }))).toBe('fixed');
+  });
+
+  test('fixedVariableMonths respektuje fvOverride', () => {
+    const exps = [
+      e({ category: 'housing', amount: 1000, date: '2026-08-03T09:00:00', fvOverride: 'variable' }),
+      e({ category: 'entertainment', amount: 50, date: '2026-08-05T09:00:00' }),
+    ];
+    const [m] = fixedVariableMonths(exps, 1, new Date(2026, 7, 15));
+    expect(m.fixed).toBe(0);
+    expect(m.variable).toBe(1050);
+  });
+});
+
+describe('fixedVariable — bucketTransactions', () => {
+  test('zwraca surową, chronologiczną (najnowsze pierwsze) listę transakcji danego kubła', () => {
+    const exps = [
+      e({ id: 'a', category: 'entertainment', note: 'Kino', amount: 40, date: '2026-08-05T09:00:00' }),
+      e({ id: 'b', category: 'other', note: 'Wiatrak', amount: 120, date: '2026-08-10T09:00:00' }),
+      e({ id: 'c', category: 'housing', note: 'Czynsz', amount: 1200, date: '2026-08-03T09:00:00' }),
+    ];
+    const out = bucketTransactions(exps, '2026-08', 'variable');
+    expect(out.map(t => t.id)).toEqual(['b', 'a']);
+    expect(out.every(t => t.overridden === false)).toBe(true);
+  });
+
+  test('flaguje overridden i respektuje przeklasyfikowanie', () => {
+    const exps = [
+      e({ id: 'a', category: 'housing', note: 'Coś', amount: 100, date: '2026-08-05T09:00:00', fvOverride: 'variable' }),
+    ];
+    expect(bucketTransactions(exps, '2026-08', 'fixed')).toHaveLength(0);
+    const out = bucketTransactions(exps, '2026-08', 'variable');
+    expect(out).toEqual([{ id: 'a', label: 'Coś', amount: 100, date: '2026-08-05T09:00:00', overridden: true }]);
   });
 });
 

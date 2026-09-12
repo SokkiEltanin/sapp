@@ -55,6 +55,11 @@ export interface Expense {
   payer?: string;           // who paid (e.g. "Ja", "Partnerka") — counts in totals, lets you split by person
   bankMatched?: boolean;    // confirmed against / created from a bank notification
   vehicleId?: string;       // manual link to a vehicle (Pojazdy) — overrides tag/category auto-match
+  // Ręczne nadpisanie klasyfikacji "Stałe/Zmienne/Jedzenie" na dashboardzie (2026-09-12,
+  // user: "zebym mógł kliknąć ze np cos sie zle liczy... zeby sie uczyło") — ustawiane z
+  // widoku rozbicia widgetu "Na co idą pieniądze", patrz `bucketOf()` w fixedVariable.ts
+  // (sprawdzane PRZED heurystyką kategorii/tagów). `null` = wyczyszczone (wróć do auto).
+  fvOverride?: 'fixed' | 'variable' | 'food' | null;
   paymentMethod?: PaymentMethod; // cash vs card; undefined treated as 'card'
   viaScan?: boolean;        // added by pasting+parsing a receipt (expenses/scan.tsx), not typed
   createdAt: string;
