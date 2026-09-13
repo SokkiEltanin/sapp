@@ -1,4 +1,4 @@
-import { usePetStore } from '@/store/petStore';
+import { usePetStore, effectiveCatMaxHp } from '@/store/petStore';
 import { isPotionActive, potionFlatHp, potionAtkBonus, potionXpMult, POTIONS } from '@/utils/potions';
 
 // Potki czasowe (2026-09-08) — user planuje przebudowę Rynku (górne 4 sloty tablicy: Zamrożenie
@@ -37,6 +37,28 @@ describe('potions.ts — funkcje czyste', () => {
   test('potionXpMult: tylko potka XP', () => {
     const xp = { kind: 'xp' as const, endsAt: new Date(Date.now() + 3600000).toISOString() };
     expect(potionXpMult(xp)).toBe(POTIONS.xp.xpMult);
+  });
+});
+
+// 2026-09-13, user zrzutem ekranu: "Max HP kotka: 397.9813491557909" — `gearFlatHp` zwraca
+// wylosowany, ciągły `owned.value` (roll zbroi), nigdy nie był całkowity.
+// `effectiveCatMaxHp` (jedyne wspólne miejsce liczące sufit HP dla wyświetlania I walki,
+// patrz komentarz w petStore.ts) musi zaokrąglić WYNIK, żeby HP zostało spójną, całkowitą
+// koncepcją gry wszędzie, tak jak bazowe staty czy HP bossów.
+describe('petStore — effectiveCatMaxHp zaokrągla ułamkowy roll ekwipunku', () => {
+  test('ułamkowa wartość zbroi (roll ze skrzynki) nie przecieka do wyświetlanego/bojowego max HP', () => {
+    const maxHp = effectiveCatMaxHp(
+      0,
+      { zbroja: 'zbroja_smoczaLuska' },
+      { zbroja_smoczaLuska: { rarity: 'epic', value: 297.9813491557909 } },
+      null,
+    );
+    expect(Number.isInteger(maxHp)).toBe(true);
+    expect(maxHp).toBe(Math.round(100 + 297.9813491557909));
+  });
+
+  test('bez ekwipunku/potki: całkowita wartość zostaje całkowita (regresja na "zawsze zaokrąglaj bez różnicy")', () => {
+    expect(effectiveCatMaxHp(20, {}, {}, null)).toBe(120);
   });
 });
 

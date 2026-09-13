@@ -6558,6 +6558,47 @@ do pełnej kwoty paragonu; (3) oznacz produkt "nie jedzenie"/z powrotem "jedzeni
 edytorze paragonu → sprawdź że kwoty w widgecie i na liście przeliczają się od razu po
 zapisie (bez potrzeby zamykania/otwierania ekranu).
 
+## 89. Naprawiony nierozokraglony Max HP + powiększony reel skrzynki (min. +50%)
+
+User (zrzut ekranu Pupila): *"Zdrowie buguje sie jakby kiedyś HP i sie nie zaokragla"*
+(pokazane: "Max HP kotka: 397.9813491557909"), plus (zrzut sklepu z reelem otwierania
+skrzynki): *"Tak animacja jest za mała powieksz ja o 50 prc minimum"*.
+
+**Fix 1 — nierozokraglone Max HP.** `gearFlatHp()` (`gear.ts`) zwraca `owned.value` —
+WYLOSOWANY roll zbroi ze skrzynki (ciągły ułamek, nigdy nie był całkowity). `effectiveCatMaxHp`
+(`petStore.ts`) — JEDYNE wspólne miejsce liczące sufit HP dla wyświetlania ORAZ walki
+(damageCat/healCat/resetCatHp) — sumowało ten ułamek z resztą bez zaokrąglenia wyniku,
+więc "397.9813491557909" wyciekało wprost na ekran Pupila. Naprawa: `Math.round()` na
+KOŃCU `effectiveCatMaxHp` — jedno miejsce, wszyscy konsumenci (wyświetlanie w pet.tsx,
+walka w boss-fight.tsx) dostają teraz spójną liczbę całkowitą, bez dotykania samych
+wylosowanych `owned.value` w `ownedGear` (i tak tylko surowe wejście do tej formuły).
+
+**Fix 2 — reel otwierania skrzynki za mały.** `BoxRevealModal.tsx`'s reel (case-opening
+pasek ikon z §82) — `REEL_ITEM_W` (rozmiar komórki) 78→120 (+54%), wysokość okna 92→138
+(+50%), obrazek ikony 44→66, emoji-fallback 30→45, grot/pasek wskaźnika proporcjonalnie
+większe. `REEL_WINDOW_W` (widoczne okno, dawniej sztywna stała 264) przestało być stałą —
+sztywne ×1.5 (396) przelewałoby się poza wąskie telefony (Xiaomi/starsze Samsungi ~360dp
+szerokości, temat portabilności zapowiedziany wcześniej w tej rozmowie), więc TERAZ liczone
+z `useWindowDimensions()` wewnątrz komponentu (`Math.min(400, winW - 48)`) — ten sam wzorzec
+co `catSize` w `pet.tsx` (§82). Matematyka lądowania (`finalX` w `doOpen()`) przeliczona na
+tę zmienną zamiast stałej — reszta (REEL_LENGTH/REEL_TARGET_INDEX, indeksy komórek) bez
+zmian, bo nie zależy od pikseli.
+
+**Explicite NIE zrobione**: żadna migracja/przeliczenie już zapisanych `owned.value` w
+istniejących save'ach userów — ułamkowe rolle zostają jak są w danych, tylko WYŚWIETLANY/
+BOJOWY sufit HP jest teraz zawsze całkowity niezależnie od tego jak "brzydki" jest surowy roll.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/952 testy (+2 nowe w `potions.test.ts`:
+`effectiveCatMaxHp` zaokrągla ułamkowy roll zbroi, i regresja że całkowite wartości
+zostają całkowite). Reel: brak testów jednostkowych (czysto wizualna zmiana rozmiaru/
+responsywności, bez nowej logiki liczącej co innego niż wcześniej).
+
+**Priorytet testu na urządzeniu**: (1) ekran Pupil → Max HP kotka pokazuje teraz liczbę
+całkowitą, bez dziesiętnych; (2) otwórz dowolną skrzynkę → reel wyraźnie większy (ikony
+czytelne w locie, nie tylko po zatrzymaniu), i NIE wystaje poza ekran na węższym telefonie
+(jeśli user ma dostęp do węższego urządzenia do testu — na szerszym telefonie okno
+osiągnie pełny sufit 400px).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
