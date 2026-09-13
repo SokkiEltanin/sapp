@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ręczny przełącznik "Przelew własny" na szczegółach transakcji — NIEsprawdzone (2026-09-13)
+
+User dopytał po poprzednim wpisie: *"mam opcje dosac własną kategorie jakby?? Czyli
+właśnie ten przelew wlasny? Który sie nie wlicza"*. Pełny opis w ARCHITECTURE.md §92.
+Skrót: dotąd self-transfer dało się oznaczyć TYLKO auto-wykryciem z banku — teraz na
+ekranie szczegółów wydatku/przychodu jest ręczny `Switch` "Przelew własny" (między
+Kategorią a Tagami), który dodaje/usuwa istniejący tag `przelew` (już rozpoznawany przez
+`isSelfTransfer`). W karcie kwoty pojawia się też czytelny badge, gdy transakcja jest
+self-transferem.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: włącz przełącznik na dowolnej transakcji,
+zapisz, sprawdź że kwota znika z sum wydatków/przychodów na liście Finansów i wraca po
+wyłączeniu.
+
 ## 🆕 Pill bez odbicia + przelew własny po imieniu + plakietki FV do szczegółów — NIEsprawdzone (2026-09-13)
 
 Trzy prośby jednym zgłoszeniem, pełny opis w ARCHITECTURE.md §91: (1) *"animacja przejścia
