@@ -1,6 +1,7 @@
 import { useBankQueue } from '@/store/bankQueueStore';
 import { commitBankTx } from './bankCommit';
 import { toast } from '@/store/toastStore';
+import { usePillFlash } from '@/store/pillFlashStore';
 
 // Auto-accepts every queued payment from a TRUSTED (auto) merchant. Runs in-app on
 // foreground so the expenses store is loaded and receipt-matching is reliable. Items
@@ -27,9 +28,13 @@ export async function processAutoBankQueue(): Promise<number> {
       if (r.ok) { useBankQueue.getState().remove(p.id); done++; total += p.amount; }
     }
     if (done > 0) {
-      toast.success(done === 1
+      const msg = done === 1
         ? `Auto-dodano płatność z banku: ${total.toFixed(2)} zł`
-        : `Auto-dodano ${done} płatności z banku: ${total.toFixed(2)} zł`);
+        : `Auto-dodano ${done} płatności z banku: ${total.toFixed(2)} zł`;
+      toast.success(msg);
+      // Też w TopPill (2026-09-13, user: "niech moze tam sie pokazuja te powiadomienia...
+      // ze dodano płatność automatyczna") — patrz komentarz w pillFlashStore.ts.
+      usePillFlash.getState().show(msg, { badge: `${done}`, color: '#2AC68F' });
     }
     return done;
   } finally {

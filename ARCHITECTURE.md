@@ -6599,6 +6599,58 @@ czytelne w locie, nie tylko po zatrzymaniu), i NIE wystaje poza ekran na węższ
 (jeśli user ma dostęp do węższego urządzenia do testu — na szerszym telefonie okno
 osiągnie pełny sufit 400px).
 
+## 90. TopPill: zadania bez terminu przestają wiecznie świecić + kanał "flash" na powiadomienia (seria logowań, auto-płatność z banku)
+
+User: *"za często tam sie pokazuje ze mam zadanie wiem ze mam zadanie jedno ale ono nie ma
+terminu i świeci mi sie na dole bez sensu jeszcze w pillu to, a dodatkowo niech moze tam si
+epokazuja te powiadomienia ze sie pill lekko rozszerza i jest napisane ze seria logowan,
+albo ze dodano płatność automatyczna czy cos nie wiem"*.
+
+**Fix 1 — zadanie bez terminu wiecznie w rotacji.** Ostatni fallback kandydat LUŹNEJ puli
+(`TopPill.tsx`) liczył WSZYSTKIE `status !== 'done'` zadania, niezależnie czy mają termin.
+Zadanie bez `deadline`/`scheduledDate` nie ma ŻADNEGO mechanizmu który by je "rozwiązał"
+(priorytety 4/4b/7 wyżej już WYMAGAJĄ terminu z tego samego powodu), więc taki kandydat
+istniał w puli NA ZAWSZE, pojawiając się co `CALM_ROTATE_MS` (8s) w nieskończoność — dokładnie
+"bez sensu świeci się" ze zgłoszenia. Filtr `t.deadline || t.scheduledDate` ujednolica ten
+fallback z resztą pliku; zadanie bez terminu po prostu nigdy nie trafia do pilla (co jest OK
+— brak terminu = brak pilności z definicji), reszta kandydatów (misja/energia bossów/
+nastrój/"wszystko ogarnięte") przejmuje slot normalnie.
+
+**Fix 2 — kanał "flash" na powiadomienia.** Drugi punkt zgłoszenia opisywał DOKŁADNIE dwa
+JUŻ ISTNIEJĄCE `toast.success(...)` w kodzie (potwierdzone grep-em, nie zgadywane): "seria
+logowań" = `registerLogin()` w `app/(tabs)/index.tsx` ("Seria logowań: X dni 🔥 +Y monet"),
+"dodano płatność automatyczna" = `processAutoBankQueue()` w `bankAutoProcess.ts` ("Auto-
+dodano płatność z banku..."). Toast znika po ~2.6s (`Toast.tsx`) i łatwo go przegapić —
+`TopPill` żyje na stałe w tab-barze, więc jest dużo bardziej "na oku". Nowy
+`pillFlashStore.ts` — mały, generyczny Zustand store (`show(text, {badge, color,
+durationMs})` / `clear()`), NIE zastępuje toastu (oba kanały strzelają naraz, świadomie —
+mniej ryzykowne niż usuwanie istniejącego, sprawdzonego UX) tylko go DUBLUJE w pillu.
+`TopPill.tsx` sprawdza aktywny flash jako priorytet 0 — PRZED pomodoro/live-earnings, bo to
+"rzeczy które user chce zobaczyć od razu", z auto-zniknięciem DOKŁADNIE po `expiresAt`
+(osobny `setTimeout`, nie czeka na `calmTick` który i tak tyka niezależnie co 8s). Tap na
+flash = zamknij od razu (`usePillFlash.getState().clear()`) — brak naturalnego miejsca
+docelowego dla czysto informacyjnego komunikatu. Animacja "pill lekko rozszerza się" =
+ISTNIEJĄCY "pop" na zmianę `key` (shrink-out → spring-in), żadnej nowej animacji do
+budowania — flash to po prostu kolejny `PillItem` z inną `key`.
+
+**Explicite NIE zrobione**: żadnych innych zdarzeń NIE podłączonych do flasha poza tymi
+dwoma dokładnie wymienionymi przez usera (np. odblokowanie osiągnięcia ma już własny,
+dedykowany modal `BadgeCelebration.tsx` — dublowanie go w pillu byłoby nadmiarowe, nie
+dołożone). `pillFlashStore` jest generyczny i gotowy na więcej wywołań `show(...)` w
+przyszłości, jeśli user zechce rozszerzyć listę po zobaczeniu jak to działa.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/952 testy (bez nowych — `pillFlashStore.ts` to
+trywialny store bez własnej logiki do testowania, ten sam brak testów co istniejący
+`toastStore.ts`; `TopPill.tsx` nie ma testów jednostkowych, projekt nie testuje komponentów
+RN, patrz ustalony wzorzec).
+
+**Priorytet testu na urządzeniu**: (1) zadanie bez terminu → pill NIE powinien już go
+pokazywać w ogóle (sprawdź że reszta rotacji — luz/misja/etc. — normalnie działa zamiast
+tego); (2) otwórz apkę pierwszy raz danego dnia → pigułka "SERIA LOGOWAŃ" powinna mignąć
+na kilka sekund NAD czymkolwiek innym, potem wrócić do normalnej rotacji; (3) jeśli masz
+zaufany automat bankowy — poczekaj na auto-dodaną płatność i sprawdź czy flash się pojawia
+razem z toastem, nie zamiast niego.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

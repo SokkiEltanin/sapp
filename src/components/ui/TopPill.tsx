@@ -1,8 +1,9 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState } from 'react-native';
 import { router } from 'expo-router';
-import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords } from 'lucide-react-native';
+import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords, Bell } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
+import { usePillFlash } from '@/store/pillFlashStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
 import { useUiActions } from '@/store/uiActions';
@@ -63,6 +64,7 @@ function up(s: string | undefined | null): string {
 
 // Kontekstowa ikona statusu (po prefiksie klucza) — daje pillowi tożsamość „live island".
 function pillIcon(key: string): any {
+  if (key.startsWith('flash-')) return Bell;
   if (key.startsWith('pom-')) return Timer;
   if (key.startsWith('earn-') || key.startsWith('shift-')) return Briefcase;
   if (key.startsWith('overdue-')) return AlertTriangle;
@@ -132,6 +134,19 @@ export default function TopPill() {
   const missionStartedAt = usePetStore(s => s.missionStartedAt);
   const bossEnergy    = usePetStore(s => s.energy);
 
+  // Flash — krótkie, "na już" powiadomienie (2026-09-13, patrz pillFlashStore.ts, user:
+  // "niech moze tam sie pokazuja te powiadomienia... seria logowan, albo ze dodano
+  // płatność automatyczna"). Auto-znika DOKŁADNIE po `expiresAt` (nie czeka na kolejny
+  // `calmTick`, który tyka co 8s niezależnie i dawałby losowe opóźnienie zniknięcia).
+  const flash = usePillFlash(s => s.flash);
+  useEffect(() => {
+    if (!flash) return;
+    const remaining = flash.expiresAt - Date.now();
+    if (remaining <= 0) { usePillFlash.getState().clear(); return; }
+    const t = setTimeout(() => usePillFlash.getState().clear(), remaining);
+    return () => clearTimeout(t);
+  }, [flash?.expiresAt]);
+
   // The pill never re-focuses (it lives in the tab bar), so reload budgets on
   // cold start AND every foreground — otherwise a limit changed in Settings would
   // leave the pill's "near limit" warning stale for the whole session.
@@ -163,6 +178,21 @@ export default function TopPill() {
   // ── Priority logic ─────────────────────────────────────────────────────────
   const item: PillItem | null = useMemo(() => {
    try {
+
+    // 0 — Flash: krótkie powiadomienie, NAJWYŻSZY priorytet — przerywa nawet
+    // pomodoro/live-earnings na czas trwania (parę sekund). To rzeczy user CHCE
+    // zobaczyć od razu (patrz komentarz przy `flash` wyżej), nie coś co ma czekać
+    // w zwykłej rotacji. Tap = zamknij od razu (brak naturalnego "miejsca docelowego").
+    if (flash && flash.expiresAt > Date.now()) {
+      return {
+        badge:  flash.badge ?? '🔔',
+        color:  flash.color,
+        text:   flash.text,
+        route:  '/(tabs)',
+        key:    `flash-${flash.expiresAt}`,
+        action: () => usePillFlash.getState().clear(),
+      };
+    }
 
     // 1 — Pomodoro running (work session)
     if (pomRunning && pomMode === 'work') {
@@ -377,8 +407,14 @@ export default function TopPill() {
       });
     }
 
-    // Fallback: pending count — zawsze dopisywany, jeśli są jakieś niezrobione zadania.
-    const pending = calTasks.filter(t => t.status !== 'done').length;
+    // Fallback: pending count (2026-09-13, user: "wiem ze mam zadanie jedno ale ono nie
+    // ma terminu i świeci mi sie na dole bez sensu jeszcze w pillu to") — TYLKO zadania z
+    // jakimś terminem (deadline LUB scheduledDate) liczą się tutaj. Zadanie bez terminu nie
+    // jest niczym pilnym do przypomnienia — bez tego filtra ono samo wystarczało, żeby ten
+    // kandydat ISTNIAŁ WIECZNIE w puli rotacji (nigdy nie znika, bo nic go nie "rozwiązuje"),
+    // więc pojawiał się co CALM_ROTATE_MS bez końca. Priorytety 4/4b/7 wyżej już wymagają
+    // terminu z tego samego powodu — ten fallback teraz jest spójny z resztą pliku.
+    const pending = calTasks.filter(t => t.status !== 'done' && (t.deadline || t.scheduledDate)).length;
     if (pending > 0) {
       calmCandidates.push({
         badge: `${pending}`,
@@ -406,6 +442,7 @@ export default function TopPill() {
     return null;
    }
   }, [
+    flash,
     pomRunning, pomMode, pomRemaining, pomTitle,
     workEarnings.isWorking, workEarnings.totalEarned, workEarnings.activeEventTitle,
     shifts, workPrefix,
