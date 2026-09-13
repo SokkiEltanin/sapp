@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sklep: gradientowa nazwa + aura rzadkości + większe itemy + potki — PRIORYTET testu (2026-09-13)
+
+**DRUGA próba naprawy tego samego buga** (pierwsza, §73e, "naprawiona" samym `lineHeight`
+na zwykłym `<Text>`, NIE przeszła realnego testu na urządzeniu — user zrzutem dowiódł że
+gradient nadal ucina nazwę). Tym razem nazwa itemu przeniesiona na prawdziwe SVG
+(`GradientText.tsx`, nowy generyczny komponent) — jawny baseline zamiast RN Text/Android
+font-metric loterii. Pełny opis w ARCHITECTURE.md §87. W tym samym batchu: nazwa jako
+gradient koloru rzadkości, kolorowa poświata (`RadialGlow`) dookoła 4 itemów Sklepu dnia,
+powiększone ikony (74%/78%), podpięte własne grafiki potek (były w `assets/potki/`, nie
+`assets/bossy/` jak user pamiętał — tylko nigdy nie podłączone do UI), usunięty nietrafiony
+podpis pod sceną Sklepu.
+
+**NIE zweryfikowane wizualnie na urządzeniu — to jest TERAZ priorytet #1**, zwłaszcza samo
+"czy gradient faktycznie już nie ucina nazwy" (patrz checklist w ARCHITECTURE.md §87). Jeśli
+nadal się powtórzy — SVG-owy `GradientText` eliminuje teoretyczny root cause (font-metric
+niezgodność RN Text/Android), więc trzeci błąd wskazywałby na coś innego (np. font systemowy
+w SVG realnie inny niż w RN Text, złe dobranie `fontSize`/`maxChars` w fit-scale) — nie
+próbować czwarty raz "na oko", tylko poprosić o świeży zrzut z konkretnym itemem i długością
+nazwy.
+
 ## 🆕 Odznaka Stałe/Zmienne/Jedzenie na liście wydatków (audyt) — NIEsprawdzone (2026-09-12)
 
 User: *"ulepsz oznaczanie żebym mógł jano widzieć na wydatkach co jest jedzeniem co jest
