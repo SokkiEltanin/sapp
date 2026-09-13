@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
+  TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -715,6 +715,20 @@ export default function ExpenseDetailScreen() {
               </View>
             )}
 
+            {/* Przelew własny (2026-09-13, user: "mam opcje dodac własną kategorie jakby??
+                Czyli właśnie ten przelew własny, który się nie wlicza") — czytelny znacznik
+                w hero, gdy transakcja jest self-transferem (tag "przelew"/"revolut"/
+                "oszczędnościowe" albo category "transfer", patrz isSelfTransfer). Przełącznik
+                do WŁĄCZANIA tego ręcznie jest niżej w karcie "Przelew własny" pod kategorią. */}
+            {isSelfTransfer(expense) && (
+              <View style={[s.transferBadge, { marginTop: spacing[2] }]}>
+                <LucideIcons.ArrowLeftRight size={11} color={heroAccent + 'CC'} />
+                <Text style={[s.transferBadgeText, { color: heroAccent + 'CC' }]}>
+                  Przelew własny — nie liczy się do {editIsIncome ? 'przychodów' : 'wydatków'}
+                </Text>
+              </View>
+            )}
+
             {/* Note */}
             {editing ? (
               <TextInput
@@ -911,6 +925,37 @@ export default function ExpenseDetailScreen() {
                 );
               })()
             )}
+          </View>
+
+          {/* ── Przelew własny ───────────────────────────────────────────────── */}
+          {/* 2026-09-13, user: "mam opcje dosac własną kategorie jakby?? Czyli właśnie ten
+              przelew wlasny? Który sie nie wlicza bo to do siebie na inne konto wysyłam" —
+              dotąd JEDYNA droga do selfTransfer to auto-wykrycie z powiadomienia banku
+              (słowa-klucze Revolut/oszczędności albo dopasowanie imienia z ownName.ts);
+              ręcznie dodany wydatek/przychód, albo taki gdzie parser się nie złapał, nie
+              miał ŻADNEJ opcji. Tag "przelew" jest już rozpoznawany przez isSelfTransfer
+              (statWidgets.ts) — ten przełącznik po prostu dodaje/usuwa go, więc żadna nowa
+              logika klasyfikująca nie powstaje, tylko brakujący manualny dostęp do
+              istniejącej. */}
+          <View style={s.card}>
+            <View style={s.transferRow}>
+              <View style={{ flex: 1, marginRight: spacing[3] }}>
+                <Text style={s.cardLabel}>Przelew własny</Text>
+                <Text style={s.transferHint}>
+                  Przelew między Twoimi kontami — nie liczy się jako {editIsIncome ? 'przychód' : 'wydatek'}
+                </Text>
+              </View>
+              {editing ? (
+                <Switch
+                  value={tags.includes('przelew')}
+                  onValueChange={() => { haptic.tap(); toggleTag('przelew'); }}
+                  trackColor={{ false: colors.fill.strong, true: accentColor + '99' }}
+                  thumbColor={tags.includes('przelew') ? colors.text.primary : colors.text.muted}
+                />
+              ) : (
+                <Text style={s.transferValue}>{isSelfTransfer(expense) ? 'Tak' : 'Nie'}</Text>
+              )}
+            </View>
           </View>
 
           {/* ── Tags ─────────────────────────────────────────────────────────── */}
@@ -1119,6 +1164,12 @@ const makeS = (c: any) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.2)',
   },
   dateBadgeText: { fontSize: 10, fontWeight: '500' },
+  transferBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    paddingHorizontal: spacing[2], paddingVertical: 3,
+    borderRadius: radius.full, backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  transferBadgeText: { fontSize: 10.5, fontWeight: '600' },
   noteText: { fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 20, marginTop: 4 },
   noteInput: { fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 20, marginTop: 4, padding: 0 },
 
@@ -1217,6 +1268,10 @@ const makeS = (c: any) => StyleSheet.create({
   },
   payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
   payerValue: { fontSize: 14, color: c.text.primary, fontWeight: '500' },
+
+  transferRow: { flexDirection: 'row', alignItems: 'center' },
+  transferHint: { fontSize: 12, color: c.text.muted, marginTop: 3, lineHeight: 16 },
+  transferValue: { fontSize: 14, color: c.text.primary, fontWeight: '600' },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   dateTxt: { fontSize: 14, color: c.text.secondary },

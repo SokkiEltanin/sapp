@@ -6721,6 +6721,47 @@ wejść do kolejki jako "odłożone", nie jako wydatek; (3) otwórz dowolny wyda
 Stałe/Zmienne/Jedzenie widoczna w karcie kwoty, tap otwiera chipsy do zmiany; sprawdź że w
 głównej liście Finansów żadnej plakietki już nie ma i kafelki nie migają wysokością.
 
+## 92. Ręczny przełącznik "Przelew własny" na ekranie szczegółów wydatku/przychodu
+
+User (po pytaniu czy działa auto-wykrywanie z §91): *"mam opcje dosac własną kategorie
+jakby?? Czyli właśnie ten przelew wlasny? Który sie nie wlicza bo to do siebie na inne
+konto wysyłam"*.
+
+**Problem.** Do tej pory JEDYNA droga do oznaczenia transakcji jako self-transfer to
+auto-wykrycie w `parseBankNotification` (słowa-klucze Revolut/oszczędności, albo — od §91 —
+dopasowanie zadeklarowanego imienia+nazwiska). Ręcznie dodany wydatek/przychód (nie z banku)
+albo taki, gdzie parser się nie złapał, nie miał ŻADNEJ opcji — user pytał wprost o
+możliwość ręcznego oznaczenia.
+
+**Fix — zero nowej logiki klasyfikującej, tylko brakujący manualny dostęp.**
+`isSelfTransfer()` (statWidgets.ts) już rozpoznaje tag `'przelew'` (jest w
+`SELF_TRANSFER_TAGS` od dawna — używany dotąd tylko jako quick-tag dla PRZYCHODÓW). Nowa
+karta "Przelew własny" na `app/expenses/[id].tsx` (między Kategorią a Tagami, widoczna i
+dla wydatków, i dla przychodów) to zwykły `Switch`, który w trybie edycji dodaje/usuwa
+DOKŁADNIE ten sam tag przez istniejący `toggleTag('przelew')` — żaden nowy stan, żadna
+nowa reguła w `fixedVariable.ts`/`statWidgets.ts`. W trybie odczytu karta pokazuje
+Tak/Nie na podstawie `isSelfTransfer(expense)`. Dodatkowo w karcie kwoty (hero) — obok
+miejsca gdzie normalnie siedzi plakietka Stałe/Zmienne (§91) — pojawia się czytelny
+badge "Przelew własny — nie liczy się do wydatków/przychodów" gdy `isSelfTransfer`
+zwraca prawdę, żeby było od razu widać status bez wchodzenia w edycję.
+
+**Explicite NIE zrobione**: żadna migracja istniejących transakcji (jeśli user chce oznaczyć
+starą transakcję, robi to teraz ręcznie tym przełącznikiem); przełącznik NIE jest osobną
+kategorią w `ExpenseCategory`/`CATEGORY_META` (celowo — dodanie nowej kategorii do enuma
+wymagałoby dotknięcia każdego miejsca, które iteruje po kategoriach — wykresy, budżety,
+merchant memory — a tag na istniejącym, już wszędzie honorowanym mechanizmie `isSelfTransfer`
+daje dokładnie to samo zachowanie zero-effort).
+
+`tsc --noEmit` czyste. `jest`: 72 suity/955 testów (bez nowych — czysty UI-toggle na
+istniejącym, już przetestowanym pośrednio mechanizmie tagów; `[id].tsx` nie ma testów
+jednostkowych, projekt nie testuje komponentów RN).
+
+**Priorytet testu na urządzeniu**: (1) otwórz dowolny wydatek → edytuj → włącz "Przelew
+własny" → zapisz → wróć na listę Finansów i sprawdź że kwota zniknęła z sumy
+wydatków/przychodów tego miesiąca; (2) ten sam wydatek ponownie w szczegółach (bez edycji)
+pokazuje badge "Przelew własny" w karcie kwoty i "Tak" w karcie niżej; (3) wyłącz przełącznik
+z powrotem → transakcja wraca do normalnych sum.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
