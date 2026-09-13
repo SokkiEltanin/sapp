@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, X, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -13,9 +13,10 @@ import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
+import GradientText from '@/components/ui/GradientText';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { POTIONS, PotionKind, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
+import { POTIONS, PotionKind, POTION_ICON, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -125,11 +126,6 @@ const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: numb
 ];
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
-
-// Placeholder ikony potek (2026-09-08) — user sam dostarczy grafiki pod skrzynki/potki
-// ("ja zrobię grafiki"), więc na razie lucide zamiast finalnego assetu, żeby mechanika
-// działała od zaraz i dała się przetestować bez czekania na art.
-const POTION_ICON: Record<PotionKind, typeof HeartPulse> = { hp: HeartPulse, atk: Swords, xp: Sparkles };
 
 const todayKey = () => {
   const d = new Date();
@@ -418,11 +414,12 @@ export default function PetShop() {
               {(Object.values(POTIONS)).map((def, i) => {
                 const afford = coins >= def.cost;
                 const active = isPotionActive(activePotion, def.kind);
-                const PotionIcon = POTION_ICON[def.kind];
                 return (
                   <PressableScale key={def.kind} onPress={() => onBuyPotion(def.kind)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
                     <RadialGlow size={38} color="#000" opacity={0.55} />
-                    <PotionIcon size={22} color={def.color} style={!afford && !active ? { opacity: 0.5 } : undefined} />
+                    {/* Własne grafiki potek (2026-09-13, user dostarczył assets/potki/potka_*.png,
+                        wcześniej lucide placeholder — patrz POTION_ICON w potions.ts) */}
+                    <Image source={POTION_ICON[def.kind]} style={[s.potionImg, !afford && !active && { opacity: 0.5 }]} contentFit="contain" />
                     {active
                       ? <View style={[s.artSlotBadge, { backgroundColor: def.color }]}><Text style={s.artSlotBadgeTxt}>{fmtPotionCountdown(activePotion!.endsAt)}</Text></View>
                       : <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{def.cost}</Text></View>}
@@ -504,7 +501,14 @@ export default function PetShop() {
                         "dodaj itemom w sklepie cień mocniejszy, słabo ich widać") — te 4
                         sloty jako jedyne nie miały żadnej poświaty pod ikoną, w przeciwieństwie
                         do zamrożenia/potek/skrzynek, stąd znikały na (poprzednio ciemniejszym)
-                        `s.boardBg`. */}
+                        `s.boardBg`. AURA RZADKOŚCI DODANA (2026-09-13, user: "rzadkość
+                        itemow miała mieć w sklepie tez gradient dookoła blurowany") — WIĘKSZY,
+                        kolorowy `RadialGlow` w `meta.color` PRZED czarnym cieniem (czyli POD
+                        nim w z-order — RadialGlow renderuje się jako `position:absolute`, więc
+                        kolejność w JSX = kolejność malowania), żeby czarny cień kontrastowy
+                        zostawał na wierzchu tuż za ikoną, a kolorowa poświata rzadkości
+                        rozlewała się szerzej dookoła niego. */}
+                    <RadialGlow size={64} color={meta.color} opacity={0.4} />
                     <RadialGlow size={40} color="#000" opacity={0.55} />
                     {/* Własny x/y/scale (`adjust.items`, 2026-09-09, user: "itemow tez
                         możesz [dać regulację]") — jeden wspólny suwak dla wszystkich 4 itemów
@@ -565,7 +569,6 @@ export default function PetShop() {
         </View>
         </View>
 
-        <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota. Startupy (ekran ładowania) i kosmetyka kotka: edytuj imię na /pet.</Text>
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -692,11 +695,23 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
         <View style={s.previewSheet}>
           <View style={s.sheetHead}>
             <View style={{ flex: 1, marginRight: spacing[2] }}>
-              <Text style={s.title2}>{item.name}</Text>
+              {/* Nazwa itemu jako gradient (2026-09-13, user: "sam kolor nazwy miał być
+                  gradientem") — prawdziwe SVG (`GradientText`), NIE zwykły <Text> +
+                  nakładka. To też NAPRAWIA "gradient nadal przykrywa nazwę" (patrz
+                  ARCHITECTURE.md §73e/§87): tamten bug brał się z tego, że pogrubiony RN
+                  <Text> na Androidzie czasem maluje się WYŻEJ/niżej niż jego wyliczony box
+                  (metryki fontu), więc żaden `lineHeight` na samym Tekście nie dawał
+                  gwarancji miejsca dla elementu OBOK w tej samej kolumnie — SvgText ma
+                  jawny, przewidywalny baseline (`baseline` w GradientText), więc box
+                  faktycznie odpowiada temu co się rysuje. */}
+              <GradientText text={item.name} color={meta.color} fontSize={16} />
               {/* Gradientowa kreska rzadkości pod nazwą (2026-09-05, user: "kolor gradientu
                   za nimi jakby + gradientowo kolorowy schludny pod nazwę itemu") — ten sam
                   `meta.color` co reszta modala (etykieta rzadkości, plakietka ✓), gaśnie do
-                  przezroczystości zamiast twardej krawędzi. */}
+                  przezroczystości zamiast twardej krawędzi. `marginTop` podbite 5→8
+                  (2026-09-13) — dodatkowy zapas TERAZ, gdy `GradientText` już gwarantuje
+                  poprawną wysokość swojego boxa, więc to czysto kosmetyczny oddech, nie
+                  obrona przed nieprzewidywalnym renderowaniem jak poprzednio. */}
               <LinearGradient
                 colors={[meta.color, meta.color + '00'] as [string, string]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -759,7 +774,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   boxIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxEmoji: { fontSize: 26 },
-  boxSlotImg: { width: '68%', height: '68%' },
+  boxSlotImg: { width: '78%', height: '78%' },  // 68%→78% (2026-09-13, patrz artSlotImg)
 
   // Scena Rynku (2026-09-05, fix "grafiki się rushają/nie na miejscu") — jeden
   // `position:relative` wrapper wokół tablicy+kotka+lady, żeby `RYNEK_BG` (pierwsze dziecko,
@@ -813,7 +828,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // otulić kształt ikony. Zamiast tego renderowany jako `<RadialGlow color="#000".../>`
   // (ten sam trik co reszta "głębi" w apce) tuż PRZED ikoną w tym samym wyśrodkowanym
   // `s.artSlot` — miękka, kolista, wtapiająca się w tło poświata, nie twardy prostokąt.
-  artSlotImg: { width: '62%', height: '62%' },
+  // Powiększone 62%→74% (2026-09-13, user: "powiekszmy itemy w sklepie troche bo sa za
+  // małe") — sam `artSlot` (procentowy prostokąt z rynekArt.ts) zostaje bez zmian, bo
+  // musi trzymać się okien narysowanych na obrazku lady/tablicy; rośnie tylko ikona W
+  // ŚRODKU, więc pozycja/hitbox slotu nie rusza się względem grafiki.
+  artSlotImg: { width: '74%', height: '74%' },
+  // Grafiki potek (2026-09-13) — nieco mniejszy % niż itemy ekwipunku, bo sloty tablicy
+  // (RYNEK_TOP_SLOTS) są węższe/wyższe (proporcje inne niż kwadratowe okna lady).
+  potionImg: { width: '68%', height: '68%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   // Liczba posiadanych (np. zamrożeń) w rogu slotu — ten sam róg co `artSlotCheck`, ale
   // `minWidth` zamiast stałej szerokości (liczba może być 2-cyfrowa), zostawia DÓŁ slotu
@@ -823,7 +845,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   artCostPill: { position: 'absolute', bottom: -8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
   artSlotBadge: { position: 'absolute', bottom: -8, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
   artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
-  rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 5, width: '70%' },
+  rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 8, width: '70%' },
 
   // Pigułka odświeżenia Sklepu dnia — POD ladą, w normalnym przepływie (2026-09-08, user:
   // "napis... żeby był pod itemami i bardziej w stylu sklepiku samego") — stylizowana jak
@@ -840,8 +862,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
-
-  hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 
   // Posiadane — pusty stan
 

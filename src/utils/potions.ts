@@ -28,6 +28,17 @@ export interface PotionDef {
 
 export interface ActivePotion { kind: PotionKind; endsAt: string }
 
+// Grafiki potek (2026-09-13, user dostarczył assets/potki/potka_*.png — wcześniej lucide
+// placeholder w pet-shop.tsx, patrz komentarz historyczny tam usunięty: "user sam
+// dostarczy grafiki... na razie lucide zamiast finalnego assetu"). Już przeskalowane w
+// health-audycie §83 (1254×1254 → 300×300, ten sam przepis co `assets/ekwipunek/`) —
+// zero dodatkowej obróbki potrzebnej tutaj, tylko podpięcie.
+export const POTION_ICON: Record<PotionKind, any> = {
+  hp:  require('../../assets/potki/potka_zdrowie.png'),
+  atk: require('../../assets/potki/potka_atak.png'),
+  xp:  require('../../assets/potki/potka_xp.png'),
+};
+
 // Umiarkowany balans (2026-09-08) — wybrany świadomie zamiast zgadywania w ciemno: wystarczająco
 // odczuwalny na 24h, ale nie psujący trudności bossów (COUNTER_PCT itd. liczone bez uwzględnienia
 // potek). Do skorygowania po realnym teście na urządzeniu — user może poprosić o inne liczby.

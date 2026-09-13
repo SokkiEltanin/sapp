@@ -6418,6 +6418,82 @@ otwiera/zamyka inline wybór bez przypadkowego odpalenia nawigacji do szczegół
 (zagnieżdżony `TouchableOpacity` w `PressableScale` — ten sam, już działający wzorzec co
 istniejący `chevronBtn` w tym samym komponencie, ale warto potwierdzić na żywym telefonie).
 
+## 87. Sklep: gradientowa nazwa itemu (naprawa realnie ucinanego tytułu) + aura rzadkości + większe itemy + podpięte potki + usunięty nietrafiony podpis
+
+User (zrzut ekranu podglądu "Zwinne Buty Skauta"): *"Tutaj nadal nie zrobiłeś zeby ten
+gradient nie przykrywał nazwy :( i sam kolor nazwy miał byc gradientem i rzadkość itemow
+miała miec w sklepie tez gradient dookoła blurowany"*, plus (mid-turn, zrzut całego ekranu
+Sklepu): *"2. Potem powiekszmy itemy w sklepie troche bo sa za małe... sprawdz czy nie
+wrzuciłem potek do assets bossy pamiętam ze dodawałem a nie ma. 3. Usuń ten napis pod
+grafika tam pod sklepem calym bez sensu tam on"*.
+
+**Root cause (gradient przykrywa nazwę — POWRÓT buga z §73e).** §73e (2026-08-?) diagnozował
+DOKŁADNIE ten sam objaw ("Kamizelka... jakby był za horyzontem") jako pogrubiony RN `<Text>`
+malujący się na Androidzie POZA swoim wyliczonym boxem (metryki fontu przy wadze 800), i
+"naprawił" go samym `lineHeight: 22` — **nie zweryfikowane wtedy na urządzeniu** (środowisko
+bez podglądu RN). Ten zrzut dowodzi, że `lineHeight` na zwykłym `<Text>` NIE rozwiązuje
+problemu — Android nadal maluje tekst z nieprzewidywalnym realnym boxem niezależnie od
+deklarowanego `lineHeight`, więc `rarityUnderline` (kolejny element w tej samej kolumnie,
+malowany PO tytule) nadal zaczynał się wewnątrz realnych liter.
+
+**Fix — realny, nie łatka na objaw.** Nazwa itemu przeniesiona z RN `<Text>` na PRAWDZIWE
+SVG (`src/components/ui/GradientText.tsx`, nowy, generyczny komponent, ten sam wzorzec co
+już istniejący `GradientGreeting.tsx` z dashboardu — `Svg`/`Defs`/`LinearGradient`/`Text`
+z `react-native-svg`, ZERO nowej natywnej zależności). SVG `<Text>` ma JAWNY, przewidywalny
+atrybut `y` (baseline) — żadnych ukrytych metryk fontu specyficznych dla platformy jak przy
+RN `<Text>`, więc box faktycznie odpowiada temu co się rysuje i `rarityUnderline` (dalej
+zwykły `<LinearGradient>` z expo, `marginTop` podbite 5→8 na dodatkowy oddech) ma
+gwarantowane miejsce. Fit-scale dla długich nazw (>22 znaków, np. "Talizman Spadającej
+Gwiazdy" — 28 znaków, najdłuższa w `gear.ts`) — SVG text nie zawija/nie skraca się jak RN
+`numberOfLines`, więc bez tego długie nazwy wystawałyby poza dostępną szerokość.
+
+**Fix — gradientowy KOLOR nazwy** (drugi, osobny punkt tej samej wiadomości): `GradientText`
+przyjmuje `color` (tu `meta.color`, kolor rzadkości) i renderuje gradient kolor→biel, ten
+sam kierunek/koncept co istniejąca kreska pod spodem — nazwa i kreska teraz spójnie "świecą"
+w kolorze rzadkości.
+
+**Fix — aura rzadkości w siatce Sklepu dnia** (trzeci punkt): drugi, WIĘKSZY `RadialGlow`
+(już istniejący komponent — prawdziwy SVG radial-gradient, dokładnie "gradient dookoła
+blurowany") w `meta.color`, renderowany PRZED (czyli POD w z-order) istniejącym czarnym
+cieniem kontrastowym każdego z 4 itemów Sklepu dnia (`size={64}, opacity={0.4}` vs czarny
+`size={40}, opacity={0.55}`) — czarny cień zostaje na wierzchu blisko ikony (kontrast na tle
+lady), kolorowa poświata rzadkości rozlewa się szerzej dookoła. Zero nowego komponentu —
+`RadialGlow` już dokładnie to robi (użyty tak wcześniej za bossami/sklepikarzem/skrzynkami).
+
+**Fix — powiększone itemy**: `artSlotImg` 62%→74%, `boxSlotImg` 68%→78%. Sam `artSlot`
+(procentowy prostokąt z `rynekArt.ts`, przypięty do okien narysowanych na obrazku lady/
+tablicy) BEZ ZMIAN — rośnie tylko ikona W ŚRODKU, więc hitbox/pozycja slotu względem
+grafiki tła nie rusza się.
+
+**Fix — potki wreszcie podpięte**: user pytał czy wrzucił grafiki potek do `assets/bossy` —
+NIE (sprawdzone: `assets/bossy/*` to wyłącznie art bossów, zero plików potek) — grafiki
+(`potka_atak.png`/`potka_xp.png`/`potka_zdrowie.png`) faktycznie leżą w `assets/potki/`
+(poprawne miejsce, już przeskalowane 1254²→300² w §83), tylko NIGDY nie zostały podpięte do
+UI (`POTION_ICON` w `pet-shop.tsx` był świadomym lucide-placeholderem z 2026-09-08, "user sam
+dostarczy grafiki... na razie lucide"). Nowy `POTION_ICON` (teraz w `src/utils/potions.ts`,
+`require()`) zastępuje placeholder — 3 sloty potek na tablicy renderują teraz własne grafiki
+zamiast ikon lucide (HeartPulse/Swords/Sparkles, usunięte z importów).
+
+**Fix — usunięty nietrafiony podpis**: `<Text style={s.hint}>Monety: questy...</Text>` pod
+całą sceną Sklepu usunięty razem z martwym stylem `hint` — user: "bez sensu tam on", żadnej
+dalszej logiki nie dotyczy (czysto opisowy tekst).
+
+`tsc --noEmit`/`jest` czyste (72 suity/942 testy — czysto wizualne zmiany + podpięcie
+istniejących assetów, zero nowej logiki do testowania jednostkowo).
+
+**Priorytet testu na urządzeniu — NAJWYŻSZY z całej sesji** (to DRUGA próba naprawy tego
+samego buga z gradientem, pierwsza nie przeszła realnego testu): (1) otwórz podgląd
+DOWOLNEGO itemu w Sklepie dnia → sprawdź że gradient POD nazwą faktycznie NIE dotyka liter,
+zwłaszcza przy NAJDŁUŻSZYCH nazwach (Talizman Spadającej Gwiazdy, Talizman
+Nieskończoności) — fit-scale może potrzebować dostrojenia progu/współczynnika; (2) sprawdź
+że sama nazwa czytelnie przechodzi z koloru rzadkości w biel, nie wygląda na "zepsutą"
+czcionkę (SVG font-family może domyślnie różnić się nieznacznie od RN Text — brak jawnego
+`fontFamily` w `GradientText`, dziedziczy systemowy default); (3) zerknij na 4 itemy Sklepu
+dnia — kolorowa poświata rzadkości powinna być widoczna, ale NIE przytłaczać czarnego cienia
+kontrastowego; (4) sprawdź że powiększone ikony (74%/78%) nie wystają poza narysowane okna
+na obrazku lady na węższych telefonach; (5) potki na tablicy — własne grafiki zamiast
+ikon lucide.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
