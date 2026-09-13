@@ -28,6 +28,9 @@ import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/ca
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases, loadTagMemory, applyTagMemory, allKnownTags, tagsMatchingWords } from '@/utils/productMemory';
 import { isFoodItem, NONFOOD_TAGS, removeNonFood } from '@/utils/food';
 import { getPayers, addPayer } from '@/utils/payers';
+import { isSelfTransfer } from '@/utils/statWidgets';
+import { fvSplitOf, bucketOf, FvBucket } from '@/utils/fixedVariable';
+import FvBadge from '@/components/expenses/FvBadge';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -429,6 +432,23 @@ export default function ExpenseDetailScreen() {
     );
   }
 
+  // Stałe/Zmienne/Jedzenie — PRZENIESIONE tu z listy Finansów (2026-09-13, user: "te
+  // stale/zmienne tagi w finansach na głównej możesz dać dopiero po kliknieciu w
+  // szczegóły bo dziwnie zaburza mi to bez sensu tam kafelki"). `null` dla przychodów i
+  // self-transferów (patrz identyczny komentarz historycznie przy BUCKET_META w
+  // ExpenseItem.tsx) — mieszany paragon (jedzenie+chemia) pokazuje obie etykiety naraz,
+  // patrz `fvSplitOf`.
+  const fvSplit = (expense.type === 'income' || isSelfTransfer(expense)) ? null : fvSplitOf(expense);
+  const fvMixedBuckets: FvBucket[] = fvSplit ? (['fixed', 'variable', 'food'] as FvBucket[]).filter(b => fvSplit[b] > 0) : [];
+  const fvIsMixed = fvMixedBuckets.length > 1;
+  const fvBucket: FvBucket | null = fvMixedBuckets.length === 0 ? null : (fvIsMixed ? bucketOf(expense) : fvMixedBuckets[0]);
+  const reclassifyFv = async (bucket: FvBucket | null) => {
+    haptic.medium();
+    updateExpense(expense.id, { fvOverride: bucket });
+    try { await expensesService.update(expense.id, { fvOverride: bucket }); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
+  };
+
   const editIsIncome = txType === 'income';
   const quickTags = editIsIncome ? INCOME_TAGS : EXPENSE_TAGS;
   const accentColor = editIsIncome ? colors.accent.green : colors.accent.red;
@@ -681,6 +701,19 @@ export default function ExpenseDetailScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Stałe/Zmienne/Jedzenie (2026-09-13) — patrz komentarz przy `fvSplit` wyżej. */}
+            {!!fvBucket && (
+              <View style={{ marginTop: spacing[2] }}>
+                <FvBadge
+                  bucket={fvBucket}
+                  mixedBuckets={fvMixedBuckets}
+                  isMixed={fvIsMixed}
+                  overridden={!!expense.fvOverride}
+                  onReclassify={reclassifyFv}
+                />
+              </View>
+            )}
 
             {/* Note */}
             {editing ? (

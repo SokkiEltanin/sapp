@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { ChevronDown, ChevronUp, Wallet, Pencil } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Wallet } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
@@ -10,28 +10,12 @@ import { getCategoryMeta } from '@/utils/categories';
 import { billTagFor } from '@/utils/recurringBills';
 import { estimateItemKcal } from '@/utils/calories';
 import { isMine } from '@/store/statsScope';
-import { isSelfTransfer } from '@/utils/statWidgets';
-import { bucketOf, fvSplitOf, FvBucket } from '@/utils/fixedVariable';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
 // Warm amber marks a transaction someone ELSE paid (payer ≠ "Ja"): it shows in the
 // list but does NOT count toward your spend/balance, so it needs an at-a-glance tell.
 const PAYER_ACCENT = '#E0A33A';
-
-// Stałe/Zmienne/Jedzenie na KAŻDYM wydatku (2026-09-12, user: "ulepsz oznaczanie żebym
-// mógł jano widzieć na wydatkach co jest jedzeniem co jest nie jedzeniem co stałym
-// wydatkiem a co zmiennym zeby widzieć czy dobrze łapie") — dotąd `bucketOf()` (patrz
-// fixedVariable.ts) był widoczny TYLKO w rozbiciu miesięcznym widgetu "Na co idą
-// pieniądze" na dashboardzie, więc audyt "czy dobrze łapie" wymagał otwierania osobnego
-// modala miesiąc po miesiącu zamiast po prostu przewinięcia listy transakcji. Te same
-// kolory co pasek widgetu (FixedVariableSection.tsx: `fixedC`/`foodC`) dla spójności —
-// `variable` dostaje fiolet (nowy, żaden inny akcent w liście go dziś nie używa).
-const BUCKET_META: Record<FvBucket, { label: string; color: string }> = {
-  fixed:    { label: 'Stałe',    color: '#8893A8' },
-  variable: { label: 'Zmienne',  color: '#BF80FF' },
-  food:     { label: 'Jedzenie', color: '#4CA96B' },
-};
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -42,12 +26,10 @@ interface Props {
   index: number;
   onPress?: (expense: Expense) => void;
   onLongPress?: (expense: Expense) => void;
-  onReclassify?: (expenseId: string, bucket: FvBucket | null) => void;
 }
 
-export default function ExpenseItem({ expense, onPress, onLongPress, onReclassify }: Props) {
+export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [bucketEditOpen, setBucketEditOpen] = useState(false);
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -68,21 +50,6 @@ export default function ExpenseItem({ expense, onPress, onLongPress, onReclassif
   const accentColor = rowColor;
   // Paid by someone else (partner) → excluded from YOUR totals. Flag it visually.
   const mine = isMine(expense);
-  // Widoczny na KAŻDYM wydatku (patrz komentarz przy BUCKET_META) — audyt "czy dobrze
-  // łapie" bez otwierania osobnego widgetu. `null` dla przychodów (bucketOf() nie ma dla
-  // nich sensu — zawsze wpadłyby w 'variable' przez fallback) i dla self-transferów
-  // (oszczędności/Revolut) — te są wykluczone ze WSZYSTKICH kubłów w fixedVariable.ts,
-  // więc pokazanie im "Zmienne" wyglądałoby jak dokładnie ten błąd klasyfikacji, który
-  // ten badge ma pomóc wyłapać.
-  // MIESZANY paragon (2026-09-13, user: "tak jak w jedzeniu mogę zaznaczyć że to nie
-  // jedzenie każdego produktu osobno" — chce tego samego dla stałe/zmienne) — `fvSplitOf`
-  // dzieli kwotę paragonu na jedzenie/zmienne PER PRODUKT (patrz fixedVariable.ts), więc
-  // np. paragon spożywczy z chemią pokazuje TERAZ obie etykiety naraz zamiast jednej,
-  // potencjalnie mylącej (cała kwota "Jedzenie" mimo że część to proszek do prania).
-  const split = (isIncome || isSelfTransfer(expense)) ? null : fvSplitOf(expense);
-  const mixedBuckets: FvBucket[] = split ? (['fixed', 'variable', 'food'] as FvBucket[]).filter(b => split[b] > 0) : [];
-  const isMixed = mixedBuckets.length > 1;
-  const bucket: FvBucket | null = mixedBuckets.length === 0 ? null : (isMixed ? bucketOf(expense) : mixedBuckets[0]);
 
   const title = expense.storeName || expense.note || meta.label;
   // No time in the list — every entry defaults to noon, so "12:00" was just noise.
@@ -119,51 +86,6 @@ export default function ExpenseItem({ expense, onPress, onLongPress, onReclassif
         <View style={styles.info}>
           <Text style={styles.note} numberOfLines={1}>{title}</Text>
           {!!subtitle && <Text style={styles.meta} numberOfLines={1}>{subtitle}</Text>}
-          {!!bucket && (
-            <TouchableOpacity
-              onPress={() => { haptic.tap(); setBucketEditOpen(v => !v); }}
-              hitSlop={6}
-              style={styles.bucketBadge}
-              activeOpacity={0.7}
-            >
-              {isMixed ? mixedBuckets.map((b, i) => (
-                <View key={b} style={styles.bucketBadgePart}>
-                  {i > 0 && <Text style={styles.bucketPlus}>+</Text>}
-                  <View style={[styles.bucketDot, { backgroundColor: BUCKET_META[b].color }]} />
-                  <Text style={[styles.bucketText, { color: BUCKET_META[b].color }]}>{BUCKET_META[b].label}</Text>
-                </View>
-              )) : (
-                <>
-                  <View style={[styles.bucketDot, { backgroundColor: BUCKET_META[bucket].color }]} />
-                  <Text style={[styles.bucketText, { color: BUCKET_META[bucket].color }]}>{BUCKET_META[bucket].label}</Text>
-                </>
-              )}
-              {!!expense.fvOverride && <Pencil size={9} color={colors.text.muted} />}
-            </TouchableOpacity>
-          )}
-          {!!bucket && bucketEditOpen && (
-            <View style={styles.bucketEditRow}>
-              {(['fixed', 'variable', 'food'] as FvBucket[]).filter(b => b !== bucket).map(b => (
-                <TouchableOpacity
-                  key={b}
-                  onPress={() => { haptic.medium(); onReclassify?.(expense.id, b); setBucketEditOpen(false); }}
-                  style={styles.bucketEditChip}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.bucketEditChipText, { color: BUCKET_META[b].color }]}>{BUCKET_META[b].label}</Text>
-                </TouchableOpacity>
-              ))}
-              {!!expense.fvOverride && (
-                <TouchableOpacity
-                  onPress={() => { haptic.medium(); onReclassify?.(expense.id, null); setBucketEditOpen(false); }}
-                  style={styles.bucketEditChipAuto}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.bucketEditChipAutoText}>Auto</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
           {!mine && !!expense.payer && (
             <View style={styles.payerBadge}>
               <Wallet size={10} color={PAYER_ACCENT} />
@@ -274,29 +196,6 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   info: { flex: 1, gap: 2 },
   note: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
   meta: { ...typography.caption, color: c.text.muted },
-  bucketBadge: {
-    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
-    marginTop: 1,
-  },
-  // Mieszany paragon (2026-09-13) — kilka par kropka+etykieta w jednym rzędzie, oddzielone `+`.
-  bucketBadgePart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bucketPlus: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginRight: 4 },
-  bucketDot: { width: 6, height: 6, borderRadius: 3 },
-  bucketText: { fontSize: 10, fontWeight: '700' },
-  bucketEditRow: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-    marginTop: 3, paddingTop: 4, borderTopWidth: 1, borderTopColor: c.border.subtle,
-  },
-  bucketEditChip: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full,
-    backgroundColor: c.fill.subtle,
-  },
-  bucketEditChipText: { fontSize: 10, fontWeight: '700' },
-  bucketEditChipAuto: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full,
-    borderWidth: 1, borderColor: c.border.default,
-  },
-  bucketEditChipAutoText: { fontSize: 10, fontWeight: '600', color: c.text.muted },
   amount: { ...typography.label, fontWeight: '700', fontSize: 14 },
   amountCol: { alignItems: 'flex-end', justifyContent: 'center' },
   // Struck-through + muted = "this amount is NOT in your total" at a glance.

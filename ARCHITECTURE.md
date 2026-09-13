@@ -6651,6 +6651,76 @@ na kilka sekund NAD czymkolwiek innym, potem wrócić do normalnej rotacji; (3) 
 zaufany automat bankowy — poczekaj na auto-dodaną płatność i sprawdź czy flash się pojawia
 razem z toastem, nie zamiast niego.
 
+## 91. Pill bez "bouncy ball", przelew własny po imieniu+nazwisku, plakietki Stałe/Zmienne przeniesione do szczegółów
+
+User (2026-09-13, trzy punkty jednym zgłoszeniem): *"I zeby ta animacja przejścia pomiędzy
+wiadomościami byla płynnym rozszerzeniem i zmiana tekstu z fajna animacja, bo tak to wygląda
+jak bouncy ball hujnia xd"*, *"W stalch / zmiennych jak mi dałeś wybór zaznaczenia co to jest
+za wydatek to tez trzeba dodać kategorie przelew własny jak jest do Wiktor Rudziński...
+to znaczy ze to przelew wewnętrzny do mnie samego i to nie zalicza sie do wydatków lub
+przychodów"*, *"I te stale /zmienne tagi w finansach na głównej możesz dać dopiero po
+kliknieciu w szczegóły (bo dzwinie zaburza mi to bez sensu tam kafelki)"*.
+
+**Część 1 — pill bez odbicia.** `Animated.spring(scale, {damping, stiffness, mass})` w
+`TopPill.tsx` (3 miejsca: item→null, zmiana `key`, idle-refresh tego samego `key`) z natury
+PRZESTRZELIWUJE cel przed ustabilizowaniem — to dokładnie "bouncy ball" ze zgłoszenia.
+Zamienione wszystkie trzy na `Animated.timing(..., {easing: Easing.out(Easing.cubic)})` —
+monotoniczne dojście do wartości docelowej, bez przestrzelenia; skala "wciśnięcia" złagodzona
+0.88/0.9 → 0.94 (mniej agresywny "schowaj się" przy przejściu).
+
+**Część 2 — przelew własny po imieniu.** Dotychczasowy `selfTransfer` w
+`bankNotification.ts` łapał tylko słowa-klucze (`revolut|oszczędno|własne|savings`) — nie
+łapał przelewu na DRUGIE własne konto zwykłym przelewem krajowym, bo tam `odbiorca:` to po
+prostu imię+nazwisko właściciela, bez żadnego słowa-klucza. Nowy moduł `ownName.ts`
+(dokładnie wzorzec cache'u `food.ts`/`userNonFood`: `loadOwnName()` raz w `app/_layout.tsx`,
+potem czysty synchroniczny `getOwnName()`) trzyma zadeklarowane w Ustawieniach imię+nazwisko
+(`AsyncStorage`, pole tekstowe w sekcji "Auto-wydatki z banku", widoczne tylko gdy
+`bankEnabled`). `parseBankNotification(title, text, ownName?)` dostał trzeci, opcjonalny
+argument — `selfTransfer` teraz dodatkowo prawdziwy gdy znormalizowany `odbiorca` ZAWIERA
+znormalizowane `ownName` (diakrytyki i wielkość liter ignorowane, helper zduplikowany
+LOKALNIE w `bankNotification.ts` zamiast importu z `ownName.ts`, bo ten plik musi zostać
+wolny od `AsyncStorage` — patrz zasada "lean" dla plików testowanych bezpośrednio przez
+Jest). `bankIngest.ts` przekazuje `getOwnName()` jako trzeci argument; downstream (booking
+jako `category: 'transfer', tags: ['revolut']`, rozpoznawanie przez `isSelfTransfer()`) bez
+zmian — to ten sam istniejący pipeline co dla Revolut/oszczędności. Przykład "Wiktor
+Rudziński" z prośby usera NIE jest przypadkowy — dokładnie ten string już wcześniej istniał
+jako realny przykład w komentarzu dokumentującym regex `odbiorca:` w `bankNotification.ts`,
+co potwierdziło wykonalność PRZED napisaniem kodu.
+
+**Część 3 — plakietki Stałe/Zmienne/Jedzenie z listy do szczegółów.** Plakietka (kropka +
+etykieta, tap → chipsy do ręcznej zmiany kubełka) wyekstrahowana z `ExpenseItem.tsx` do
+samodzielnego `FvBadge.tsx` (jeden konsument na razie — `app/expenses/[id].tsx` — ale
+ekstrakcja i tak uzasadniona jasnością: inny layout kolorystyczny na gradiencie karty-hero
+niż wcześniej na tle listy). `ExpenseItem.tsx`/`finances.tsx` wrócone funkcjonalnie do stanu
+sprzed §77/§?? (żadnej plakietki w wierszu listy — usera "dzwinie zaburza" chodziło o
+migotanie/przeskakiwanie wysokości kafelków przy re-renderach listy). Ekran szczegółów
+liczy `fvSplitOf`/`bucketOf` raz przy renderze (pomijając przelewy własne i przychody —
+te nie mają sensownego kubełka Stałe/Zmienne) i renderuje `FvBadge` w karcie kwoty, pod
+datą, z tym samym handlerem `reclassifyFv` co poprzednio (`updateExpense` lokalnie +
+`expensesService.update` do trwałego zapisu).
+
+**Explicite NIE zrobione**: (2) UI podglądu "na żywo" pokazującego dopasowanie w Ustawieniach
+podczas wpisywania imienia — `matchesOwnName`/`normalizeName` z `ownName.ts` zostają
+eksportowane i gotowe, ale niewykorzystane poza samym parserem; (2) obsługa wielu własnych
+kont pod różnymi nazwiskami (np. konto współmałżonka) — jedno pole, jedna nazwa; (3) żadna
+migracja/inny UI dla kubełka na liście — usunięty całkowicie, widoczny wyłącznie po wejściu
+w szczegóły, zgodnie z dosłowną prośbą.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/955 testów (+3 nowe w `bankNotification.test.ts`:
+przelew do osoby o Twoim imieniu BEZ skonfigurowanego `ownName` → nie selfTransfer; z
+pasującym `ownName` → selfTransfer; z niepasującym `ownName` → nadal nie selfTransfer, czyli
+brak zgadywania na siłę). `TopPill.tsx`/`FvBadge.tsx`/ekran szczegółów bez testów
+jednostkowych — czysto wizualne zmiany animacji/layoutu, projekt nie testuje komponentów RN
+(ustalony wzorzec).
+
+**Priorytet testu na urządzeniu**: (1) obserwuj pill przy zmianie komunikatu (np. flash z
+§90 → normalna rotacja) — powinno wyglądać jak płynne rozszerzenie z podmianą tekstu, bez
+"odbicia"; (2) Ustawienia → Auto-wydatki z banku → wpisz swoje imię+nazwisko, potem zrób
+(albo poczekaj na) przelew na drugie własne konto zwykłym przelewem (nie Revolut) → powinien
+wejść do kolejki jako "odłożone", nie jako wydatek; (3) otwórz dowolny wydatek → plakietka
+Stałe/Zmienne/Jedzenie widoczna w karcie kwoty, tap otwiera chipsy do zmiany; sprawdź że w
+głównej liście Finansów żadnej plakietki już nie ma i kafelki nie migają wysokością.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

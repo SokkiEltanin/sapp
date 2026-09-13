@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Pill bez odbicia + przelew własny po imieniu + plakietki FV do szczegółów — NIEsprawdzone (2026-09-13)
+
+Trzy prośby jednym zgłoszeniem, pełny opis w ARCHITECTURE.md §91: (1) *"animacja przejścia
+pomiędzy wiadomościami... wygląda jak bouncy ball"* — `TopPill.tsx` przepisany ze
+`Animated.spring` na `Animated.timing` + `Easing.out(Easing.cubic)`, bez przestrzelenia;
+(2) *"trzeba dodać kategorie przelew własny jak jest do Wiktor Rudziński... to przelew
+wewnętrzny do mnie samego"* — nowe pole "Twoje imię i nazwisko" w Ustawieniach →
+Auto-wydatki z banku (`ownName.ts`), `parseBankNotification` rozpoznaje teraz `selfTransfer`
+też po dopasowaniu `odbiorca` do tego imienia, nie tylko po słowach-kluczach
+Revolut/oszczędności; (3) *"stale/zmienne tagi w finansach na głównej... dzwinie zaburza mi
+to... kafelki"* — plakietka Stałe/Zmienne/Jedzenie (`FvBadge.tsx`) usunięta z listy wydatków,
+widoczna wyłącznie po wejściu w szczegóły wydatku.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) pill przy zmianie treści wygląda płynnie,
+bez odbicia; (2) przelew na drugie własne konto (bez Revolut w treści) po wpisaniu
+imienia+nazwiska w Ustawieniach ląduje jako "odłożone", nie wydatek/przychód; (3) lista
+Finansów bez plakietek, plakietka widoczna i działająca w szczegółach wydatku.
+
 ## 🆕 TopPill: zadanie bez terminu przestaje wiecznie świecić + kanał "flash" — NIEsprawdzone (2026-09-13)
 
 User: *"za często tam sie pokazuje ze mam zadanie... ono nie ma terminu i świeci mi sie na

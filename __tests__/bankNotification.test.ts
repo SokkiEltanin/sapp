@@ -11,6 +11,11 @@ const SELF_OUT = 'Wykonano przelew 200,00 PLN z konta *6332 na konto *6284, odbi
 // diagnostyka w Ustawieniach), nie w regexach. Test zostaje jako trwała ochrona przed
 // regresją, skoro to realny przypadek usera.
 const INCOMING_WPLYW_TITLE = { title: 'Wpływ', text: 'Wpłynęło 3752,78 PLN na konto *6332 od MARKETING INVESTMENT GROUP SA. Bank Pekao S.A.' };
+// 2026-09-13, user: "trzeba dodać kategorie przelew własny jak jest do Wiktor Rudziński...
+// to znaczy ze to przelew wewnętrzny do mnie samego" — przelew na DRUGIE WŁASNE konto, bez
+// żadnego słowa-klucza typu "Revolut"/"oszczędności", rozpoznawany WYŁĄCZNIE po dopasowaniu
+// `odbiorca` do zadeklarowanego w Ustawieniach imienia+nazwiska (3. argument parsera).
+const SELF_OUT_BY_NAME = 'Wykonano przelew 150,00 PLN z konta *6332 na konto *9911, odbiorca: Wiktor Rudziński. Bank Pekao S.A.';
 
 describe('parseBankNotification (Pekao)', () => {
   test('płatność kartą → wydatek (out), kwota + sklep + data z treści', () => {
@@ -35,6 +40,26 @@ describe('parseBankNotification (Pekao)', () => {
     expect(tx).not.toBeNull();
     expect(tx!.direction).toBe('out');
     expect(tx!.selfTransfer).toBe(true);
+  });
+
+  test('przelew do innej osoby o Twoim imieniu/nazwisku, bez ownName → zwykły wydatek (nie selfTransfer)', () => {
+    const tx = parseBankNotification('Pekao', SELF_OUT_BY_NAME);
+    expect(tx).not.toBeNull();
+    expect(tx!.direction).toBe('out');
+    expect(tx!.selfTransfer).toBeFalsy();
+  });
+
+  test('przelew na WŁASNE konto rozpoznany po imieniu+nazwisku z Ustawień → selfTransfer', () => {
+    const tx = parseBankNotification('Pekao', SELF_OUT_BY_NAME, 'Wiktor Rudziński');
+    expect(tx).not.toBeNull();
+    expect(tx!.direction).toBe('out');
+    expect(tx!.selfTransfer).toBe(true);
+  });
+
+  test('niepasujące ownName → nie selfTransfer (nie zgaduje na siłę)', () => {
+    const tx = parseBankNotification('Pekao', SELF_OUT_BY_NAME, 'Jan Kowalski');
+    expect(tx).not.toBeNull();
+    expect(tx!.selfTransfer).toBeFalsy();
   });
 
   test('nie-bankowa treść → null', () => {

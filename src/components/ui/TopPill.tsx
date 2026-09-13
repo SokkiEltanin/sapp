@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords, Bell } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -474,30 +474,40 @@ export default function TopPill() {
     pulse.setValue(0);
   }, [item?.key]);
 
+  // Bez `Animated.spring` NIGDZIE tutaj (2026-09-13, user: "zeby ta animacja przejścia
+  // pomiędzy wiadomościami byla płynnym rozszerzeniem... bo tak to wygląda jak bouncy
+  // ball") — spring z tym `damping`/`stiffness` przelatywał przez 1.0 i odbijał się z
+  // powrotem (widoczny "bounce"), dokładnie efekt na który user narzekał. Zamiast tego
+  // WSZĘDZIE `Animated.timing` z `Easing.out(Easing.cubic)` — rośnie płynnie DO 1.0 i
+  // się zatrzymuje, bez przestrzelenia. Skurcz też złagodzony (0.88→0.94) — subtelny
+  // "oddech" zamiast wyraźnego zmniejszenia, żeby całość czytała się jako JEDNO płynne
+  // rozszerzenie tekstu, nie dwa oddzielne skoki.
+  const EASE_OUT = Easing.out(Easing.cubic);
   useEffect(() => {
     if (!item) {
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.spring(scale, { toValue: 0.9, useNativeDriver: true, damping: 16, stiffness: 220 }),
+        Animated.timing(opacity, { toValue: 0, duration: 180, easing: EASE_OUT, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0.94, duration: 180, easing: EASE_OUT, useNativeDriver: true }),
       ]).start();
       return;
     }
     if (prevKey.current !== item.key) {
-      // Pop: shrink out, then spring in (the island "morphs" to new content).
+      // Płynne przejście: lekki oddech w dół, potem gładkie rozszerzenie do pełnego
+      // rozmiaru wraz z nowym tekstem — bez sprężynowego odbicia.
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(opacity, { toValue: 0, duration: 110, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 0.88, duration: 110, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0, duration: 130, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.94, duration: 130, easing: EASE_OUT, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }),
-          Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 240, mass: 0.7 }),
+          Animated.timing(opacity, { toValue: 1, duration: 240, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 240, easing: EASE_OUT, useNativeDriver: true }),
         ]),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 220 }),
+        Animated.timing(opacity, { toValue: 1, duration: 200, easing: EASE_OUT, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 200, easing: EASE_OUT, useNativeDriver: true }),
       ]).start();
     }
     prevKey.current = item.key;
