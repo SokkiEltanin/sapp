@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 TopPill: zadanie bez terminu przestaje wiecznie świecić + kanał "flash" — NIEsprawdzone (2026-09-13)
+
+User: *"za często tam sie pokazuje ze mam zadanie... ono nie ma terminu i świeci mi sie na
+dole bez sensu... a dodatkowo niech moze tam si epokazuja te powiadomienia ze sie pill lekko
+rozszerza... seria logowan, albo ze dodano płatność automatyczna"*. Pełny opis w
+ARCHITECTURE.md §90. Skrót: fallback "N zadań w toku" w TopPill teraz wymaga terminu
+(deadline/scheduledDate), tak jak reszta priorytetów — zadanie bez terminu już nigdy nie
+zapala pilla. Nowy `pillFlashStore.ts` (generyczny, `show()`/`clear()`) daje drugi kanał dla
+ważnych powiadomień — podpięty do dwóch ISTNIEJĄCYCH toastów usera dokładnie opisanych
+(seria logowań, auto-dodana płatność z banku), pokazuje się w pillu z najwyższym
+priorytetem na kilka sekund, NIE zastępując toastu (oba naraz).
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) zadanie bez terminu faktycznie znika
+z pilla, (2) flash mignie przy logowaniu/auto-płatności bankowej i sam zniknie po ~6s.
+
 ## 🆕 Naprawiony nierozokraglony Max HP + powiększony reel skrzynki — NIEsprawdzone (2026-09-13)
 
 User zrzutem: "Max HP kotka: 397.9813491557909" (nierozokraglone) + "animacja [reela

@@ -148,6 +148,7 @@ import { Debt, PaymentMethod } from '@/types';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
+import { usePillFlash } from '@/store/pillFlashStore';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
@@ -1576,7 +1577,15 @@ export default function DashboardScreen() {
     if (!petHydrated || loginRan.current) return;
     loginRan.current = true;
     const g = registerLogin();
-    if (g) { haptic.success(); toast.success(`Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} monet`); }
+    if (g) {
+      haptic.success();
+      const msg = `Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} monet`;
+      toast.success(msg);
+      // Też w TopPill (2026-09-13, user: "niech moze tam sie pokazuja te powiadomienia...
+      // seria logowan") — toast znika po ~2.6s i łatwo go przegapić, pill jest bardziej
+      // "na oku" (żyje w tab-barze), patrz pillFlashStore.ts.
+      usePillFlash.getState().show(msg, { badge: `${g.streak}🔥`, color: '#F59E0B' });
+    }
   }, [petHydrated, registerLogin]);
   const petState = useMemo(() => {
     const tISO = todayISO();
