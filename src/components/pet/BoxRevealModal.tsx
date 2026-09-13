@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image, useWindowDimensions } from 'react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
 import { RARITY_META, gearById, GEAR_ITEMS } from '@/utils/gear';
@@ -28,8 +28,13 @@ function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: numb
 // PRZED tą animacją) nagrodzie pod wskaźnikiem na środku. `REEL_ITEM_W` = pełny "pitch" (skok)
 // jednej komórki (szerokość + odstępy razem), nie tylko widoczny box — matematyka
 // przesunięcia (`finalX` w `doOpen`) musi liczyć w tych samych jednostkach.
-const REEL_ITEM_W = 78;
-const REEL_WINDOW_W = 264;
+// Komórka powiększona 78→120 (+54%, 2026-09-13, user: "animacja jest za mała powieksz ja
+// o 50 prc minimum") — reszta rozmiarów reela (`reelCell`/`reelCellImg`/`reelCellEmoji`)
+// skalowana razem z nią w stylach niżej. `REEL_WINDOW_W` (widoczne okno) NIE jest już
+// stałą — sztywne ×1.5 (264→396) przelewałoby się poza wąskie telefony (Xiaomi/starsze
+// Samsungi ~360dp szerokości), więc jest teraz liczone z realnej szerokości ekranu
+// wewnątrz komponentu (patrz `reelWindowW`), ten sam wzorzec co `catSize` w pet.tsx.
+const REEL_ITEM_W = 120;
 const REEL_LENGTH = 40;
 const REEL_TARGET_INDEX = 34; // kilka komórek zapasu PO celu na jitter (patrz `doOpen`)
 
@@ -93,6 +98,10 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   // trzęsie i puchnie (shake+openScale), potem błysk światła (flash) podczas gdy skrzynka
   // znika (scale→0) — DOPIERO na końcu tego cut do `spinning`, więc reel "wyskakuje" z
   // błysku zamiast się po prostu podmieniać.
+  const { width: winW } = useWindowDimensions();
+  // Sufit 400 (~+51% vs starą stałą 264), ale nigdy szerszy niż ekran minus bezpieczny
+  // margines — patrz komentarz przy `REEL_ITEM_W` wyżej.
+  const reelWindowW = Math.min(400, winW - 48);
   const [phase, setPhase] = useState<'closed' | 'opening' | 'spinning' | 'revealed'>('closed');
   const [reel, setReel] = useState<ReelCell[]>([]);
   const [flies, setFlies] = useState<{ id: number; sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }[]>([]);
@@ -148,7 +157,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
         // TYM SAMYM miejscu za każdym razem, ale zawsze w granicach komórki nagrody (bezpieczne,
         // bo target ma 5 komórek zapasu PO sobie w REEL_LENGTH, patrz stałe wyżej).
         const jitter = (Math.random() - 0.5) * REEL_ITEM_W * 0.6;
-        const finalX = REEL_WINDOW_W / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
+        const finalX = reelWindowW / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
         Animated.timing(reelX, {
           toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
         }).start(() => {
@@ -208,7 +217,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
             <Animated.View pointerEvents="none" style={[st.flash, { opacity: flashOpacity, transform: [{ scale: flashScale }] }]} />
           )}
           {phase === 'spinning' && (
-            <View style={st.reelWindow}>
+            <View style={[st.reelWindow, { width: reelWindowW }]}>
               <Animated.View style={[st.reelStrip, { transform: [{ translateX: reelX }] }]}>
                 {reel.map(cell => (
                   <View key={cell.key} style={st.reelCellOuter}>
@@ -222,8 +231,8 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
               </Animated.View>
               <View style={st.reelFadeL} pointerEvents="none" />
               <View style={st.reelFadeR} pointerEvents="none" />
-              <View style={st.reelPointerTri} pointerEvents="none" />
-              <View style={st.reelPointerBar} pointerEvents="none" />
+              <View style={[st.reelPointerTri, { left: reelWindowW / 2 - 10 }]} pointerEvents="none" />
+              <View style={[st.reelPointerBar, { left: reelWindowW / 2 - 2 }]} pointerEvents="none" />
             </View>
           )}
           {phase === 'revealed' && (
@@ -293,19 +302,21 @@ const st = StyleSheet.create({
   // `reelCellOuter` = pełny "pitch" komórki (REEL_ITEM_W, BEZ marginesów — cała matematyka
   // przesunięcia w `doOpen` liczy w tej jednostce), `reelCell` = mniejszy, wycentrowany box
   // wizualny w środku (zostawia "szczelinę" między komórkami bez psucia pitcha).
-  reelWindow: { width: REEL_WINDOW_W, height: 92, overflow: 'hidden', position: 'relative', borderRadius: 16, backgroundColor: '#0E1113' },
+  // `width` NIE tutaj — liczony z ekranu (`reelWindowW`), patrz JSX. Wysokość 92→138 (+50%).
+  reelWindow: { height: 138, overflow: 'hidden', position: 'relative', borderRadius: 16, backgroundColor: '#0E1113' },
   reelStrip: { flexDirection: 'row', height: '100%', alignItems: 'center' },
   reelCellOuter: { width: REEL_ITEM_W, height: '100%', alignItems: 'center', justifyContent: 'center' },
-  reelCell: { width: REEL_ITEM_W - 10, height: 76, borderRadius: 12, borderWidth: 2, backgroundColor: '#161A1A', alignItems: 'center', justifyContent: 'center' },
-  reelCellImg: { width: 44, height: 44 },
-  reelCellEmoji: { fontSize: 30 },
+  reelCell: { width: REEL_ITEM_W - 15, height: 114, borderRadius: 14, borderWidth: 2, backgroundColor: '#161A1A', alignItems: 'center', justifyContent: 'center' },
+  reelCellImg: { width: 66, height: 66 },
+  reelCellEmoji: { fontSize: 45 },
   // Winieta po bokach okna — sygnalizuje "tu ikony wjeżdżają/wyjeżdżają", nie twardą krawędź.
-  reelFadeL: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 28, backgroundColor: '#0E1113', opacity: 0.85 },
-  reelFadeR: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28, backgroundColor: '#0E1113', opacity: 0.85 },
-  reelPointerBar: { position: 'absolute', left: REEL_WINDOW_W / 2 - 1.5, top: 0, bottom: 0, width: 3, backgroundColor: '#FBBF24' },
+  reelFadeL: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 36, backgroundColor: '#0E1113', opacity: 0.85 },
+  reelFadeR: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 36, backgroundColor: '#0E1113', opacity: 0.85 },
+  // `left` NIE tutaj — liczony z `reelWindowW` (centruje się na środku okna), patrz JSX.
+  reelPointerBar: { position: 'absolute', top: 0, bottom: 0, width: 4, backgroundColor: '#FBBF24' },
   reelPointerTri: {
-    position: 'absolute', left: REEL_WINDOW_W / 2 - 7, top: -2, width: 0, height: 0,
-    borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9,
+    position: 'absolute', top: -2, width: 0, height: 0,
+    borderLeftWidth: 10, borderRightWidth: 10, borderTopWidth: 14,
     borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FBBF24',
   },
 

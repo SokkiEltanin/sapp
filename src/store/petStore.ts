@@ -31,13 +31,20 @@ export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.
 // była zduplikowana w 4 miejscach (boss-fight.tsx, app/pet.tsx, damageCat/resetCatHp niżej) —
 // dodanie potki HP (2026-09-08, patrz `potions.ts`) w JEDNYM miejscu zamiast czterech, i bez
 // ryzyka, że kolejna kopia formuły gdzieś w przyszłości zapomni o którymś składniku.
+// `Math.round` na końcu (2026-09-13, user zrzutem: "Max HP kotka: 397.9813491557909" —
+// nierozokraglone) — `gearFlatHp` zwraca `owned.value`, WYLOSOWANY roll itemu (ciągły
+// ułamek, patrz rollBox w petBoxes.ts), nigdy nie był całkowity. HP jako koncepcja gry jest
+// wszędzie indziej całkowite (bazowe staty, HP bossów) — zaokrąglenie TU, w jedynym
+// wspólnym miejscu liczącym sufit HP, naprawia wyświetlanie ORAZ walkę (damageCat/healCat/
+// resetCatHp) naraz, bez dotykania samych wylosowanych wartości w `ownedGear` (są i tak
+// tylko surowym wejściem do tej formuły, nie czymś co user widzi wprost).
 export function effectiveCatMaxHp(
   catMaxHpBonus: number,
   equippedGear: Partial<Record<GearSlot, string>>,
   ownedGear: Partial<Record<string, OwnedGear>>,
   activePotion: ActivePotion | null,
 ): number {
-  return catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear) + potionFlatHp(activePotion);
+  return Math.round(catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear) + potionFlatHp(activePotion));
 }
 
 // XP mnożone przez potkę Mądrości (jeśli aktywna) — JEDYNY chokepoint (żadna z 14 akcji

@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Naprawiony nierozokraglony Max HP + powiększony reel skrzynki — NIEsprawdzone (2026-09-13)
+
+User zrzutem: "Max HP kotka: 397.9813491557909" (nierozokraglone) + "animacja [reela
+skrzynki] jest za mała powieksz ja o 50 prc minimum". Pełny opis w ARCHITECTURE.md §89.
+Skrót: `effectiveCatMaxHp` (petStore.ts) teraz zaokrągla wynik — ułamkowy roll zbroi ze
+skrzynki już nie wycieka na ekran ani do walki. Reel otwierania skrzynki (BoxRevealModal.tsx)
+powiększony min. +50% (komórki, ikony, wskaźnik), okno reela RESPONSYWNE (useWindowDimensions,
+sufit 400px) zamiast sztywnej stałej, żeby nie przelewało się na wąskich telefonach.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) Max HP bez dziesiętnych, (2) reel
+wyraźnie większy i mieści się na ekranie.
+
 ## 🆕 Stałe/Zmienne: rozbicie mieszanego paragonu per produkt (reużyty mechanizm food) — NIEsprawdzone (2026-09-13)
 
 User: *"muszę miec opcje zaznaczenia edytowania co jest stała a co zmienna, tak jak w
