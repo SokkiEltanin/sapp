@@ -2,6 +2,7 @@ import { Expense } from '@/types';
 import { isSelfTransfer } from './statWidgets';
 import { looksLikeBill } from './recurringBills';
 import { getCategoryMeta } from './categories';
+import { foodAmountOf } from './food';
 
 // Fixed = committed monthly costs you can't easily cut (rent, utilities, internet,
 // insurance, subscriptions). Everything else you spend is variable/discretionary.
@@ -14,17 +15,41 @@ export function isFixedExpense(e: Expense): boolean {
 }
 
 export type FvBucket = 'fixed' | 'variable' | 'food';
+export interface FvSplit { fixed: number; variable: number; food: number }
 
-// Klasyfikacja JEDNEGO wydatku do kubła Stałe/Zmienne/Jedzenie — CENTRALNA funkcja
-// (2026-09-12, refaktor przy okazji `e.fvOverride`), używana teraz wszędzie zamiast
-// osobno powtarzanego `isFixedExpense(e) ? ... : e.category === 'groceries' ? ...`
-// w każdej funkcji niżej. `fvOverride` (ręczne przeklasyfikowanie z widoku rozbicia
-// widgetu "Na co idą pieniądze" — user: "zebym mógł kliknąć ze np cos sie zle liczy...
-// zeby sie uczyło") ma ZAWSZE pierwszeństwo przed heurystyką kategorii/tagów.
+// Rozbija JEDEN wydatek na wkłady do kubłów Stałe/Zmienne/Jedzenie (2026-09-13, user:
+// "tak jak w jedzeniu mogę zaznaczyć że to nie jedzenie każdego produktu osobno (tak
+// jest teraz)" — chce TEGO SAMEGO dla stałe/zmienne). Poprzednia wersja (`bucketOf`
+// klasyfikujący CAŁY wydatek do JEDNEGO kubła po samej kategorii) była ślepa na to, że
+// pojedynczy paragon (np. spożywczy) może mieć WYMIESZANE produkty — część faktycznie
+// jedzeniem, część nie (chemia/higiena/"nie jedzenie" oznaczone RĘCZNIE per-produkt w
+// edycji paragonu, patrz `toggleItemFood` w app/expenses/[id].tsx) — więc CAŁA kwota
+// wpadała w jeden kubeł, myląc "ile realnie wydaję na jedzenie" vs "na resztę zakupów".
+// `foodAmountOf()` (food.ts) już dokładnie to liczy PER PRODUKT — reużyte tutaj zamiast
+// zgadywania z samej kategorii całego wydatku, więc oznaczenie produktu "nie jedzenie"
+// automatycznie przesuwa jego udział z kubła Jedzenie do Zmienne, bez żadnego NOWEGO
+// mechanizmu do budowania. `fvOverride` (ręczne przeklasyfikowanie CAŁEGO wydatku) i
+// rozpoznany rachunek stały mają pierwszeństwo i idą w 100% do jednego kubła — rozbicie
+// dotyczy tylko zwykłych zakupów.
+export function fvSplitOf(e: Expense): FvSplit {
+  if (e.fvOverride === 'fixed') return { fixed: e.amount, variable: 0, food: 0 };
+  if (e.fvOverride === 'variable') return { fixed: 0, variable: e.amount, food: 0 };
+  if (e.fvOverride === 'food') return { fixed: 0, variable: 0, food: e.amount };
+  if (isFixedExpense(e)) return { fixed: e.amount, variable: 0, food: 0 };
+  const food = Math.min(e.amount, Math.max(0, foodAmountOf(e)));
+  return { fixed: 0, variable: Math.max(0, e.amount - food), food };
+}
+
+// Dominujący kubeł JEDNEGO wydatku — do widoków, które muszą pokazać JEDNĄ etykietę (np.
+// odznaka na liście transakcji), pochodna `fvSplitOf` (ta sama prawda co reszta pliku,
+// nie osobna heurystyka). Dla mieszanego paragonu (jedzenie+zmienne oba >0) UI wyżej
+// (ExpenseItem.tsx) pokazuje OBIE etykiety wprost zamiast polegać na tym wyborze —
+// `bucketOf` zostaje jako rozsądny fallback/pojedyncza wartość tam, gdzie mieszanie nie
+// ma znaczenia (np. stare wywołania, testy).
 export function bucketOf(e: Expense): FvBucket {
-  if (e.fvOverride === 'fixed' || e.fvOverride === 'variable' || e.fvOverride === 'food') return e.fvOverride;
-  if (isFixedExpense(e)) return 'fixed';
-  if (e.category === 'groceries') return 'food';
+  const s = fvSplitOf(e);
+  if (s.fixed > 0 && s.fixed >= s.variable && s.fixed >= s.food) return 'fixed';
+  if (s.food > 0 && s.food >= s.variable) return 'food';
   return 'variable';
 }
 
@@ -46,10 +71,8 @@ export function fixedVariableMonths(expenses: Expense[], n = 4, now = new Date()
       if (e.type === 'income') continue;
       if (isSelfTransfer(e)) continue;
       if ((e.date ?? '').slice(0, 7) !== key) continue;
-      const b = bucketOf(e);
-      if (b === 'fixed') fixed += e.amount;
-      else if (b === 'food') food += e.amount;
-      else variable += e.amount;
+      const s = fvSplitOf(e);
+      fixed += s.fixed; food += s.food; variable += s.variable;
     }
     out.push({ month: key, fixed: Math.round(fixed), variable: Math.round(variable), food: Math.round(food) });
   }
@@ -107,9 +130,10 @@ export function topVariableContributors(expenses: Expense[], month: string, n = 
   for (const e of expenses) {
     if (e.type === 'income' || isSelfTransfer(e)) continue;
     if ((e.date ?? '').slice(0, 7) !== month) continue;
-    if (bucketOf(e) !== 'variable') continue;
+    const variableAmt = fvSplitOf(e).variable;
+    if (variableAmt <= 0) continue;
     const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
-    map[label] = (map[label] ?? 0) + e.amount;
+    map[label] = (map[label] ?? 0) + variableAmt;
   }
   return Object.entries(map)
     .map(([label, amount]) => ({ label, amount: Math.round(amount) }))
@@ -153,9 +177,10 @@ export function fixedBreakdown(expenses: Expense[], month: string): FixedItem[] 
   for (const e of expenses) {
     if (e.type === 'income' || isSelfTransfer(e)) continue;
     if ((e.date ?? '').slice(0, 7) !== month) continue;
-    if (bucketOf(e) !== 'fixed') continue;
+    const fixedAmt = fvSplitOf(e).fixed;
+    if (fixedAmt <= 0) continue;
     const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
-    map[label] = (map[label] ?? 0) + e.amount;
+    map[label] = (map[label] ?? 0) + fixedAmt;
   }
   return Object.entries(map)
     .map(([label, amount]) => ({ label, amount: Math.round(amount) }))
@@ -176,9 +201,13 @@ export function bucketTransactions(expenses: Expense[], month: string, bucket: F
   for (const e of expenses) {
     if (e.type === 'income' || isSelfTransfer(e)) continue;
     if ((e.date ?? '').slice(0, 7) !== month) continue;
-    if (bucketOf(e) !== bucket) continue;
+    // Kwota = WKŁAD tego wydatku do TEGO kubła, nie zawsze cała `e.amount` — mieszany
+    // paragon (jedzenie+chemia) może pojawić się w OBU zakładkach (Jedzenie i Zmienne)
+    // naraz, każda z tylko swoją częścią kwoty, patrz `fvSplitOf`.
+    const amt = fvSplitOf(e)[bucket];
+    if (amt <= 0) continue;
     const label = (e.note ?? '').trim() || (e.storeName ?? '').trim() || getCategoryMeta(e.category).label;
-    out.push({ id: e.id, label, amount: Math.round(e.amount), date: e.date, overridden: !!e.fvOverride });
+    out.push({ id: e.id, label, amount: Math.round(amt), date: e.date, overridden: !!e.fvOverride });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date));
 }

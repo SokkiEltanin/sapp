@@ -11,7 +11,7 @@ import { billTagFor } from '@/utils/recurringBills';
 import { estimateItemKcal } from '@/utils/calories';
 import { isMine } from '@/store/statsScope';
 import { isSelfTransfer } from '@/utils/statWidgets';
-import { bucketOf, FvBucket } from '@/utils/fixedVariable';
+import { bucketOf, fvSplitOf, FvBucket } from '@/utils/fixedVariable';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -74,7 +74,15 @@ export default function ExpenseItem({ expense, onPress, onLongPress, onReclassif
   // (oszczędności/Revolut) — te są wykluczone ze WSZYSTKICH kubłów w fixedVariable.ts,
   // więc pokazanie im "Zmienne" wyglądałoby jak dokładnie ten błąd klasyfikacji, który
   // ten badge ma pomóc wyłapać.
-  const bucket: FvBucket | null = (isIncome || isSelfTransfer(expense)) ? null : bucketOf(expense);
+  // MIESZANY paragon (2026-09-13, user: "tak jak w jedzeniu mogę zaznaczyć że to nie
+  // jedzenie każdego produktu osobno" — chce tego samego dla stałe/zmienne) — `fvSplitOf`
+  // dzieli kwotę paragonu na jedzenie/zmienne PER PRODUKT (patrz fixedVariable.ts), więc
+  // np. paragon spożywczy z chemią pokazuje TERAZ obie etykiety naraz zamiast jednej,
+  // potencjalnie mylącej (cała kwota "Jedzenie" mimo że część to proszek do prania).
+  const split = (isIncome || isSelfTransfer(expense)) ? null : fvSplitOf(expense);
+  const mixedBuckets: FvBucket[] = split ? (['fixed', 'variable', 'food'] as FvBucket[]).filter(b => split[b] > 0) : [];
+  const isMixed = mixedBuckets.length > 1;
+  const bucket: FvBucket | null = mixedBuckets.length === 0 ? null : (isMixed ? bucketOf(expense) : mixedBuckets[0]);
 
   const title = expense.storeName || expense.note || meta.label;
   // No time in the list — every entry defaults to noon, so "12:00" was just noise.
@@ -118,8 +126,18 @@ export default function ExpenseItem({ expense, onPress, onLongPress, onReclassif
               style={styles.bucketBadge}
               activeOpacity={0.7}
             >
-              <View style={[styles.bucketDot, { backgroundColor: BUCKET_META[bucket].color }]} />
-              <Text style={[styles.bucketText, { color: BUCKET_META[bucket].color }]}>{BUCKET_META[bucket].label}</Text>
+              {isMixed ? mixedBuckets.map((b, i) => (
+                <View key={b} style={styles.bucketBadgePart}>
+                  {i > 0 && <Text style={styles.bucketPlus}>+</Text>}
+                  <View style={[styles.bucketDot, { backgroundColor: BUCKET_META[b].color }]} />
+                  <Text style={[styles.bucketText, { color: BUCKET_META[b].color }]}>{BUCKET_META[b].label}</Text>
+                </View>
+              )) : (
+                <>
+                  <View style={[styles.bucketDot, { backgroundColor: BUCKET_META[bucket].color }]} />
+                  <Text style={[styles.bucketText, { color: BUCKET_META[bucket].color }]}>{BUCKET_META[bucket].label}</Text>
+                </>
+              )}
               {!!expense.fvOverride && <Pencil size={9} color={colors.text.muted} />}
             </TouchableOpacity>
           )}
@@ -260,6 +278,9 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4,
     marginTop: 1,
   },
+  // Mieszany paragon (2026-09-13) — kilka par kropka+etykieta w jednym rzędzie, oddzielone `+`.
+  bucketBadgePart: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bucketPlus: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginRight: 4 },
   bucketDot: { width: 6, height: 6, borderRadius: 3 },
   bucketText: { fontSize: 10, fontWeight: '700' },
   bucketEditRow: {
