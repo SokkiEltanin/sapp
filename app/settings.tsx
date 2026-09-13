@@ -61,6 +61,7 @@ import { useBankQueue } from '@/store/bankQueueStore';
 import { ingestBankNotification } from '@/services/bankIngest';
 import { useBankRules, BankRule, BankRuleKind, ruleKind } from '@/store/bankRulesStore';
 import { parseBankNotification } from '@/utils/bankNotification';
+import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef } from '@/types/settings';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
@@ -155,6 +156,13 @@ export default function SettingsScreen() {
   const setBankAutoAll = useBankQueue(s => s.setAutoAll);
   const bankPending = useBankQueue(s => s.pending.length);
   const [bankTest, setBankTest] = useState('');
+  // Własne imię — wykrywanie przelewów do siebie (2026-09-13, patrz komentarz w
+  // src/utils/ownName.ts). Wczytane raz przy montowaniu (moduł jest już zapełniony przez
+  // `loadOwnName()` w app/_layout.tsx przy starcie apki, ale ten ekran mógł się zamontować
+  // PRZED tamtym efektem — `getOwnName()` tuż po mount i tak da poprawną wartość, bo React
+  // uruchamia efekty layoutu w kolejności montowania rodzic→dziecko, root layout zawsze
+  // pierwszy).
+  const [ownNameField, setOwnNameField] = useState(getOwnName());
   const bankRules = useBankRules(s => s.rules);
   const addBankRule = useBankRules(s => s.addRule);
   const updateBankRule = useBankRules(s => s.updateRule);
@@ -1661,6 +1669,20 @@ export default function SettingsScreen() {
           keywords: ['bank', 'powiadomienia', 'pekao', 'peopay', 'pko', 'iko', 'płatność', 'automatyczne wydatki'],
           control: { kind: 'switch', value: bankEnabled, onChange: (v: boolean) => { setBankEnabled(v); if (v) import('@/services/bankNotificationDrain').then(m => m.drainBankNotifications()).catch(() => {}); } },
         },
+        ...(bankEnabled ? [{
+          // Własne imię — wykrywanie przelewów do siebie (2026-09-13, user: "trzeba
+          // dodać kategorie przelew własny jak jest do Wiktor Rudziński... to znaczy ze
+          // to przelew wewnętrzny do mnie samego"). Przelew między WŁASNYMI kontami (bez
+          // słowa "Revolut"/"oszczędności" w treści) niesie tylko `odbiorca: <Imię
+          // Nazwisko>" — bez tego pola apka nie ma jak wiedzieć że to Ty, nie obcy.
+          id: 'bank-own-name', title: 'Twoje imię i nazwisko',
+          subtitle: ownNameField.trim()
+            ? 'Przelew do tej osoby (na Twoje inne konto) liczy się jako "odłożone", nie wydatek'
+            : 'Wpisz, żeby przelewy między Twoimi kontami nie liczyły się jako wydatek',
+          icon: LucideIcons.UserCircle2, accentColor: '#2AC68F',
+          keywords: ['imię', 'nazwisko', 'przelew własny', 'odbiorca', 'wewnętrzny', 'moje konto'],
+          control: { kind: 'text' as const, value: ownNameField, onChangeText: setOwnNameField, onBlur: () => setOwnName(ownNameField), placeholder: 'np. Jan Kowalski' },
+        }] : []),
         ...(bankEnabled ? [{
           id: 'bank-auto-all', title: 'Dodawaj automatycznie (bez zatwierdzania)',
           subtitle: 'Każda płatność kartą księguje się od razu. Wpłaty/wypłaty i tak sprawdzasz ręcznie.',

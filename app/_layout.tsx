@@ -33,6 +33,7 @@ import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import { loadNonFood } from '@/utils/food';
+import { loadOwnName } from '@/utils/ownName';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
@@ -205,6 +206,7 @@ export default function RootLayout() {
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
   useEffect(() => { loadNonFood().catch(() => {}); }, []);   // "to nie jedzenie" exclusions → module set
+  useEffect(() => { loadOwnName().catch(() => {}); }, []);   // własne imię → wykrywanie przelewów do siebie (bankNotification.ts)
 
   // Lokalny licznik użycia ekranów (2026-09-12, user: "coś ala meta pixel... obieg
   // zamknięty" — patrz `usageStatsStore.ts`/`screenStats.ts` dla pełnego opisu). JEDNO

@@ -26,7 +26,21 @@ export const BANK_PACKAGES = ['pl.pekao24.peopay', 'eu.eleader.mobilebanking.pek
 
 const num = (s: string) => parseFloat(s.replace(/\s/g, '').replace(',', '.'));
 
-export function parseBankNotification(title: string, text: string): ParsedBankTx | null {
+// Znormalizowane porównanie imienia (2026-09-13, user: "trzeba dodać kategorie przelew
+// własny jak jest do Wiktor Rudziński... to znaczy ze to przelew wewnętrzny do mnie
+// samego") — lokalna, minimalna kopia zamiast importu z ownName.ts (ten plik celowo
+// zostaje lekki/bez efektów ubocznych, testowany bezpośrednio przez Jest, patrz komentarz
+// nad BANK_PACKAGES).
+const NAME_DIACRITICS: Record<string, string> = { ą: 'a', ć: 'c', ę: 'e', ł: 'l', ń: 'n', ó: 'o', ś: 's', ż: 'z', ź: 'z' };
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[ąćęłńóśżź]/g, c => NAME_DIACRITICS[c] ?? c).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// `ownName` (2026-09-13) — Twoje imię+nazwisko z Ustawień (opcjonalne). Przelew MIĘDZY
+// WŁASNYMI kontami (nie Revolut/oszczędności, po prostu drugie konto na to samo nazwisko)
+// niesie `odbiorca: <Imię Nazwisko>` bez żadnego słowa-klucza który już łapiemy niżej —
+// stąd osobne porównanie z tym, co user sam zadeklarował jako "to ja".
+export function parseBankNotification(title: string, text: string, ownName?: string): ParsedBankTx | null {
   const body = `${title ?? ''} ${text ?? ''}`.replace(/\s+/g, ' ').trim();
   if (!body) return null;
 
@@ -84,7 +98,8 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     const rcpM = body.match(/odbiorca:?\s*(.+?)(?:\s*(?:tytu[łl]|tyt\.?|nr\b|rachun|kwot|dnia|\.\s*Bank|$))/i);
     let store = (rcpM?.[1] ?? 'Przelew wychodzący').replace(/\s+/g, ' ').trim();
     if (store.length > 40) store = store.slice(0, 40).trim();
-    const selfTransfer = /revolut|oszcz[ęe]dno|w[łl]asne|savings|konto\s+oszcz/i.test(body);
+    const selfTransfer = /revolut|oszcz[ęe]dno|w[łl]asne|savings|konto\s+oszcz/i.test(body)
+      || (!!ownName && normalizeName(store).includes(normalizeName(ownName)));
     const storeKey = (store.split(/\s+/)[0] ?? 'przelew').toLowerCase();
     return { amount, currency, dateISO, store, storeKey, method: 'transfer', direction: 'out', selfTransfer, raw: body };
   }
