@@ -6494,6 +6494,70 @@ kontrastowego; (4) sprawdź że powiększone ikony (74%/78%) nie wystają poza n
 na obrazku lady na węższych telefonach; (5) potki na tablicy — własne grafiki zamiast
 ikon lucide.
 
+## 88. Stałe/Zmienne/Jedzenie: rozbicie mieszanego paragonu PER PRODUKT (reużycie mechanizmu "nie jedzenie")
+
+User: *"A co do stałych zmiennych muszę miec opcje zaznaczenia edytowania co jest stała a
+co zmienna, tak jak w jedzeniu moge zaznaczyć ze to nie jedzenie każdego produktu osobno
+(tak jest teraz)"*.
+
+**Root cause.** `bucketOf(e)` (§77/§86) klasyfikował CAŁY wydatek do JEDNEGO kubła po
+samej kategorii (`e.category === 'groceries' → 'food'`) — ślepy na to, że pojedynczy
+paragon spożywczy realnie bywa MIESZANY (chleb + proszek do prania + kosmetyki), a
+dokładnie TA sama sytuacja dla "jedzenie/nie jedzenie" ma już od dawna precyzyjne,
+PER-PRODUKTOWE rozwiązanie: `toggleItemFood`/pigułka "jedzenie / nie jedz." na każdej
+pozycji paragonu (`app/expenses/[id].tsx`) + `foodAmountOf()` (`food.ts`), które sumuje
+TYLKO linie oznaczone jako jedzenie. Kubły Stałe/Zmienne/Jedzenie po prostu z tego nie
+korzystały — całość paragonu wpadała w jeden kubeł, myląc "ile realnie wydaję na
+jedzenie" vs "na resztę zakupów przy okazji".
+
+**Fix — reużycie istniejącego mechanizmu, ZERO nowego UI do budowania.** Nowa
+`fvSplitOf(e): {fixed, variable, food}` w `fixedVariable.ts` — dla zwykłych zakupów
+(bez `fvOverride`, nie rozpoznany rachunek stały) liczy `food = foodAmountOf(e)` (już
+istniejące, per-produktowe) i resztę (`e.amount - food`) wrzuca do `variable`. Efekt:
+oznaczenie POJEDYNCZEGO produktu jako "nie jedzenie" w edytorze paragonu (mechanizm z
+pytania usera — "tak jest teraz") TERAZ AUTOMATYCZNIE przesuwa jego udział z kubła
+Jedzenie do Zmienne we WSZYSTKICH miejscach liczących te kubły — dokładnie ta sama
+kontrola co user już zna i używa, żadnego nowego przełącznika do nauczenia się.
+`fvOverride` (ręczna korekta CAŁEGO wydatku, badge na liście z §86) i rozpoznany rachunek
+stały (`isFixedExpense`) mają pierwszeństwo i idą w 100% do jednego kubła — rozbicie
+dotyczy tylko zwykłych zakupów.
+
+**Zaktualizowane funkcje** (wszystkie w `fixedVariable.ts`, wszystkie teraz przez
+`fvSplitOf` zamiast `bucketOf`+całe `e.amount`): `fixedVariableMonths` (sumuje OBA kubły
+z jednego mieszanego wydatku naraz), `fixedBreakdown`, `topVariableContributors`,
+`bucketTransactions` (mieszany paragon może teraz pojawić się w OBU zakładkach rozbicia
+widgetu "Na co idą pieniądze" — Jedzenie i Zmienne — każda tylko ze SWOJĄ częścią kwoty,
+nie z całą). `bucketOf(e)` (pojedyncza etykieta, dalej używana tam gdzie nie ma miejsca na
+dwie) zostaje jako POCHODNA `fvSplitOf` — dla mieszanego wydatku zwraca dominujący
+(większy udziałem) kubeł, nie osobną heurystykę.
+
+**Odznaka na liście (`ExpenseItem.tsx`, §86)** — dla mieszanego paragonu (jedzenie I
+zmienne oba >0) pokazuje TERAZ OBIE etykiety naraz ("● Jedzenie + ● Zmienne") zamiast
+jednej potencjalnie mylącej. Tap dalej otwiera inline korektę `fvOverride` (kolapsuje
+naturalny podział w JEDEN wybrany kubeł — świadomy wyjątek "chcę to policzyć inaczej",
+nie próba budowania osobnego per-produktowego edytora dla stałe/zmienne, bo taki JUŻ
+ISTNIEJE dla jedzenia i został tu podłączony zamiast duplikowany).
+
+**Explicite NIE zrobione**: żaden nowy przełącznik/UI per-produktowy dla stałe/zmienne —
+to była literalna prośba usera ("muszę mieć opcje zaznaczenia"), ale okazało się że
+DOKŁADNIE ten mechanizm już istnieje (food/nie-jedzenie) i wystarczyło go PODŁĄCZYĆ do
+klasyfikacji fv zamiast budować drugi, równoległy. "Stałe" per-produkt nie ma sensu
+(rachunki nie mają pozycji paragonu) — rozbicie dotyczy wyłącznie jedzenie↔zmienne.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/950 testów (+8 nowych w `fixedVariable.test.ts`:
+paragon bez pozycji zachowuje stare zachowanie, mieszany paragon dzieli proporcjonalnie,
+oznaczenie "nie jedzenie" przesuwa udział, `fvOverride` wygrywa nawet z mieszanym
+paragonem, rachunek stały ignoruje pozycje, `bucketOf` na mieszanym zwraca dominujący,
+`fixedVariableMonths`/`bucketTransactions` poprawnie dzielą JEDEN wydatek na dwa kubły).
+
+**Priorytet testu na urządzeniu**: (1) paragon spożywczy z produktem oznaczonym "nie
+jedzenie" → sprawdź że lista pokazuje odznakę "Jedzenie + Zmienne" zamiast samego
+"Jedzenie"; (2) widget "Na co idą pieniądze" → rozbicie miesięczne → sprawdź że TEN SAM
+paragon pojawia się w obu zakładkach (Jedzenie/Zmienne) z podzieloną kwotą, sumującą się
+do pełnej kwoty paragonu; (3) oznacz produkt "nie jedzenie"/z powrotem "jedzenie" w
+edytorze paragonu → sprawdź że kwoty w widgecie i na liście przeliczają się od razu po
+zapisie (bez potrzeby zamykania/otwierania ekranu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Stałe/Zmienne: rozbicie mieszanego paragonu per produkt (reużyty mechanizm food) — NIEsprawdzone (2026-09-13)
+
+User: *"muszę miec opcje zaznaczenia edytowania co jest stała a co zmienna, tak jak w
+jedzeniu moge zaznaczyć ze to nie jedzenie każdego produktu osobno (tak jest teraz)"*.
+Pełny opis w ARCHITECTURE.md §88. Zamiast budować NOWY przełącznik per-produkt, podłączony
+JUŻ ISTNIEJĄCY mechanizm "nie jedzenie" (`toggleItemFood`/`foodAmountOf`) do klasyfikacji
+Stałe/Zmienne/Jedzenie (`fvSplitOf` w `fixedVariable.ts`) — mieszany paragon (jedzenie +
+chemia) dzieli się teraz PROPORCJONALNIE zamiast wpadać w cały jeden kubeł. Odznaka na
+liście wydatków pokazuje obie etykiety naraz dla mieszanych paragonów ("Jedzenie +
+Zmienne").
+
+**NIE zweryfikowane na urządzeniu** — priorytet: sprawdź na realnym paragonie z mieszaną
+zawartością, że kwoty w widgecie "Na co idą pieniądze" i na liście się zgadzają i sumują
+do całości.
+
 ## 🆕 Sklep: gradientowa nazwa + aura rzadkości + większe itemy + potki — PRIORYTET testu (2026-09-13)
 
 **DRUGA próba naprawy tego samego buga** (pierwsza, §73e, "naprawiona" samym `lineHeight`
