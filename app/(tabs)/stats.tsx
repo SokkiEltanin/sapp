@@ -20,6 +20,7 @@ import DayTimelineH from '@/components/calendar/DayTimelineH';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService } from '@/services/maintenanceService';
@@ -454,10 +455,10 @@ export default function CalendarTabScreen() {
 
   const isToday = selectedDate === todayStr();
   const totalExpensesAmt = selectedExpenses
-    .filter(e => !e.type || e.type === 'expense')
+    .filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e))
     .reduce((s, e) => s + e.amount, 0);
   const totalIncomeAmt = selectedExpenses
-    .filter(e => e.type === 'income')
+    .filter(e => e.type === 'income' && !isSelfTransfer(e))
     .reduce((s, e) => s + e.amount, 0);
   const expCurrency = selectedExpenses[0]?.currency ?? 'PLN';
 

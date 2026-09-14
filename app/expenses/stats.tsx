@@ -15,6 +15,7 @@ import { Expense, ExpenseCategory } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { detectFixedCosts } from '@/utils/fixedCosts';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -73,8 +74,10 @@ function LineChart30Day({ data, width }: { data: { ds: string; exp: number; inc:
 const FOOD_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje'];
 const SKIP_BILL_CATS: ExpenseCategory[] = ['housing', 'subscriptions'];
 
-function isExpense(e: Expense) { return !e.type || e.type === 'expense'; }
-function isIncome(e: Expense)  { return e.type === 'income'; }
+// Self-transfery (przelew między własnymi kontami) wyłączone ze wszystkich statystyk na
+// tym ekranie — patrz isSelfTransfer, ten sam wyjątek co reszta statystyk finansowych.
+function isExpense(e: Expense) { return (!e.type || e.type === 'expense') && !isSelfTransfer(e); }
+function isIncome(e: Expense)  { return e.type === 'income' && !isSelfTransfer(e); }
 
 function inMonth(e: Expense, start: Date, end: Date) {
   try { return isWithinInterval(parseISO(e.date), { start, end }); }

@@ -6762,6 +6762,63 @@ wydatków/przychodów tego miesiąca; (2) ten sam wydatek ponownie w szczegóła
 pokazuje badge "Przelew własny" w karcie kwoty i "Tak" w karcie niżej; (3) wyłącz przełącznik
 z powrotem → transakcja wraca do normalnych sum.
 
+## 93. Self-transfer wyciekał do statystyk poza głównym bilansem — domknięcie po całej apce
+
+User po §92: *"przelew własny nadal sie liczy do sumy na finansach nie?"*, a po
+doprecyzowaniu (bilans NA KARCIE ma zostać jak jest — realnie liczy główne konto): *"inne
+statystyki tez powinny brać pod uwagę ze to przelew własny a nie cos co mam / wydaje"*.
+
+**Problem.** `isSelfTransfer()` (statWidgets.ts) istnieje od dawna i JEST honorowany w
+kluczowych miejscach (monthTotals w finances.tsx, widgety dashboardu w statWidgets.ts,
+fixedVariable.ts, monthCards.ts) — ale wykluczanie self-transferu NIE było spójnie
+zastosowane wszędzie tam, gdzie apka liczy sumy wydatków/przychodów. Audyt (grep
+`reduce((s, e) => s + e.amount`) znalazł osiem miejsc, gdzie self-transfer nadal wpadał
+do sumy jak zwykły wydatek/przychód:
+
+1. `app/(tabs)/finances.tsx` — suma PER DZIEŃ przy nagłówku daty w liście transakcji.
+2. `app/(tabs)/stats.tsx` — suma dnia w widoku Kalendarz (drill-down po kliknięciu dnia).
+3. `src/hooks/useExpenses.ts` — `stats.monthExpenses`/`monthIncome` (m.in. napędza widget
+   "Budżet" na Dashboardzie — `budgetRemaining` w `app/(tabs)/index.tsx`).
+4. `src/utils/dashboard/spend.ts` — `allSpend`/`weekIncome` (widgety tygodniowe
+   dashboardu).
+5. `src/utils/monthlyReports.ts` — `totalSpend`/`totalIncome` w raporcie MIESIĘCZNYM i
+   ROCZNYM (ekran Podsumowania).
+6. `src/utils/statWidgets.ts` — widget `'food'` (ile wydaję na jedzenie).
+7. `app/weekly.tsx` — cały ekran "Tydzień" (suma tygodnia, porównanie z poprzednim,
+   wykres dzienny) — lokalne `isExpense`/`isIncome` bez wykluczenia.
+8. `app/expenses/stats.tsx` — cały ekran "Statystyki wydatków" (trend 6-mies., wykres
+   30-dniowy, rozbicie po kategoriach/tagach, drill-down transakcji per kategoria/dzień) —
+   też lokalne `isExpense`/`isIncome` bez wykluczenia; NAJBARDZIEJ prawdopodobne miejsce,
+   gdzie user faktycznie zauważył wyciek.
+
+**Fix.** Wszędzie, gdzie plik miał WŁASNĄ lokalną definicję `isExpense`/`isIncome`
+(`weekly.tsx`, `expenses/stats.tsx`, `useExpenses.ts`), wykluczenie `!isSelfTransfer(e)`
+wbudowane BEZPOŚREDNIO w te predykaty — jeden punkt zmiany na plik, automatycznie
+poprawia WSZYSTKIE pochodne agregacje (wykresy, rozbicia kategorii, drill-downy), zamiast
+łatać każde wywołanie `.reduce()` osobno. Gdzie nie było lokalnego predykatu (`spend.ts`,
+`monthlyReports.ts`, `stats.tsx`, `finances.tsx` sekcja-total, `statWidgets.ts`) — dodane
+`&& !isSelfTransfer(e)` bezpośrednio w filtrze. **Świadomie NIE dotknięte**: `allExp`/
+`allInc` w `finances.tsx` (bilans "NA KARCIE") — user explicite potwierdził że TEN ma
+zostać jak jest, bo self-transfer realnie rusza stanem głównego konta; `tagBudgets.ts`
+(budżet per-tag — self-transfer musiałby mieć JEDNOCZEŚNIE tag budżetu i tag `przelew`,
+skrajnie mało prawdopodobne, pominięte celowo żeby nie komplikować); running-totale przy
+DODAWANIU nowego paragonu (`expenses/add.tsx`/`manual.tsx` — sumują pozycje WPROWADZANE
+teraz, nie historię).
+
+**Explicite NIE zrobione**: pełna migracja/retest WSZYSTKICH widgetów dashboardu (ponad 20
+w rejestrze `statWidgets.ts`) — audyt objął tylko te faktycznie sumujące kwoty
+(`reduce(...amount)`), nie liczniki/inne metryki niepieniężne.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (+3 nowe: `dashboardSpend.test.ts` —
+`allSpend`/`weekIncome` pomijają self-transfer; `monthlyReports.test.ts` — self-transfer
+out+in jednocześnie nie zmienia `totalSpend`/`totalIncome`).
+
+**Priorytet testu na urządzeniu**: (1) oznacz dowolny wydatek jako "Przelew własny" (§92)
+→ sprawdź, że znika z: sumy dnia na liście Finansów, "Statystyki wydatków" (kategoria,
+tydzień, miesiąc, wykres 30-dniowy), ekranu "Tydzień", drill-downu dnia w Kalendarzu,
+widgetu Budżet na Dashboardzie; (2) bilans "NA KARCIE" u góry Finansów NIE powinien się
+zmienić — to jedyne miejsce, które celowo dalej liczy self-transfer.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -1,5 +1,6 @@
 import { Expense } from '@/types';
 import { consumesInScope, StatsScope } from '@/store/statsScope';
+import { isSelfTransfer } from '@/utils/statWidgets';
 
 // Czyste agregacje wydatków dla dashboardu — wyniesione z app/(tabs)/index.tsx (krok 1
 // utwardzania: „najpierw logika, nie JSX"). Dzień = LOKALNY przez slice(0,10) — patrz
@@ -17,17 +18,18 @@ export function groceryTotal(expenses: Expense[], dates: string[]): number {
     .reduce((s, e) => s + e.amount, 0);
 }
 
-// Suma WSZYSTKICH wydatków (nie-przychodów) w podanych dniach.
+// Suma WSZYSTKICH wydatków (nie-przychodów) w podanych dniach. Self-transfery (przelew
+// między własnymi kontami) wyłączone — to nie realne wydawanie, patrz isSelfTransfer.
 export function allSpend(expenses: Expense[], dates: string[]): number {
   const set = onDays(dates);
-  return expenses.filter(e => (!e.type || e.type === 'expense') && set.has(e.date.slice(0, 10)))
+  return expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && set.has(e.date.slice(0, 10)))
     .reduce((s, e) => s + e.amount, 0);
 }
 
 // Suma przychodów w podanych dniach.
 export function weekIncome(expenses: Expense[], dates: string[]): number {
   const set = onDays(dates);
-  return expenses.filter(e => e.type === 'income' && set.has(e.date.slice(0, 10)))
+  return expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && set.has(e.date.slice(0, 10)))
     .reduce((s, e) => s + e.amount, 0);
 }
 

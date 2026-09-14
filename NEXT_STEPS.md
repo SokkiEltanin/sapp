@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Self-transfer wyciekał do statystyk poza bilansem — domknięcie (2026-09-14)
+
+User po włączeniu przełącznika z poprzedniego wpisu: *"przelew własny nadal sie liczy do
+sumy na finansach nie?"*, potem: *"inne statystyki tez powinny brać pod uwagę ze to
+przelew własny a nie cos co mam / wydaje"* (bilans NA KARCIE ma zostać jak jest — to
+potwierdzone). Pełny opis w ARCHITECTURE.md §93. Skrót: `isSelfTransfer()` był
+honorowany tylko częściowo — audyt znalazł 8 miejsc (dzienny total w Finansach, drill-down
+w Kalendarzu, widget Budżet na Dashboardzie, tygodniowe widgety dashboardu, raport
+miesięczny/roczny, widget "ile na jedzenie", cały ekran "Tydzień", cały ekran "Statystyki
+wydatków"), gdzie self-transfer nadal liczył się jak zwykły wydatek/przychód. Wszystkie
+poprawione.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: oznacz wydatek jako "Przelew własny",
+sprawdź że znika z KAŻDEGO miejsca wymienionego wyżej, ale bilans NA KARCIE u góry
+Finansów się NIE zmienia (to jedyne celowe wyjątkowe miejsce).
+
 ## 🆕 Ręczny przełącznik "Przelew własny" na szczegółach transakcji — NIEsprawdzone (2026-09-13)
 
 User dopytał po poprzednim wpisie: *"mam opcje dosac własną kategorie jakby?? Czyli

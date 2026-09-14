@@ -20,6 +20,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, Habit, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -280,8 +281,10 @@ export default function WeeklyScreen() {
 
   // ── Finances ───────────────────────────────────────────────────────────────
 
-  const isExpense = (e: any) => !e.type || e.type === 'expense';
-  const isIncome  = (e: any) => e.type === 'income';
+  // Self-transfery (przelew między własnymi kontami) wyłączone ze wszystkich sum niżej —
+  // patrz isSelfTransfer, ten sam wyjątek co reszta statystyk finansowych w apce.
+  const isExpense = (e: any) => (!e.type || e.type === 'expense') && !isSelfTransfer(e);
+  const isIncome  = (e: any) => e.type === 'income' && !isSelfTransfer(e);
 
   const weekExp = useMemo(() =>
     expenses.filter(e => isExpense(e) && e.date >= dates[0] && e.date <= dates[6])
