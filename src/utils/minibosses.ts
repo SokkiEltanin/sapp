@@ -39,6 +39,14 @@ export interface MiniBoss {
 // ta sama konwencja co pazurzaste bossy kampanii). Osa dostała plik bez jednoznacznego typu
 // ataku w nazwie (`osa_BOSSYuntitled.png`) — user nie sprecyzował attackKind, więc zgodnie z
 // domyślną zasadą (niejednoznaczny atak = pięść) zostaje bez wpisu, tak jak reszta rosteru.
+// Motywy lokacji PRZYPISANE NA NOWO (2026-09-14, user: "będziemy robić od nowa te co mamy
+// OSA, GRIZZLY, WILK zostawiamy, ogarnę pod nich JUNGLĘ (osa), GRIZLI TO BĘDZIE LEŚNE
+// POLANY PRZY WODZIE, a WILK środek lasu") — user rysuje dedykowane tła lokacji
+// (`assets/lokalizacje/`, patrz `missionLocationBg` w bossIcons.ts) i chce, żeby `destination`
+// każdego z tej trójki pasował do środowiska, w którym faktycznie stanie tło. Stare nazwy
+// (Osie Gniazdo/Niedźwiedzia Gawra/Mroźna Ostoja) ZASTĄPIONE — "Mroźna Ostoja" (wilk)
+// świadomie porzucona, bo temat lodu przejmuje NOWY miniboss (`mb_lodowykrolik` niżej),
+// żeby dwie różne lokacje nie kolidowały tematycznie.
 export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…', destination: 'Leniwe Bajoro' },
   { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…', destination: 'Kałuża za Płotem' },
@@ -46,9 +54,13 @@ export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw', destination: 'Wichrowy Szczyt' },
   { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', attackKind: 'claw', destination: 'Szmaragdowa Dżungla' },
   { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…', attackKind: 'claw', destination: 'Piaszczysta Ścieżka' },
-  { id: 'mb_wilk', name: 'Wilk Głodu', emoji: '🐺', taunt: 'Zjesz jutro, dziś odpuść…', attackKind: 'claw', destination: 'Mroźna Ostoja' },
-  { id: 'mb_grizzly', name: 'Grizzly Ospałości', emoji: '🐻', taunt: 'Prześpij to, nic się nie stanie…', attackKind: 'claw', destination: 'Niedźwiedzia Gawra' },
-  { id: 'mb_osa', name: 'Osa Rozproszenia', emoji: '🐝', taunt: 'Ciągle coś Cię rozprasza, i tak dobrze…', destination: 'Osie Gniazdo' },
+  { id: 'mb_wilk', name: 'Wilk Głodu', emoji: '🐺', taunt: 'Zjesz jutro, dziś odpuść…', attackKind: 'claw', destination: 'Głąb Puszczy' },
+  { id: 'mb_grizzly', name: 'Grizzly Ospałości', emoji: '🐻', taunt: 'Prześpij to, nic się nie stanie…', attackKind: 'claw', destination: 'Polana nad Strumieniem' },
+  { id: 'mb_osa', name: 'Osa Rozproszenia', emoji: '🐝', taunt: 'Ciągle coś Cię rozprasza, i tak dobrze…', destination: 'Gęstwina Dżungli' },
+  // Nowy miniboss (2026-09-14) — user dostarczył dedykowany art (`MBOSS_LODOWYKROLIK.png`) +
+  // tło lokacji (`LOKALIZACJA_LODOWA.png`). Bez jednoznacznego pazura/szponu w nazwie/art —
+  // zostaje na domyślnej pięści, ta sama zasada co reszta rosteru bez `attackKind`.
+  { id: 'mb_lodowykrolik', name: 'Lodowy Królik', emoji: '🐇', taunt: 'Zamarznij razem ze mną, to nic nie kosztuje…', destination: 'Lodowa Kraina' },
 ];
 
 function hashOf(s: string, mul: number): number {

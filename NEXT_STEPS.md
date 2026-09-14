@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Miniboss "Lodowy Królik" + tła lokacji misji + grafika zamrożenia serii — NIEsprawdzone (2026-09-14)
+
+User dostarczył 3 pliki wprost na GitHub (`MBOSS_LODOWYKROLIK.png`, `LOKALIZACJA_LODOWA.png`,
+`freeze_streakCoin.png`) i poprosił o retematyzowanie destynacji OSA/GRIZZLY/WILK (jungla/
+polana nad wodą/środek lasu). Pełny opis w ARCHITECTURE.md §94. Skrót: nowy miniboss
+`mb_lodowykrolik` w rosterze questów/misji, NOWY system teł lokacji na scenie "W drodze"
+(`app/pet.tsx`) — scrim + jasnoszara "mgiełka" nad każdym tłem, żeby różne palety (lód/
+dżungla/las) nie gryzły się kolorystycznie — na razie tylko lodowa lokacja ma plik, reszta
+(osa/grizzly/wilk) czeka aż user dostarczy grafiki (dodanie = jedna linia w
+`MISSION_LOCATION_BG`, bossIcons.ts). Zamrożenie serii w Rynku dostało własną monetę zamiast
+lucide płatka śniegu.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) trafić na Lodowego Królika w misji →
+sprawdzić tło + czytelność tekstu; (2) sprawdzić że pozostałe 9 minibossów wygląda BEZ ZMIAN
+(brak tła — nic nie powinno się różnić od wcześniej); (3) slot Zamrożenia w Rynku pokazuje
+nową grafikę.
+
 ## 🆕 Self-transfer wyciekał do statystyk poza bilansem — domknięcie (2026-09-14)
 
 User po włączeniu przełącznika z poprzedniego wpisu: *"przelew własny nadal sie liczy do

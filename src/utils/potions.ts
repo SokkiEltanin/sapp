@@ -39,6 +39,14 @@ export const POTION_ICON: Record<PotionKind, any> = {
   xp:  require('../../assets/potki/potka_xp.png'),
 };
 
+// Grafika zamrożenia serii (2026-09-14, user dostarczył `assets/potki/freeze_streakCoin.png`
+// — wcześniej lucide `Snowflake` placeholder w pet-shop.tsx, dokładnie ten sam "user sam
+// dostarczy grafiki" jak POTION_ICON wyżej). Nie jest `PotionKind` (zamrożenie to osobna
+// mechanika, `streakFreezeStore.ts`), stąd osobny eksport zamiast wpisu do mapy powyżej.
+// Źródłowy plik przeskalowany 1536×1024/1,5MB → 300×200/58KB (Pillow LANCZOS), ten sam próg
+// co reszta `assets/potki/`.
+export const FREEZE_COIN_ICON: any = require('../../assets/potki/freeze_streakCoin.png');
+
 // Umiarkowany balans (2026-09-08) — wybrany świadomie zamiast zgadywania w ciemno: wystarczająco
 // odczuwalny na 24h, ale nie psujący trudności bossów (COUNTER_PCT itd. liczone bez uwzględnienia
 // potek). Do skorygowania po realnym teście na urządzeniu — user może poprosić o inne liczby.
