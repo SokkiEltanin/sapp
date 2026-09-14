@@ -6973,6 +6973,46 @@ całego tekstu (nazwa bossa, motyw, "Pomiń walkę") na różnych tłach — nic
 na jasnych fragmentach zdjęcia; (5) paski HP pod portretami wyglądają DOKŁADNIE jak wcześniej
 (regresja jeśli coś się zmieniło — user explicite chciał ich BEZ zmian).
 
+## 96. Ekran walki: kotek/boss "unosili się" nad tłem + stara arena kampanii odpięta
+
+User zrzutem ekranu (kampania, "Skamieniały Nawyk"): *"muszą być niżej żeby wyglądali jakby
+byli, i wywal te stara arenę i daj ten las górski, te usuniemy wgle pewnie"*.
+
+**Diagnoza 1 — puste miejsce pod kartą walki.** `<ScrollView contentContainerStyle={s.scroll}>`
+z `s.scroll: {flexGrow:1, justifyContent:'center'}` na SAMEJ `contentContainerStyle` NIE
+centruje krótkiej treści, jeśli `ScrollView` sam nie dostał `style={{flex:1}}` — bez tego
+ScrollView dopasowuje WŁASNY rozmiar do treści (shrink-wrap), więc `flexGrow`/`justifyContent`
+wewnątrz nie mają się w czym rozłożyć. Dokładnie to widać na zrzucie: karta walki przyklejona
+pod headerem, ogromna pusta przestrzeń między "Motyw" a przyciskiem WALCZ. Fix: `style={{flex:
+1}}` na `<ScrollView>`.
+
+**Diagnoza 2 — portrety w złym miejscu kadru mimo naprawy centrowania.** Wszystkie 3 tła
+lokacji (GORSKILAS/JUNGLA/LODOWA) mają tę samą kompozycję: niebo/góry/korony drzew w górnych
+~55-60% kadru, "ziemia" (ścieżka/polana) TYLKO w dolnych ~40%. Wycentrowana karta (środek
+DOSTĘPNEJ przestrzeni scrolla, nie środek całego ekranu) i tak lądowała zbyt wysoko względem
+tej "ziemi". `s.scroll.justifyContent` zmienione `'center'` → `'flex-end'` — karta walki
+zakotwicza się do DOŁU dostępnej przestrzeni (tuż nad `s.floatingBar`), więc portrety trafiają
+w dolną, "naziemną" część KAŻDEGO z tych teł, nie tylko przypadkiem tego jednego testowanego —
+uniwersalny fix pasujący do wspólnej kompozycji wszystkich obecnych i przyszłych lokacji, nie
+pojedyncza poprawka pikselowa pod jeden obrazek.
+
+**Stara arena kampanii odpięta.** `bossIcons.ts`: `campaign` USUNIĘTY z `ARENA_BG_BY_KIND` —
+kampania teraz TEŻ pożycza `DEFAULT_ARENA_BG` (GORSKILAS) przez fallback w `arenaBgFor()`,
+zamiast swojego dawnego dedykowanego `CAMPAIGN_ARENA_BG` (dungeon/łańcuchy/pochodnie z
+zrzutu). Plik i eksport ZOSTAJĄ (user: "usuniemy wgle **pewnie**" — niepewne, nie stanowcze) —
+ten sam wzorzec co porzucone `mb_goat`/`mb_whale` w minibosses.ts, nic już tego nie czyta, ale
+nie kasuję dopóki user wprost nie potwierdzi.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (bez nowych — czysto layoutowy fix, zero
+nowej logiki).
+
+**Priorytet testu na urządzeniu**: (1) wejdź w Kampanię → tło powinno być teraz GORSKILAS
+(las/góry), NIE stary dungeon z łańcuchami; (2) w KAŻDYM trybie walki (kampania/raid/event/
+quest/MAD/misja) kotek i boss powinni stać wyraźnie NIŻEJ, w dolnej części ekranu, blisko
+"ziemi" widocznej na obrazku, nie unosić się na środku/górze; (3) sprawdź że nic nie chowa się
+pod dokowanym paskiem WALCZ na dole przy krótkiej ORAZ długiej treści (dużo linijek
+mechaniki naraz).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

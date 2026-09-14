@@ -133,28 +133,31 @@ export function attackPng(kind: AttackKind | undefined): ImageSourcePropType {
   return kind ? ATTACK_PNG[kind] : FIST_PNG;
 }
 
-// Tło areny walki kampanii (2026-09-02, user dostarczył dedykowany art po wcześniejszym
-// `arena-template.svg`). Nazwa zostaje "CAMPAIGN" — to WCIĄŻ dedykowane tło TYLKO kampanii
-// (nie generyczny fallback — patrz `DEFAULT_ARENA_BG` niżej, który przejął tę rolę 2026-09-14).
+// Dawne dedykowane tło areny kampanii (2026-09-02, `arena-template.svg` → własny art usera).
+// ODPIĘTE z rotacji 2026-09-14 (user ze zrzutem starej dungeon-owej areny: "wywal tę starą
+// arenę i daj ten las górski, te [stare tło] usuniemy wgle pewnie") — kampania teraz też
+// pożycza `DEFAULT_ARENA_BG` przez fallback w `arenaBgFor()` (`ARENA_BG_BY_KIND` niżej nie ma
+// już wpisu `campaign`). Eksport i plik ZOSTAJĄ na razie (user: "usuniemy pewnie" — niepewne,
+// nie stanowcze), ten sam wzorzec co dawne `mb_goat`/`mb_whale` w minibosses.ts — nic już tego
+// nie czyta, ale nie kasuj dopóki user wprost nie potwierdzi.
 export const CAMPAIGN_ARENA_BG: ImageSourcePropType = require('../../assets/lokalizacje/LOKACJA_KAMPANIA.png');
 
 // Domyślne/fallbackowe tło areny (2026-09-14, user dostarczył `LOKALIZACJA_GORKISLAS.png` +
 // "będę robił w trakcie kolejne grafiki pod inne kampanie, na razie możesz zostawić ten
-// GORSKILAS jako domyślną [lokację]") — zastępuje dawny fallback na `CAMPAIGN_ARENA_BG`
-// (raid/event/MAD/questy-i-misje-bez-własnej-lokacji dostawały tło kampanii, co nie miało
-// tematycznego sensu). Kampania SAMA zostaje przy swoim dedykowanym `CAMPAIGN_ARENA_BG`
-// (jawny wpis w `ARENA_BG_BY_KIND` niżej wygrywa z fallbackiem).
+// GORSKILAS jako domyślną [lokację]") — TERAZ dla WSZYSTKICH trybów bez własnego, dedykowanego
+// tła, kampanię włącznie (patrz komentarz przy `CAMPAIGN_ARENA_BG` wyżej).
 export const DEFAULT_ARENA_BG: ImageSourcePropType = require('../../assets/lokalizacje/LOKALIZACJA_GORKISLAS.png');
 
 // Tła areny PER TYP WALKI (2026-09-02, user: "questy będą miały oddzielne tło... a eventowe
 // będą miały osobne, a MAD bossy będą miały jeszcze inne" — ale bez gotowej grafiki jeszcze,
-// więc na razie tylko przygotowanie: kampania ma dedykowany art, reszta pożycza domyślne tło
-// przez `arenaBgFor()`, dopóki user nie dostarczy własnych plików per-kind. Dodanie nowego
-// tła = jedna nowa linia w tej mapie (`require()` na plik w `assets/lokalizacje/`) + WPIS DO
-// TEJ MAPY, zero zmian w boss-fight.tsx — `arenaBgFor`/`fightArenaBg` już tam są podpięte.
+// więc na razie tylko przygotowanie: WSZYSTKIE tryby pożyczają `DEFAULT_ARENA_BG` przez
+// `arenaBgFor()`, dopóki user nie dostarczy własnych plików per-kind (kampania też, od
+// 2026-09-14 — patrz komentarz przy `CAMPAIGN_ARENA_BG`). Dodanie nowego dedykowanego tła =
+// jedna nowa linia w tej mapie (`require()` na plik w `assets/lokalizacje/`) + WPIS DO TEJ
+// MAPY, zero zmian w boss-fight.tsx — `arenaBgFor`/`fightArenaBg` już tam są podpięte.
 type ArenaKind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 const ARENA_BG_BY_KIND: Partial<Record<ArenaKind, ImageSourcePropType>> = {
-  campaign: CAMPAIGN_ARENA_BG,
+  // campaign: require('../../assets/lokalizacje/LOKACJA_KAMPANIA.png'), // odpięte 2026-09-14
   // raid:   require('../../assets/lokalizacje/LOKACJA_RAID.png'),
   // event:  require('../../assets/lokalizacje/LOKACJA_EVENT.png'),
   // mad:    require('../../assets/lokalizacje/LOKACJA_MAD.png'),
