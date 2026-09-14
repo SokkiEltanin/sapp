@@ -71,6 +71,10 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   mb_wilk:     require('../../assets/bossy/questy/BOSS_atakpazury_wilk.png'),
   mb_grizzly:  require('../../assets/bossy/questy/BOSS_atakpazury_grizly.png'),
   mb_osa:      require('../../assets/bossy/questy/osa_BOSSYuntitled.png'),
+  // Lodowy Królik (2026-09-14) — user dostarczył WŁASNY art razem z tłem lokacji, patrz
+  // `MISSION_LOCATION_BG` niżej. Źródłowy plik przeskalowany 1536×1024/2MB → 600×400/290KB
+  // (Pillow LANCZOS, alfa zachowana) — ten sam próg co reszta folderu `bossy/` (§13).
+  mb_lodowykrolik: require('../../assets/bossy/questy/MBOSS_LODOWYKROLIK.png'),
   // ── raid (2026-08-15) — 6 rajdowych bossów zaczynały bez własnego artu (placeholder/
   // emoji), tymczasowo pożyczały PNG z kampanii + programowa czerwona aura (`powered` prop
   // w BossArt). User dorysował WŁASNY dedykowany art dla 3 z nich (golem/kraken/upior=
@@ -149,4 +153,19 @@ const ARENA_BG_BY_KIND: Partial<Record<ArenaKind, ImageSourcePropType>> = {
 };
 export function arenaBgFor(kind: ArenaKind): ImageSourcePropType {
   return ARENA_BG_BY_KIND[kind] ?? CAMPAIGN_ARENA_BG;
+}
+
+// Tła LOKACJI misji (`MiniBoss.destination` w minibosses.ts, scena "W drodze"/"wrócił" na
+// app/pet.tsx) — 2026-09-14, user dostarczył pierwsze dedykowane tło (`LOKALIZACJA_LODOWA.png`,
+// pod nowego `mb_lodowykrolik`) i zapowiedział kolejne (jungla pod osę, polana nad wodą pod
+// grizzly, głąb lasu pod wilka — na razie SAME NAZWY, bez plików). Dokładnie ten sam wzorzec
+// fallbacku co `bossPng`/`arenaBgFor`: miniboss BEZ wpisu tutaj po prostu nie dostaje tła w
+// pet.tsx (zwykła scena jak dotąd) — nic się nie psuje, dodanie nowego pliku = jedna linia tu,
+// zero zmian w pet.tsx. Źródłowy plik przeskalowany 940×1672/2,1MB → 675×1200/1,18MB (Pillow
+// LANCZOS) — ten sam próg wagowy co `CAMPAIGN_ARENA_BG` (§14).
+export const MISSION_LOCATION_BG: Partial<Record<string, ImageSourcePropType>> = {
+  mb_lodowykrolik: require('../../assets/lokalizacje/LOKALIZACJA_LODOWA.png'),
+};
+export function missionLocationBg(minibossId: string | undefined): ImageSourcePropType | undefined {
+  return minibossId ? MISSION_LOCATION_BG[minibossId] : undefined;
 }

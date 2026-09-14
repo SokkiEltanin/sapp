@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, X } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -16,7 +16,7 @@ import RadialGlow from '@/components/ui/RadialGlow';
 import GradientText from '@/components/ui/GradientText';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { POTIONS, PotionKind, POTION_ICON, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
+import { POTIONS, PotionKind, POTION_ICON, FREEZE_COIN_ICON, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -399,15 +399,15 @@ export default function PetShop() {
                 bez ruszania samego obrazka. Zawartość PRZEBUDOWANA (2026-09-08, user: "u góry
                 w tych 4 slotach: zamrożenie serii, potka HP, potka atak, potka XP") — dawna
                 skrzynka dnia + 3 loot-boxy PRZENIESIONE do dolnego rzędu lady (patrz niżej,
-                `RYNEK_BOTTOM_SLOTS[4..7]`), bo tablica ma teraz Zamrożenie + 3 potki. Ikony
-                potek to na razie placeholder z lucide (user: "ja zrobię grafiki pod
-                skrzynki") — do podmiany na własne ikony gdy user je dostarczy. Per-slot
-                `artSlotBg` USUNIĘTY (patrz `s.boardBg` wyżej — jedno wspólne tło zastępuje
-                osobne kwadraciki). */}
+                `RYNEK_BOTTOM_SLOTS[4..7]`), bo tablica ma teraz Zamrożenie + 3 potki. Wszystkie
+                4 sloty mają teraz WŁASNĄ grafikę usera (potki od 2026-09-13, zamrożenie od
+                2026-09-14, `FREEZE_COIN_ICON` w potions.ts) — dawny lucide `Snowflake`
+                placeholder podmieniony jako ostatni. Per-slot `artSlotBg` USUNIĘTY (patrz
+                `s.boardBg` wyżej — jedno wspólne tło zastępuje osobne kwadraciki). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
               <PressableScale onPress={onBuyFreeze} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
                 <RadialGlow size={40} color="#000" opacity={0.55} />
-                <Snowflake size={24} color="#7DD3FC" />
+                <Image source={FREEZE_COIN_ICON} style={s.potionImg} contentFit="contain" />
                 {freezes > 0 && <View style={s.artSlotCountBadge}><Text style={s.artSlotBadgeTxt}>{freezes}</Text></View>}
                 <View style={s.artCostPill}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
               </PressableScale>

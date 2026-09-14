@@ -19,6 +19,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
+import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
@@ -442,6 +443,30 @@ export default function Pet() {
             dawny dynamiczny `minHeight` dla wielkiego kafelka podróży zniknął razem z nim
             (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu). */}
         <View style={s.stage}>
+          {/* Tło LOKACJI misji (2026-09-14, user dostarczył pierwszy dedykowany art —
+              `LOKALIZACJA_LODOWA.png` pod mb_lodowykrolik, zapowiedział kolejne pod
+              osę/grizzly/wilka) — widoczne TYLKO gdy pupil jest w drodze/właśnie wrócił
+              (`missionMb` ustawiony) I dla TEGO minibossa istnieje już plik
+              (`missionLocationBg`, fallback `undefined` = brak zmian, zwykła scena jak
+              dotąd — ten sam wzorzec co `bossPng`/`arenaBgFor`). Scrim (3-stopniowy czarny
+              gradient) + jednolita jasnoszara "mgiełka" NAD obrazkiem — user: "musisz
+              nałożyć między każdą lokalizację jakiś gradient low opacity... będzie zbyt
+              zlewało się kolorystycznie... efekt zamglenia lekko" — różne lokacje będą mieć
+              bardzo różne palety (lód/dżungla/las), więc stały overlay ujednolica kontrast
+              i czytelność tekstu NIEZALEŻNIE od tego, jak jaskrawe/ciemne jest źródłowe tło
+              (identyczna logika co scrim na arenie walki w boss-fight.tsx). */}
+          {missionMb && !!missionLocationBg(missionMb.id) && (
+            <>
+              <Image source={missionLocationBg(missionMb.id)} style={StyleSheet.absoluteFillObject} contentFit="cover" pointerEvents="none" />
+              <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.5)'] as [string, string, string]}
+                locations={[0, 0.45, 1]}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(160,165,175,0.16)' }]} />
+            </>
+          )}
           <GearPanel>
             {/* Kotek W MISJI — JEDEN kotek, nie dwa (2026-08-20, user: "kotek jest podwojony" —
                 dawniej duży skurczony portret NA scenie + osobny mały na pasku renderowały się
@@ -780,7 +805,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
-  stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
+  // `position: relative` + `overflow: hidden` + `borderRadius` (2026-09-14) — dawniej niepotrzebne
+  // (żadnej warstwy do przycięcia), teraz potrzebne pod absolutnie pozycjonowane tło lokacji
+  // misji (`missionLocationBg`, patrz JSX wyżej) — bez tego obrazek/gradient wystawałby poza
+  // zaokrąglone rogi reszty UI.
+  stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%', position: 'relative', overflow: 'hidden', borderRadius: radius.lg },
   // Kotek W MISJI (2026-08-20) — JEDEN kotek jeżdżący po pasku (nie osobny duży portret NA
   // scenie + mały na pasku naraz, patrz `missionEnter` przy hookach wyżej w pliku).
   stageMissionWrap: { alignItems: 'center', gap: spacing[2], width: '84%' },
@@ -793,6 +822,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   missionReadyDest: {
     fontSize: 11, fontWeight: '700', color: c.text.secondary, textAlign: 'center', marginBottom: 2,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
@@ -844,7 +874,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // miała tekstowy timer, teraz stoi tam kotek z tymi samymi animacjami chodu co dawniej na
   // pasku, patrz komentarz przy `missionEnter`/`missionSway` wyżej w pliku).
   missionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
-  missionDestTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.primary, flexShrink: 1, marginRight: spacing[2] },
+  // Text-shadow (2026-09-14) — legibility nad tłem lokacji (`missionLocationBg`), ten sam
+  // powód co `tileLabel`/`tileHpTxt` w boss-fight.tsx (arena bg o zmiennej jasności). Nieszkodliwe
+  // też bez tła (zwykłe destynacje bez artu) — cień prawie niewidoczny na płaskim tle karty.
+  missionDestTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.primary, flexShrink: 1, marginRight: spacing[2], textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   missionHeadCatWrap: { width: MISSION_CAT_SIZE, height: MISSION_CAT_SIZE, alignItems: 'center', justifyContent: 'center' },
   // Pasek GRUBSZY i SZERSZY niż dawny cienki 4px (2026-08-20, user: "ten pasek troszeczkę
   // tłuszczy i o wiele szerszy") — pełna szerokość dostępnej kolumny (`catCol` w GearPanel),

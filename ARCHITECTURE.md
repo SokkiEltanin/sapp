@@ -6819,6 +6819,80 @@ tydzień, miesiąc, wykres 30-dniowy), ekranu "Tydzień", drill-downu dnia w Kal
 widgetu Budżet na Dashboardzie; (2) bilans "NA KARCIE" u góry Finansów NIE powinien się
 zmienić — to jedyne miejsce, które celowo dalej liczy self-transfer.
 
+## 94. Nowy miniboss "Lodowy Królik" + system teł lokacji misji (gradient/mgiełka) + własna grafika zamrożenia serii
+
+User: *"będziemy robić od nowa te co mamy OSA, GRIZZLY, WILK zostawiamy ogarnę pod nich
+JUNGLĘ (osa), GRIZLI TO BĘDZIE LEŚNE POLANY PRZY WODZIE, a WILK środek lasu. teraz dodaję
+MBOSS_LODOWYKROLIK do bossów questów i do niego jest lokalizacja LOKALIZACJA_LODOWA (tylko
+musisz nałożyć między każdą lokalizację jakiś gradient low opacity chyba czarny bo będzie
+zbyt zlewało się kolorystycznie i efekt zamglenia lekko... a i dodałem też
+freeze_streakCoin.png i możesz pozmieniać gdzie był używany"*. Trzy pliki wgrane wprost na
+`master` (GitHub upload, wymagało zmergowania do brancha roboczego, ten sam tryb co
+`LOKACJA_KAMPANIA.png` w §14): `MBOSS_LODOWYKROLIK.png`, `LOKALIZACJA_LODOWA.png`,
+`freeze_streakCoin.png`.
+
+**Część 1 — nowy miniboss + retematyzowane destynacje trójki, która zostaje.**
+`minibosses.ts`: dodany `mb_lodowykrolik` (🐇, bez `attackKind` — brak jednoznacznego
+pazura w art, domyślna pięść jak reszta rosteru bez wpisu), `destination: 'Lodowa Kraina'`.
+Destynacje OSA/GRIZZLY/WILK zmienione pod zapowiedziane środowiska: `mb_osa` → "Gęstwina
+Dżungli" (dawniej "Osie Gniazdo"), `mb_grizzly` → "Polana nad Strumieniem" (dawniej
+"Niedźwiedzia Gawra"), `mb_wilk` → "Głąb Puszczy" (dawniej "Mroźna Ostoja" — PORZUCONA
+świadomie, bo temat lodu przejmuje teraz `mb_lodowykrolik`, dwie lokacje o tym samym
+motywie kolidowałyby). `bossIcons.ts`: `mb_lodowykrolik` dopisany do `BOSS_PNG` (walka).
+
+**Część 2 — system teł lokacji misji (nowy, wcześniej NIE istniał).** Scena "W drodze"/
+"wrócił z" na `app/pet.tsx` (`s.stage`, `missionMb.destination` jako sam TEKST) nigdy
+wcześniej nie miała żadnego obrazka w tle — tylko nazwę. Nowy `MISSION_LOCATION_BG`
+(`bossIcons.ts`, `Partial<Record<minibossId, ImageSourcePropType>>`) + `missionLocationBg()`
+— DOKŁADNIE ten sam wzorzec gracefully-missing co `bossPng`/`arenaBgFor`: miniboss bez wpisu
+(9 z 10 na razie) po prostu nie dostaje tła, zero zmian w wyglądzie; dodanie kolejnego pliku
+(user zapowiedział jungla/polana-nad-wodą/las, gdy dostarczy) to jedna linia w tej mapie,
+zero zmian w `pet.tsx`. Renderowane jako `Image` (absolutnie, wypełnia `s.stage`,
+`contentFit="cover"`) + **scrim** — 3-stopniowy czarny gradient (identyczny przepis co arena
+walki w `boss-fight.tsx`: ciemniej góra/dół, jaśniej środek) — **PLUS jednolita jasnoszara
+"mgiełka"** (`rgba(160,165,175,0.16)`, płaska warstwa NAD gradientem) — to jest odpowiedź na
+"efekt zamglenia... jakby przejście w szarość" z prośby: różne lokacje (lód/dżungla/las)
+będą mieć BARDZO różne palety, więc stały overlay ujednolica kontrast i czytelność tekstu
+NIEZALEŻNIE od tego, jak jaskrawe/ciemne jest źródłowe zdjęcie — nie animowane
+przejście MIĘDZY dwoma konkretnymi obrazkami (nic takiego nie istnieje — lokacja zmienia się
+raz na misję), tylko stały "filtr" na KAŻDYM z nich, żeby całość apki czuła się spójnie mimo
+skrajnie różnych źródłowych kolorów. `missionDestTxt`/`missionReadyDest` dostały text-shadow
+(ta sama przyczyna co `tileLabel` w boss-fight.tsx) — nieszkodliwe też bez tła. `s.stage`
+dostał `position:relative, overflow:hidden, borderRadius` pod przycięcie nowych warstw.
+
+**Część 3 — grafika zamrożenia serii.** `freeze_streakCoin.png` trafia w DOKŁADNIE to samo
+miejsce co user się domyślił ("możesz pozmieniać gdzie był używany") — jedyny lucide
+placeholder zostały w 4-slotowej tablicy Rynku (`Snowflake` ikona, `onBuyFreeze` slot w
+`pet-shop.tsx`) obok 3 potek, które własną grafikę dostały dzień wcześniej (2026-09-13).
+Nowy `FREEZE_COIN_ICON` (`potions.ts`, obok `POTION_ICON` — nie `PotionKind`, bo zamrożenie
+to osobna mechanika w `streakFreezeStore.ts`, stąd osobny eksport) podmienia `<Snowflake>`
+na `<Image>` z tym samym stylem co potki (`s.potionImg`, `contentFit="contain"`) — teraz
+wszystkie 4 sloty tablicy mają spójną, własną grafikę.
+
+**Przeskalowanie źródłowych plików** (Pillow LANCZOS, alfa zachowana — ten sam skrypt/próg co
+§13/§14, bez pytania o zgodę tym razem: to NOWE, jeszcze nigdzie nie wyświetlane uploady, nie
+istniejące assety na których cokolwiek już polegało): `MBOSS_LODOWYKROLIK.png` 1536×1024/2MB
+→ 600×400/290KB (próg "bossy" z §13); `freeze_streakCoin.png` 1536×1024/1,5MB → 300×200/58KB
+(próg "potki" z §83); `LOKALIZACJA_LODOWA.png` 940×1672/2,1MB → 675×1200/1,18MB (próg "arena
+bg, cover-fit" z §14).
+
+**Explicite NIE zrobione**: tła dla osy/grizzly/wilka (user je ZAPOWIEDZIAŁ, ale jeszcze nie
+dostarczył plików — `MISSION_LOCATION_BG` ma tylko `mb_lodowykrolik`, reszta czeka); żadna
+migracja istniejących zapisanych misji (jeśli akurat trwa misja z minibossem BEZ tła, po
+prostu nic się nie zmienia do końca tej misji).
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (bez nowych — czysto treściowa/wizualna
+zmiana, `minibosses.test.ts` już nie asercjonuje długości rostera ani konkretnych nazw
+destynacji, więc rozrost do 10 pozycji przeszedł bez modyfikacji testów).
+
+**Priorytet testu na urządzeniu**: (1) wyślij pupila na misję kilka razy (albo poczekaj na
+naturalną rotację) aż trafi się Lodowy Królik → scena "W drodze" powinna pokazać lodowe tło
+z przyciemnieniem góra/dół i czytelnym tekstem "Lodowa Kraina"; (2) dla pozostałych 9
+minibossów scena powinna wyglądać DOKŁADNIE jak wcześniej (brak tła — regresja jeśli coś się
+zmieniło); (3) Rynek → slot Zamrożenia (lewy górny w tablicy) powinien pokazywać nową
+monetę zamiast płatka śniegu; (4) walka z Lodowym Królikiem (quest/misja) → sprawdź że jego
+własny portret ładuje się poprawnie.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
