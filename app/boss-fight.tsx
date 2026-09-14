@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable } from 'react-native';
-import { Image, ImageBackground } from 'expo-image';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Trophy, Compass } from 'lucide-react-native';
 
@@ -13,7 +13,7 @@ import RadialGlow from '@/components/ui/RadialGlow';
 import GroundShadow from '@/components/ui/GroundShadow';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
-import { attackPng, arenaBgFor } from '@/utils/bossIcons';
+import { attackPng, fightArenaBg } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, effectiveCatMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
@@ -108,6 +108,7 @@ export default function BossFight() {
 
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  const insets = useSafeAreaInsets();
   // usePetStore selecting NAZWANE pola przez useShallow (2026-09-09, "dawaj dalej
   // optymalizacje") — petStore.ts to WSPÓLNY store dla całego systemu pupila (questy,
   // ekwipunek, customizacja, streaki...), a walka to NAJCZĘŚCIEJ mutujący go ekran (HP/coiny/
@@ -299,6 +300,13 @@ export default function BossFight() {
     (liveBossHp ?? target.maxHp)
   ) : 0;
   const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? (isMenace ? 'Nemesis' : 'Wydarzenie') : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
+  // Tło CAŁEGO ekranu (2026-09-14, user: "dodałem Ci całoekranowe lokacje GORSKILAS oraz
+  // JUNGLA, one są na cały ekran... trzeba je ładnie zrobić") — per-miniboss dla quest/misja
+  // (`fightArenaBg` sprawdza `MISSION_LOCATION_BG[target.id]` NAJPIERW), per-kind fallback dla
+  // reszty trybów (`arenaBgFor`, domyślnie `DEFAULT_ARENA_BG` = GORSKILAS, dopóki user nie
+  // dorysuje dedykowanych teł dla raid/event/MAD). Liczone nawet bez `target` (np. "wszyscy
+  // bossowie pokonani") — ekran ma pełnoekranowe tło ZAWSZE, nie tylko w trakcie realnej walki.
+  const bgSource = fightArenaBg(kind, target?.id);
   // Do modala przegranej — kampania/wydarzenie/quest/MAD/misja mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
   // `raid` dołączony 2026-08-25 razem z realnym stanem porażki dla rajdu (patrz finish() i
@@ -668,24 +676,31 @@ export default function BossFight() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
+      {/* Tło CAŁEGO ekranu (2026-09-14) — Image + Image (expo-image) absolutnie wypełniające
+          cały SafeAreaView, POD headerem/scrollem/dokowanym paskiem, nie tylko pod areną
+          portretów jak dawniej (`arenaScene`/`ImageBackground`, teraz zwykły `View`, patrz
+          niżej). Scrim (ten sam 3-stopniowy czarny gradient co dawna winieta areny, teraz na
+          całym ekranie) + jednolita jasnoszara "mgiełka" (identyczny przepis co tło lokacji
+          misji w pet.tsx, żeby te same lokacje wyglądały spójnie w OBU miejscach, gdzie się
+          pojawiają — w drodze i w walce). */}
+      <Image source={bgSource} style={StyleSheet.absoluteFillObject} contentFit="cover" pointerEvents="none" />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.55)'] as [string, string, string]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(160,165,175,0.16)' }]} />
+
       <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
+        <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color="#fff" /></PressableScale>
         <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        {/* Quest/misja-walki nie mają puli prób (patrz komentarz przy questAlreadyClaimed) —
-            pigułka energii nie miałaby tu sensu, więc zajmuje miejsce pusty spacer
-            (żeby tytuł został wyśrodkowany tak jak w pozostałych trybach). */}
-        {kind === 'quest' || kind === 'mission'
-          ? <View style={{ width: 40 }} />
-          // Pigułka pokazuje SAM stan puli (2026-09-07, user: "energia bosów pokazywała mi
-          // 5/2... jakby się przeładowywała" — dawny format "masz/koszt", np. "5/2", wyglądał
-          // jak zepsuty/przepełniony ułamek gdy energii było WIĘCEJ niż koszt jednego ataku,
-          // nie tylko gdy było jej za mało). Wyjaśnienie KOSZTU zostaje wyłącznie w
-          // `energyShortTxt` niżej pod przyciskiem WALCZ — ten sam problem z 2026-08-28
-          // ("mimo że mam energię nie mogę zawalczyć") dalej pokryty, ale TYLKO gdy realnie
-          // brakuje energii, nie zawsze.
-          : <View style={s.energyPill}><Zap size={13} color="#38BDF8" />
-              <Text style={s.energyTxt}>{target?.energy ?? 0}</Text>
-            </View>}
+        {/* Prawy spacer balansujący `backBtn` (40px), żeby tytuł został wyśrodkowany — pigułka
+            energii PRZENIESIONA niżej, obok pływającego przycisku WALCZ (2026-09-14, user:
+            "przycisk walki od teraz będzie lewitował na dole jak navbar jakby obok niego
+            dane" — dane = koszt/stan energii, żyją teraz RAZEM z akcją którą opisują, zamiast
+            osobno w headerze, daleko nad przewijaną treścią). */}
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -700,7 +715,7 @@ export default function BossFight() {
           <View style={s.done} />
         ) : !target ? (
           <View style={s.done}>
-            <Swords size={30} color={c.text.muted} />
+            <Swords size={30} color="rgba(255,255,255,0.85)" />
             <Text style={s.doneTxt}>
               {kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.'
                 : kind === 'mad' ? 'Brak dostępnego MAD celu — pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.'
@@ -710,44 +725,22 @@ export default function BossFight() {
           </View>
         ) : !target.unlocked ? (
           <View style={s.lockBox}>
-            <Lock size={16} color={c.text.muted} />
+            <Lock size={16} color="rgba(255,255,255,0.85)" />
             <Text style={s.lockTxt}>Odblokujesz na poziomie {target.unlockLevel} (masz {level}). Rozwijaj pupila questami.</Text>
           </View>
         ) : (
           <View style={s.arena}>
             {/* dwa symetryczne kafelki — Pupil / Boss. Pupil ma pasek HP w kampanii I wydarzeniu
                 (obie mają realny kontratak) — TYLKO raid go nie ma, pasek zawsze pełny byłby mylący.
-                Scena walki (2026-09-02, user dostarczył `LOKACJA_KAMPANIA.png`, i: "wypierdolić
-                ramki że bosy stoją na tym... hp jest podspodem") — samo pole portretów/HP dostało
-                tło-obrazek zamiast per-kafelkowej karty; kafelki straciły własne tło/ramkę, bossy/
-                kotek stoją bezpośrednio na scenie, etykieta+pasek HP zostają (cień tekstu pod
-                czytelność, bo tło bywa jasne w miejscach). Reszta karty (motyw/przycisk/mechaniki
-                pod spodem) zostaje na zwykłym tle ekranu — obrazek to STAŁEJ wysokości scena
-                portretów, nie cała, zmiennej wysokości karta walki. `arenaBgFor(kind)` (tej
-                samej sesji, przygotowanie pod przyszłość) — user zapowiedział osobne tła dla
-                questów/eventów/MAD, kampania zostaje jak jest: dopóki te pliki nie istnieją,
-                wszystkie `kind` pożyczają `CAMPAIGN_ARENA_BG` jako fallback, patrz
-                `ARENA_BG_BY_KIND` w bossIcons.ts — dodanie nowego pliku tam wystarczy, zero
-                zmian tutaj. */}
-            <ImageBackground
-              source={arenaBgFor(kind)}
-              style={s.arenaScene}
-              imageStyle={s.arenaSceneImg}
-              contentFit="cover"
-            >
-            {/* Scrim/winieta (2026-09-06, user ze zrzutem: "postacie są niewidoczne, arena
-                za jasna... wygląda tanio, zrób z tego high-end fight scene") — 3-stopniowy
-                pionowy gradient przyciemniający górę/dół sceny (gdzie tło zwykle jest
-                najbardziej "zgiełkliwe" — łańcuchy/pochodnie w obecnej grafice), a środek
-                (twarze sprite'ów) zostaje jaśniejszy. Niezależne od TEGO, jak jasne/ciemne
-                jest samo źródłowe zdjęcie areny — winieta ZAWSZE dodaje kontrast i głębię,
-                więc zostaje nawet po podmianie `LOKACJA_KAMPANIA.png` na nową grafikę usera. */}
-            <LinearGradient
-              pointerEvents="none"
-              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.55)'] as [string, string, string]}
-              locations={[0, 0.45, 1]}
-              style={StyleSheet.absoluteFillObject}
-            />
+                Scena walki (2026-09-02, user dostarczył `LOKACJA_KAMPANIA.png`; PEŁNOEKRANOWA
+                od 2026-09-14, patrz `bgSource`/scrim/mgiełka renderowane raz na całym ekranie
+                wyżej) — samo pole portretów/HP nie ma już WŁASNEGO obrazka/scrimu (usunięty
+                `ImageBackground`+lokalny gradient, dawny `arenaScene` to teraz zwykły
+                pozycjonujący `View`, BEZ zmian w geometrii wewnątrz — `projectile.top` i cała
+                reszta nadal liczą się względem TEGO SAMEGO `position:'relative'` kontenera,
+                tylko już nie niesie własnego tła). Etykieta+pasek HP kotka/bossa ZOSTAJĄ z
+                text-shadow jak dotąd (user: "paski zdrowia pod nimi cienie zostają"). */}
+            <View style={s.arenaScene}>
             <View style={s.vsRow}>
               <View style={s.tile}>
                 {/* Portret NAD nazwą/paskiem HP (2026-09-03, user: "w bossach w walkach
@@ -836,7 +829,7 @@ export default function BossFight() {
                     )}
                   </View>
                 </View>
-                <Text style={[s.tileLabel, { color: WEAK_COLOR[target.weakness] ?? c.text.primary }]} numberOfLines={1}>{target.name}</Text>
+                <Text style={[s.tileLabel, { color: WEAK_COLOR[target.weakness] ?? '#fff' }]} numberOfLines={1}>{target.name}</Text>
                 <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(targetRemaining / target.maxHp * 100)}%` }]} /></View>
                 <Text style={s.tileHpTxt}>{targetRemaining} / {target.maxHp}</Text>
               </View>
@@ -876,7 +869,7 @@ export default function BossFight() {
                 <Image source={counterPng} style={{ width: 28, height: 28 }} contentFit="contain" />
               </Animated.View>
             )}
-            </ImageBackground>
+            </View>
 
             <Text style={s.bossTaunt}>„{target.taunt}"</Text>
             {/* Tylko HP + motyw (słabość) — BEZ nagrody i mechanik (osłona/regen) przed walką,
@@ -885,55 +878,23 @@ export default function BossFight() {
             {/* Quest/misja-minibossy nie mają "motywu"/słabości (placeholder w minibosses.ts) —
                 pokazywanie pustej etykiety byłoby myląco puste, więc linijka schowana. */}
             {kind !== 'quest' && kind !== 'mission' && (
-              <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
+              <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? '#fff', fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
             )}
             {/* Odliczanie (2026-08-16) — TYLKO sezonowe mają jeszcze FLAT próbę dzienną i termin.
                 Nemesis (2026-08-18) nie ma już końca ani limitu prób — pasek HP wyżej (trwały
                 bank) mówi wprost ile jeszcze zostało do zrobienia, bez sztucznego dedline'u. */}
             {kind === 'event' && !isMenace && !eventDone && (
-              <Text style={[s.motywTxt, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted, fontWeight: '800' }]}>
+              <Text style={[s.motywTxt, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : 'rgba(255,255,255,0.85)', fontWeight: '800' }]}>
                 {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
               </Text>
             )}
-            {target.done ? (
-              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : kind === 'event' && isMenace ? 'nemesis rozwiązany' : 'wróć w kolejnym okresie'}</Text>
-            ) : (
-              <>
-                <PressableScale onPress={attack} disabled={target.energy < target.energyCost || fighting} style={{ width: '100%' }}>
-                  <View style={[s.attackBtn, (target.energy < target.energyCost || fighting) && { opacity: 0.5 }]}>
-                    <Swords size={18} color="#fff" />
-                    <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'WALCZ!'}</Text>
-                  </View>
-                </PressableScale>
-                {/* Raid kosztuje >1⚡ — jeśli masz za mało (ale nie zero), powiedz wprost ILE
-                    potrzeba, zamiast wygaszonego przycisku bez wyjaśnienia (2026-08-28, user
-                    ze screenshotem: "mimo że mam energię nie mogę zawalczyć"). */}
-                {target.energy > 0 && target.energy < target.energyCost && (
-                  <Text style={s.energyShortTxt}>Potrzeba {target.energyCost}⚡, masz {target.energy}</Text>
-                )}
-              </>
-            )}
-            {/* "Pomiń walkę" (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek
-                pomiń walke?") — wynik jest już rozstrzygnięty w momencie WALCZ!, ten przycisk
-                tylko przerywa kosmetyczną animację i skacze do finish(), patrz komentarz przy
-                `skipFightRef`. Widoczny TYLKO w trakcie animacji, każdy z 6 trybów walki. */}
-            {fighting && (
-              <PressableScale onPress={skipFight} style={{ marginTop: spacing[2] }}>
-                <Text style={s.skipFightTxt}>Pomiń walkę</Text>
-              </PressableScale>
-            )}
-            {/* Reaktywne linijki mechaniki (co WŁAŚNIE się stało w tej rundzie) — PRZENIESIONE
-                pod przycisk WALCZ! (2026-08-30, user: "po kliknięciu walcz przycisk się
-                przesuwa bo pojawiają się napisy że boss ma osłonę i redukuje obrażenia...
-                czy nie lepiej było by zrobić żeby kampania miała statyczny UiUx"). Dawniej
-                renderowały się MIĘDZY "Motyw" a przyciskiem — 0 do 4 z nich mogą pojawić się
-                LUB zniknąć na dowolnej rundzie (guarded/regen/heal/cierń są niezależne od
-                siebie), więc wszystko PONIŻEJ nich (czyli przycisk) fizycznie skakało w górę/
-                dół przy każdym trafieniu. User explicite chce ZATRZYMAĆ pomysł (boss ma
-                osłonę/kryt/pancerz) — usunąć miał tylko SKUTEK (skaczący przycisk), nie samą
-                mechanikę. Tu, POD przyciskiem (i pod "Pomiń walkę"), ich pojawienie/zniknięcie
-                już nic nie przesuwa — przycisk ma stałą pozycję niezależnie od tego ile linijek
-                feedbacku akurat jest widocznych. */}
+            {/* Reaktywne linijki mechaniki (co WŁAŚNIE się stało w tej rundzie) — zostają w
+                scrollu pod "Motywem" (informacyjne, nie akcja). Przycisk WALCZ!/"Pomiń
+                walkę"/ostrzeżenie o energii PRZENIESIONE do dokowanego paska na dole ekranu
+                (2026-09-14, user: "przycisk walki od teraz będzie lewitował na dole jak
+                navbar" — patrz `s.floatingBar` po zamknięciu ScrollView niżej), więc te
+                linijki już nic pod sobą nie przesuwają — floating bar ma stałą pozycję
+                niezależnie od tego ile ich jest widocznych. */}
             {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
             {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
             {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
@@ -949,6 +910,62 @@ export default function BossFight() {
           </View>
         )}
       </ScrollView>
+
+      {/* Dokowany pasek akcji (2026-09-14, user: "przycisk walki od teraz będzie lewitował na
+          dole jak navbar jakby obok niego dane") — ten sam wizualny język co TabBar.tsx (pill
+          zawsze widoczny NAD contentem, bottom scrim żeby treść płynnie chowała się pod spód,
+          `pointerEvents="box-none"` żeby przezroczyste marginesy przepuszczały dotyk do sceny
+          za nimi). Renderowany TYLKO gdy jest realny cel do zaatakowania (target && unlocked,
+          nie w trakcie podróży/brak-celu/zablokowane — tam nie ma czego robić). "Dane obok
+          przycisku" = pigułka energii (koszt/stan puli), PRZENIESIONA tu z headera — żyje teraz
+          razem z akcją którą opisuje, zamiast osobno nad przewijaną treścią; quest/misja nadal
+          jej nie mają (brak puli energii, patrz komentarz przy dawnym `energyPill` w headerze),
+          więc przycisk zajmuje wtedy całą szerokość paska. */}
+      {!missionAway && target && target.unlocked && (
+        <View style={[s.floatingBar, { paddingBottom: (insets.bottom || 0) + spacing[3] }]} pointerEvents="box-none">
+          <LinearGradient
+            pointerEvents="none"
+            colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.8)']}
+            locations={[0, 0.4, 1]}
+            style={[s.floatingBarScrim, { height: (insets.bottom || 0) + 180 }]}
+          />
+          {target.done ? (
+            <View style={s.floatingBarDone}>
+              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : kind === 'event' && isMenace ? 'nemesis rozwiązany' : 'wróć w kolejnym okresie'}</Text>
+            </View>
+          ) : (
+            <>
+              <View style={s.floatingBarRow}>
+                {/* Pigułka energii — ta sama logika/format co dawny header (2026-09-07, "5/2...
+                    jakby się przeładowywała" — SAM stan puli, nie ułamek), tylko teraz obok
+                    przycisku zamiast osobno nad scrollem. Quest/misja bez puli → pomijana. */}
+                {kind !== 'quest' && kind !== 'mission' && (
+                  <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target.energy}</Text></View>
+                )}
+                <PressableScale onPress={attack} disabled={target.energy < target.energyCost || fighting} style={{ flex: 1 }}>
+                  <View style={[s.attackBtn, (target.energy < target.energyCost || fighting) && { opacity: 0.5 }]}>
+                    <Swords size={18} color="#fff" />
+                    <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'WALCZ!'}</Text>
+                  </View>
+                </PressableScale>
+              </View>
+              {/* Raid kosztuje >1⚡ — jeśli masz za mało (ale nie zero), powiedz wprost ILE
+                  potrzeba, zamiast wygaszonego przycisku bez wyjaśnienia (2026-08-28, user
+                  ze screenshotem: "mimo że mam energię nie mogę zawalczyć"). */}
+              {target.energy > 0 && target.energy < target.energyCost && (
+                <Text style={s.energyShortTxt}>Potrzeba {target.energyCost}⚡, masz {target.energy}</Text>
+              )}
+              {/* "Pomiń walkę" (2026-08-20) — wynik jest już rozstrzygnięty w momencie WALCZ!,
+                  ten przycisk tylko przerywa kosmetyczną animację i skacze do finish(). */}
+              {fighting && (
+                <PressableScale onPress={skipFight} style={{ marginTop: spacing[2], alignSelf: 'center' }}>
+                  <Text style={s.skipFightTxt}>Pomiń walkę</Text>
+                </PressableScale>
+              )}
+            </>
+          )}
+        </View>
+      )}
 
       <Modal visible={!!victory} transparent statusBarTranslucent animationType="fade" onRequestClose={closeVictory}>
         <Pressable style={s.vBackdrop} onPress={closeVictory}>
@@ -1062,28 +1079,37 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
+  // Stały biały + text-shadow (2026-09-14) zamiast `c.text.primary` — ekran ma teraz
+  // pełnoekranowe zdjęcie za sobą zamiast płaskiego tła motywu, więc kolor tekstu musi być
+  // NIEZALEŻNY od jasnego/ciemnego motywu (ten sam powód co `tileLabel` niżej, już dawno
+  // hardkodowany z tego samego względu).
+  headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 60, flexGrow: 1, justifyContent: 'center' },
+  // +110 (2026-09-14) — rezerwa pod dokowany pasek WALCZ na dole (`s.floatingBar`, absolutnie
+  // pozycjonowany POZA ScrollView), żeby ostatnia linijka feedbacku nie chowała się na stałe
+  // pod nim; treść i tak da się doscrollować dalej, to tylko wygodny domyślny odstęp.
+  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 170, flexGrow: 1, justifyContent: 'center' },
 
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
-  doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
+  doneTxt: { fontSize: 13, color: '#fff', opacity: 0.85, textAlign: 'center', maxWidth: 260, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
 
   // Powiększone portrety (2026-08-30, patrz `PORTRAIT_SIZE` u góry pliku) — padding areny/
   // odstęp wierszy/padding kafelka lekko ścieśnione (16→12 / 12→8 / 12→8), żeby oddać
   // portretowi więcej miejsca bez rozsadzania szerokości ekranu. (`tilePortrait.height` ma
   // teraz własny, nowszy komentarz niżej — 2026-09-03 dodał drugi, większy rozmiar dla kotka.)
-  arena: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
+  // BEZ własnego tła/ramki (2026-09-14) — cała karta stoi teraz na pełnoekranowym tle lokacji
+  // (`bgSource`, renderowane raz na poziomie SafeAreaView), nie na płaskim `c.bg.card` jak
+  // dawniej. Padding zostaje — geometria wewnątrz (kafelki/portret/pocisk) nietknięta.
+  arena: { alignItems: 'center', padding: spacing[3] },
 
-  // Scena portretów/HP (2026-09-02) — STAŁEJ wysokości podkładka pod `LOKACJA_KAMPANIA.png`,
-  // odseparowana od reszty `arena` (motyw/przycisk/mechaniki), której wysokość zmienia się
-  // wraz z liczbą widocznych linijek feedbacku — obrazek areny nigdy się nie rozciąga/kurczy.
-  // BEZ własnego paddingu — geometria wewnątrz (kafelki/portret/pocisk) zostaje DOKŁADNIE
-  // taka jak przed zmianą (patrz `projectile.top`, przeliczony niegdyś wprost z tych
-  // paddingów), tylko nośnikiem tła zamiast płaskiego koloru jest teraz obrazek.
-  arenaScene: { width: '100%', position: 'relative', borderRadius: radius.lg, overflow: 'hidden' },
-  arenaSceneImg: { borderRadius: radius.lg },
+  // Scena portretów/HP (2026-09-02) — czysto POZYCJONUJĄCY kontener (`position:'relative'` pod
+  // `projectile`'y absolutnie pozycjonowane względem niego), odseparowany od reszty `arena`
+  // (motyw/mechaniki), której wysokość zmienia się wraz z liczbą widocznych linijek feedbacku.
+  // Przestał nieść WŁASNY obrazek/scrim 2026-09-14 (dawny `ImageBackground` → zwykły `View`,
+  // tło już jest pełnoekranowe za całym ekranem) — BEZ własnego paddingu, geometria wewnątrz
+  // (kafelki/portret/pocisk) zostaje DOKŁADNIE taka jak przed zmianą (patrz `projectile.top`).
+  arenaScene: { width: '100%', position: 'relative' },
 
   vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%' },
   // Kafelki straciły własne tło/ramkę (2026-09-02, user: "wypierdolić ramki że bosy stoją na
@@ -1106,20 +1132,33 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: SPRITE_GROUND_SHIFT }] },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
-  bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center' },
-  motywTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, textAlign: 'center', marginTop: 4 },
+  // Stałe jasne kolory + text-shadow (2026-09-14, zamiast `c.text.muted`/`c.text.secondary`) —
+  // ten sam powód co `headerTitle`/`doneTxt` wyżej: tekst teraz siedzi wprost na zdjęciu
+  // lokacji, nie na płaskiej karcie motywu.
+  bossTaunt: { fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  motywTxt: { fontSize: 12.5, fontWeight: '700', color: '#fff', textAlign: 'center', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
 
   mechRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, justifyContent: 'center', flexWrap: 'wrap' },
-  mechNote: { fontSize: 11.5, color: '#F4B740', fontWeight: '800', textAlign: 'center' },
-  mechNoteHeal: { fontSize: 11.5, color: '#7DD3FC', fontWeight: '800', textAlign: 'center' },
+  mechNote: { fontSize: 11.5, color: '#F4B740', fontWeight: '800', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  mechNoteHeal: { fontSize: 11.5, color: '#7DD3FC', fontWeight: '800', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
-  doneInlineTxt: { fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center', marginTop: spacing[4] },
-  attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[4], width: '100%' },
+  doneInlineTxt: { fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: radius.lg, paddingVertical: 16, width: '100%' },
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#fff' },
   energyShortTxt: { fontSize: 12, fontWeight: '700', color: '#F87171', textAlign: 'center', marginTop: spacing[2] },
-  skipFightTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline' },
+  skipFightTxt: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textAlign: 'center', textDecorationLine: 'underline' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[6], paddingHorizontal: spacing[3] },
-  lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
+  lockTxt: { flex: 1, fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+
+  // Dokowany pasek akcji (2026-09-14, user: "przycisk walki od teraz będzie lewitował na
+  // dole jak navbar") — ten sam wzorzec co TabBar.tsx: `position:absolute` nad resztą treści,
+  // `pointerEvents:'box-none'` żeby przezroczyste marginesy przepuszczały dotyk do sceny za
+  // nimi (tu akurat nieużywane bo pasek jest wąski, ale zachowuje spójność z tamtym wzorcem),
+  // bottom scrim żeby content płynnie "znikał" pod spodem zamiast twardo się urywać.
+  floatingBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing[4], paddingTop: spacing[3] },
+  floatingBarScrim: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  floatingBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  floatingBarDone: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[2] },
 
   // Mini popup "pupil w trakcie podróży" (2026-08-20) — ta sama karta-na-przyciemnionym-tle
   // stylistyka co `ConfirmDialog` (mały wyśrodkowany box, nie pełny ekran).
