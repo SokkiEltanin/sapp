@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ekran walki: kotek/boss niżej + stara arena kampanii odpięta — NIEsprawdzone (2026-09-14)
+
+User zrzutem: *"muszą być niżej żeby wyglądali jakby byli, i wywal te stara arenę i daj ten
+las górski"*. Pełny opis w ARCHITECTURE.md §96. Skrót: (1) `ScrollView` nie miał `style=
+{{flex:1}}`, więc karta walki nie centrowała się wcale — teraz zakotwicza się do DOŁU
+dostępnej przestrzeni (`justifyContent:'flex-end'`), żeby portrety trafiały w "naziemną"
+dolną część zdjęcia lokacji, jak na wszystkich 3 obecnych tłach (GORSKILAS/JUNGLA/LODOWA);
+(2) Kampania straciła swoje stare, dedykowane tło (dungeon) — teraz też dostaje GORSKILAS
+jak reszta trybów bez własnej lokacji.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) Kampania pokazuje GORSKILAS, nie stary
+dungeon; (2) kotek/boss wyraźnie niżej, blisko "ziemi" na obrazku, w KAŻDYM trybie walki.
+
 ## 🆕 Ekran walki: pełnoekranowe tło + WALCZ dokowany na dole jak navbar — NIEsprawdzone (2026-09-14)
 
 User dostarczył 2 kolejne pełnoekranowe tła (JUNGLA pod osę, GORKISLAS pod wilka — i jako

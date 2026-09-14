@@ -703,7 +703,12 @@ export default function BossFight() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      {/* `style={{flex:1}}` (2026-09-14) — bez tego ScrollView NIE wypełnia dostępnej
+          wysokości ekranu (rozmiar dopasowuje do treści, nie do rodzica), więc
+          `flexGrow:1`+`justifyContent` na `contentContainerStyle` (`s.scroll`) nie miało
+          się w czym wycentrować/zakotwiczyć — dokładnie stąd zrzut usera z pustą przestrzenią
+          pod kartą walki zamiast realnego "zakotwiczenia" niżej. */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Pupil w trakcie podróży (2026-08-20) — renderowany jako MINI POPUP niżej
             (`missionAwayOverlay`/`missionAwayCard`), nie jako pełnoekranowy tekst w treści
             ekranu (user: "zamiast full screen powiadomień jak pupil jest w misji zrób mini
@@ -1086,10 +1091,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
-  // +110 (2026-09-14) — rezerwa pod dokowany pasek WALCZ na dole (`s.floatingBar`, absolutnie
+  // paddingBottom 170 — rezerwa pod dokowany pasek WALCZ na dole (`s.floatingBar`, absolutnie
   // pozycjonowany POZA ScrollView), żeby ostatnia linijka feedbacku nie chowała się na stałe
   // pod nim; treść i tak da się doscrollować dalej, to tylko wygodny domyślny odstęp.
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 170, flexGrow: 1, justifyContent: 'center' },
+  // `justifyContent:'flex-end'` (2026-09-14, user ze zrzutem pełnoekranowej areny: "muszą być
+  // niżej żeby wyglądali jakby byli [tam]") — było `'center'`, ale tła lokacji (GORSKILAS/
+  // JUNGLA/LODOWA) mają wyraźną "ziemię"/ścieżkę TYLKO w dolnej ~40% kadru (niebo/góry/korony
+  // drzew nad tym) — wycentrowana karta zostawiała kotka/bossa unoszących się w środku nieba.
+  // Zakotwiczenie do DOŁU dostępnej przestrzeni scrolla (tuż nad `floatingBar`) stawia portrety
+  // w dolnej części ekranu niezależnie od konkretnej kompozycji obrazka — ten sam efekt
+  // "stania na ziemi" na każdym z nich, nie tylko na tym jednym, który akurat teraz testujemy.
+  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 170, flexGrow: 1, justifyContent: 'flex-end' },
 
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   doneTxt: { fontSize: 13, color: '#fff', opacity: 0.85, textAlign: 'center', maxWidth: 260, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
