@@ -222,7 +222,7 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       // FOOD ONLY — sum food receipt lines, not the whole grocery receipt (papier
       // toaletowy / chemia z Lidla nie liczy się do jedzenia). foodAmountOf handles the
       // no-items fallback (a plain groceries entry counts whole).
-      return exp.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && pred(e))
+      return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + foodAmountOf(e), 0);
     case 'sweets': {
       let total = 0;

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodEntry, Task, CalendarEvent } from '@/types';
 import { Expense } from '@/types';
+import { isSelfTransfer } from '@/utils/statWidgets';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,9 +143,9 @@ export function generateMonthlyReport(input: {
   const done     = monthTasks.filter(t => t.status === 'done').length;
   const taskRate = monthTasks.length > 0 ? done / monthTasks.length : 0;
 
-  // ── Finances
-  const exp = expenses.filter(e => (!e.type || e.type === 'expense') && e.date.slice(0, 7) === month);
-  const inc = expenses.filter(e => e.type === 'income' && e.date.slice(0, 7) === month);
+  // ── Finances (self-transfery między własnymi kontami wyłączone — patrz isSelfTransfer)
+  const exp = expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && e.date.slice(0, 7) === month);
+  const inc = expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && e.date.slice(0, 7) === month);
   const totalSpend  = exp.reduce((s, e) => s + e.amount, 0);
   const totalIncome = inc.reduce((s, e) => s + e.amount, 0);
   const foodSpend   = exp.filter(e => e.category === 'groceries').reduce((s, e) => s + e.amount, 0);
@@ -267,9 +268,9 @@ export function generateYearlyReport(input: {
   const done     = yearTasks.filter(t => t.status === 'done').length;
   const taskRate = yearTasks.length > 0 ? done / yearTasks.length : 0;
 
-  // ── Finances
-  const exp = expenses.filter(e => (!e.type || e.type === 'expense') && e.date.startsWith(`${year}`));
-  const inc = expenses.filter(e => e.type === 'income' && e.date.startsWith(`${year}`));
+  // ── Finances (self-transfery między własnymi kontami wyłączone — patrz isSelfTransfer)
+  const exp = expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && e.date.startsWith(`${year}`));
+  const inc = expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && e.date.startsWith(`${year}`));
   const totalSpend  = exp.reduce((s, e) => s + e.amount, 0);
   const totalIncome = inc.reduce((s, e) => s + e.amount, 0);
   const byCat: Record<string, number> = {};

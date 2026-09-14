@@ -44,6 +44,26 @@ describe('dashboard/spend — agregacje wydatków', () => {
     expect(groceryTotal([], D)).toBe(0);
     expect(weekIncome([], D)).toBe(0);
   });
+
+  // 2026-09-14, user: "inne statystyki tez powinny brać pod uwagę ze to przelew własny
+  // a nie cos co mam / wydaje" — przelew między WŁASNYMI kontami (tag "przelew") nie jest
+  // ani realnym wydatkiem, ani przychodem, więc nie może wpadać do żadnej sumy poza
+  // głównym bilansem NA KARCIE (ten liczy go celowo — patrz finances.tsx).
+  test('allSpend pomija self-transfer (tag "przelew")', () => {
+    const exp = [
+      e({ amount: 30, date: '2026-08-04T09:00:00' }),
+      e({ amount: 200, date: '2026-08-04T09:00:00', tags: ['przelew'] }), // self-transfer
+    ];
+    expect(allSpend(exp, D)).toBeCloseTo(30);
+  });
+
+  test('weekIncome pomija self-transfer (tag "przelew")', () => {
+    const exp = [
+      e({ amount: 1000, type: 'income', date: '2026-08-04T09:00:00' }),
+      e({ amount: 300, type: 'income', date: '2026-08-04T09:00:00', tags: ['przelew'] }), // self-transfer
+    ];
+    expect(weekIncome(exp, D)).toBeCloseTo(1000);
+  });
 });
 
 describe('dashboard/spend — sweetsTotal (per-pozycja + scope)', () => {

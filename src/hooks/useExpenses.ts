@@ -3,6 +3,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { Expense, ExpenseCategory } from '@/types';
 import { CATEGORY_META } from '@/utils/categories';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 export function useExpenses() {
@@ -32,8 +33,12 @@ export function useExpenses() {
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
-    const isExpense = (e: Expense) => !e.type || e.type === 'expense';
-    const isIncome = (e: Expense) => e.type === 'income';
+    // Self-transfery (przelew między WŁASNYMI kontami) nie liczą się jako wydatek ani
+    // przychód — patrz isSelfTransfer w statWidgets.ts, ten sam wyjątek co reszta
+    // statystyk finansowych w apce (2026-09-14, user: "inne statystyki tez powinny brać
+    // pod uwagę ze to przelew własny a nie cos co mam / wydaje").
+    const isExpense = (e: Expense) => (!e.type || e.type === 'expense') && !isSelfTransfer(e);
+    const isIncome = (e: Expense) => e.type === 'income' && !isSelfTransfer(e);
 
     const thisWeek = expenses
       .filter((e) => isExpense(e) && isWithinInterval(parseISO(e.date), { start: thisWeekStart, end: thisWeekEnd }))

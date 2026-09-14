@@ -117,4 +117,18 @@ describe('generateMonthlyReport — agregacje (nie tylko highlight)', () => {
     expect(r.finances.sweetsSpend).toBe(0);
     expect(r.finances.totalIncome).toBe(1000);
   });
+
+  // 2026-09-14, user: "inne statystyki tez powinny brać pod uwagę ze to przelew własny
+  // a nie cos co mam / wydaje" — self-transfer (tag "przelew") nie jest ani wydatkiem, ani
+  // przychodem, więc raport miesięczny/roczny nie może go liczyć do żadnej z tych sum.
+  test('self-transfer (tag "przelew") nie liczy się do totalSpend/totalIncome', () => {
+    const r = generateMonthlyReport({ ...base(), expenses: [
+      exp({ amount: 100 }),                                             // zwykły wydatek
+      exp({ amount: 300, tags: ['przelew'] }),                          // self-transfer (out)
+      exp({ type: 'income', amount: 50 }),                              // zwykły przychód
+      exp({ type: 'income', amount: 400, tags: ['przelew'] }),          // self-transfer (in)
+    ] });
+    expect(r.finances.totalSpend).toBe(100);
+    expect(r.finances.totalIncome).toBe(50);
+  });
 });

@@ -319,7 +319,7 @@ export default function FinancesScreen() {
     return filtered.map(([date, items]) => ({
       title: formatDate(date + 'T12:00:00'),
       data: items,
-      total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
+      total: items.reduce((s, e) => s + (isExp(e) && !isSelfTransfer(e) ? e.amount : 0), 0),
     }));
   }, [grouped, activeTagFilter, activeBillFilter, activePayer, activePayment, activeType, min, max, activeFilterCount, capTx, recentCutoff]);
 
