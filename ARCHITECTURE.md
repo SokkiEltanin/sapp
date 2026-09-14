@@ -6893,6 +6893,86 @@ zmieniło); (3) Rynek → slot Zamrożenia (lewy górny w tablicy) powinien poka
 monetę zamiast płatka śniegu; (4) walka z Lodowym Królikiem (quest/misja) → sprawdź że jego
 własny portret ładuje się poprawnie.
 
+## 95. Ekran walki: pełnoekranowe tło lokacji + przycisk WALCZ dokowany na dole jak navbar
+
+User dostarczył 2 kolejne pełnoekranowe tła (`LOKALIZACJA_JUNGLA.png`, wgrana ze spacją w
+nazwie — zmienione na `LOKALIZACJA_JUNGLA.png` pod konwencję; `LOKALIZACJA_GORKISLAS.png`) i
+napisał: *"dodałem Ci całoekranowe lokacje GORSKILAS oraz JUNGLA, one są na cały ekran nie
+tak jak robiliśmy, więc trzeba je ładnie zrobić. przycisk walki od teraz będzie lewitował na
+dole jak navbar jakby obok niego dane, a paski zdrowia pod nimi cienie zostają"*. W trakcie
+pracy, mid-turn: *"ja będę robił w trakcie kolejne grafiki pod inne kampanie, na razie możesz
+zostawić ten GORSKILAS jako domyślną [lokację]"*. Doprecyzowanie zakresu (AskUserQuestion):
+user potwierdził że pełnoekranowe tło + dokowany dół mają dotyczyć **wszystkich 6 trybów
+walki** (kampania/raid/event/quest/MAD/misja), nie tylko questowych minibossów.
+
+**Część 1 — GORSKILAS jako nowy domyślny fallback.** `bossIcons.ts`: nowy
+`DEFAULT_ARENA_BG` (= `LOKALIZACJA_GORKISLAS.png`) ZASTĘPUJE `CAMPAIGN_ARENA_BG` jako
+fallback w `arenaBgFor()` dla trybów bez własnego, dedykowanego tła (raid/event/MAD — dotąd
+pożyczały dungeon-owy art kampanii, co nie miało tematycznego sensu). Kampania SAMA zostaje
+przy swoim `CAMPAIGN_ARENA_BG` (jawny wpis w `ARENA_BG_BY_KIND` wygrywa z fallbackiem).
+`MISSION_LOCATION_BG` (§94) dostał 2 nowe wpisy: `mb_osa` → JUNGLA, `mb_wilk` → GORKISLAS —
+pasują do retematyzowanych destynacji z §94 (Gęstwina Dżungli/Głąb Puszczy). `mb_grizzly`
+(Polana nad Strumieniem) wciąż BEZ pliku — czeka, user zapowiedział dosyłanie stopniowo.
+Nowa `fightArenaBg(kind, targetId)` — JEDNA funkcja zamiast duplikowania fallback-chain w
+`boss-fight.tsx`: dla quest/misja sprawdza NAJPIERW `MISSION_LOCATION_BG[targetId]` (per
+KONKRETNY miniboss, bo te dwa `kind` dzielą jeden fight-tryb ale 10 różnych zwierząt/lokacji),
+dopiero potem spada na `arenaBgFor(kind)` (per-typ-walki fallback) — dla pozostałych 4 trybów
+idzie prosto do `arenaBgFor`.
+
+**Część 2 — pełnoekranowe tło ekranu walki (`app/boss-fight.tsx`).** Dotąd tło (`LOKACJA_
+KAMPANIA.png`) było ograniczone do MAŁEJ, stałej wysokości "sceny" (`arenaScene`,
+`ImageBackground`) obejmującej TYLKO portrety+paski HP — reszta karty (taunt/motyw/przycisk/
+mechaniki) stała na płaskim `c.bg.card`. Teraz `Image` (absolutnie, `contentFit="cover"`)
+renderuje się RAZ na poziomie `SafeAreaView`, POD headerem/scrollem/dokowanym paskiem —
+naprawdę cały ekran. Scrim (identyczny 3-stopniowy czarny gradient co dawna winieta areny) +
+jasnoszara "mgiełka" (ten sam przepis co tło lokacji misji w `pet.tsx`, §94 — TA SAMA lokacja
+wygląda teraz spójnie w OBU miejscach, gdzie się pojawia: w drodze i w walce) renderują się
+też raz, na całym ekranie. `arenaScene` (dawny `ImageBackground`+lokalny gradient) to teraz
+zwykły pozycjonujący `View` (`position:'relative'`) — BEZ zmian w geometrii wewnątrz
+(`projectile.top`, kafelki, portrety) — ryzykowna część (matematyka lecących pocisków) została
+NIETKNIĘTA, zmieniła się tylko WARSTWA pod spodem. `s.arena` stracił własne tło/ramkę
+(`c.bg.card`/border) — karta stoi teraz bezpośrednio na pełnoekranowym obrazku. Wszystkie
+teksty, które wcześniej siedziały na płaskiej karcie motywu (header, taunt, motyw, "Pokonany
+✓", stany "brak celu"/"zablokowane", ikony Swords/Lock) dostały STAŁY jasny kolor +
+text-shadow zamiast zależnego-od-motywu `c.text.*` — ten sam powód, dla którego `tileLabel`/
+`tileHpTxt` (etykiety NA portretach) już dawno miały ten zabieg: tekst musi być czytelny
+NIEZALEŻNIE od tego, jak jasne/ciemne jest źródłowe zdjęcie lokacji, nie od motywu apki.
+**Paski HP (`tileHpTrack`/`tileHpTxt`/`tileHpFill`) świadomie NIETKNIĘTE** — user explicite:
+"paski zdrowia pod nimi cienie zostają".
+
+**Część 3 — przycisk WALCZ dokowany na dole jak navbar.** Nowy `s.floatingBar` —
+`position:'absolute', bottom:0`, ten sam wizualny język co `TabBar.tsx` (pill nad contentem,
+bottom scrim żeby treść płynnie "znika" pod spód zamiast twardo się urywać,
+`useSafeAreaInsets` pod padding). Wyciągnięty z przewijanej treści: przycisk WALCZ!/stan
+"Pokonany ✓"/ostrzeżenie o brakującej energii/"Pomiń walkę" — wszystko co wcześniej żyło NA
+DOLE karty `arena` w scrollu. "Dane obok przycisku" (dosłowna prośba usera) = pigułka energii
+(koszt/stan puli), PRZENIESIONA z headera (gdzie żyła osobno, daleko nad treścią) — teraz stoi
+BEZPOŚREDNIO obok przycisku którego dotyczy; quest/misja nadal jej nie mają (brak puli
+energii, jak dotąd), więc przycisk zajmuje wtedy całą szerokość paska. Reaktywne linijki
+mechaniki (osłona/regen/uzdrowienie/cierń — informacyjne, nie akcja) ZOSTAJĄ w przewijanej
+treści pod "Motywem", nie w dokowanym pasku. `s.scroll` dostał +110px rezerwy na dole, żeby
+domyślnie nic nie chowało się na stałe pod pływającym paskiem (content da się i tak
+doscrollować dalej).
+
+**Świadomie NIE zrobione**: dedykowane tła dla raid/event/MAD (wciąż na `DEFAULT_ARENA_BG`);
+tło dla `mb_grizzly` (czeka na plik); żadna zmiana w SAMEJ logice walki/animacji pocisków —
+to czysto prezentacyjny refaktor renderowanej WARSTWY, `attackRoundBased`/`simulateFight`/
+cała reszta silnika nietknięte.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (bez nowych — czysto wizualny refaktor
+ekranu bez testów jednostkowych, projekt nie testuje komponentów RN; `minibosses.ts`/
+`bossIcons.ts` bez zmian logiki, tylko nowe/przemianowane require()'y i jedna funkcja
+kompozytowa).
+
+**Priorytet testu na urządzeniu**: (1) wejdź w KAŻDY z 6 trybów walki (kampania/raid/
+event/quest/MAD/misja) → tło powinno wypełniać CAŁY ekran, nie tylko małe pole portretów;
+(2) trafiwszy na osę/wilka w queście/misji → JUNGLA/GORKISLAS jako tło zamiast domyślnego
+GORSKILAS; (3) przycisk WALCZ powinien być ZAWSZE widoczny u dołu ekranu, niezależnie od
+przewinięcia treści, z pigułką energii obok niego (poza questem/misją); (4) sprawdź czytelność
+całego tekstu (nazwa bossa, motyw, "Pomiń walkę") na różnych tłach — nic nie powinno "znikać"
+na jasnych fragmentach zdjęcia; (5) paski HP pod portretami wyglądają DOKŁADNIE jak wcześniej
+(regresja jeśli coś się zmieniło — user explicite chciał ich BEZ zmian).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

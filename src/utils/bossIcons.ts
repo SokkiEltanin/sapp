@@ -134,38 +134,64 @@ export function attackPng(kind: AttackKind | undefined): ImageSourcePropType {
 }
 
 // Tło areny walki kampanii (2026-09-02, user dostarczył dedykowany art po wcześniejszym
-// `arena-template.svg`). Nazwa zostaje "CAMPAIGN" (nie "DEFAULT") — to WCIĄŻ dedykowane tło
-// kampanii, tylko dodatkowo pełni rolę fallbacku w `arenaBgFor()` niżej.
+// `arena-template.svg`). Nazwa zostaje "CAMPAIGN" — to WCIĄŻ dedykowane tło TYLKO kampanii
+// (nie generyczny fallback — patrz `DEFAULT_ARENA_BG` niżej, który przejął tę rolę 2026-09-14).
 export const CAMPAIGN_ARENA_BG: ImageSourcePropType = require('../../assets/lokalizacje/LOKACJA_KAMPANIA.png');
+
+// Domyślne/fallbackowe tło areny (2026-09-14, user dostarczył `LOKALIZACJA_GORKISLAS.png` +
+// "będę robił w trakcie kolejne grafiki pod inne kampanie, na razie możesz zostawić ten
+// GORSKILAS jako domyślną [lokację]") — zastępuje dawny fallback na `CAMPAIGN_ARENA_BG`
+// (raid/event/MAD/questy-i-misje-bez-własnej-lokacji dostawały tło kampanii, co nie miało
+// tematycznego sensu). Kampania SAMA zostaje przy swoim dedykowanym `CAMPAIGN_ARENA_BG`
+// (jawny wpis w `ARENA_BG_BY_KIND` niżej wygrywa z fallbackiem).
+export const DEFAULT_ARENA_BG: ImageSourcePropType = require('../../assets/lokalizacje/LOKALIZACJA_GORKISLAS.png');
 
 // Tła areny PER TYP WALKI (2026-09-02, user: "questy będą miały oddzielne tło... a eventowe
 // będą miały osobne, a MAD bossy będą miały jeszcze inne" — ale bez gotowej grafiki jeszcze,
-// więc na razie tylko przygotowanie: kampania ma dedykowany art, reszta pożycza go jako
-// fallback przez `arenaBgFor()`, dopóki user nie dostarczy własnych plików. Dodanie nowego
+// więc na razie tylko przygotowanie: kampania ma dedykowany art, reszta pożycza domyślne tło
+// przez `arenaBgFor()`, dopóki user nie dostarczy własnych plików per-kind. Dodanie nowego
 // tła = jedna nowa linia w tej mapie (`require()` na plik w `assets/lokalizacje/`) + WPIS DO
-// TEJ MAPY, zero zmian w boss-fight.tsx — `arenaBgFor` już tam jest podpięte.
+// TEJ MAPY, zero zmian w boss-fight.tsx — `arenaBgFor`/`fightArenaBg` już tam są podpięte.
 type ArenaKind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 const ARENA_BG_BY_KIND: Partial<Record<ArenaKind, ImageSourcePropType>> = {
   campaign: CAMPAIGN_ARENA_BG,
-  // quest:  require('../../assets/lokalizacje/LOKACJA_QUEST.png'),
+  // raid:   require('../../assets/lokalizacje/LOKACJA_RAID.png'),
   // event:  require('../../assets/lokalizacje/LOKACJA_EVENT.png'),
   // mad:    require('../../assets/lokalizacje/LOKACJA_MAD.png'),
 };
 export function arenaBgFor(kind: ArenaKind): ImageSourcePropType {
-  return ARENA_BG_BY_KIND[kind] ?? CAMPAIGN_ARENA_BG;
+  return ARENA_BG_BY_KIND[kind] ?? DEFAULT_ARENA_BG;
 }
 
-// Tła LOKACJI misji (`MiniBoss.destination` w minibosses.ts, scena "W drodze"/"wrócił" na
-// app/pet.tsx) — 2026-09-14, user dostarczył pierwsze dedykowane tło (`LOKALIZACJA_LODOWA.png`,
-// pod nowego `mb_lodowykrolik`) i zapowiedział kolejne (jungla pod osę, polana nad wodą pod
-// grizzly, głąb lasu pod wilka — na razie SAME NAZWY, bez plików). Dokładnie ten sam wzorzec
-// fallbacku co `bossPng`/`arenaBgFor`: miniboss BEZ wpisu tutaj po prostu nie dostaje tła w
-// pet.tsx (zwykła scena jak dotąd) — nic się nie psuje, dodanie nowego pliku = jedna linia tu,
-// zero zmian w pet.tsx. Źródłowy plik przeskalowany 940×1672/2,1MB → 675×1200/1,18MB (Pillow
-// LANCZOS) — ten sam próg wagowy co `CAMPAIGN_ARENA_BG` (§14).
+// Tła LOKACJI misji/questów (`MiniBoss.destination` w minibosses.ts) — per KONKRETNY miniboss,
+// nie per fight-`kind` jak `ARENA_BG_BY_KIND` wyżej (quest/misja dzielą JEDEN `kind`, ale 10
+// różnych zwierząt z 10 różnymi lokacjami). 2026-09-14: `mb_lodowykrolik` (pierwsze dedykowane
+// tło), `mb_osa` (Gęstwina Dżungli) i `mb_wilk` (Głąb Puszczy) dostały własne pliki w tej samej
+// sesji co retematyzacja ich destynacji (patrz minibosses.ts); `mb_grizzly` (Polana nad
+// Strumieniem) jeszcze CZEKA na plik — user zapowiedział, że dorysuje resztę stopniowo.
+// Dokładnie ten sam wzorzec fallbacku co `bossPng`/`arenaBgFor`: miniboss BEZ wpisu tutaj po
+// prostu nie dostaje dedykowanego tła (przez `fightArenaBg`/pet.tsx spada na `DEFAULT_ARENA_BG`)
+// — nic się nie psuje, dodanie nowego pliku = jedna linia tu. Źródłowe pliki przeskalowane
+// (Pillow LANCZOS) do tego samego progu co `LOKALIZACJA_LODOWA.png` (§94): max 1200px dłuższy
+// bok, ~1-1,2MB.
 export const MISSION_LOCATION_BG: Partial<Record<string, ImageSourcePropType>> = {
   mb_lodowykrolik: require('../../assets/lokalizacje/LOKALIZACJA_LODOWA.png'),
+  mb_osa:          require('../../assets/lokalizacje/LOKALIZACJA_JUNGLA.png'),
+  mb_wilk:         require('../../assets/lokalizacje/LOKALIZACJA_GORKISLAS.png'),
 };
 export function missionLocationBg(minibossId: string | undefined): ImageSourcePropType | undefined {
   return minibossId ? MISSION_LOCATION_BG[minibossId] : undefined;
+}
+
+// Tło CAŁEGO ekranu walki (2026-09-14, user: "dodałem Ci całoekranowe lokacje GORSKILAS oraz
+// JUNGLA, one są na cały ekran... trzeba je ładnie zrobić" — boss-fight.tsx). Quest/misja mają
+// PER-MINIBOSS lokację (`MISSION_LOCATION_BG`, ta sama scena co pet.tsx dla spójności — user
+// widzi to samo miejsce w drodze I w walce); pozostałe tryby (kampania/raid/event/MAD) trzymają
+// się PER-KIND `arenaBgFor`. Jedna funkcja zamiast duplikowania fallback-chain w boss-fight.tsx.
+export function fightArenaBg(kind: ArenaKind, targetId: string | undefined): ImageSourcePropType {
+  if ((kind === 'quest' || kind === 'mission') && targetId) {
+    const loc = missionLocationBg(targetId);
+    if (loc) return loc;
+  }
+  return arenaBgFor(kind);
 }

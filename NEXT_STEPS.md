@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ekran walki: pełnoekranowe tło + WALCZ dokowany na dole jak navbar — NIEsprawdzone (2026-09-14)
+
+User dostarczył 2 kolejne pełnoekranowe tła (JUNGLA pod osę, GORKISLAS pod wilka — i jako
+NOWY domyślny fallback dla trybów bez własnego tła) i poprosił o przebudowę ekranu walki:
+*"przycisk walki od teraz będzie lewitował na dole jak navbar jakby obok niego dane, a paski
+zdrowia pod nimi cienie zostają"*. Pełny opis w ARCHITECTURE.md §95. Skrót: tło teraz
+wypełnia CAŁY ekran walki (wszystkie 6 trybów — kampania/raid/event/quest/MAD/misja, nie
+tylko questowe minibossy), przycisk WALCZ + pigułka energii + "Pomiń walkę" przeniesione do
+dokowanego paska na dole (ten sam wzorzec co TabBar.tsx), zawsze widocznego niezależnie od
+scrolla. Paski HP pod portretami CELOWO nietknięte.
+
+**NIE zweryfikowane na urządzeniu** — priorytet: (1) każdy z 6 trybów walki ma pełnoekranowe
+tło; (2) osa/wilk w queście/misji pokazują swoje dedykowane lokacje; (3) przycisk WALCZ
+zawsze widoczny na dole, czytelny na różnych tłach; (4) paski HP wyglądają jak wcześniej.
+
 ## 🆕 Miniboss "Lodowy Królik" + tła lokacji misji + grafika zamrożenia serii — NIEsprawdzone (2026-09-14)
 
 User dostarczył 3 pliki wprost na GitHub (`MBOSS_LODOWYKROLIK.png`, `LOKALIZACJA_LODOWA.png`,
