@@ -9,7 +9,7 @@ const strip = <T extends Record<string, any>>(obj: T): T =>
 
 export const vehiclesService = {
   async getAll(): Promise<Vehicle[]> {
-    const q = query(userCol(COL), orderBy('createdAt', 'asc'));
+    const q = query(await userCol(COL), orderBy('createdAt', 'asc'));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as Vehicle));
   },
@@ -17,15 +17,15 @@ export const vehiclesService = {
   async add(v: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vehicle> {
     const now = new Date().toISOString();
     const data = strip({ ...v, createdAt: now, updatedAt: now });
-    const ref = await addDoc(userCol(COL), data);
+    const ref = await addDoc(await userCol(COL), data);
     return { ...v, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async update(id: string, updates: Partial<Vehicle>): Promise<void> {
-    await updateDoc(userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(userDoc(COL, id));
+    await deleteDoc(await userDoc(COL, id));
   },
 };

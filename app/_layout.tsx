@@ -12,9 +12,8 @@ import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { router } from 'expo-router';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from '@/services/firebase';
+import { whenAuthReady } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
@@ -179,10 +178,15 @@ function AutoMoodPopup() {
 }
 
 export default function RootLayout() {
+  // Still used by the two "wait for auth" effects further down (autobackup, restore-
+  // prompt) and the StatusBar color — no longer gates the Stack itself, see `whenAuthReady()`
+  // in firebase.ts.
   const [authReady, setAuthReady] = useState(false);
-  // Animated pet splash: keep it up until auth is ready AND a minimum time has passed,
-  // so the cat animation is actually seen on every launch (auth can resolve instantly).
-  // `splashGone` unmounts it after its fade-out completes.
+  // Animated pet splash: up for a fixed minimum time so the cat animation is actually
+  // seen on every launch, independent of auth (2026-09-15 — used to also wait for
+  // `authReady`, which is exactly what made cold start feel slow: Firebase auth
+  // resolution, not this timer, dominated the wait). `splashGone` unmounts it after its
+  // fade-out completes.
   const [minSplashDone, setMinSplashDone] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
   useEffect(() => {
@@ -290,21 +294,13 @@ export default function RootLayout() {
 
   useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
 
-  useEffect(() => {
-    // Fallback: show app after 4s regardless (prevents permanent black screen)
-    const timer = setTimeout(() => setAuthReady(true), 4000);
-    const unsub = onAuthStateChanged(auth, (user) => {
-      clearTimeout(timer);
-      if (!user) {
-        signInAnonymously(auth)
-          .then(() => setAuthReady(true))
-          .catch(() => setAuthReady(true));
-      } else {
-        setAuthReady(true);
-      }
-    });
-    return () => { unsub(); clearTimeout(timer); };
-  }, []);
+  // Auth resolution itself MOVED to firebase.ts (2026-09-15, `whenAuthReady()`) — the
+  // `<Stack>` below no longer waits for it (patrz komentarz przy JSX niżej), this
+  // `authReady` state stays only for the two effects further down that explicitly want
+  // to wait (autobackup, restore-prompt) and for the StatusBar color while the splash
+  // is still covering the screen. `whenAuthReady()` never rejects (mirrors the old 4s
+  // fallback exactly — resolves either way), so no `.catch` needed here.
+  useEffect(() => { whenAuthReady().then(() => setAuthReady(true)); }, []);
 
   // Daily cloud backup — runs shortly after launch (throttled to once/24h inside).
   // Also backs up when the app goes to background (shorter 2h throttle) so recent
@@ -479,13 +475,19 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
+  // Stack renders UNCONDITIONALLY now (2026-09-15) — dawniej `{authReady && (...)}`
+  // blokowało CAŁY navigation tree za auth (patrz komentarz przy `whenAuthReady()` w
+  // firebase.ts dla pełnej diagnozy "laguje na wejściu"). Splash decoupled od auth
+  // (`!minSplashDone`, nie `!(authReady && minSplashDone)`) — znika po stałym,
+  // przewidywalnym czasie brandingu niezależnie od tego, jak długo Firebase potrzebuje;
+  // ekrany pod spodem po prostu pokazują normalny stan ładowania/pusty przez tę chwilę,
+  // dokładnie tak jak przy każdym innym oczekiwaniu na sieć.
+  const splashVisible = !minSplashDone;
   return (
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={authReady ? colors.bg.primary : '#083A64'} />
-        {authReady && (
-        <>
+        <StatusBar style="light" backgroundColor={splashVisible ? '#083A64' : colors.bg.primary} />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg.primary }, animation: 'fade' }}>
           <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
           <Stack.Screen name="expenses/add" options={{ animation: 'fade' }} />
@@ -520,10 +522,8 @@ export default function RootLayout() {
         <BadgeCelebration />
         <LevelUpCelebration />
         <AutoMoodPopup />
-        </>
-        )}
         {!splashGone && (
-          <AnimatedSplash visible={!(authReady && minSplashDone)} onHidden={() => setSplashGone(true)} />
+          <AnimatedSplash visible={splashVisible} onHidden={() => setSplashGone(true)} />
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

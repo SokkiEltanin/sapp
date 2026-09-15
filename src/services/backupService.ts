@@ -189,13 +189,13 @@ export async function createBackup(auto: boolean, appBuild?: number): Promise<Ba
 
   // Chunks first, then the meta doc — so a half-written backup is never listed.
   for (let i = 0; i < chunks.length; i++) {
-    await setDoc(userSubdoc(BACKUPS, id, 'chunks', String(i)), { d: chunks[i] });
+    await setDoc(await userSubdoc(BACKUPS, id, 'chunks', String(i)), { d: chunks[i] });
   }
   const meta: BackupMeta = {
     id, createdAt: snap.createdAt, auto, appBuild,
     chunks: chunks.length, sizeBytes: json.length, counts,
   };
-  await setDoc(userDoc(BACKUPS, id), strip(meta));
+  await setDoc(await userDoc(BACKUPS, id), strip(meta));
 
   await prune();
   if (auto) await AsyncStorage.setItem(LAST_AUTO_KEY, snap.createdAt);
@@ -203,15 +203,15 @@ export async function createBackup(auto: boolean, appBuild?: number): Promise<Ba
 }
 
 export async function listBackups(): Promise<BackupMeta[]> {
-  const q = query(userCol(BACKUPS), orderBy('createdAt', 'desc'));
+  const q = query(await userCol(BACKUPS), orderBy('createdAt', 'desc'));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...(d.data() as Omit<BackupMeta, 'id'>) }));
 }
 
 async function deleteBackup(id: string): Promise<void> {
-  const chunksSnap = await getDocs(userSubcol(BACKUPS, id, 'chunks'));
+  const chunksSnap = await getDocs(await userSubcol(BACKUPS, id, 'chunks'));
   await Promise.all(chunksSnap.docs.map(d => deleteDoc(d.ref)));
-  await deleteDoc(userDoc(BACKUPS, id));
+  await deleteDoc(await userDoc(BACKUPS, id));
 }
 
 async function prune(): Promise<void> {
@@ -223,12 +223,12 @@ async function prune(): Promise<void> {
 }
 
 async function readSnapshot(id: string): Promise<Snapshot> {
-  const metaSnap = await getDoc(userDoc(BACKUPS, id));
+  const metaSnap = await getDoc(await userDoc(BACKUPS, id));
   if (!metaSnap.exists()) throw new Error('Kopia nie istnieje');
   const meta = metaSnap.data() as BackupMeta;
   let json = '';
   for (let i = 0; i < meta.chunks; i++) {
-    const c = await getDoc(userSubdoc(BACKUPS, id, 'chunks', String(i)));
+    const c = await getDoc(await userSubdoc(BACKUPS, id, 'chunks', String(i)));
     json += (c.data() as { d?: string } | undefined)?.d ?? '';
   }
   return JSON.parse(json) as Snapshot;
@@ -238,7 +238,7 @@ async function readSnapshot(id: string): Promise<Snapshot> {
 // data is never momentarily empty, then delete ids that aren't in the backup).
 async function replaceCollection(col: string, items: any[]): Promise<void> {
   const keepIds = new Set(items.map(it => it.id));
-  const current = await getDocs(userCol(col));
+  const current = await getDocs(await userCol(col));
 
   let batch = writeBatch(db);
   let ops = 0;
@@ -246,7 +246,7 @@ async function replaceCollection(col: string, items: any[]): Promise<void> {
 
   for (const it of items) {
     const { id, ...rest } = it;
-    batch.set(userDoc(col, id), strip(rest));
+    batch.set(await userDoc(col, id), strip(rest));
     if (++ops >= 450) await flush();
   }
   for (const d of current.docs) {

@@ -46,7 +46,7 @@ export async function runSelfTest(): Promise<SelfCheck[]> {
     if (!auth.currentUser) {
       out.push({ name: 'Chmura (Firestore)', ok: true, detail: 'niezalogowany — pominięto (dane lokalne działają)' });
     } else {
-      await withTimeout(getDocs(query(userCol('expenses'), limit(1))), 6000);
+      await withTimeout(getDocs(query(await userCol('expenses'), limit(1))), 6000);
       out.push({ name: 'Chmura (Firestore)', ok: true, detail: 'połączenie OK — plan Spark w zupełności wystarcza' });
     }
   } catch (e: any) {
