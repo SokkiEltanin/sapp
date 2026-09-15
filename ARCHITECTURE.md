@@ -2974,13 +2974,19 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/
-  `SettingsItem` w `src/types/settings.ts`; generyczny render `SettingsRow`/`SettingsSectionView`
-  w `src/components/settings/`; wyszukiwarka (pasek + AND-match po słowach kluczowych,
+  `SettingsItem` w `src/types/settings.ts`; generyczny render `SettingsRow` w
+  `src/components/settings/`; wyszukiwarka (pasek + AND-match po słowach kluczowych,
   diakrytyki-insensitive) w `src/utils/settingsSearch.ts` (`normalizeSearch`/`filterSections`,
   testy w `__tests__/settingsSearch.test.ts`). Każdy wiersz ma `title`/`subtitle`/`keywords` w
   JEDNYM miejscu (manifest w `settings.tsx`) — to jest zamierzony punkt pod przyszłe języki:
-  string do zmiany żyje w jednym polu, nie trzeba go szukać w JSX. `BackupSection` jest
-  wyjątkiem — zawsze widoczna, nie przechodzi przez filtr wyszukiwania (ma własny nagłówek).
+  string do zmiany żyje w jednym polu, nie trzeba go szukać w JSX. **Nawigacja (§100,
+  2026-09-15)**: bez wyszukiwania ekran to menu kategorii (`SettingsCategoryRow`, jeden
+  wiersz na sekcję) — kliknięcie otwiera PEŁNĄ podstronę tej sekcji (`activeSectionId`
+  state, sprzętowy „wstecz" na Androidzie wraca do menu zamiast wyjść z Ustawień), nie
+  akordeon rozwijany w miejscu. `SettingsSectionView` (akordeon) żyje dalej, ale tylko
+  jako renderer WYNIKÓW WYSZUKIWANIA (zawsze `forceOpen`) — poza tym nieużywany.
+  `BackupSection`/`UsageStatsSection` nie są już zawsze-widoczne — mieszkają na końcu
+  podstrony sekcji `'dane'`.
 
 ## 11. Pułapki, które psują build (CZYTAJ ZANIM COŚ ZMIENISZ)
 
@@ -3034,7 +3040,10 @@ połowicznie podpiętej.
    render: () => (...) }` z własnym JSX (korzysta z `styles`/`colors` z domknięcia) — nadal
    wymaga `title`+`keywords`, żeby wyszukiwarka go znalazła, mimo że nie renderuje ich sama.
 3. Nowa sekcja → dopisz wpis do tablicy `sections` (id/title/icon/color/keywords/items) —
-   pojawi się automatycznie w liście i w wyszukiwarce, nic więcej nie trzeba podpinać.
+   pojawi się automatycznie jako wiersz w menu głównym Ustawień I w wyszukiwarce, nic
+   więcej nie trzeba podpinać (patrz §100 — menu→podstrona, nie akordeon). `defaultOpen`
+   nie ma już praktycznego znaczenia poza wynikami wyszukiwania (zawsze wymuszone otwarte)
+   — można go pominąć w nowych sekcjach.
 
 ## 13. Optymalizacja wydajności — 2026-09-02
 
@@ -7223,6 +7232,85 @@ sama płatność po kilku akceptacjach (sklep "nauczony") → kolejny wpis "nauc
 (5) sprawdź że nagłówki grup ("Rozwiązywanie problemów i test" / "Szablony i dopasowania"
 / "Historia") wizualnie rozdzielają sekcję i nie ma podwójnych linii/dziwnych odstępów;
 (6) "Wyczyść historię" faktycznie czyści listę i nie rusza zapisanych szablonów/wydatków.
+
+---
+
+## 100. Sprzątanie Ustawień, runda 3: menu → podstrona zamiast akordeonu (nawigacja jak na Androidzie)
+
+User (item #5 z tej samej wiadomości co §98/§99), dosłownie dał dwie opcje: *"w
+USTAWIENIACH > KOPIA ZAPASOWA CHMURA (zakłądka się nie chowa zawsze jest otawrta może
+sie zwijać do zakładki DANE) albo wgle ustawienia zrobmy że po kliknięciu dane przenosi
+nas jak na androidzie do kolejnej storny z ustawieniami gdzie o bedzie bo rozwijane
+rzeczy tez wprowadzaja chaossu troche"*. Zapytany (AskUserQuestion: A = zwiń tylko
+backup do akordeonu Dane / B = pełny redesign nawigacji / C = hybryda) — user wybrał
+**B: pełny redesign**.
+
+**Co się zmieniło.** `app/settings.tsx` bez wyszukiwania renderował płaską listę
+akordeonów (`SettingsSectionView`, każda sekcja rozwijana w miejscu) + `BackupSection`
+zawsze rozwinięta między sekcją "Dane" a "Konto". Teraz: ekran główny to MENU —
+jeden wiersz na sekcję (`SettingsCategoryRow`: ikona, tytuł, liczba opcji, chevron),
+kliknięcie otwiera PEŁNĄ podstronę tej JEDNEJ sekcji (nagłówek zmienia się na jej
+tytuł, treść to jej `items` renderowane przez `SettingsRow` w zwykłej, nieskładanej
+karcie). Sprzętowy przycisk "wstecz" na Androidzie (`BackHandler`) w trybie podstrony
+wraca do menu zamiast wyjść z Ustawień; wraca też przycisk `‹` w nagłówku (ten sam
+element UI, dwie role zależnie od stanu). `BackupSection`/`UsageStatsSection`
+przeniesione na koniec podstrony `'dane'` — dokładnie rozwiązuje to pierwszą,
+mniejszą opcję usera (backup już nie stoi zawsze otwarty, zajmując miejsce), przy
+okazji zrealizowaną w ramach wybranej dużej.
+
+**Jak to zaimplementowane — BEZ ekstrakcji hooków do osobnych plików.** Rozważona
+była "prawdziwa" wersja: osobne trasy `app/settings/index.tsx` + `app/settings/[id].tsx`
+z całą logiką (~150 hooków: work settings, pracodawcy, bank rules, budżety, Google
+sign-in…) wyciągniętą do współdzielonego hooka. Odrzucona — zamontowanie DWÓCH
+instancji tego hooka jednocześnie (menu + podstrona, gdy nawigujesz w sekcję) uruchamia
+KAŻDY efekt dwa razy równolegle, w tym realny precedens buga w tym samym pliku
+(wyścig przy pierwszym ładowaniu pracodawców, `workService.ts`/`settings.tsx` — patrz
+wpis w spisie błędów) oraz co najmniej jeden efekt z jednorazowym `Alert.alert` po
+AsyncStorage-guard (`work_confirm_asked`), który przy podwójnym mount mógłby pokazać
+się dwa razy. Zamiast tego: **jeden komponent, jeden mount, przełącznik widoku**.
+Cała tablica `sections` (linie ~740–2160) zostaje DOKŁADNIE jak była — wszystkie hooki,
+cały stan, wszystkie handlery, bez zmian. Zmieniony jest WYŁĄCZNIE render na końcu
+(`return (...)`): nowy stan `activeSectionId` (`null` = menu, `id` = podstrona),
+`openSection`/`closeSection` (haptyka + `LayoutAnimation` fade, ten sam wzorzec co
+istniejący toggle akordeonu w `SettingsSectionView`) + `scrollRef.current?.scrollTo({y:0})`
+przy każdym przełączeniu (bez tego stary scroll offset menu zostawał, podstrona
+renderowała się "wjechana" w środek ekranu). To realna, świadoma różnica względem
+prawdziwych, natywnych podstron: BRAK gestu "swipe z krawędzi żeby wrócić" (tylko
+przycisk `‹`/sprzętowy wstecz) — react-navigation daje to za darmo tylko prawdziwym
+ekranom w stosie, nie ręcznemu przełącznikowi widoku w jednym komponencie. Ryzyko
+uznane za akceptowalne: user prosił o "kliknięcie → osobna strona" (wygląd/strukturę),
+nie explicité o gest swipe'a.
+
+**Wyszukiwanie nietknięte.** Gdy `query` niepuste, ekran nadal renderuje
+`SettingsSectionView` per dopasowana sekcja z `forceOpen` (jak dotąd) — spłaszczona
+lista trafień, nie menu kategorii do przeklikania. `SettingsSectionView` (akordeon)
+żyje dalej wyłącznie w tej roli; poza nią już nieużywany (`defaultOpen` na sekcjach
+stał się kosmetycznie martwy — akceptowalne, nie usunięte z typu).
+
+**`headerRight` (przycisk "Zapisz" w sekcji budżetu) przeniesiony** z nagłówka
+akordeonu na osobny wiersz nad kartą itemów podstrony — jedyna sekcja która go
+używała (`'budzet'`), zachowanie identyczne, tylko inne miejsce.
+
+**Explicite NIE zrobione**: prawdziwy natywny swipe-back gest (patrz wyżej); żadna
+sekcja nie dostała dedykowanej trasy `expo-router` — to wciąż jeden plik, jeden
+komponent. Panel "Statystyki" (item #3) i zarządzanie powiadomieniami (item #4) wciąż
+czekają — teraz łatwiej się w nie wpina (każda nowa/duża sekcja od razu dostaje pełną
+podstronę za darmo, bez osobnej decyzji o UI).
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów bez zmian (czysto UI/nawigacja —
+`settingsSearch.test.ts` w tym bez zmian, bo `filterSections` nietknięty).
+
+**Priorytet testu na urządzeniu** (to jest największa zmiana UX tej sesji — testuj
+uważnie): (1) ekran główny Ustawień pokazuje listę kategorii, nie rozwinięte sekcje;
+(2) kliknięcie kategorii otwiera pełną podstronę z poprawnym tytułem w nagłówku;
+(3) sprzętowy przycisk wstecz na Androidzie z otwartej podstrony wraca do MENU, nie
+wychodzi z Ustawień — dopiero drugie wciśnięcie (już w menu) wychodzi; (4) przycisk
+`‹` w nagłówku robi to samo co sprzętowy wstecz; (5) "Dane" pokazuje 4 liczniki +
+Kopię zapasową + Statystyki apki pod spodem, wszystko działa (utwórz/przywróć kopię,
+eksport JSON/CSV); (6) "Budżet miesięczny" — przycisk "Zapisz" nad listą kategorii
+nadal zapisuje budżety; (7) wyszukiwarka (wpisz cokolwiek w polu na głównym ekranie)
+nadal pokazuje spłaszczone trafienia jak dawniej, nie menu kategorii; (8) scroll nie
+"skacze" dziwnie przy wejściu/wyjściu z podstrony.
 
 ---
 

@@ -3,30 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sprzątanie Ustawień — runda 2 z 5 zrobiona (bank overhaul), 3 duże zostają (2026-09-15)
+## 🆕 Sprzątanie Ustawień — runda 3 z 5 zrobiona (nawigacja menu→podstrona), 2 duże zostają (2026-09-15)
 
 User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku, przesłany
 dwukrotnie). Runda 1 (§98): "Pytaj o wypłatę" domyślnie wyłączone, martwy przełącznik
-"Ogranicz animacje" usunięty, sekcja "Więcej" → "Skróty". **Runda 2 (§99, ta sesja)**:
-overhaul sekcji "Auto-wydatki z banku" — nowa "Historia odczytów" (`BankHistorySection.tsx`,
-log w `bankQueueStore.history`, capped 150), nowe pole `matchedSource` na każdym wpisie
-pokazujące skąd wzięła się kategoria ("wg szablonu"/"nauczony sklep"/"zgadywane"), trzy
-nagłówki grupujące resztę sekcji (Rozwiązywanie problemów i test / Szablony i dopasowania /
-Historia) zamiast jednej ściany tekstu. Kod pipeline'u (`bankIngest.ts`,
-`bankAutoProcess.ts`) przejrzany — bez znalezionych błędów, ale NIE testowane na
-urządzeniu z prawdziwymi powiadomieniami — patrz priorytet testu w §99.
+"Ogranicz animacje" usunięty, sekcja "Więcej" → "Skróty". Runda 2 (§99): overhaul sekcji
+"Auto-wydatki z banku" — "Historia odczytów", pole `matchedSource`, grupujące nagłówki.
+**Runda 3 (§100, ta sesja)**: pełny redesign nawigacji Ustawień — user wybrał (przez
+AskUserQuestion) opcję "B" z trzech: cały ekran główny to teraz MENU kategorii zamiast
+listy akordeonów; kliknięcie kategorii otwiera pełną podstronę (nagłówek + sprzętowy
+"wstecz" na Androidzie wraca do menu). `BackupSection`/`UsageStatsSection` przeniesione z
+"zawsze widoczne" do końca podstrony "Dane" — to też rozwiązuje starszy, mniejszy
+zgłoszony problem ("zakładka się nie chowa"). Zaimplementowane BEZ rozbijania pliku na
+osobne trasy (ryzyko podwójnego mountu ~150 hooków) — jeden komponent, przełącznik
+widoku, `SettingsSectionView`/akordeon żyje dalej tylko dla wyników wyszukiwania. Pełny
+opis + świadomie NIE zrobione (brak natywnego swipe-back gestu) w §100. **To największa
+zmiana UX tej sesji — priorytet testu na urządzeniu, patrz checklist w §100.**
 
-**Zostają do zrobienia (3 większe, każde osobnym PR-em)**:
+**Zostają do zrobienia (2 większe, każde osobnym PR-em)**:
 1. **Panel "Statystyki"** w Ustawieniach — pełny ekran z wykresami W CZASIE (kiedy/ile
    razy korzystam z czego). Obecny `usageStatsStore.ts` ma TYLKO agregat
    `{count, lastOpenedAt}` per ekran — żadnej historii per-otwarcie, więc wymaga
-   rozszerzenia modelu danych (log zdarzeń z limitem) zanim da się rysować wykresy.
-2. **"Kopia zapasowa (chmura)"** — dziś zawsze rozwinięta, poza mechanizmem
-   akordeonu reszty Ustawień (user: "zakładka się nie chowa"). Zwinąć do "Dane" albo
-   przenieść na osobną podstronę (user zaproponował wzorzec android-owy: kliknięcie
-   sekcji → osobny ekran, zamiast rozwijania w miejscu — "rozwijane rzeczy też
-   wprowadzają chaos").
-3. **Zarządzanie powiadomieniami w apce** — user: niejasne kiedy dane powiadomienie
+   rozszerzenia modelu danych (log zdarzeń z limitem) zanim da się rysować wykresy. Teraz
+   dostanie od razu pełną podstronę za darmo (§100), bez osobnej decyzji o UI.
+2. **Zarządzanie powiadomieniami w apce** — user: niejasne kiedy dane powiadomienie
    przyjdzie + chce personalizacji wyglądu KAŻDEGO typu osobno. Istnieje już
    `/notifications` (link "Zarządzaj powiadomieniami" w Ustawieniach) — sprawdzić co
    tam jest, zanim projektować rozszerzenie.

@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { computePayMonths } from '@/utils/workSummary';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -65,7 +65,9 @@ import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef } from '@/types/settings';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
+import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
+import { plPlural } from '@/utils/plural';
 
 GoogleSignin.configure({
   webClientId: '1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com',
@@ -101,6 +103,38 @@ function HeroStepper({ label, value, onDec, onInc }: { label: string; value: str
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// Ustawienia, przebudowa nawigacji (2026-09-15, user: "wgle ustawienia zrobmy że po
+// kliknięciu dane przenosi nas jak na androidzie do kolejnej storny z ustawieniami...
+// bo rozwijane rzeczy tez wprowadzaja chaossu") — jeden wiersz-kategoria w menu głównym
+// Ustawień, zamiast akordeonu który rozwijał się w miejscu. Kliknięcie woła
+// `openSection(section.id)` w `SettingsScreen` niżej, który przełącza widok na pełną
+// podstronę tej sekcji (patrz stan `activeSectionId`).
+function SettingsCategoryRow({ section, onPress }: { section: SettingsSectionDef; onPress: () => void }) {
+  const c = useColors();
+  const Icon = section.icon;
+  return (
+    <PressableScale onPress={onPress}>
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+        backgroundColor: c.bg.card, borderRadius: radius.xl,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+        padding: spacing[4],
+      }}>
+        <View style={{ width: 34, height: 34, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: section.color + '1A' }}>
+          <Icon size={17} color={section.color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: c.text.primary }}>{section.title}</Text>
+          <Text style={{ fontSize: 11, color: c.text.muted, marginTop: 1 }}>
+            {plPlural(section.items.length, 'opcja', 'opcje', 'opcji')}
+          </Text>
+        </View>
+        <ChevronLeft size={16} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+      </View>
+    </PressableScale>
+  );
 }
 
 export default function SettingsScreen() {
@@ -735,6 +769,29 @@ export default function SettingsScreen() {
   // carry title/keywords so search reaches them, they just own their layout.
   const [query, setQuery] = useState('');
   const workMode = workSettings.workMode ?? 'calendar';
+
+  // Nawigacja po kategoriach (2026-09-15, §100) — `null` = menu główne, id = pełna
+  // podstrona tej sekcji. Sprzętowy przycisk "wstecz" na Androidzie ma wrócić do menu,
+  // nie wyjść z Ustawień, dopóki jakaś sekcja jest otwarta.
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const openSection = (id: string) => {
+    haptic.tap();
+    LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'));
+    setActiveSectionId(id);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+  const closeSection = () => {
+    haptic.tap();
+    LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'));
+    setActiveSectionId(null);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !activeSectionId) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeSection(); return true; });
+    return () => sub.remove();
+  }, [activeSectionId]);
 
   const sections: SettingsSectionDef[] = [
     {
@@ -2107,73 +2164,85 @@ export default function SettingsScreen() {
     },
   ];
 
-  // BackupSection always renders (it's not collapsible today, and it has its own
-  // header) — so it stays outside search filtering, positioned where it always
-  // was: right after "Dane", before "Konto".
-  const BACKUP_AFTER_ID = 'dane';
   const filtered = filterSections(sections, query);
-  const backupIdx = sections.findIndex(s => s.id === BACKUP_AFTER_ID);
-  const beforeBackupIds = new Set(sections.slice(0, backupIdx + 1).map(s => s.id));
-  const filteredBeforeBackup = filtered.filter(f => beforeBackupIds.has(f.section.id));
-  const filteredAfterBackup = filtered.filter(f => !beforeBackupIds.has(f.section.id));
+  const searching = query.trim().length > 0;
+  const activeSection = activeSectionId ? sections.find(s => s.id === activeSectionId) ?? null : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+      {/* Header — podwójna rola: menu główne Ustawień (tytuł "Ustawienia", wstecz =
+          opuść ekran) albo pojedyncza podstrona (tytuł sekcji, wstecz = wróć do menu). */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.backBtn}>
+        <PressableScale onPress={() => { if (activeSection) closeSection(); else router.back(); }} style={styles.backBtn}>
           <ChevronLeft size={22} color={colors.text.secondary} />
         </PressableScale>
-        <Text style={styles.headerTitle}>Ustawienia</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{activeSection ? activeSection.title : 'Ustawienia'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {activeSection ? (
+          <>
+            {activeSection.headerRight && (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing[2] }}>
+                {activeSection.headerRight}
+              </View>
+            )}
+            <View style={styles.card}>
+              {activeSection.items.map((item, i) => <SettingsRow key={item.id} item={item} first={i === 0} />)}
+            </View>
+            {/* "Kopia zapasowa" nie stoi już zawsze rozwinięta na głównej liście (2026-09-15,
+                §100, user: "zakłądka się nie chowa zawsze jest otawrta") — mieszka teraz w
+                podstronie "Dane", razem ze statystykami lokalnymi. */}
+            {activeSection.id === 'dane' && (
+              <View>
+                <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
+                <UsageStatsSection />
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.searchWrap}>
+              <LucideIcons.Search size={15} color={colors.text.muted} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Szukaj w ustawieniach…"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="none"
+                style={styles.searchInput}
+              />
+              {query.length > 0 && (
+                <PressableScale onPress={() => setQuery('')} style={styles.searchClear}>
+                  <LucideIcons.X size={15} color={colors.text.muted} />
+                </PressableScale>
+              )}
+            </View>
 
-        <View style={styles.searchWrap}>
-          <LucideIcons.Search size={15} color={colors.text.muted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Szukaj w ustawieniach…"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            style={styles.searchInput}
-          />
-          {query.length > 0 && (
-            <PressableScale onPress={() => setQuery('')} style={styles.searchClear}>
-              <LucideIcons.X size={15} color={colors.text.muted} />
-            </PressableScale>
-          )}
-        </View>
+            {searching && filtered.length === 0 && (
+              <Text style={styles.searchEmpty}>Nic nie znaleziono dla „{query.trim()}". Spróbuj innego słowa.</Text>
+            )}
 
-        {query.trim().length > 0 && filtered.length === 0 && (
-          <Text style={styles.searchEmpty}>Nic nie znaleziono dla „{query.trim()}". Spróbuj innego słowa.</Text>
+            {searching ? (
+              // Szukając, rozwiń dopasowane pozycje wprost na liście (jak dotąd) — dopiero
+              // przeglądanie bez wyszukiwania idzie przez podstrony niżej. Wyszukiwarka i
+              // tak wymaga precyzyjnie WSKAZANEGO ustawienia, nie kategorii do przeklikania.
+              filtered.map(f => (
+                <SettingsSectionView
+                  key={f.section.id}
+                  section={f.section}
+                  items={f.matchedItemIds ? f.section.items.filter(i => f.matchedItemIds!.has(i.id)) : f.section.items}
+                  forceOpen
+                />
+              ))
+            ) : (
+              sections.map(section => (
+                <SettingsCategoryRow key={section.id} section={section} onPress={() => openSection(section.id)} />
+              ))
+            )}
+          </>
         )}
-
-        {filteredBeforeBackup.map(f => (
-          <SettingsSectionView
-            key={f.section.id}
-            section={f.section}
-            items={f.matchedItemIds ? f.section.items.filter(i => f.matchedItemIds!.has(i.id)) : f.section.items}
-            forceOpen={query.trim().length > 0}
-          />
-        ))}
-
-        <View>
-          <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
-          <UsageStatsSection />
-        </View>
-
-        {filteredAfterBackup.map(f => (
-          <SettingsSectionView
-            key={f.section.id}
-            section={f.section}
-            items={f.matchedItemIds ? f.section.items.filter(i => f.matchedItemIds!.has(i.id)) : f.section.items}
-            forceOpen={query.trim().length > 0}
-          />
-        ))}
-
       </ScrollView>
 
       <ConfirmDialog
