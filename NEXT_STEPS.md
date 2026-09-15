@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: tło lokacji misji trafiało za GearPanel zamiast tylko do paska ładowania (2026-09-15)
+
+Pełny opis w ARCHITECTURE.md §107. Art `LOKALIZACJA_LODOWA.png` (i przyszłe lokacje pod
+kolejnych minibossów) renderował się jako tło CAŁEJ sceny Pupila (za kotkiem + 6 slotami
+ekwipunku) zamiast tylko wewnątrz paska postępu misji, jak zamierzone ("ładuje się
+kraina X"). Przeniesione do `s.missionBarTrack` w `app/pet.tsx` — `tsc`/`jest` czyste.
+Do zrobienia (przez usera, na urządzeniu): otworzyć misję do Lodowej Krainy, sprawdzić że
+tło widać TYLKO w pasku "1:XX:XX", a scena z kotkiem/ekwipunkiem jest znów czysta.
+
+## 🆕 W trakcie: statystyki otwierania skrzynek (Rynek/pet-shop) per typ skrzynki
+
+User: *"niech mi tez da statystyki tam otwierania skrzynek (procentowe, zysk,strata itp
+itd zeby balansować trochę pozniej... ale to nic nie zmieniaj ja pootwieram ze
+statystykami podzielonym per skrzynka zeby wiedzieć jak balansować nie q ciemno"*.
+Czysto addytywna instrumentacja (log + ekran statystyk) dla `src/utils/petBoxes.ts`
+(`sardine`/`iron`/`gold`/`divine`) — **żadna wartość ekonomii (koszt, szanse, zakresy
+monet) nie może się zmienić w ramach tego zadania**. Wzorzec: capped event-log jak
+`usageStatsStore.events`/`bankQueueStore.history`. Jeszcze nie zaimplementowane — patrz
+konwersacja po szczegóły integracji (punkt wywołania `rollBox()` w `petStore.ts`).
+
 ## ✅ Audyt bezpieczeństwa — keystore zrotowany, 1 punkt zostaje (2026-09-15)
 
 Pełny opis w ARCHITECTURE.md §105. User potwierdził: apka NIE jest na Play Store (tylko

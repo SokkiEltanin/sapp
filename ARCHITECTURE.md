@@ -7674,6 +7674,26 @@ zrobić kopię zapasową w apce (Ustawienia → Dane → Kopia zapasowa — dane
 chmurze Firestore, więc to tylko dodatkowe zabezpieczenie); (2) odinstalować obecną
 apkę; (3) zainstalować nowy APK, zalogować się tym samym kontem Google.
 
+## 107. Fix: tło lokacji misji (§na 2026-09-14) trafiało za GearPanel zamiast do paska ładowania
+
+User (ze screenshotem ekranu Pupila w trakcie misji "Lodowa Kraina"): *"I te obrazy miały
+być tylko w tym pasku ładowania jakby że się ładuje lodowa kraina a nie w tle xd"*.
+
+**Bug.** `LOKALIZACJA_LODOWA.png` (dodany 2026-09-14, §wpis w tym pliku wyżej) renderował
+się jako `StyleSheet.absoluteFillObject` na CAŁYM `s.stage` (300px, cała scena z kotkiem
++ 6 slotami `GearPanel`) — czyli tło zalewało też ekwipunek, mimo że miało być tylko
+dekoracją paska postępu misji ("ładuje się kraina X").
+
+**Fix** (`app/pet.tsx`): przeniesiony art + scrim z `s.stage` do wnętrza
+`s.missionBarTrack` (sam pasek postępu, ma już `overflow:'hidden'` + zaokrąglone rogi —
+idealny kontener bez dodatkowych stylów). Renderuje się tam jako tekstura toru, pod
+niebieskim `missionBarFillWrap` — wypełnienie "odsłania" resztę paska w miarę postępu,
+dokładnie efekt "ładowania krainy" o który chodziło. Scena z kotkiem/gearem wróciła do
+czystego wyglądu sprzed 2026-09-14 (bez tła za sobą), niezależnie od tego czy dla danego
+minibossa istnieje dedykowany art (`missionLocationBg` dalej może zwrócić `undefined` —
+wtedy pasek wygląda jak zawsze, `c.bg.elevated`). Zero zmian w `minibosses.ts` czy w
+logice doboru arta — tylko przeniesienie renderowania.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
