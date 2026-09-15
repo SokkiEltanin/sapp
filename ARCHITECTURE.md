@@ -7013,6 +7013,83 @@ quest/MAD/misja) kotek i boss powinni stać wyraźnie NIŻEJ, w dolnej części 
 pod dokowanym paskiem WALCZ na dole przy krótkiej ORAZ długiej treści (dużo linijek
 mechaniki naraz).
 
+## 97. Cold start: cały ekran przestał czekać na Firebase auth przed pierwszym renderem
+
+User: *"nadal aplikacja bardzo laguje na wejściu, wszystko zoptymalizowaliśmy... co trzeba
+zrobić?"* — po wcześniejszych rundach optymalizacji dashboardu (staged render §4, cache
+"Roku w pikselach" §5, kilka fixów O(n²)) subiektywny lag na wejściu WCIĄŻ był odczuwalny.
+Zamiast zgadywać kolejną optymalizację, sprawdzony **realny** licznik cold-startu
+(`perfLog.ts`, Ustawienia → Diagnostyka) — user przesłał zrzut: średnia z 20 uruchomień
+**1508ms do 1. klatki dashboardu, 1793ms w pełni gotowy**. Różnica między tymi dwiema
+liczbami to tylko ~285ms — czyli staged/deferred rendering z §4 realnie działa, cały problem
+siedział PRZED pierwszą klatką, nie w niej.
+
+**Diagnoza.** `app/_layout.tsx` owijał CAŁY `<Stack>` (czyli KAŻDY ekran apki) w
+`{authReady && (...)}` — `authReady` czekał na pełny round-trip `onAuthStateChanged`/
+`signInAnonymously` przez Firebase Auth SDK (odczyt sesji z AsyncStorage + ewentualny
+network call dla świeżego anonimowego konta), z fallbackiem do 4s jeśli się zatnie. Dopóki
+to się nie skończyło, żaden ekran — nawet dashboard — nie mógł się w ogóle zamontować,
+niezależnie od tego jak szybko renderowałby się sam w sobie. `AnimatedSplash` (czysto
+kosmetyczny, "lag-proof by design", bez własnej zależności od danych) tylko WIZUALNIE
+maskował ten czas — realny powód czekania to Firebase, nie sam splash.
+
+**Fix — przenieś czekanie z "blokuje render" na "blokuje konkretne zapytanie".**
+`src/services/firebase.ts`: nowa, memoizowana `whenAuthReady(): Promise<void>` (dokładnie
+ta sama logika `onAuthStateChanged`/`signInAnonymously`/4s-fallback co dawniej w
+`_layout.tsx`, przeniesiona tu jako jedno, dzielone źródło prawdy). `uid()` — dawniej
+SYNCHRONICZNA funkcja rzucająca `'Not authenticated'` jeśli `auth.currentUser` jeszcze nie
+istniał (co wymuszało zewnętrzny gate, żeby cokolwiek jej używające nigdy nie odpaliło się
+za wcześnie) — jest teraz `async`, `await whenAuthReady()` PRZED odczytem
+`auth.currentUser`. `userCol`/`userDoc`/`userSubcol`/`userSubdoc` (budują referencje
+Firestore z `uid()`) są teraz też `async` — każde dotychczasowe wywołanie (zawsze już
+wewnątrz funkcji `async`, zawsze już przekazywane prosto do `query()`/`addDoc()`/
+`updateDoc()`/`deleteDoc()`/`getDoc()`/`getDocs()`/`setDoc()`/`batch.set()`, które i tak są
+`await`owane) dostało `await` przed sobą — **mechaniczna, zweryfikowana przez `tsc`
+zmiana**: przepuszczenie kompilatora przez cały projekt po zmianie typu na `Promise<...>`
+wyłapało WSZYSTKIE 60 miejsc do poprawki w 10 plikach serwisów (`backupService`/
+`calendarService`/`debtsService`/`expensesService`/`maintenanceService`/`moodService`/
+`subscriptionsService`/`templatesService`/`vehiclesService`/`workService`) +
+`selfTest.ts` — żadne nie zostało pominięte ręcznym grep-em, kompilator by nie pozwolił.
+Efekt: każdy odczyt/zapis do Firestore teraz PO PROSTU CZEKA na auth tyle ile potrzeba,
+zamiast rzucać błąd jeśli odpali się za wcześnie — więc zdjęcie zewnętrznego gate'u jest
+bezpieczne, żadnego wyścigu do przegrania.
+
+**Wyjątek — `expensesService.newId()` ZOSTAJE synchroniczna.** Ta funkcja celowo generuje
+offline-safe id BEZ dotykania sieci (żeby dało się zaktualizować lokalny store i
+nawigować dalej bez czekania na `add()`, patrz oryginalny komentarz o "czarnym ekranie"
+przy skanowaniu paragonu). Zrobienie jej `async` (żeby zaczekać na `userCol`) zmusiłoby OBA
+miejsca wywołania (`expenses/scan.tsx`/`manual.tsx`) do `await`owania jej, dokładnie
+niwecząc ten cel. Zamiast tego: `doc(collection(db, COL)).id` — throwaway referencja BEZ
+prawdziwego `uid()`, bo losowe id Firestore i tak nie zależy od ścieżki kolekcji. Bezpieczne
+i BARDZIEJ odseparowane od auth niż wcześniej, nie mniej.
+
+**`app/_layout.tsx`**: `<Stack>` renderuje się teraz BEZWARUNKOWO (usunięty
+`{authReady && (...)}`). `AnimatedSplash` odpięty od `authReady` — znika po samym,
+stałym `minSplashDone` (1500ms brandingu), niezależnie od tego jak długo trwa auth w tle;
+`authReady` state zostaje TYLKO dla dwóch efektów które jawnie na niego czekają (auto-backup,
+prompt przywrócenia kopii) i koloru StatusBar podczas splasha.
+
+**Explicite NIE zrobione**: żadna próba przyspieszenia SAMEGO Firebase SDK (poza zakresem —
+to należy do biblioteki, nie do tego kodu); żadna migracja na inny auth provider; deferred
+sections z §4 (już działały dobrze, nietknięte).
+
+`tsc --noEmit` czyste (zero błędów po całym przepisaniu — dowód że żadne wywołanie
+`userCol`/`userDoc`/`userSubcol`/`userSubdoc` nie zostało pominięte). `jest`: 72 suity/958
+testów (bez nowych — projekt nie mockuje Firestore, żaden test nie dotyka tych serwisów
+bezpośrednio; poprawność zweryfikowana przez wyczerpujące przejście kompilatora + ręczny
+przegląd wszystkich 60 zmienionych miejsc).
+
+**Priorytet testu na urządzeniu — TO JEST GŁÓWNA ZMIANA DO SPRAWDZENIA**: (1) zamknij i
+otwórz apkę od zera kilka razy → Ustawienia → Diagnostyka → licznik startu powinien pokazać
+WYRAŹNIE niższe `msToFirstFrame` niż dotychczasowa średnia ~1508ms; (2) sprawdź że dane
+(wydatki/zadania/eventy/nastrój/itd.) NADAL poprawnie się ładują na każdym z ekranów mimo że
+teraz montują się wcześniej — powinny po prostu pojawić się chwilę po pierwszym renderze,
+nie zniknąć/zostać puste na stałe; (3) dodaj nowy wydatek/zadanie zaraz po otwarciu apki
+(zanim auth na pewno się rozwiąże) → sprawdź że zapis faktycznie trafia do chmury (nie tylko
+lokalnie) — to jest DOKŁADNIE scenariusz który ta zmiana miała zabezpieczyć; (4) słaby/
+wyłączony internet przy starcie → apka powinna pokazać się i działać lokalnie normalnie
+(offline-first), auth/sync dogoni później jak zawsze.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

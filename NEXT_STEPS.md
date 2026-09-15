@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Cold start: Stack nie czeka już na Firebase auth — PRIORYTET testu (2026-09-15)
+
+User: *"nadal aplikacja bardzo laguje na wejściu... czy trzeba co zrobić?"* — Diagnostyka
+(licznik startu w Ustawieniach) pokazała REALNĄ przyczynę: średnio ~1508ms do 1. klatki
+dashboardu, z czego dosłownie WSZYSTKO to czekanie na `_layout.tsx`, które blokowało CAŁY
+`<Stack>` (każdy ekran) za rozwiązaniem Firebase auth, zanim cokolwiek mogło się w ogóle
+zamontować. Pełny opis w ARCHITECTURE.md §97. Skrót: auth resolution przeniesione do
+`firebase.ts` jako `whenAuthReady()`, `uid()`/`userCol`/`userDoc`/`userSubcol`/`userSubdoc`
+są teraz `async` i CZEKAJĄ na auth WEWNĄTRZ siebie zamiast rzucać błąd jeśli odpalą się za
+wcześnie — więc `<Stack>` może renderować się natychmiast, bez zewnętrznego gate'u. 60
+miejsc w 10 plikach serwisów zaktualizowanych, wszystkie zweryfikowane przez `tsc` (zero
+błędów po zmianie).
+
+**PRIORYTET testu na urządzeniu — to duża zmiana architektoniczna, sprawdź dokładnie**:
+(1) Ustawienia → Diagnostyka → nowy czas startu powinien być WYRAŹNIE niższy niż stara
+średnia ~1508ms; (2) każdy ekran (Finanse/Kalendarz/Zadania/Nastrój/Pojazdy/itd.) nadal
+poprawnie ładuje dane z chmury, tylko chwilę PO pierwszym renderze zamiast przed nim; (3)
+dodaj coś zaraz po otwarciu apki (zanim auth na pewno się rozwiąże) → sprawdź że realnie
+zapisało się w chmurze, nie tylko lokalnie; (4) offline przy starcie → apka działa normalnie
+lokalnie, sync dogania później jak zawsze.
+
 ## 🆕 Ekran walki: kotek/boss niżej + stara arena kampanii odpięta — NIEsprawdzone (2026-09-14)
 
 User zrzutem: *"muszą być niżej żeby wyglądali jakby byli, i wywal te stara arenę i daj ten

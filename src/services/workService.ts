@@ -30,7 +30,7 @@ export const workService = {
   // ── Shifts (Firebase) ────────────────────────────────────────────────────────
 
   async getShifts(fromDate?: string, toDate?: string): Promise<WorkShift[]> {
-    let q = query(userCol(SHIFTS_COL), orderBy('date', 'desc'));
+    let q = query(await userCol(SHIFTS_COL), orderBy('date', 'desc'));
     const snap = await getDocs(q);
     let shifts = snap.docs.map(d => ({ id: d.id, ...d.data() } as WorkShift));
     if (fromDate) shifts = shifts.filter(s => s.date >= fromDate);
@@ -40,16 +40,16 @@ export const workService = {
 
   async addShift(shift: Omit<WorkShift, 'id' | 'createdAt'>): Promise<WorkShift> {
     const now = new Date().toISOString();
-    const ref = await addDoc(userCol(SHIFTS_COL), strip({ ...shift, createdAt: now }));
+    const ref = await addDoc(await userCol(SHIFTS_COL), strip({ ...shift, createdAt: now }));
     return { ...shift, id: ref.id, createdAt: now };
   },
 
   async updateShift(id: string, updates: Partial<WorkShift>): Promise<void> {
-    await updateDoc(userDoc(SHIFTS_COL, id), strip(updates));
+    await updateDoc(await userDoc(SHIFTS_COL, id), strip(updates));
   },
 
   async deleteShift(id: string): Promise<void> {
-    await deleteDoc(userDoc(SHIFTS_COL, id));
+    await deleteDoc(await userDoc(SHIFTS_COL, id));
   },
 
   // ── Settings (AsyncStorage) ──────────────────────────────────────────────────
