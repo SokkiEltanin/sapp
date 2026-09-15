@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Activity, Trash2, ChevronDown } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Activity, Trash2, ChevronDown, ChevronLeft, BarChart3 } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -52,6 +53,17 @@ export default function UsageStatsSection() {
       <Text style={s.sub}>
         Ile razy i kiedy otwierałeś poszczególne ekrany — TYLKO na tym urządzeniu, nigdzie nie wysyłane. Chcesz mi to podesłać do analizy? Użyj eksportu JSON wyżej — te dane jadą razem z resztą.
       </Text>
+
+      {/* Pełny panel (2026-09-15, §102) — user: "chciałem mieć w USTAWIENIACH > STATYSTYKI
+          PANEL cały żebym mógł wejść w niego" — wykresy w czasie (dziennie/pora dnia) +
+          pełny, nieucięty ranking. Ta karta zostaje jako szybki podgląd na miejscu. */}
+      <PressableScale onPress={() => { haptic.tap(); router.push('/usage-stats' as any); }}>
+        <View style={s.panelLinkBtn}>
+          <BarChart3 size={14} color={c.accent.blue} />
+          <Text style={s.panelLinkText}>Zobacz pełny panel</Text>
+          <ChevronLeft size={14} color={c.accent.blue} style={{ transform: [{ rotate: '180deg' }] }} />
+        </View>
+      </PressableScale>
 
       {rows.length === 0 ? (
         <Text style={s.empty}>Jeszcze za mało danych.</Text>
@@ -105,6 +117,12 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { ...typography.body, fontWeight: '700', color: c.text.primary },
   sub: { fontSize: 12, color: c.text.muted, lineHeight: 17, marginTop: -spacing[1] },
+  panelLinkBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[2], borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.accent.blue + '40', backgroundColor: c.accent.blue + '14',
+  },
+  panelLinkText: { fontSize: 12, fontWeight: '700', color: c.accent.blue },
   empty: { fontSize: 12, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[2] },
   totalLine: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
   list: { borderRadius: radius.md, overflow: 'hidden' },
