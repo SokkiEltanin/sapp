@@ -3,33 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🔴 PILNE — audyt bezpieczeństwa: hasło keystore w publicznym repo, wymaga TWOJEJ decyzji (2026-09-15)
+## ✅ Audyt bezpieczeństwa — keystore zrotowany, 1 punkt zostaje (2026-09-15)
 
-Pełny opis w ARCHITECTURE.md §105. Dwa znaleziska NIE naprawione (celowo, wymagają decyzji
-poza zakresem samej edycji kodu):
+Pełny opis w ARCHITECTURE.md §105. User potwierdził: apka NIE jest na Play Store (tylko
+GitHub + własne urządzenie), więc rotacja klucza podpisującego była bezpieczna —
+zrobiona. Nowy keystore + nowe losowe hasło wygenerowane, user zapisał je jako sekrety
+GitHub (`KEYSTORE_BASE64` zaktualizowany, nowy `ANDROID_KEYSTORE_PASSWORD` dodany),
+`build.yml` zaktualizowany żeby czytać hasło z sekretu zamiast mieć je wpisane na
+sztywno (3 miejsca). Stare hasło `sapp123release` zostaje trwale w historii gita (nie do
+wymazania bez dużo bardziej ryzykownego przepisania całej historii repo), ale nic już nim
+nie chroni — stary keystore przestał być używany.
 
-1. **`.github/workflows/build.yml` ma hardkodowane hasło do keystore'a podpisującego
-   release Androida** (`MYAPP_UPLOAD_STORE_PASSWORD`/`MYAPP_UPLOAD_KEY_PASSWORD` =
-   `sapp123release`, 3 miejsca w pliku) — w PUBLICZNYM repo. Sam plik keystore jest
-   bezpieczny (`KEYSTORE_BASE64` to prawdziwy GitHub Secret), ale hasło który go chroni
-   nie jest, i jest to teraz trwale w historii gita, widoczne dla każdego. Realna
-   naprawa = rotacja: nowy keystore + nowe hasło jako GitHub Secret zamiast literału w
-   pliku. To POTENCJALNIE ŁAMIE możliwość publikowania aktualizacji na Google Play dla
-   już opublikowanej apki (Play wymaga TEGO SAMEGO klucza podpisującego dla update'ów,
-   chyba że korzysta się z Play App Signing) — dlatego nie ruszone bez pytania. Powiedz
-   jak chcesz to rozegrać: rotować teraz, zaplanować, czy jest jakiś powód (Play App
-   Signing już aktywny?) czemu rotacja jest bezpieczna.
-2. **Reguły bezpieczeństwa Firestore nie istnieją w tym repo** (żyją w konsoli Firebase)
-   — nie dało się zweryfikować czy realnie ograniczają dostęp do `users/{uid}/...` po
-   stronie serwera. Warto sprawdzić w konsoli Firebase, że każda taka ścieżka wymaga
-   `request.auth.uid == uid`, nie tylko `request.auth != null` (apka loguje się anonimowo
-   jeśli normalny login nie zdąży w 4s, a to jest trywialnie dostępne dla każdego z
-   publicznym `apiKey` projektu).
+**PRIORYTET po następnym buildzie z GitHub Actions**: nowy APK ma INNY podpis niż
+obecnie zainstalowany na telefonie — Android nie pozwoli zainstalować go jako
+"aktualizacji" w miejscu. Trzeba: (1) zrobić kopię zapasową w apce (Ustawienia → Dane →
+Kopia zapasowa) na wszelki wypadek, choć dane i tak są w chmurze Firestore; (2)
+odinstalować obecną apkę; (3) zainstalować nowy APK i zalogować się ponownie tym samym
+kontem Google.
 
-**Zrobione w tej samej rundzie (bezpieczne, techniczne, już w PR)**: token OAuth
-Kalendarza Google wykluczony z eksportu/kopii danych (wyciekał w czystym tekście przy
-eksporcie JSON), mylący wpis `.gitignore` dla `google-services.json` (plik jest celowo
-publiczny, nie sekret) usunięty.
+**Zostaje (osobny temat, nie blokuje niczego pilnie)**: **Reguły bezpieczeństwa
+Firestore nie istnieją w tym repo** (żyją w konsoli Firebase) — nie dało się
+zweryfikować czy realnie ograniczają dostęp do `users/{uid}/...` po stronie serwera.
+Warto kiedyś sprawdzić w konsoli Firebase, że każda taka ścieżka wymaga
+`request.auth.uid == uid`, nie tylko `request.auth != null` (apka loguje się anonimowo
+jeśli normalny login nie zdąży w 4s, a to jest trywialnie dostępne dla każdego z
+publicznym `apiKey` projektu).
 
 ## 🆕 Audyt poprawności — 3 realne bugi naprawione, priorytet testu (2026-09-15)
 

@@ -62,6 +62,12 @@ jobs:
         run: cp google-services.json android/app/google-services.json
 
       - name: Setup signing keystore
+        # Hasło czytane z sekretu (2026-09-15, audyt bezpieczeństwa, patrz ARCHITECTURE.md
+        # §105) — było wpisane na sztywno w tym pliku (publiczne repo, trwale w historii
+        # gita). Keystore zrotowany (nowy plik + nowe hasło), stary klucz/hasło już nic nie
+        # chronią.
+        env:
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/sapp-release.keystore
           # Guarantee a trailing newline so appended props never merge with the
@@ -69,9 +75,9 @@ jobs:
           printf '\n' >> android/gradle.properties
           {
             echo "MYAPP_UPLOAD_STORE_FILE=sapp-release.keystore"
-            echo "MYAPP_UPLOAD_STORE_PASSWORD=sapp123release"
+            echo "MYAPP_UPLOAD_STORE_PASSWORD=${MYAPP_UPLOAD_STORE_PASSWORD}"
             echo "MYAPP_UPLOAD_KEY_ALIAS=sapp"
-            echo "MYAPP_UPLOAD_KEY_PASSWORD=sapp123release"
+            echo "MYAPP_UPLOAD_KEY_PASSWORD=${MYAPP_UPLOAD_STORE_PASSWORD}"
             echo "kotlin.jvm.target.validation.mode=warning"
           } >> android/gradle.properties
           echo "=== tail of gradle.properties ===" && tail -8 android/gradle.properties
@@ -122,7 +128,9 @@ jobs:
           cat android/app/google-services.json | grep -E "package_name|certificate_hash"
 
       - name: Print keystore SHA-1 (for verification)
-        run: keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass sapp123release 2>&1 | grep "SHA1:"
+        env:
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass "$MYAPP_UPLOAD_STORE_PASSWORD" 2>&1 | grep "SHA1:"
 
       # Pre-install the NDK explicitly, with retries + cleanup of any corrupt partial
       # download. Gradle's own auto-install has no retry, so a single bad download
