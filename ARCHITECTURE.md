@@ -7674,6 +7674,74 @@ zrobić kopię zapasową w apce (Ustawienia → Dane → Kopia zapasowa — dane
 chmurze Firestore, więc to tylko dodatkowe zabezpieczenie); (2) odinstalować obecną
 apkę; (3) zainstalować nowy APK, zalogować się tym samym kontem Google.
 
+## 107. Fix: tło lokacji misji (§na 2026-09-14) trafiało za GearPanel zamiast do paska ładowania
+
+User (ze screenshotem ekranu Pupila w trakcie misji "Lodowa Kraina"): *"I te obrazy miały
+być tylko w tym pasku ładowania jakby że się ładuje lodowa kraina a nie w tle xd"*.
+
+**Bug.** `LOKALIZACJA_LODOWA.png` (dodany 2026-09-14, §wpis w tym pliku wyżej) renderował
+się jako `StyleSheet.absoluteFillObject` na CAŁYM `s.stage` (300px, cała scena z kotkiem
++ 6 slotami `GearPanel`) — czyli tło zalewało też ekwipunek, mimo że miało być tylko
+dekoracją paska postępu misji ("ładuje się kraina X").
+
+**Fix** (`app/pet.tsx`): przeniesiony art + scrim z `s.stage` do wnętrza
+`s.missionBarTrack` (sam pasek postępu, ma już `overflow:'hidden'` + zaokrąglone rogi —
+idealny kontener bez dodatkowych stylów). Renderuje się tam jako tekstura toru, pod
+niebieskim `missionBarFillWrap` — wypełnienie "odsłania" resztę paska w miarę postępu,
+dokładnie efekt "ładowania krainy" o który chodziło. Scena z kotkiem/gearem wróciła do
+czystego wyglądu sprzed 2026-09-14 (bez tła za sobą), niezależnie od tego czy dla danego
+minibossa istnieje dedykowany art (`missionLocationBg` dalej może zwrócić `undefined` —
+wtedy pasek wygląda jak zawsze, `c.bg.elevated`). Zero zmian w `minibosses.ts` czy w
+logice doboru arta — tylko przeniesienie renderowania.
+
+## 108. Statystyki otwierania skrzynek Rynku (per typ skrzynki, do balansowania) — 2026-09-15
+
+User: *"niech mi tez da statystyki tam otwierania skrzynek (procentowe, zysk,strata itp
+itd zeby balansować trochę pozniej - bo teraz najtańsza skrzynka kosztuje 35 a co raz
+dropie po 60, 80 monet z niej jako common i dodatkowo nie wiem czemu legendarne coiny to
+tylko 40 xd , ale to nic nie zmieniaj ja pootwieram ze statystykami podzielonym per
+skrzynka zeby wiedzieć jak balansować nie q ciemno"*.
+
+**Zakres: czysta instrumentacja, ZERO zmian w ekonomii.** Nic w `petBoxes.ts`
+(`LOOT_BOXES`, koszty, `gearChance`/`combatItemChance`/`gearRarityWeight`, zakresy monet,
+`rollBox()`) nie zostało ruszone — user świadomie chce najpierw nazbierać danych, dopiero
+potem (osobne zadanie) decydować o rebalansie.
+
+**Store** (`src/store/boxStatsStore.ts`) — capped event-log, ten sam wzorzec co
+`usageStatsStore.events`/`bankQueueStore.history` (cap 3000, `persist` + AsyncStorage,
+WYŁĄCZNIE lokalnie, nigdzie nie wysyłane). Każdy wpis: `{at, boxId, daily, cost,
+rewardType, coins?, rarity?}`. `daily` jest kluczowy — DAILY_BOX i "Drewniana skrzynka"
+(pierwsza z `LOOT_BOXES`) mają TEN SAM `BoxId: 'sardine'` w `petBoxes.ts` (różny obiekt,
+ten sam identyfikator), więc bez tej flagi darmowe otwarcia (cost 0) mieszałyby się z
+płatnymi w tej samej grupie statystyk i fałszowały bilans monet.
+
+**Punkty logowania** (dokładnie 2, jedyne miejsca w apce wołające `rollBox()`):
+`onBuyBox` w `app/pet-shop.tsx` (płatne, `daily:false`, `cost:box.cost`) i `onDailyBox` w
+`app/pet.tsx` (darmowa, `daily:true`, `cost:0`). Log pisany PO rozstrzygnięciu nagrody
+(ten sam `reward` obiekt co idzie do `BoxRevealModal`), więc żadnego dodatkowego losowania
+ani ryzyka rozjazdu z tym co user faktycznie dostał.
+
+**Analiza** (`src/utils/boxStatsAnalysis.ts`, `computeBoxStats()`) — grupuje po
+`(boxId, daily)`, per grupa liczy: `opens`, `totalCost`, `totalCoinsWon`, `netCoins`
+(= wygrane − wydane, dodatnie = skrzynka "opłaca się" w samych monetach), rozkład %
+typu nagrody (monety/ekwipunek/umiejętność), rozkład rzadkości NAGRÓD MONETOWYCH
+(`basic` vs `legendary` czyli jackpot — DOKŁADNIE to, o co user pyta: "common" 60-80 vs
+"legendarne" 40) ze średnią kwotą per rzadkość, i rozkład rzadkości ekwipunku
+(common/rare/epic/legendary/mythic). Pokryte testem (`__tests__/boxStatsAnalysis.test.ts`)
+— w tym explicit test na rozdzielenie darmowej/płatnej skrzynki o tym samym `boxId`.
+
+**UI**: pełny panel `app/box-stats.tsx` (karta per typ skrzynki: pasek segmentowy typu
+nagrody + listy rzadkości + bilans monet) + skrócona karta `BoxStatsSection.tsx` w
+Ustawienia → Dane, sąsiad `UsageStatsSection` (§102) — identyczny layout/wzorzec
+("Zobacz pełny panel" + reset), tylko inne dane. Wpięta w `app/settings.tsx` obok
+`<UsageStatsSection />`.
+
+**Świadomie NIE zrobione**: rozbicie rzadkości `combatItem` (umiejętności) — próg
+`combatItemChance` jest mały (2-16%) i user pytał głównie o monety/ekwipunek; % udziału
+tego typu nagrody jest widoczny w pasku segmentowym, samego rozkładu rzadkości brak. Można
+dodać identycznym wzorcem co `coinRarityBreakdown`/`gearRarityBreakdown`, jeśli user
+zapyta.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

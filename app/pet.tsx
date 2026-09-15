@@ -15,6 +15,7 @@ import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
 import GearPanel from '@/components/pet/GearPanel';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
+import { useBoxStats } from '@/store/boxStatsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
@@ -220,6 +221,7 @@ export default function Pet() {
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
+  const recordBoxOpen = useBoxStats(st => st.recordOpen);
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
@@ -230,6 +232,13 @@ export default function Pet() {
     if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
+    // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — `daily:true` bo to darmowa
+    // Skrzynka dnia (cost 0), odróżniona od płatnej Drewnianej (ten sam BoxId 'sardine'),
+    // patrz komentarz w onBuyBox (pet-shop.tsx).
+    recordBoxOpen({
+      at: Date.now(), boxId: DAILY_BOX.id, daily: true, cost: 0, rewardType: reward.type,
+      coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+    });
     haptic.success();
     setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });
   };
@@ -443,30 +452,6 @@ export default function Pet() {
             dawny dynamiczny `minHeight` dla wielkiego kafelka podróży zniknął razem z nim
             (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu). */}
         <View style={s.stage}>
-          {/* Tło LOKACJI misji (2026-09-14, user dostarczył pierwszy dedykowany art —
-              `LOKALIZACJA_LODOWA.png` pod mb_lodowykrolik, zapowiedział kolejne pod
-              osę/grizzly/wilka) — widoczne TYLKO gdy pupil jest w drodze/właśnie wrócił
-              (`missionMb` ustawiony) I dla TEGO minibossa istnieje już plik
-              (`missionLocationBg`, fallback `undefined` = brak zmian, zwykła scena jak
-              dotąd — ten sam wzorzec co `bossPng`/`arenaBgFor`). Scrim (3-stopniowy czarny
-              gradient) + jednolita jasnoszara "mgiełka" NAD obrazkiem — user: "musisz
-              nałożyć między każdą lokalizację jakiś gradient low opacity... będzie zbyt
-              zlewało się kolorystycznie... efekt zamglenia lekko" — różne lokacje będą mieć
-              bardzo różne palety (lód/dżungla/las), więc stały overlay ujednolica kontrast
-              i czytelność tekstu NIEZALEŻNIE od tego, jak jaskrawe/ciemne jest źródłowe tło
-              (identyczna logika co scrim na arenie walki w boss-fight.tsx). */}
-          {missionMb && !!missionLocationBg(missionMb.id) && (
-            <>
-              <Image source={missionLocationBg(missionMb.id)} style={StyleSheet.absoluteFillObject} contentFit="cover" pointerEvents="none" />
-              <LinearGradient
-                pointerEvents="none"
-                colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.5)'] as [string, string, string]}
-                locations={[0, 0.45, 1]}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(160,165,175,0.16)' }]} />
-            </>
-          )}
           <GearPanel>
             {/* Kotek W MISJI — JEDEN kotek, nie dwa (2026-08-20, user: "kotek jest podwojony" —
                 dawniej duży skurczony portret NA scenie + osobny mały na pasku renderowały się
@@ -492,6 +477,22 @@ export default function Pet() {
                   </View>
                 </View>
                 <View style={s.missionBarTrack} onLayout={e => setMissionBarWidthPx(e.nativeEvent.layout.width)}>
+                  {/* Tło LOKACJI misji (2026-09-14, user dostarczył pierwszy dedykowany art —
+                      `LOKALIZACJA_LODOWA.png` pod mb_lodowykrolik, zapowiedział kolejne pod
+                      osę/grizzly/wilka) — user: "te obrazy miały być tylko w tym pasku
+                      ładowania jakby że się ładuje lodowa kraina a nie w tle" — PIERWOTNIE
+                      renderowane jako pełne tło całej sceny (za GearPanel+kotkiem), po
+                      feedbacku PRZENIESIONE tak, żeby żyło wyłącznie wewnątrz samego paska
+                      postępu (`missionBarTrack` ma już `overflow:'hidden'` +
+                      zaokrąglenie), jako tekstura toru "pod" niebieskim wypełnieniem — czyli
+                      dokładnie efekt "ładowania krainy", a scena z kotkiem/ekwipunkiem
+                      zostaje czysta jak przed 2026-09-14. */}
+                  {missionMb && !!missionLocationBg(missionMb.id) && (
+                    <>
+                      <Image source={missionLocationBg(missionMb.id)} style={StyleSheet.absoluteFillObject} contentFit="cover" pointerEvents="none" />
+                      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(11,14,26,0.35)' }]} />
+                    </>
+                  )}
                   <View style={[s.missionBarFillWrap, { width: missionBarFillWidthPx ?? `${Math.round(missionProgress * 100)}%` }]}>
                     <LinearGradient colors={['#2AA9E0', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
                     <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />

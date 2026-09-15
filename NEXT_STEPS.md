@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: tło lokacji misji trafiało za GearPanel zamiast tylko do paska ładowania (2026-09-15)
+
+Pełny opis w ARCHITECTURE.md §107. Art `LOKALIZACJA_LODOWA.png` (i przyszłe lokacje pod
+kolejnych minibossów) renderował się jako tło CAŁEJ sceny Pupila (za kotkiem + 6 slotami
+ekwipunku) zamiast tylko wewnątrz paska postępu misji, jak zamierzone ("ładuje się
+kraina X"). Przeniesione do `s.missionBarTrack` w `app/pet.tsx` — `tsc`/`jest` czyste.
+Do zrobienia (przez usera, na urządzeniu): otworzyć misję do Lodowej Krainy, sprawdzić że
+tło widać TYLKO w pasku "1:XX:XX", a scena z kotkiem/ekwipunkiem jest znów czysta.
+
+## ✅ Statystyki otwierania skrzynek (Rynek/pet-shop) per typ skrzynki (2026-09-15)
+
+Pełny opis w ARCHITECTURE.md §108. User: *"niech mi tez da statystyki tam otwierania
+skrzynek (procentowe, zysk,strata itp itd zeby balansować trochę pozniej... ale to nic nie
+zmieniaj ja pootwieram ze statystykami podzielonym per skrzynka zeby wiedzieć jak
+balansować nie q ciemno"*. Zaimplementowane: `boxStatsStore.ts` (capped log, wzorzec jak
+`usageStatsStore`) + `boxStatsAnalysis.ts` (per-skrzynka % typu nagrody, rozkład rzadkości
+monet basic/legendary z avg, rozkład rzadkości ekwipunku, bilans monet) + panel
+`app/box-stats.tsx` + skrócona karta w Ustawienia → Dane. Logowanie wpięte w oba miejsca
+wołające `rollBox()` (`onBuyBox` w pet-shop.tsx, `onDailyBox` w pet.tsx), darmowa
+Skrzynka dnia rozdzielona od płatnej Drewnianej mimo tego samego `BoxId`. **Zero zmian
+w wartościach ekonomii** — `tsc`/`jest` czyste (+ nowy test `boxStatsAnalysis.test.ts`).
+Do zrobienia (user): pootwierać sporo skrzynek na urządzeniu, sprawdzić czy panel
+faktycznie pokazuje to zniekształcenie (common 60-80 vs legendary jackpot 40) o którym
+wspomniał — dopiero potem osobna rozmowa o rebalansie.
+
 ## ✅ Audyt bezpieczeństwa — keystore zrotowany, 1 punkt zostaje (2026-09-15)
 
 Pełny opis w ARCHITECTURE.md §105. User potwierdził: apka NIE jest na Play Store (tylko
