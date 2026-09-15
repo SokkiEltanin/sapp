@@ -7414,6 +7414,58 @@ gdzieś jeszcze była w pamięci podręcznej routera) nie powinna się zdarzać,
 
 ---
 
+## 102. Sprzątanie Ustawień, runda 5 (ostatnia): pełny panel "Statystyki apki"
+
+User (item #3 z batcha §98-101, ostatni z siedmiu): *"Te statystyki apki lokalnie
+chciałem mieć w USTAWIENIACH > STATYSTYKI PANEL cały żebym mógł wejść w niego i mieć
+dużo dokładnych danych jak korzystam w co wchodzę kiedy dokładnie itp (wykresy z czasem
+itp co po kolei (może się ładować chwilkę po wejscu to nie main)"*.
+
+**Model danych rozszerzony.** `usageStatsStore.ts` miał tylko `screens: Record<id,
+{count, lastOpenedAt}>` — agregat bez historii, za mało na "wykresy z czasem". Dodany
+`events: ScreenOpenEvent[]` (`{screenId, at: number}`, `at` jako epoch ms nie ISO — mniejszy
+JSON, tania arytmetyka Date przy bucketowaniu), capped na 3000 (jak `seenNotifications`/
+bank `history` w innych store'ach tej sesji — rolling window, nie pełny audit trail; przy
+typowym użyciu to wciąż wiele miesięcy). Zapisywany w TYM SAMYM `recordOpen()` co `screens`
+(jedno miejsce, `app/_layout.tsx`, bez zmian w call site) — nie da się rozjechać.
+Istniejącym userom `events` domyślnie `[]` przez standardowy merge zustand-persist (brak
+klucza w starym zapisie = zostaje initial state), bez osobnej migracji.
+
+**Nowa trasa `app/usage-stats.tsx`** (nie zakładka Ustawień — osobny pełny ekran, zgodnie
+z tym co user opisał: "wejść w niego"). Agregacje wydzielone jako czyste, testowalne
+funkcje w `src/utils/usageStatsAnalysis.ts` (`bucketByDay`/`bucketByHour`/
+`oldestEventDate`, testy w `__tests__/usageStatsAnalysis.test.ts`) — ekran sam tylko je
+woła w `useMemo` i renderuje. Trzy karty: (1) słupkowy wykres otwarć dziennie z ostatnich
+14 dni (ten sam wzorzec gołych `View`-i co `WeekBars` w `weekly.tsx` — bez zewnętrznej
+biblioteki wykresów, spójnie z resztą apki), dni bez otwarcia dostają `count: 0` (nie są
+pomijane — luki w używaniu widoczne jako puste słupki, nie zniekształcają skali); (2)
+rozkład godzinowy (24 cienkie słupki, "o której porze dnia") — odpowiada wprost na "kiedy
+dokładnie"; (3) pełny, nieucięty ranking ekranów (poprzednio w Ustawieniach ucięty do
+top-6 z "pokaż wszystkie"). Dostęp: nowy przycisk "Zobacz pełny panel" w istniejącym
+`UsageStatsSection.tsx` (karcie w podstronie "Dane"), która zostaje jako szybki podgląd
+na miejscu — pełny ekran to osobna, bogatsza warstwa, nie zamiennik.
+
+**"Może się ładować chwilkę, to nie main"** — user świadomie zaakceptował że to nie musi
+być błyskawiczne. W praktyce niepotrzebne: nawet przy pełnym capie 3000 zdarzeń,
+bucketowanie to pojedyncza pętla po tablicy — liczone synchronicznie w `useMemo` przy
+wejściu na ekran, bez zauważalnego opóźnienia nawet na słabszym telefonie. Brak sztucznego
+stanu ładowania.
+
+**To ostatni z 7 zgłoszeń z jednej wiadomości usera (§98-102)** — cała runda "Sprzątanie
+Ustawień" zamknięta.
+
+`tsc --noEmit` czyste. `jest`: 73 suity/964 testy (+1 nowa suita, +6 testów —
+`usageStatsAnalysis.test.ts`, czyste funkcje bez potrzeby mockowania Zustand/AsyncStorage).
+
+**Priorytet testu na urządzeniu**: (1) Ustawienia → Dane → "Statystyki apki" → "Zobacz
+pełny panel" otwiera nowy ekran; (2) wykres dzienny pokazuje realny wzorzec ostatnich 14
+dni (słupek "dziś" wyróżniony kolorem); (3) rozkład godzinowy ma sensowny kształt (szczyt
+w porach faktycznego używania apki); (4) ranking pokazuje WSZYSTKIE odwiedzone ekrany, nie
+tylko top 6; (5) "Wyczyść statystyki" na nowym ekranie faktycznie zeruje też kartę w
+Ustawieniach (ten sam store).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

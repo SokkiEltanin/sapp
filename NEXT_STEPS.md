@@ -3,36 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sprzątanie Ustawień — runda 4 z 5 zrobiona (powiadomienia), 1 duża zostaje (2026-09-15)
+## ✅ Sprzątanie Ustawień — WSZYSTKIE 5 rund zrobione, batch zamknięty (2026-09-15)
 
-User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku, przesłany
-dwukrotnie). Runda 1 (§98): "Pytaj o wypłatę" domyślnie wyłączone, martwy przełącznik
-"Ogranicz animacje" usunięty, sekcja "Więcej" → "Skróty". Runda 2 (§99): overhaul sekcji
-"Auto-wydatki z banku". Runda 3 (§100): pełny redesign nawigacji Ustawień — menu kategorii
-zamiast akordeonu, kliknięcie otwiera podstronę. **Runda 4 (§101, ta sesja)**: powiadomienia
-— śledztwo pokazało, że "niejasne" (user) było REALNYMI bugami: przełącznik nazwany
-"Przypomnienie nastroju" po cichu sterował GLOBALNYM masterem (kasował wszystkie typy, nie
-tylko Humor); "Poranne"/"Lista zadań"/"Nawyki" resetowały się na OFF przy każdym wejściu w
-ekran (brak odczytu stanu przy mount); `notif_habits_enabled` nigdy nie było zapisywane
-mimo że kod je czyta jako bramę. Osobny ekran `/notifications` (dublujący część stanu, z
-INNYM niesynchronizowanym źródłem prawdy) USUNIĘTY — jego 5 prostych typów (bez własnego
-edytora godziny) przeniesione do `src/utils/notificationTypes.ts` i wyrenderowane jako
-pozycje w tej samej podstronie "Powiadomienia", budżet dostał własny on/off (dawniej brak).
-Pełny opis wszystkich 4 znalezionych bugów + fixów w §101.
+User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku,
+przesłany dwukrotnie) — teraz wszystkie zaadresowane, każde osobnym PR-em:
+- Runda 1 (§98): "Pytaj o wypłatę" domyślnie wyłączone, martwy przełącznik "Ogranicz
+  animacje" usunięty, sekcja "Więcej" → "Skróty".
+- Runda 2 (§99): overhaul sekcji "Auto-wydatki z banku" — historia odczytów, czytelność.
+- Runda 3 (§100): pełny redesign nawigacji Ustawień — menu kategorii zamiast akordeonu,
+  kliknięcie otwiera podstronę.
+- Runda 4 (§101): powiadomienia — 4 realne bugi naprawione (mylący master, resetujący
+  się stan, martwa flaga), dwa nachodzące na siebie ekrany scalone w jeden.
+- **Runda 5 (§102, ta sesja) — ostatnia**: pełny panel "Statystyki apki"
+  (`app/usage-stats.tsx`), osobna trasa z linkiem z Ustawienia → Dane. Model danych
+  rozszerzony o `usageStatsStore.events` (capped log zdarzeń z timestampem — dotąd był
+  tylko agregat count+lastOpenedAt). Trzy wykresy: dziennie (14 dni, gołe `View`-bary jak
+  w `weekly.tsx`, bez biblioteki wykresów), rozkład godzinowy ("o której porze dnia"),
+  pełny nieucięty ranking ekranów. Agregacje w testowalnym
+  `src/utils/usageStatsAnalysis.ts` (+6 nowych testów).
 
-**Explicite NIE zrobione (druga połowa zgłoszenia usera)**: personalizacja WYGLĄDU
-(treści) każdego powiadomienia — wymaga osobnej decyzji projektowej (co edytowalne, jak to
-się ma do typów z dynamiczną treścią jak budżet/lista zadań) — świadomie osobny, przyszły
-PR. Też znalezione, nie naprawione: `pet-daily`/`boss-ready` mają skonfigurowalne godziny w
-kodzie (`notif_pet_hour`/`notif_boss_hour` itd.) ale ZERO UI do ich ustawienia — zawsze
-hardkodowany default. Osierocony punkt rozszerzenia na przyszłość, nie bug.
-
-**Zostaje do zrobienia (1 duża, osobnym PR-em)**:
-1. **Panel "Statystyki"** w Ustawieniach — pełny ekran z wykresami W CZASIE (kiedy/ile
-   razy korzystam z czego). Obecny `usageStatsStore.ts` ma TYLKO agregat
-   `{count, lastOpenedAt}` per ekran — żadnej historii per-otwarcie, więc wymaga
-   rozszerzenia modelu danych (log zdarzeń z limitem) zanim da się rysować wykresy. Teraz
-   dostanie od razu pełną podstronę za darmo (§100), bez osobnej decyzji o UI.
+**Explicite NIE zrobione, każde jako osobny przyszły temat (nie część tej rundy)**:
+personalizacja WYGLĄDU/treści każdego powiadomienia (§101 — wymaga własnej decyzji
+projektowej: co edytowalne, jak to się ma do typów z dynamiczną treścią); UI do godzin
+`pet-daily`/`boss-ready` (istnieją w kodzie, zero UI, nie bug — osierocony punkt
+rozszerzenia).
 
 ## 🆕 Cold start: Stack nie czeka już na Firebase auth — PRIORYTET testu (2026-09-15)
 

@@ -18,8 +18,25 @@ export interface ScreenStat {
   lastOpenedAt: string; // ISO
 }
 
+// Log zdarzeń z limitem (2026-09-15, §102) — user: "chciałem mieć w USTAWIENIACH >
+// STATYSTYKI PANEL cały żebym mógł wejść w niego i mieć dużo dokładnych danych jak
+// korzystam w co wchodzę kiedy dokładnie itp (wykresy z czasem itp". `screens` wyżej to
+// tylko agregat (count + ostatnie otwarcie) — nie starczy do wykresu "otwarcia w czasie"
+// ani "o której porze dnia". `events` to PROSTY, capped log {screenId, at} — `at` jako
+// liczba (epoch ms), nie ISO string, żeby JSON był mniejszy i bucketowanie po dniu/
+// godzinie było tanie (Date arytmetyka, bez parsowania stringów). Cap 3000 (nie rośnie
+// bez końca jak surowy click-stream by rósł) — przy typowym użyciu to wciąż wiele
+// miesięcy historii, starsze wpisy po prostu wypadają z okna.
+export interface ScreenOpenEvent {
+  screenId: string;
+  at: number; // Date.now()
+}
+
+const EVENTS_MAX = 3000;
+
 interface UsageStatsState {
   screens: Record<string, ScreenStat>; // klucz = znormalizowany screenId, patrz screenStats.ts
+  events: ScreenOpenEvent[];
   recordOpen: (screenId: string) => void;
   reset: () => void;
 }
@@ -28,6 +45,7 @@ export const useUsageStats = create<UsageStatsState>()(
   persist(
     (set) => ({
       screens: {},
+      events: [],
       recordOpen: (screenId) =>
         set((state) => {
           const prev = state.screens[screenId];
@@ -36,9 +54,10 @@ export const useUsageStats = create<UsageStatsState>()(
               ...state.screens,
               [screenId]: { count: (prev?.count ?? 0) + 1, lastOpenedAt: new Date().toISOString() },
             },
+            events: [...state.events, { screenId, at: Date.now() }].slice(-EVENTS_MAX),
           };
         }),
-      reset: () => set({ screens: {} }),
+      reset: () => set({ screens: {}, events: [] }),
     }),
     {
       name: 'usage-stats-v1',
