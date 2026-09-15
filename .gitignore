@@ -39,7 +39,12 @@ yarn-error.*
 
 # Sensitive config — keys stored in GitHub Secrets
 .env.local
-google-services.json
+# google-services.json NIE jest tu (2026-09-15, audyt bezpieczeństwa) — wpis tu był
+# mylący: plik jest CELOWO commitowany w repo (publiczna konfiguracja klienta Firebase —
+# apiKey/appId dla mobilnej apki NIE są sekretem, bezpieczeństwo egzekwują reguły
+# Firestore po stronie serwera, nie ukrywanie tego pliku) i wymagany przez build.yml
+# (`cp google-services.json android/app/`). Ignorowanie go tu i tak nic nie chowało —
+# był już śledzony przed dodaniem tej reguły.
 
 # Build artifacts
 *.apk

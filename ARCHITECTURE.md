@@ -7589,6 +7589,66 @@ w tych liczbach; sprawdź rozbicie "wg kategorii" na dashboardzie tak samo.
 
 ---
 
+## 105. Audyt bezpieczeństwa (2026-09-15)
+
+Trzecia runda tego samego statycznego audytu tej sesji (§13/§103 wydajność, §104
+poprawność), tym razem bezpieczeństwo. Repo jest PUBLICZNE (github.com/SokkiEltanin/sapp).
+Dwa bezpieczne, techniczne fixy w tym PR; dwa poważniejsze znaleziska przekazane
+bezpośrednio userowi w czacie (wymagają decyzji poza repo, nie coś co można po cichu
+"naprawić" edycją kodu) — patrz NEXT_STEPS.md.
+
+**1. Token OAuth Kalendarza Google wyciekał w eksporcie/kopii danych.**
+`backupService.ts`'s `gatherSnapshot()` bierze KAŻDY klucz AsyncStorage poza tymi
+zaczynającymi się od `firebase:` i własnym znacznikiem throttle — nie wykluczał
+`gcal_access_token` (googleCalendarService.ts). Eksport JSON (przycisk w Ustawieniach →
+Dane) ląduje w systemowym share-sheecie (mail/chmura/komunikator) — żywy token OAuth
+(krótkotrwały, ~1h, ale bez powodu żeby w ogóle tam być) leciał w czystym tekście razem z
+resztą danych. Fix: `EXCLUDED_LOCAL_KEYS` (nowa lista, dziś jeden wpis) filtrowana obok
+istniejących wykluczeń. Bez wpływu na restore — token i tak odtwarza się na nowo z
+bezpiecznie przechowywanej sesji natywnego Google Sign-In SDK.
+
+**2. `.gitignore` mylący wpis dla `google-services.json`.** Plik jest CELOWO
+commitowany (publiczna konfiguracja klienta Firebase — `apiKey`/`appId` dla apki mobilnej
+NIE są sekretem, bezpieczeństwo egzekwują reguły Firestore po stronie serwera) i wymagany
+przez `build.yml` (`cp google-services.json android/app/`), ale `.gitignore` oznaczał go
+jako "sensitive" — nigdy realnie nic nie chował (plik był już śledzony PRZED dodaniem tej
+reguły), tylko mylił co do intencji. Usunięty wpis, zastąpiony komentarzem wyjaśniającym.
+
+**Przekazane bezpośrednio userowi (NIE naprawione w tym PR)**:
+- **Hasło do keystore'a podpisującego release Androida jest hardkodowane w czystym
+  tekście w `build.yml` (3 miejsca), w publicznym repo.** Sam plik keystore trzymany
+  poprawnie (`KEYSTORE_BASE64` to prawdziwy GitHub Secret), ale hasło który go chroni —
+  nie. To jest permanentnie w historii gita. Prawdziwa naprawa wymaga ROTACJI (nowy
+  keystore + nowe hasło jako GitHub Secret) — konsekwencyjna, potencjalnie łamiąca
+  publikowanie aktualizacji na Play Store jeśli apka już tam jest (wymaga TEGO SAMEGO
+  klucza podpisującego dla update'ów, chyba że używane jest Play App Signing) — decyzja
+  usera, nie coś do zrobienia bez pytania.
+- **Reguły bezpieczeństwa Firestore nie istnieją nigdzie w repo** — żyją w konsoli
+  Firebase, poza zasięgiem tego audytu. Zalecenie: sprawdzić w konsoli że każda ścieżka
+  `users/{uid}/...` wymaga `request.auth.uid == uid`, nie tylko `request.auth != null`
+  (klient loguje się anonimowo jeśli normalny auth nie rozwiąże się w 4s —
+  `firebase.ts`, `signInAnonymously()` — anonimowe logowanie jest trywialnie dostępne
+  dla każdego kto ma publiczny `apiKey` projektu).
+
+**Sprawdzone, świadomie NIE zmienione (niski priorytet)**: fallback "wygląda jak
+powiadomienie z banku" w natywnym listenerze (`withBankNotificationListener.js`) łapie
+też treść spoza 3 dopuszczonych paczek bankowych po słowach-kluczach — teoretycznie
+dowolna apka mogłaby wysłać spreparowane powiadomienie, ale wymaga to (a) usera który już
+przyznał szeroki dostęp "Dostęp do powiadomień", (b) usera z włączonym "Dodawaj
+automatycznie" — a najgorszy scenariusz to błędnie dodany wydatek do poprawienia, nie
+wyciek danych. Token Kalendarza Google w zwykłym AsyncStorage zamiast
+`expo-secure-store` — też niski priorytet, token krótkotrwały, re-derywowany z
+bezpiecznej sesji SDK.
+
+`tsc --noEmit` czyste. `jest`: 73 suity/967 testów bez zmian (czysto naprawcze fixy, nic
+nowego do przetestowania jednostkowo).
+
+**Priorytet testu na urządzeniu**: wyeksportuj dane (Ustawienia → Dane → eksport JSON) —
+plik NIE powinien zawierać `gcal_access_token`; reszta eksportu (wydatki/nastrój/itd.)
+bez zmian.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
