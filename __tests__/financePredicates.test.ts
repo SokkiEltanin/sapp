@@ -1,4 +1,4 @@
-import { isSelfTransfer } from '@/utils/statWidgets';
+import { isSelfTransfer, dailyValue, metricNumber, metricList, StatCtx } from '@/utils/statWidgets';
 import { looksLikeBill, billTagFor } from '@/utils/recurringBills';
 import { Expense } from '@/types';
 
@@ -6,6 +6,13 @@ const e = (o: Partial<Expense>): Expense => ({
   id: 'x', amount: 0, currency: 'PLN', category: 'other', date: '2026-08-04T10:00:00',
   createdAt: '', updatedAt: '', ...o,
 } as Expense);
+
+const ctx = (expenses: Expense[]): StatCtx => ({
+  expenses, scope: 'all', moodEntries: [], workEvents: [],
+  workSettings: {} as StatCtx['workSettings'], ratePerHour: 0, tasks: [],
+  habitsTotal: 0, habitsDone: 0, nameAliases: {}, weightMemory: {},
+  healthDays: {},
+});
 
 describe('statWidgets — isSelfTransfer', () => {
   test('kategoria transfer lub tag oszczędnościowy = self-transfer', () => {
@@ -15,6 +22,48 @@ describe('statWidgets — isSelfTransfer', () => {
   test('zwykły wydatek = nie', () => {
     expect(isSelfTransfer(e({ category: 'groceries', amount: 30 }))).toBe(false);
     expect(isSelfTransfer(e({ category: 'groceries', tags: ['chleb'] }))).toBe(false);
+  });
+});
+
+// 2026-09-15, audyt poprawności — self-transfer wyciekał do 'food'/'sweets' w
+// `dailyValue` (rok w pixelach) i do 'sweets' w `bucketValue` (dashboard/stats), mimo że
+// siostrzane 'spend'/'income' w tych samych funkcjach go już wykluczały (ten sam kształt
+// buga co §93, gdzie znaleziono 8 analogicznych miejsc).
+describe('statWidgets — self-transfer wykluczony z food/sweets/byCategory', () => {
+  const day = '2026-09-10';
+  const transferFood = e({
+    id: 't1', category: 'transfer' as any, tags: ['revolut'], amount: 100, date: `${day}T09:00:00`,
+    receiptItems: [{ name: 'Bułka', price: 100, tags: ['pieczywo'] } as any],
+  });
+  const transferSweets = e({
+    id: 't2', category: 'groceries', tags: ['przelew', 'słodycze'], amount: 50, date: `${day}T09:00:00`,
+  });
+  const realFood = e({
+    id: 'r1', category: 'groceries', amount: 20, date: `${day}T09:00:00`,
+    receiptItems: [{ name: 'Chleb', price: 20, tags: ['pieczywo'] } as any],
+  });
+
+  test('dailyValue food/sweets pomija self-transfer, ale nie prawdziwe wydatki', () => {
+    expect(dailyValue('food', ctx([transferFood]), day)).toBe(0);
+    expect(dailyValue('food', ctx([transferFood, realFood]), day)).toBe(20);
+    expect(dailyValue('sweets', ctx([transferSweets]), day)).toBe(0);
+  });
+
+  test('metricNumber sweets (bucketValue) pomija self-transfer', () => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const inMonth = e({ ...transferSweets, date: `${ym}-05T09:00:00` });
+    expect(metricNumber('sweets', ctx([inMonth]), 'month').value).toBe(0);
+  });
+
+  test('metricList byCategory pomija self-transfer', () => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const transfer = e({ category: 'transfer' as any, amount: 500, date: `${ym}-05T09:00:00` });
+    const real = e({ category: 'groceries', amount: 30, date: `${ym}-05T09:00:00` });
+    const rows = metricList('byCategory', ctx([transfer, real]));
+    expect(rows.find(r => r.label === 'transfer')).toBeUndefined();
+    expect(rows.find(r => r.label === 'groceries')?.value).toBe(30);
   });
 });
 

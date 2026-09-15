@@ -7529,6 +7529,66 @@ cen, sugestie z pamięci, tagi).
 
 ---
 
+## 104. Audyt poprawności — 3 realne bugi znalezione i naprawione (2026-09-15)
+
+User: "dawaj dalej... i analiza" — po dwóch rundach optymalizacji wydajności (§13, §103),
+ten sam statyczny audyt, tym razem szukający realnych bugów logicznych, nie wolnej pracy.
+Agent Explore znalazł kandydatów, każdy zweryfikowany ręcznie przed poprawką (jeden
+kandydat — wyścig przy migracji `migratePaydayDefaultOff`/`getPaydayConfig` — świadomie
+NIE naprawiony, agent sam ocenił go jako niepewny i niskiego wpływu: najgorszy scenariusz
+to jeden nieaktualny prompt "dostałeś wypłatę?" przy pierwszym starcie po migracji).
+
+**1. Przełącznik "Przelew własny" w edycji transakcji nie odzwierciedlał ani nie
+zmieniał prawdziwego stanu dla przelewów wykrytych z banku.** `app/expenses/[id].tsx`.
+`isSelfTransfer()` (statWidgets.ts) uznaje za self-transfer `category === 'transfer'`
+ORAZ tagi oszczednosci/oszczędnościowe/przelew/revolut — ale przełącznik w trybie edycji
+patrzył WYŁĄCZNIE na tag `'przelew'`. Auto-wykryte przelewy własne z banku zapisują się z
+`category: 'transfer', tags: ['revolut']` (bankIngest.ts) — NIGDY z tagiem `'przelew'`.
+Efekt: otwórz do edycji auto-wykryty przelew Revolut → tryb odczytu (ten sam ekran, kawałek
+wyżej) poprawnie pokazuje "Tak", ale przełącznik w edycji pokazuje WYŁĄCZONY; próba
+"wyłączenia" (dodanie tagu przelew) nic nie zmienia bo `category` zostaje 'transfer' —
+user nie ma ŻADNEJ drogi, żeby z tego ekranu faktycznie cofnąć klasyfikację self-transfer
+takiej transakcji. Fix: przełącznik czyta/pisze pełną semantykę `isSelfTransfer` (nowy
+`toggleSelfTransfer` — włączenie dodaje tag 'przelew' jak dotąd; wyłączenie czyści
+WSZYSTKIE tagi self-transferowe I resetuje kategorię z 'transfer' na neutralny fallback
+— 'other' dla wydatku, 'other_income' dla przychodu). `SELF_TRANSFER_TAGS` wyeksportowany
+ze statWidgets.ts zamiast duplikować listę tagów w drugim miejscu.
+
+**2. "Zapisz przypomnienia" po cichu z powrotem włączało Humor nawet gdy user go jawnie
+wyłączył.** `app/settings.tsx`, `saveReminders()`. Bezwarunkowe wywołanie
+`scheduleDailyMoodReminder` (które samo zapisuje `notif_mood_enabled: 'true'` przy okazji
+planowania) — user wyłącza Humor osobnym przełącznikiem (§101, `moodEnabled=false`,
+powiadomienie anulowane, flaga 'false'), potem edytuje i zapisuje NIEZWIĄZANE ustawienie
+(Poranne/Lista zadań/Nawyki) przez ten sam przycisk "Zapisz przypomnienia" — co po cichu
+re-planuje Humor i nadpisuje flagę z powrotem na 'true', mimo że przełącznik na ekranie
+wciąż pokazuje WYŁĄCZONY (aż do przeładowania). Ten sam kształt buga co dwa już naprawione
+w §101 (etykieta/stan przełącznika niezgodny z jego realnym efektem). Fix: `if (moodEnabled)
+schedule else cancel`; walidacja godziny wieczornej też przeniesiona pod `moodEnabled`
+(pole jest wtedy w ogóle niewidoczne — nie ma powodu blokować zapisu reszty błędem o
+niewidocznym polu).
+
+**3. Self-transfer wyciekał do jedzenia/słodyczy/rozbicia "wg kategorii" w statWidgets.ts
+— ten sam kształt buga co §93 (8 miejsc), teraz 3 kolejne.** Niespójność WEWNĄTRZ
+pojedynczych funkcji: `bucketValue`'s `case 'food'` wykluczał self-transfer, `case
+'sweets'` tuż niżej — nie; `dailyValue`'s `case 'spend'`/`'income'` wykluczały,
+`case 'food'`/`'sweets'` — nie; `metricList`'s `byCategory` w ogóle nie sprawdzał. Fix:
+`isSelfTransfer(e)` dodane do wszystkich czterech brakujących miejsc — identyczny
+warunek co już działający w sąsiednich `case`'ach w tych samych funkcjach. Nowe testy
+regresyjne w `__tests__/financePredicates.test.ts` (3 nowe, sprawdzają że self-transfer
+faktycznie nie wlicza się, a prawdziwe wydatki dalej się liczą poprawnie).
+
+`tsc --noEmit` czyste. `jest`: 73 suity/967 testów (+3 nowe, regresja na fix #3).
+
+**Priorytet testu na urządzeniu**: (1) otwórz auto-wykryty przelew Revolut → edytuj →
+przełącznik "Przelew własny" pokazuje WŁĄCZONY (zgodnie z trybem odczytu), wyłącz go i
+zapisz → transakcja powinna zacząć liczyć się jako normalny wydatek/przychód (kategoria
+"Inne"); (2) wyłącz Humor, potem zmień i zapisz Poranne/Listę zadań/Nawyki → Humor MA
+zostać wyłączony (nie wraca po cichu); (3) sprawdź "Statystyki wydatków"/rok w pixelach
+dla jedzenia i słodyczy — self-transfer (np. przelew na Revolut) nie powinien pojawiać się
+w tych liczbach; sprawdź rozbicie "wg kategorii" na dashboardzie tak samo.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

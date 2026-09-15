@@ -8,7 +8,7 @@ import { WidgetViz } from '@/store/dashboardLayout';
 // A "self-transfer" is moving your own money (to savings / Revolut / another
 // account). It changes the account balance but is NOT real spending or income, so
 // stats exclude it. Detected by the transfer category or a savings/transfer tag.
-const SELF_TRANSFER_TAGS = ['oszczednosci', 'oszczędnościowe', 'przelew', 'revolut'];
+export const SELF_TRANSFER_TAGS = ['oszczednosci', 'oszczędnościowe', 'przelew', 'revolut'];
 export function isSelfTransfer(e: Expense): boolean {
   return (e.category as string) === 'transfer'
     || (e.tags ?? []).some(t => SELF_TRANSFER_TAGS.includes(t.toLowerCase()));
@@ -225,10 +225,14 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + foodAmountOf(e), 0);
     case 'sweets': {
+      // Wyłączenie self-transferu (2026-09-15, audyt poprawności) — siostrzany `case
+      // 'food'` tuż wyżej już wyklucza przelewy własne, ten NIE wykluczał: niespójność w
+      // tej samej funkcji, ten sam kształt buga co §93 (przelew własny wyciekał do
+      // statystyk poza bilansem).
       let total = 0;
       for (const e of exp) {
         if (e.type && e.type !== 'expense') continue;
-        if (!inScope(e, ctx.scope) || !pred(e)) continue;
+        if (isSelfTransfer(e) || !inScope(e, ctx.scope) || !pred(e)) continue;
         const items = e.receiptItems ?? [];
         if (items.length > 0) {
           for (const it of items) if (countsForConsumption(it) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price;
@@ -371,7 +375,10 @@ export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
     const now = new Date(); const ym = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
     const sums: Record<string, number> = {};
     for (const e of exp) {
-      if (e.type === 'income' || !inScope(e, ctx.scope) || !inMonth(e, ym)) continue;
+      // Wyłączenie self-transferu (2026-09-15, audyt poprawności) — bez tego przelew
+      // własny (category 'transfer' albo tag przelew/revolut/oszczędnościowe) wpadał do
+      // rozbicia "wg kategorii" jak zwykły wydatek; ten sam kształt buga co §93.
+      if (e.type === 'income' || isSelfTransfer(e) || !inScope(e, ctx.scope) || !inMonth(e, ym)) continue;
       sums[e.category] = (sums[e.category] ?? 0) + e.amount;
     }
     return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, limit)
@@ -428,13 +435,16 @@ export function dailyValue(metric: string, ctx: StatCtx, day: string): number {
     case 'spend':
       return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
     case 'food':
-      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + foodAmountOf(e), 0);
+      // Wyłączenie self-transferu (2026-09-15, audyt poprawności) — dotąd brakowało go
+      // tu, mimo że `case 'spend'` tuż wyżej w TEJ SAMEJ funkcji już je ma; ten sam
+      // kształt buga co §93.
+      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + foodAmountOf(e), 0);
     case 'income':
       return ctx.expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
     case 'sweets': {
       let total = 0;
       for (const e of ctx.expenses) {
-        if ((e.type && e.type !== 'expense') || !inScope(e, ctx.scope) || !onDay(e.date)) continue;
+        if ((e.type && e.type !== 'expense') || isSelfTransfer(e) || !inScope(e, ctx.scope) || !onDay(e.date)) continue;
         const items = e.receiptItems ?? [];
         if (items.length > 0) { for (const it of items) if (countsForConsumption(it) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price; }
         else if (e.tags?.includes('słodycze')) total += e.amount;
