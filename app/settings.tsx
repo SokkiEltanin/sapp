@@ -68,6 +68,7 @@ import SettingsSectionView from '@/components/settings/SettingsSectionView';
 import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
 import { plPlural } from '@/utils/plural';
+import { SIMPLE_NOTIF_TYPES, cancelNotifType, NotifType } from '@/utils/notificationTypes';
 
 GoogleSignin.configure({
   webClientId: '1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com',
@@ -630,6 +631,51 @@ export default function SettingsScreen() {
   const [habitNotifEnabled, setHabitNotifEnabled] = useState(false);
   const [habitHour, setHabitHour]         = useState('21');
   const [habitMin, setHabitMin]           = useState('00');
+  // Włącznik Humoru, osobno od globalnego mastera (2026-09-15, §101) — dawniej ten sam
+  // przełącznik ("Przypomnienie nastroju") w Ustawieniach po cichu sterował GLOBALNYM
+  // `notif_enabled` (kasował WSZYSTKIE typy przez `cancelAll()`), mimo etykiety sugerującej
+  // że dotyczy tylko nastroju — user: "POWIADOMIENIA W APCE są nie jasne". `notif_mood_enabled`
+  // już istniało w AsyncStorage (zapisywane przez `scheduleDailyMoodReminder`), ale
+  // Ustawienia nigdy go nie odczytywały — tylko `notificationsService.refreshMoodReminder`.
+  const [moodEnabled, setMoodEnabled] = useState(true);
+  // Reszta "prostych" typów (bez własnego edytora godziny) — dawniej WYŁĄCZNIE na osobnym
+  // ekranie `/notifications` (teraz zwiniętym w tę podstronę, patrz §101).
+  const [typeFlags, setTypeFlags] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    AsyncStorage.getItem('notif_mood_enabled').then(v => { if (v != null) setMoodEnabled(v !== 'false'); }).catch(() => {});
+    // morning/todo/habit domyślnie WYŁĄCZONE (jak zawsze w tym ekranie) — flaga włącza
+    // je TYLKO gdy jawnie zapisana jako 'true' (patrz saveReminders niżej, który zawsze
+    // pisze którąś z wartości, więc "nieustawiona" = jeszcze nigdy nie zapisana = off).
+    AsyncStorage.multiGet(['notif_morning_enabled', 'notif_todo_enabled', 'notif_habits_enabled']).then(pairs => {
+      const m = Object.fromEntries(pairs);
+      if (m.notif_morning_enabled === 'true') setMorningEnabled(true);
+      if (m.notif_todo_enabled === 'true') setBriefingEnabled(true);
+      if (m.notif_habits_enabled === 'true') setHabitNotifEnabled(true);
+    }).catch(() => {});
+    AsyncStorage.multiGet(SIMPLE_NOTIF_TYPES.map(t => t.flag)).then(pairs => {
+      const next: Record<string, boolean> = {};
+      for (const [k, v] of pairs) next[k] = v !== 'false'; // default ON — patrz komentarz w notificationTypes.ts
+      setTypeFlags(next);
+    }).catch(() => {});
+  }, []);
+  const toggleMoodNotif = async (val: boolean) => {
+    haptic.tap();
+    setMoodEnabled(val);
+    await AsyncStorage.setItem('notif_mood_enabled', val ? 'true' : 'false').catch(() => {});
+    if (!val) {
+      await notificationsService.cancelDailyMoodReminder();
+    } else if (notifEnabled) {
+      const h = parseInt(eveningHour) || 20, m = parseInt(eveningMin) || 0;
+      const granted = await notificationsService.requestPermissions();
+      if (granted) await notificationsService.scheduleDailyMoodReminder(h, m, useMoodStore.getState().todayEntry != null);
+    }
+  };
+  const toggleSimpleNotifType = async (t: NotifType, val: boolean) => {
+    haptic.tap();
+    setTypeFlags(f => ({ ...f, [t.flag]: val }));
+    await AsyncStorage.setItem(t.flag, val ? 'true' : 'false').catch(() => {});
+    if (!val) await cancelNotifType(t);
+  };
 
   const [budgetInputs, setBudgetInputs] = useState<Partial<Record<ExpenseCategory, string>>>({});
   const [tagRules, setTagRules] = useState<TagBudgetRule[]>([]);
@@ -713,8 +759,10 @@ export default function SettingsScreen() {
       await AsyncStorage.setItem('notif_enabled', 'true').catch(() => {});
       await notificationsService.scheduleDailyMoodReminder(eh, em, useMoodStore.getState().todayEntry != null);
       if (morningEnabled) {
+        await AsyncStorage.setItem('notif_morning_enabled', 'true');
         await notificationsService.scheduleMorningMoodReminder(mh, mm);
       } else {
+        await AsyncStorage.setItem('notif_morning_enabled', 'false');
         await notificationsService.cancelMorningReminder();
       }
       if (briefingEnabled && !isNaN(bh) && !isNaN(bm)) {
@@ -726,9 +774,16 @@ export default function SettingsScreen() {
         await AsyncStorage.setItem('notif_todo_enabled', 'false');
         await notificationsService.cancelDailyTodoList();
       }
+      // `notif_habits_enabled` (2026-09-15, §101) — było CZYTANE jako brama w
+      // `notificationsService.scheduleDailyHabitReminder`, ale Ustawienia nigdy go nie
+      // zapisywały: przełącznik "Przypomnienie o nawykach" działał tylko przez
+      // schedule/cancel, flaga zostawała martwa. Teraz zapisywana symetrycznie do
+      // `notif_todo_enabled` wyżej.
       if (habitNotifEnabled && !isNaN(hh) && !isNaN(hmm)) {
+        await AsyncStorage.setItem('notif_habits_enabled', 'true');
         await notificationsService.scheduleDailyHabitReminder(hh, hmm);
       } else {
+        await AsyncStorage.setItem('notif_habits_enabled', 'false');
         await notificationsService.cancelDailyHabitReminder();
       }
       toast.success('Przypomnienia zapisane');
@@ -742,8 +797,16 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem('notif_enabled', val ? 'true' : 'false').catch(() => {});
     if (!val) {
       await notificationsService.cancelAll();
+      // `refreshMoodReminder` (wołane np. na foreground apki) sprawdza WYŁĄCZNIE
+      // `notif_mood_enabled`, nie globalnego `notif_enabled` — bez tego jawnego zapisu
+      // potrafiłoby po cichu z powrotem uzbroić przypomnienie mimo wyłączonego mastera.
       await AsyncStorage.setItem('notif_mood_enabled', 'false').catch(() => {});
+      setMoodEnabled(false);
     } else {
+      // Master z powrotem ON zawsze re-armuje Humor (jak zawsze — `scheduleDailyMoodReminder`
+      // i tak nadpisuje `notif_mood_enabled` na 'true' przy okazji), więc UI trzyma się w
+      // zgodzie z tym co faktycznie zapisane, zamiast pokazywać nieaktualny stan.
+      setMoodEnabled(true);
       const h = parseInt(eveningHour) || 20;
       const m = parseInt(eveningMin) || 0;
       const granted = await notificationsService.requestPermissions();
@@ -1422,43 +1485,26 @@ export default function SettingsScreen() {
       keywords: ['notyfikacje', 'przypomnienia'],
       items: [
         {
-          id: 'notif-manage-link', title: 'Zarządzaj powiadomieniami', subtitle: 'Włącz/wyłącz każdy typ osobno',
-          icon: Bell, accentColor: '#8B5CF6',
-          keywords: ['zarządzaj', 'wszystkie typy', 'ustawienia powiadomień'],
-          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/notifications' as any); } },
-        },
-        {
-          id: 'notif-mood-enabled', title: 'Przypomnienie nastroju', subtitle: 'Codzienne powiadomienie wieczorne',
-          icon: Bell, accentColor: colors.accent.green,
-          keywords: ['nastrój', 'humor', 'mood', 'wieczorne'],
+          // Prawdziwy, jedyny master — dawniej ten sam efekt (globalny `notif_enabled` +
+          // `cancelAll()`) chował się pod etykietą "Przypomnienie nastroju" niżej, co
+          // wyglądało jak przełącznik samego Humoru (2026-09-15, §101, user: "POWIADOMIENIA
+          // W APCE są nie jasne"). Logika `toggleNotifications` bez zmian — tylko poprawna
+          // etykieta i właściwe miejsce (na samej górze, poza wszystkimi typami).
+          id: 'notif-master', title: 'Wszystkie powiadomienia', subtitle: 'Główny wyłącznik — gdy wyłączony, nic nie przychodzi',
+          icon: Bell, accentColor: colors.text.primary,
+          keywords: ['wszystkie', 'master', 'główny wyłącznik', 'włącz', 'wyłącz'],
           control: { kind: 'switch', value: notifEnabled, onChange: toggleNotifications },
         },
         ...(notifEnabled ? [
+          { id: 'notif-group-daily', title: 'Codzienne przypomnienia', keywords: ['codzienne'],
+            control: { kind: 'custom' as const, render: () => <Text style={styles.groupLabel}>Codzienne przypomnienia</Text> } },
           {
-            id: 'notif-budget-threshold', title: 'Alert limitu wydatków',
-            keywords: ['próg', 'budżet', 'procent', 'alert', 'limit wydatków'],
-            control: { kind: 'custom' as const, render: () => (
-              <>
-                <View style={styles.notifLabel}>
-                  <Wallet size={12} color={colors.text.muted} />
-                  <Text style={styles.notifLabelText}>Alert limitu wydatków od</Text>
-                </View>
-                <View style={{ flexDirection: 'row', gap: spacing[2], paddingHorizontal: spacing[1], marginBottom: spacing[2] }}>
-                  {[75, 80, 85, 90, 100].map(v => {
-                    const active = budgetThr === v;
-                    return (
-                      <PressableScale key={v} onPress={() => { haptic.tap(); saveBudgetThr(v); }} style={{ flex: 1 }}>
-                        <View style={{ alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: active ? colors.accent.amber : colors.border.default, backgroundColor: active ? colors.accent.amber + '22' : colors.bg.elevated }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: active ? colors.accent.amber : colors.text.secondary }}>{v}%</Text>
-                        </View>
-                      </PressableScale>
-                    );
-                  })}
-                </View>
-              </>
-            ) },
+            id: 'notif-mood-enabled', title: 'Humor', subtitle: 'Wieczorne przypomnienie o zapisaniu nastroju',
+            icon: Bell, accentColor: colors.accent.green,
+            keywords: ['nastrój', 'humor', 'mood', 'wieczorne'],
+            control: { kind: 'switch' as const, value: moodEnabled, onChange: toggleMoodNotif },
           },
-          {
+          ...(moodEnabled ? [{
             id: 'notif-evening', title: 'Wieczorne przypomnienie nastroju',
             keywords: ['wieczór', 'godzina', 'wieczorne przypomnienie'],
             control: { kind: 'custom' as const, render: () => (
@@ -1476,7 +1522,7 @@ export default function SettingsScreen() {
                 </View>
               </>
             ) },
-          },
+          }] : []),
           {
             id: 'notif-morning', title: 'Poranne przypomnienie', subtitle: 'Check-in z rana',
             keywords: ['poranne', 'rano', 'check-in'],
@@ -1578,6 +1624,45 @@ export default function SettingsScreen() {
               </View>
             ) },
           },
+          { id: 'notif-group-events', title: 'Zdarzenia i limity', keywords: ['zdarzenia', 'limity'],
+            control: { kind: 'custom' as const, render: () => <Text style={styles.groupLabel}>Zdarzenia i limity</Text> } },
+          // Dawniej WYŁĄCZNIE na osobnym ekranie `/notifications` (2026-09-15, §101) —
+          // ten sam typ+flaga+cancel-logika co tam (patrz `notificationTypes.ts`), tylko
+          // teraz jedna podstrona zamiast dwóch nachodzących na siebie miejsc.
+          ...SIMPLE_NOTIF_TYPES.flatMap(t => {
+            const on = typeFlags[t.flag] ?? true;
+            const switchItem = {
+              id: `notif-type-${t.flag}`, title: t.label, subtitle: t.desc,
+              icon: t.Icon, accentColor: t.color,
+              keywords: [t.label.toLowerCase()],
+              control: { kind: 'switch' as const, value: on, onChange: (v: boolean) => toggleSimpleNotifType(t, v) },
+            };
+            if (t.flag !== 'notif_budget_enabled' || !on) return [switchItem];
+            return [switchItem, {
+              id: 'notif-budget-threshold', title: 'Alert limitu wydatków',
+              keywords: ['próg', 'budżet', 'procent', 'alert', 'limit wydatków'],
+              control: { kind: 'custom' as const, render: () => (
+                <>
+                  <View style={styles.notifLabel}>
+                    <Wallet size={12} color={colors.text.muted} />
+                    <Text style={styles.notifLabelText}>Alert limitu wydatków od</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: spacing[2], paddingHorizontal: spacing[1], marginBottom: spacing[2] }}>
+                    {[75, 80, 85, 90, 100].map(v => {
+                      const active = budgetThr === v;
+                      return (
+                        <PressableScale key={v} onPress={() => { haptic.tap(); saveBudgetThr(v); }} style={{ flex: 1 }}>
+                          <View style={{ alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: active ? colors.accent.amber : colors.border.default, backgroundColor: active ? colors.accent.amber + '22' : colors.bg.elevated }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? colors.accent.amber : colors.text.secondary }}>{v}%</Text>
+                          </View>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
+                </>
+              ) },
+            }];
+          }),
         ] : []),
         {
           id: 'notif-clear-all', title: 'Anuluj wszystkie powiadomienia',
@@ -1750,7 +1835,7 @@ export default function SettingsScreen() {
         ...(bankEnabled ? [{
           id: 'bank-group-troubleshoot', title: 'Rozwiązywanie problemów i test',
           keywords: ['diagnostyka', 'test', 'powiadomienia', 'dostęp', 'problem'],
-          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Rozwiązywanie problemów i test</Text> },
+          control: { kind: 'custom' as const, render: () => <Text style={styles.groupLabel}>Rozwiązywanie problemów i test</Text> },
         }] : []),
         ...(bankEnabled && Platform.OS === 'android' ? [{
           id: 'bank-notif-access', title: 'Dostęp do powiadomień',
@@ -1821,7 +1906,7 @@ export default function SettingsScreen() {
         ...(bankEnabled ? [{
           id: 'bank-group-templates', title: 'Szablony i dopasowania',
           keywords: ['szablon', 'kategoria', 'tagi', 'dopasowanie'],
-          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Szablony i dopasowania</Text> },
+          control: { kind: 'custom' as const, render: () => <Text style={styles.groupLabel}>Szablony i dopasowania</Text> },
         }] : []),
         ...(bankEnabled ? [{
           id: 'bank-templates', title: 'Szablony powiadomień',
@@ -1955,7 +2040,7 @@ export default function SettingsScreen() {
         ...(bankEnabled ? [{
           id: 'bank-group-history', title: 'Historia',
           keywords: ['historia', 'log', 'odczyt', 'dziennik'],
-          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Historia</Text> },
+          control: { kind: 'custom' as const, render: () => <Text style={styles.groupLabel}>Historia</Text> },
         }] : []),
         ...(bankEnabled ? [{
           id: 'bank-history', title: 'Historia odczytów',
@@ -2308,7 +2393,7 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2],
   },
   diagTitle: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8 },
-  bankGroupLabel: {
+  groupLabel: {
     fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase',
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[1],
   },

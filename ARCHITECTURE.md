@@ -7314,6 +7314,106 @@ nadal pokazuje spłaszczone trafienia jak dawniej, nie menu kategorii; (8) scrol
 
 ---
 
+## 101. Sprzątanie Ustawień, runda 4: powiadomienia — dwa nachodzące ekrany scalone, prawdziwe bugi naprawione
+
+User (item #4 z batcha §98-100): *"POWIADOMIENIA W APCE są nie jasne w USTAWIENIACH musimy
+je ulepszyć pod kątem ustawiania kiedy takie będzie (oraz dodać personalizacje że mogę
+zmienić jak wygląda każde powiadomienie ręcznie)"*. Śledztwo pokazało, że "niejasne" to nie
+tylko wrażenie — to były REALNE, sprawdzalne bugi wynikające z DWÓCH osobnych, częściowo
+nachodzących na siebie ekranów zarządzania powiadomieniami.
+
+**Co było zepsute (znalezione, nie tylko podejrzewane):**
+1. **Zły przełącznik pod złą etykietą.** Item `'notif-mood-enabled'` w Ustawieniach →
+   Powiadomienia nazywał się "Przypomnienie nastroju" / "Codzienne powiadomienie
+   wieczorne", ale realnie był podpięty pod `toggleNotifications` — GLOBALNY master
+   (`notif_enabled` + `notificationsService.cancelAll()`, kasujący WSZYSTKIE typy, nie
+   tylko Humor). User wyłączający "tylko przypomnienie nastroju" po cichu wyłączał
+   WSZYSTKO (budżet, subskrypcje, zmiany w pracy…). Prawdziwy, poprawnie nazwany master
+   ("Wszystkie powiadomienia") istniał — ale na OSOBNYM ekranie `/notifications`,
+   osiągalnym tylko przez link "Zarządzaj powiadomieniami" schowany NIŻEJ w tej samej
+   sekcji.
+2. **Stan "Poranne"/"Lista zadań"/"Nawyki" resetował się do OFF przy każdym wejściu w
+   Ustawienia.** `morningEnabled`/`briefingEnabled`/`habitNotifEnabled` to były lokalne
+   `useState(false)` BEZ żadnego odczytu z AsyncStorage przy montowaniu — user włączający
+   je i zapisujący widział je z powrotem jako wyłączone przy następnym otwarciu ekranu
+   (mimo że realnie zaplanowane powiadomienie wciąż działało w tle, aż do następnego
+   "Zapisz przypomnienia", które by je po cichu ANULOWAŁO, bo UI kłamało że są off).
+3. **`notif_habits_enabled` nigdy nie było zapisywane.** `notificationsService.
+   scheduleDailyHabitReminder` CZYTA tę flagę jako bramę (`=== 'false'` → nie planuj), ale
+   `saveReminders()` w Ustawieniach nigdy jej nie zapisywało — sterowało tylko przez
+   bezpośrednie `schedule`/`cancel`. Martwa flaga, żadnego realnego efektu, ale mylące dla
+   każdego kto by ją odczytał licząc że coś znaczy.
+4. **Ekran `/notifications` (osobna trasa) miał WŁASNĄ listę 8 typów on/off**
+   (`notif_mood_enabled`/`notif_todo_enabled`/`notif_habits_enabled`/`notif_maintenance_
+   enabled`/`notif_budget_enabled`/`notif_work_enabled`/`notif_subs_enabled`/`notif_
+   weekly_enabled`) — częściowo dublującą to co Ustawienia już miały (mood/todo/habits, z
+   INNYM, niesynchronizowanym stanem — patrz #2), częściowo unikalną (maintenance/budget/
+   work/subs/weekly — te w Ustawieniach w ogóle nie miały włącznika, budżet miał tylko
+   próg %).
+
+**Fix — jedna podstrona zamiast dwóch ekranów.** `app/notifications.tsx` USUNIĘTY (jedyna
+referencja do `/notifications` żyła w linku "Zarządzaj powiadomieniami", teraz też
+usuniętym). Jego 5 "prostych" typów bez własnego edytora godziny (maintenance/budget/
+work/subs/weekly) przeniesione do `src/utils/notificationTypes.ts`
+(`SIMPLE_NOTIF_TYPES`/`cancelNotifType` — ta sama struktura/logika co było, tylko
+wydzielona jako reużywalna tabela zamiast żyć w skasowanym ekranie) i renderowane
+generycznie (`.flatMap`) jako pozycje w sekcji `'powiadomienia'` w `settings.tsx`.
+Budżet dostał WŁASNY przełącznik on/off (`notif_budget_enabled`, dawniej niedostępny z
+Ustawień) — próg % pokazuje się tylko gdy włączony. Sekcja ma teraz DWA nagłówki-grupy
+(`styles.groupLabel` — przemianowany z `bankGroupLabel`, wzorzec z §99, teraz reużywalny
+poza sekcją banku): "Codzienne przypomnienia" (Humor/Poranne/Lista zadań/Nawyki, każdy z
+własnym edytorem godziny) i "Zdarzenia i limity" (5 prostych typów). Master
+("Wszystkie powiadomienia", poprawnie nazwany i przeniesiony na sam wierzch, POZA
+wszystkimi typami) korzysta z NIETKNIĘTEJ logiki `toggleNotifications` — poprawiona tylko
+etykieta/pozycja, nie działanie. Humor dostał WŁASNY, osobny od mastera przełącznik
+(`moodEnabled`/`toggleMoodNotif`, nowy stan + nowa funkcja, czyta/pisze `notif_mood_
+enabled` który już istniał w AsyncStorage, tylko Ustawienia go nigdy nie odczytywały) —
+edytor godziny wieczornej pokazuje się teraz TYLKO gdy Humor jest włączony, nie zawsze
+(dawniej pokazywał się zawsze gdy master był on, niezależnie od tego co user by chciał).
+Poranne/Lista zadań/Nawyki dostały brakujący odczyt stanu na mount (`AsyncStorage.
+multiGet(['notif_morning_enabled','notif_todo_enabled','notif_habits_enabled'])`,
+nowa flaga `notif_morning_enabled` dopisana symetrycznie do istniejącego wzorca `notif_
+todo_enabled`) + `saveReminders()` teraz faktycznie zapisuje `notif_habits_enabled`
+(fix #3 wyżej). `notificationsService.ts` dostał brakujący `cancelDailyMoodReminder()`
+(symetryczny do `cancelMorningReminder`/`cancelDailyTodoList`/`cancelDailyHabitReminder`,
+których wzorca dotąd nie miał Humor).
+
+**Explicite NIE zrobione — personalizacja WYGLĄDU powiadomień** (druga połowa
+zgłoszenia usera: *"dodać personalizacje że mogę zmienić jak wygląda każde powiadomienie
+ręcznie"*). Treść (tytuł/body) każdego typu jest dziś zaszyta w kodzie
+`notificationsService.ts` (osobna funkcja per typ, np. `scheduleDailyMoodReminder`
+zawsze `'Nie zapisałeś dziś humoru'`). Zrobienie tego wymaga osobnej decyzji projektowej:
+co dokładnie edytowalne (sam tekst? placeholdery na dynamiczne wartości jak kwoty/
+liczby zadań?), gdzie to trzymać (nowy per-typ store z override'ami czytany przy każdym
+`schedule*`), jak to się ma do typów z dynamiczną treścią (budget/todo/weekly budują
+treść z aktualnych danych, nie da się tam wstawić gołego stringa 1:1) — świadomie
+odłożone jako osobny, przyszły PR, żeby nie robić pochopnego designu w tej samej rundzie
+co fix bugów.
+
+Dodatkowo znaleziona, ale NIE naprawiona (świadomie, poza zakresem tej rundy): `pet-daily`
+i `boss-ready` mają skonfigurowalne godziny (`notif_pet_hour`/`notif_pet_min`,
+`notif_boss_hour`/`notif_boss_min`) w kodzie `notificationsService.ts`, ale ŻADNEGO UI do
+ich ustawienia — zawsze biorą hardkodowany default (19:00/18:30). Osierocony punkt
+rozszerzenia, nie bug (działają, tylko nieedytowalne) — zanotowane w NEXT_STEPS.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów bez zmian (bez dedykowanych testów
+jednostkowych dla tego ekranu/serwisu — nietestowalne bez mocka `expo-notifications` i
+zegara, zgodnie z istniejącą konwencją repo).
+
+**Priorytet testu na urządzeniu** (realne bugi behawioralne, nie tylko UI — testuj
+uważnie): (1) włącz "Poranne"/"Lista zadań"/"Nawyki", zapisz, ZAMKNIJ i otwórz ponownie
+Ustawienia → Powiadomienia — wszystkie trzy powinny wciąż pokazywać się jako WŁĄCZONE
+(dawniej resetowały się na OFF); (2) wyłącz WYŁĄCZNIE "Humor" (nie master) — reszta typów
+ma zostać aktywna; (3) wyłącz "Wszystkie powiadomienia" (master) — WSZYSTKO znika z listy,
+`cancelAll()` faktycznie kasuje zaplanowane; włącz z powrotem — Humor wraca; (4) Budżet ma
+teraz własny przełącznik, próg % pokazuje się tylko gdy włączony; (5) Serwis/Subskrypcje/
+Zmiany w pracy/Podsumowanie tygodniowe — przełączniki działają (sprawdź że wyłączenie
+faktycznie anuluje zaplanowane powiadomienie danego typu, `getAllScheduledNotificationsAsync`
+w debugu jeśli trzeba); (6) `/notifications` już nie istnieje — nawigacja do niego (gdyby
+gdzieś jeszcze była w pamięci podręcznej routera) nie powinna się zdarzać, bo link usunięty.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
