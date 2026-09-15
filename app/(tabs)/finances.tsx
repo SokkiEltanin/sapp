@@ -288,8 +288,19 @@ export default function FinancesScreen() {
     [grouped, activeFilterCount, recentCutoff],
   );
 
-  const sections = useMemo(() => {
-    const matches = (e: Expense) => {
+  // Rozdzielone na dwa useMemo (2026-09-15, audyt wydajności — patrz ARCHITECTURE.md §13
+  // fix #2, ten sam kształt buga). Pole "Szukaj tagu" (2026-09-12) pisze do `activeTagFilter`
+  // na KAŻDE naciśnięcie klawisza — dopóki filtr strukturalny (typ/płatnik/płatność/kwota/
+  // rachunek) i cały przebieg `capTx`/cięcia do 31 dni żyły w JEDNYM useMemo z `activeTagFilter`
+  // w deps, każdy klawisz przeliczał WSZYSTKO od nowa nad CAŁĄ, nieograniczoną historią
+  // (capTx spada do false gdy jakikolwiek filtr aktywny — w tym tag). Teraz: `structuralFiltered`
+  // (filtry rzadko się zmieniające, przez chipy/inputy) liczy się tylko gdy ONE się zmienią;
+  // `sections` dokłada WYŁĄCZNIE dopasowanie tagu na już przefiltrowanym, dużo mniejszym
+  // wejściu — jedyny koszt per-klawisz to sam substring-scan, nie cała reszta filtrów + cięcie.
+  const hasStructuralFilter = activeType !== 'all' || !!activePayer || activePayment !== 'all'
+    || !isNaN(min) || !isNaN(max) || !!activeBillFilter;
+  const structuralFiltered = useMemo(() => {
+    const matchesStructural = (e: Expense) => {
       if (activeType === 'income' && e.type !== 'income') return false;
       if (activeType === 'expense' && !isExp(e)) return false;
       if (activePayer && e.payer !== activePayer) return false;
@@ -297,31 +308,39 @@ export default function FinancesScreen() {
       if (!isNaN(min) && e.amount < min) return false;
       if (!isNaN(max) && e.amount > max) return false;
       if (activeBillFilter && billTagFor(e)?.tag !== activeBillFilter) return false;
-      if (activeTagFilter) {
-        // Dopasowanie CASE-INSENSITIVE substring (2026-09-12, user: "możliwość wpisania
-        // tagu własnego, taka wyszukiwarka jakby") — dotąd `activeTagFilter` szedł tylko z
-        // kliknięcia chipa (ZAWSZE dokładny string z `availableTags`, top 12 wg częstości),
-        // więc ścisła równość wystarczała. Teraz może pochodzić też z ręcznie wpisanego
-        // tekstu (patrz `fmTagSearch` niżej) — ścisła równość by nie łapała tagów spoza
-        // top 12 ani częściowych fraz, stąd `includes` zamiast `===`.
-        const q = activeTagFilter.trim().toLowerCase();
-        if ((e.tags ?? []).some(t => t.toLowerCase().includes(q))) return true;
-        if (e.receiptItems?.some(it => (it.tags ?? []).some(t => t.toLowerCase().includes(q)))) return true;
-        return false;
-      }
       return true;
     };
     const base = capTx ? grouped.filter(([date]) => date >= recentCutoff) : grouped;
-    const filtered = activeFilterCount > 0
-      ? base.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
+    return hasStructuralFilter
+      ? base.map(([date, items]) => [date, items.filter(matchesStructural)] as [string, typeof items])
           .filter(([, items]) => items.length > 0)
       : base;
+  }, [grouped, activeBillFilter, activePayer, activePayment, activeType, min, max, capTx, recentCutoff, hasStructuralFilter]);
+
+  const sections = useMemo(() => {
+    // Dopasowanie CASE-INSENSITIVE substring (2026-09-12, user: "możliwość wpisania tagu
+    // własnego, taka wyszukiwarka jakby") — dotąd `activeTagFilter` szedł tylko z kliknięcia
+    // chipa (ZAWSZE dokładny string z `availableTags`, top 12 wg częstości), więc ścisła
+    // równość wystarczała. Teraz może pochodzić też z ręcznie wpisanego tekstu (patrz
+    // `fmTagSearch` niżej) — ścisła równość by nie łapała tagów spoza top 12 ani częściowych
+    // fraz, stąd `includes` zamiast `===`.
+    const q = activeTagFilter?.trim().toLowerCase();
+    const matchesTag = (e: Expense) => {
+      if (!q) return true;
+      if ((e.tags ?? []).some(t => t.toLowerCase().includes(q))) return true;
+      if (e.receiptItems?.some(it => (it.tags ?? []).some(t => t.toLowerCase().includes(q)))) return true;
+      return false;
+    };
+    const filtered = q
+      ? structuralFiltered.map(([date, items]) => [date, items.filter(matchesTag)] as [string, typeof items])
+          .filter(([, items]) => items.length > 0)
+      : structuralFiltered;
     return filtered.map(([date, items]) => ({
       title: formatDate(date + 'T12:00:00'),
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) && !isSelfTransfer(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter, activeBillFilter, activePayer, activePayment, activeType, min, max, activeFilterCount, capTx, recentCutoff]);
+  }, [structuralFiltered, activeTagFilter]);
 
   // Suma po filtrach (2026-08-31) — bez tego "ile płacę za prąd" wymagałoby ręcznego
   // dodawania kwot z każdego dnia; sekcje już pokazują total PER DZIEŃ (sectionTotal

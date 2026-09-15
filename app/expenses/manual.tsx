@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback, memo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard,
@@ -95,21 +95,33 @@ function CategoryPicker({ current, onSelect }: {
   );
 }
 
-function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, onToggleGroup, catMemory, tagMemory, priceMemory }: {
+// Zmemoizowany (2026-09-15, audyt wydajności — ten sam kształt co §13 fix #1, notes.tsx).
+// Dotąd wywoływanie z `.map()` w rodzicu przekazywało NOWE closures (`onUpdate={u =>
+// updateItem(item.id, u)}` itd.) do każdego wiersza na KAŻDY render — edycja pola w JEDNYM
+// produkcie przerysowywała WSZYSTKIE wiersze paragonu (multi-item skan potrafi mieć
+// 20-40+ pozycji, każdy z kilkoma TextInputami/pickerami kategorii-tagów). Rodzic
+// przekazuje teraz STABILNE `onUpdate`/`onDelete`/`onToggleGroup` (id jako pierwszy
+// argument, `useCallback` z pustymi deps) — ten komponent binduje je lokalnie do
+// `item.id` PONIŻEJ, więc reszta ciała funkcji (wywołania `onUpdate({...})` bez id) zostaje
+// nietknięta.
+const ItemRow = memo(function ItemRow({ item, index, onUpdate: onUpdateRaw, onDelete: onDeleteRaw, groupSize, share, canGroup, onToggleGroup: onToggleGroupRaw, catMemory, tagMemory, priceMemory }: {
   item: Item;
   index: number;
-  onUpdate: (updates: Partial<Item>) => void;
-  onDelete: () => void;
+  onUpdate: (id: string, updates: Partial<Item>) => void;
+  onDelete: (id: string) => void;
   groupSize: number;      // members sharing this LEADER's price (1 = not a group)
   share: number | null;   // this item's split of the combined price (preview)
   canGroup: boolean;      // there is an item above to share a price with
-  onToggleGroup: () => void;
+  onToggleGroup: (id: string) => void;
   catMemory: Record<string, ExpenseCategory>;
   tagMemory: Record<string, string[]>;
   priceMemory: PriceMemory;
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const onUpdate = useCallback((updates: Partial<Item>) => onUpdateRaw(item.id, updates), [item.id, onUpdateRaw]);
+  const onDelete = useCallback(() => onDeleteRaw(item.id), [item.id, onDeleteRaw]);
+  const onToggleGroup = useCallback(() => onToggleGroupRaw(item.id), [item.id, onToggleGroupRaw]);
   const [catOpen, setCatOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [newTag, setNewTag] = useState('');
@@ -373,7 +385,7 @@ function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, 
       )}
     </View>
   );
-}
+});
 
 export default function ManualReceiptScreen() {
   const colors = useColors();
@@ -439,20 +451,24 @@ export default function ManualReceiptScreen() {
 
   const addItem = () => setItems(prev => [...prev, makeItem()]);
 
-  const updateItem = (id: string, updates: Partial<Item>) => {
+  // `useCallback` z pustymi deps (2026-09-15, audyt wydajności) — wszystkie trzy używają
+  // WYŁĄCZNIE funkcyjnej formy `setItems(prev => ...)` (nigdy nie czytają `items` z
+  // domknięcia), więc stabilna referencja jest bezpieczna i to ona pozwala zmemoizowanemu
+  // `ItemRow` (wyżej) faktycznie pomijać przerysowanie niezmienionych wierszy.
+  const updateItem = useCallback((id: string, updates: Partial<Item>) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
-  };
+  }, []);
 
-  const deleteItem = (id: string) => {
+  const deleteItem = useCallback((id: string) => {
     setItems(prev => {
       if (prev.length === 1) return prev.map(it => it.id === id ? makeItem() : it);
       return prev.filter(it => it.id !== id);
     });
-  };
+  }, []);
 
-  const toggleGroup = (id: string) => {
+  const toggleGroup = useCallback((id: string) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, groupWithPrev: !it.groupWithPrev } : it));
-  };
+  }, []);
 
   // Group consecutive items that share a combined price. A group starts at any item
   // whose `groupWithPrev` is off; following items with it on attach to that group and
@@ -813,12 +829,12 @@ export default function ManualReceiptScreen() {
                 key={item.id}
                 item={item}
                 index={i}
-                onUpdate={u => updateItem(item.id, u)}
-                onDelete={() => deleteItem(item.id)}
+                onUpdate={updateItem}
+                onDelete={deleteItem}
                 groupSize={info?.size ?? 1}
                 share={info?.share ?? null}
                 canGroup={i > 0}
-                onToggleGroup={() => toggleGroup(item.id)}
+                onToggleGroup={toggleGroup}
                 catMemory={catMemory}
                 tagMemory={tagMemory}
                 priceMemory={priceMemory}

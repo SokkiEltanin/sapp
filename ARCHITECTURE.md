@@ -7466,6 +7466,69 @@ Ustawieniach (ten sam store).
 
 ---
 
+## 103. Optymalizacja wydajności, runda 2 — audyt statyczny (2026-09-15)
+
+User: "dawaj dalej... a potem optymalizacja ta co mówiłeś" — odniesienie do §13
+(2026-09-02), gdzie na ogólną prośbę o "dalszą optymalizację apki" zrobiony był statyczny
+audyt kodu (brak dostępu do profilera na urządzeniu) pod kątem realnych, ewidencjonowanych
+problemów zamiast zgadywania. Ta runda to to samo podejście, po tygodniu nowego kodu
+(overhaul Ustawień §98-102). Audyt zrobiony agentem Explore, każde znalezisko zweryfikowane
+ręcznie przed poprawką (żadne nie przyjęte "na słowo").
+
+Trzy potwierdzone, naprawione:
+
+1. **`app/(tabs)/finances.tsx` — wyszukiwarka tagu przeliczała WSZYSTKO nad CAŁĄ historią
+   na każdy klawisz, gorzej niż oryginalny bug z §13.** Pole "Szukaj tagu" (dodane
+   2026-09-12) pisze do `activeTagFilter` per klawisz. Dotąd JEDEN `useMemo` (`sections`)
+   miał `activeTagFilter` w deps razem z filtrami strukturalnymi (typ/płatnik/płatność/
+   kwota/rachunek) — i ponieważ `capTx` (cięcie do 31 dni) świadomie spada do `false` gdy
+   JAKIKOLWIEK filtr jest aktywny (w tym tag — "filtry zawsze przeszukują całą historię"),
+   pierwszy wpisany znak porzucał cięcie i KAŻDY kolejny klawisz przeliczał filtr
+   strukturalny + zagnieżdżony skan `receiptItems` nad CAŁĄ, nieograniczoną historią
+   transakcji. Fix (ten sam kształt co §13 fix #2): rozbite na `structuralFiltered`
+   (filtry rzadko zmieniające się — deps bez `activeTagFilter`, `capTx` jako boolean
+   zmienia się tylko RAZ na sesję wpisywania, nie per klawisz) i `sections` (dokłada
+   WYŁĄCZNIE dopasowanie tagu, na już przefiltrowanym wejściu). Semantyka "tag szuka całej
+   historii" zachowana bez zmian — poprawiony jest tylko koszt, nie zachowanie.
+2. **`app/achievements.tsx` — 99 odznak bez memoizacji.** Każdy wiersz to był goły
+   `TouchableOpacity` w `.map()` z inline `onPress={() => { haptic.tap(); setDetail(st); }}`
+   — nowa closure na wiersz przy KAŻDYM renderze rodzica, więc samo otwarcie/zamknięcie
+   modala szczegółów (`setDetail`) przerysowywało wszystkie 99 komórek (w tym `BadgeArt` —
+   Image + halo/pulse animacja dla legendarnych). Fix (ten sam kształt co §13 fix #1,
+   `notes.tsx`): nowy `AchievementCell` (`React.memo`), stabilny `onSelect`
+   (`useCallback` puste deps) z rodzica, `s`/`c` (style/kolory) jako propsy zamiast
+   osobnego `useColors()`/`useMemo` w każdej z 99 instancji.
+3. **`app/expenses/manual.tsx` — `ItemRow` (edytor pozycji paragonu) bez memoizacji.**
+   Ten sam kształt buga co #2, aplikowany do multi-item skanów paragonów (20-40+ pozycji
+   realistyczne). `updateItem`/`deleteItem`/`toggleGroup` w rodzicu owinięte
+   `useCallback` (puste deps — bezpieczne, bo używają WYŁĄCZNIE funkcyjnej formy
+   `setItems(prev => ...)`, nigdy nie czytają `items` z domknięcia) i przekazywane
+   BEZPOŚREDNIO (nie `u => updateItem(item.id, u)`); `ItemRow` sam binduje je do
+   `item.id` lokalnym `useCallback` na starcie, więc reszta ciała funkcji (11 miejsc
+   wołających `onUpdate({...})`) zostaje nietknięta — zmienia się tylko sygnatura
+   propsów + `React.memo` na całym komponencie.
+
+**Sprawdzone, bez regresji** (agent zweryfikował, nie znaleziono nowych wystąpień): żadne
+nowe `StyleSheet.create` poza `themedStyles()`/modułowym scope (reguła #1 CLAUDE.md nadal
+przestrzegana wszędzie); żadne nowe przewymiarowane assety (tła lokacji/portrety bossów są
+już świadomie przyciosane, patrz §13 fix #4 i komentarze w `bossIcons.ts`);
+`app/products.tsx`/`app/search.tsx` (oba dotąd naprawione w §13) wciąż poprawnie rozbite na
+base/filtered `useMemo`.
+
+`tsc --noEmit` czyste. `jest`: 73 suity/964 testy bez zmian (czysto wydajnościowe fixy,
+identyczna logika biznesowa — żadna nowa/zmieniona logika do przetestowania).
+
+**Priorytet testu na urządzeniu**: (1) Finanse → wpisz coś w "Szukaj tagu" mając sporo
+transakcji — powinno czuć się responsywniej niż wcześniej, wyniki nadal obejmują CAŁĄ
+historię (nie tylko ostatnie 31 dni); (2) Gablota (Osiągnięcia) — otwórz/zamknij szczegóły
+odznaki kilka razy, scrolluj listę — zero zmiany funkcjonalnej (te same odznaki, te same
+paski postępu), tylko powinno czuć się płynniej przy 99 pozycjach; (3) Dodaj ręczny
+paragon z kilkunastoma pozycjami, edytuj nazwę/cenę/tagi w jednej z nich — reszta pozycji
+nie powinna "migać"/przerysowywać się, funkcjonalnie identycznie jak wcześniej (grupowanie
+cen, sugestie z pamięci, tagi).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
