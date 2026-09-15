@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 PILNE — audyt bezpieczeństwa: hasło keystore w publicznym repo, wymaga TWOJEJ decyzji (2026-09-15)
+
+Pełny opis w ARCHITECTURE.md §105. Dwa znaleziska NIE naprawione (celowo, wymagają decyzji
+poza zakresem samej edycji kodu):
+
+1. **`.github/workflows/build.yml` ma hardkodowane hasło do keystore'a podpisującego
+   release Androida** (`MYAPP_UPLOAD_STORE_PASSWORD`/`MYAPP_UPLOAD_KEY_PASSWORD` =
+   `sapp123release`, 3 miejsca w pliku) — w PUBLICZNYM repo. Sam plik keystore jest
+   bezpieczny (`KEYSTORE_BASE64` to prawdziwy GitHub Secret), ale hasło który go chroni
+   nie jest, i jest to teraz trwale w historii gita, widoczne dla każdego. Realna
+   naprawa = rotacja: nowy keystore + nowe hasło jako GitHub Secret zamiast literału w
+   pliku. To POTENCJALNIE ŁAMIE możliwość publikowania aktualizacji na Google Play dla
+   już opublikowanej apki (Play wymaga TEGO SAMEGO klucza podpisującego dla update'ów,
+   chyba że korzysta się z Play App Signing) — dlatego nie ruszone bez pytania. Powiedz
+   jak chcesz to rozegrać: rotować teraz, zaplanować, czy jest jakiś powód (Play App
+   Signing już aktywny?) czemu rotacja jest bezpieczna.
+2. **Reguły bezpieczeństwa Firestore nie istnieją w tym repo** (żyją w konsoli Firebase)
+   — nie dało się zweryfikować czy realnie ograniczają dostęp do `users/{uid}/...` po
+   stronie serwera. Warto sprawdzić w konsoli Firebase, że każda taka ścieżka wymaga
+   `request.auth.uid == uid`, nie tylko `request.auth != null` (apka loguje się anonimowo
+   jeśli normalny login nie zdąży w 4s, a to jest trywialnie dostępne dla każdego z
+   publicznym `apiKey` projektu).
+
+**Zrobione w tej samej rundzie (bezpieczne, techniczne, już w PR)**: token OAuth
+Kalendarza Google wykluczony z eksportu/kopii danych (wyciekał w czystym tekście przy
+eksporcie JSON), mylący wpis `.gitignore` dla `google-services.json` (plik jest celowo
+publiczny, nie sekret) usunięty.
+
 ## 🆕 Audyt poprawności — 3 realne bugi naprawione, priorytet testu (2026-09-15)
 
 Po dwóch rundach optymalizacji (§13, §103) ten sam agent-audyt, tym razem szukający

@@ -38,6 +38,13 @@ const RETAIN_DAYS = 3;
 const MIN_KEEP = 3;
 const CHUNK = 480_000;                 // chars per chunk, safely under 1 MiB
 const LAST_AUTO_KEY = 'backup_last_auto_at';
+// Wykluczone z eksportu/kopii (2026-09-15, audyt bezpieczeństwa) — `gcal_access_token`
+// (googleCalendarService.ts) to żywy token OAuth do Kalendarza Google, nie stan UI. Eksport
+// JSON ląduje w share-sheecie systemu (mail, chmura, komunikator) — bez tego wykluczenia
+// leciał w nim w czystym tekście razem z resztą danych. Krótkotrwały (Google zwykle ~1h),
+// ale nie ma powodu go w ogóle wysyłać — apka i tak odtwarza go na nowo z bezpiecznie
+// przechowywanej sesji natywnego Google Sign-In SDK.
+const EXCLUDED_LOCAL_KEYS = ['gcal_access_token'];
 const AUTO_EVERY_MS = 24 * 60 * 60 * 1000;
 
 const strip = <T extends Record<string, any>>(obj: T): T =>
@@ -71,7 +78,7 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
   await flushThrottledStorage();
   // Local: every AsyncStorage key except Firebase auth + our own throttle marker.
   const keys = (await AsyncStorage.getAllKeys()).filter(
-    k => !k.startsWith('firebase:') && k !== LAST_AUTO_KEY,
+    k => !k.startsWith('firebase:') && k !== LAST_AUTO_KEY && !EXCLUDED_LOCAL_KEYS.includes(k),
   );
   const pairs = await AsyncStorage.multiGet(keys);
   const local: Record<string, string> = {};
