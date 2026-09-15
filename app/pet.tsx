@@ -15,6 +15,7 @@ import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
 import GearPanel from '@/components/pet/GearPanel';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
+import { useBoxStats } from '@/store/boxStatsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
@@ -220,6 +221,7 @@ export default function Pet() {
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
+  const recordBoxOpen = useBoxStats(st => st.recordOpen);
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
@@ -230,6 +232,13 @@ export default function Pet() {
     if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
+    // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — `daily:true` bo to darmowa
+    // Skrzynka dnia (cost 0), odróżniona od płatnej Drewnianej (ten sam BoxId 'sardine'),
+    // patrz komentarz w onBuyBox (pet-shop.tsx).
+    recordBoxOpen({
+      at: Date.now(), boxId: DAILY_BOX.id, daily: true, cost: 0, rewardType: reward.type,
+      coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+    });
     haptic.success();
     setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });
   };

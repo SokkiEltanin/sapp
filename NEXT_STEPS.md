@@ -12,16 +12,21 @@ kraina X"). Przeniesione do `s.missionBarTrack` w `app/pet.tsx` — `tsc`/`jest`
 Do zrobienia (przez usera, na urządzeniu): otworzyć misję do Lodowej Krainy, sprawdzić że
 tło widać TYLKO w pasku "1:XX:XX", a scena z kotkiem/ekwipunkiem jest znów czysta.
 
-## 🆕 W trakcie: statystyki otwierania skrzynek (Rynek/pet-shop) per typ skrzynki
+## ✅ Statystyki otwierania skrzynek (Rynek/pet-shop) per typ skrzynki (2026-09-15)
 
-User: *"niech mi tez da statystyki tam otwierania skrzynek (procentowe, zysk,strata itp
-itd zeby balansować trochę pozniej... ale to nic nie zmieniaj ja pootwieram ze
-statystykami podzielonym per skrzynka zeby wiedzieć jak balansować nie q ciemno"*.
-Czysto addytywna instrumentacja (log + ekran statystyk) dla `src/utils/petBoxes.ts`
-(`sardine`/`iron`/`gold`/`divine`) — **żadna wartość ekonomii (koszt, szanse, zakresy
-monet) nie może się zmienić w ramach tego zadania**. Wzorzec: capped event-log jak
-`usageStatsStore.events`/`bankQueueStore.history`. Jeszcze nie zaimplementowane — patrz
-konwersacja po szczegóły integracji (punkt wywołania `rollBox()` w `petStore.ts`).
+Pełny opis w ARCHITECTURE.md §108. User: *"niech mi tez da statystyki tam otwierania
+skrzynek (procentowe, zysk,strata itp itd zeby balansować trochę pozniej... ale to nic nie
+zmieniaj ja pootwieram ze statystykami podzielonym per skrzynka zeby wiedzieć jak
+balansować nie q ciemno"*. Zaimplementowane: `boxStatsStore.ts` (capped log, wzorzec jak
+`usageStatsStore`) + `boxStatsAnalysis.ts` (per-skrzynka % typu nagrody, rozkład rzadkości
+monet basic/legendary z avg, rozkład rzadkości ekwipunku, bilans monet) + panel
+`app/box-stats.tsx` + skrócona karta w Ustawienia → Dane. Logowanie wpięte w oba miejsca
+wołające `rollBox()` (`onBuyBox` w pet-shop.tsx, `onDailyBox` w pet.tsx), darmowa
+Skrzynka dnia rozdzielona od płatnej Drewnianej mimo tego samego `BoxId`. **Zero zmian
+w wartościach ekonomii** — `tsc`/`jest` czyste (+ nowy test `boxStatsAnalysis.test.ts`).
+Do zrobienia (user): pootwierać sporo skrzynek na urządzeniu, sprawdzić czy panel
+faktycznie pokazuje to zniekształcenie (common 60-80 vs legendary jackpot 40) o którym
+wspomniał — dopiero potem osobna rozmowa o rebalansie.
 
 ## ✅ Audyt bezpieczeństwa — keystore zrotowany, 1 punkt zostaje (2026-09-15)
 

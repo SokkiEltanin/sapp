@@ -20,6 +20,7 @@ import { POTIONS, PotionKind, POTION_ICON, FREEZE_COIN_ICON, isPotionActive, fmt
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
+import { useBoxStats } from '@/store/boxStatsStore';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
 import { spacing, radius } from '@/theme';
@@ -186,6 +187,7 @@ export default function PetShop() {
     ownedCombatItems: s.ownedCombatItems, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
     activePotion: s.activePotion, buyPotion: s.buyPotion,
   })));
+  const recordBoxOpen = useBoxStats(st => st.recordOpen);
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
@@ -297,6 +299,14 @@ export default function PetShop() {
       if (reward.type === 'coins') addCoins(reward.coins);
       else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
       else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
+      // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — czysta obserwacja wyniku
+      // `rollBox()`, żadna wartość ekonomii się tu nie zmienia. `daily:false` bo to
+      // PŁATNA skrzynka (patrz onDailyBox w pet.tsx dla darmowej, ten sam BoxId 'sardine'
+      // musi zostać odróżniony żeby statystyki się nie zlały).
+      recordBoxOpen({
+        at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
+        coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+      });
       haptic.success();
       setReveal({ box, reward, dupeCoins });
     }, 'Otwórz', odds);
