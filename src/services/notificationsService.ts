@@ -157,6 +157,10 @@ export const notificationsService = {
     } catch {}
   },
 
+  async cancelDailyMoodReminder(): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync('daily-mood').catch(() => {});
+  },
+
   async scheduleMorningMoodReminder(hour = 8, minute = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
     return Notifications.scheduleNotificationAsync({
