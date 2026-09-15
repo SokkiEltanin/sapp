@@ -7647,6 +7647,33 @@ nowego do przetestowania jednostkowo).
 plik NIE powinien zawierać `gcal_access_token`; reszta eksportu (wydatki/nastrój/itd.)
 bez zmian.
 
+## 106. Rotacja keystore'a podpisującego — domknięcie §105 (2026-09-15)
+
+User potwierdził: apka NIE jest publikowana na Google Play (tylko GitHub Releases +
+własne urządzenie) — usuwa to główne ryzyko rotacji (łamanie aktualizacji istniejącej
+publikacji na Play, bo Play wymaga tego samego klucza podpisującego dla update'ów).
+
+**Co zrobione.** Nowy keystore (`keytool -genkeypair`, RSA 2048, alias `sapp` — bez
+zmian, `build.yml` go oczekuje) + nowe, losowe 32-znakowe hasło wygenerowane lokalnie w
+sesji, wysłane userowi (`SendUserFile`, nie wklejone gołym tekstem na czacie) razem z
+instrukcją krok po kroku. User zapisał: `KEYSTORE_BASE64` (istniejący sekret,
+zaktualizowany) i `ANDROID_KEYSTORE_PASSWORD` (nowy sekret). `build.yml`
+zaktualizowany — 3 miejsca z `sapp123release` wpisanym na sztywno zastąpione odczytem z
+`${{ secrets.ANDROID_KEYSTORE_PASSWORD }}` przez `env:` na każdym kroku (GitHub Actions
+automatycznie maskuje w logach każdy string pasujący do użytego sekretu — także w kroku
+`tail gradle.properties`, który wcześniej wypisywał zawartość pliku z hasłem w środku).
+
+**Świadomie NIE zrobione**: przepisanie historii gita żeby usunąć stare
+`sapp123release` — technicznie możliwe (`git filter-repo`), ale dużo bardziej
+ryzykowne/destrukcyjne niż warte tego problemu, skoro stare hasło już nic nie chroni
+(stary keystore przestał być używany). Zostaje trwale w historii, ale to martwy sekret.
+
+**Priorytet po następnym buildzie z GitHub Actions**: nowy APK ma INNY podpis — Android
+odmówi zainstalowania go jako aktualizacji nad obecną apką. User musi: (1) opcjonalnie
+zrobić kopię zapasową w apce (Ustawienia → Dane → Kopia zapasowa — dane i tak są w
+chmurze Firestore, więc to tylko dodatkowe zabezpieczenie); (2) odinstalować obecną
+apkę; (3) zainstalować nowy APK, zalogować się tym samym kontem Google.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
