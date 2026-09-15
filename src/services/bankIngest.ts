@@ -52,6 +52,7 @@ export async function ingestBankNotification(title: string, text: string, notifK
       suggestedCategory: 'other',
       jd,
       auto: (store.autoAll || !!incomeRule) && !uncertain,
+      matchedSource: incomeRule ? 'template' : undefined,
       ...(uncertain ? { flagReason: 'duży przelew przychodzący — potwierdź, czy to przychód' } : {}),
     });
   }
@@ -98,6 +99,7 @@ export async function ingestBankNotification(title: string, text: string, notifK
     // earn trust (5 clean accepts) before its payments skip review — and uncertain ones
     // always fall back to review regardless.
     auto: (store.autoAll || !!learned?.auto) && !uncertain,
+    matchedSource: learned ? 'learned' : (rule ? 'template' : 'guess'),
     ...(uncertain ? { flagReason } : {}),
   });
 }
