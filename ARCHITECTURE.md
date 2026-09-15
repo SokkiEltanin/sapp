@@ -7090,6 +7090,60 @@ lokalnie) — to jest DOKŁADNIE scenariusz który ta zmiana miała zabezpieczy�
 wyłączony internet przy starcie → apka powinna pokazać się i działać lokalnie normalnie
 (offline-first), auth/sync dogoni później jak zawsze.
 
+## 98. Sprzątanie Ustawień, runda 1: wypłata domyślnie off, martwy "Ogranicz animacje", "Więcej"→"Skróty"
+
+User dał naraz 7 zgłoszeń do Ustawień (screenshot + lista). Ta runda — trzy najmniejsze,
+bezpieczne do zrobienia od razu; pozostałe (nowy panel Statystyk, przebudowa nawigacji
+Ustawień/Kopii zapasowej, overhaul sekcji banku z historią odczytów, ulepszenie zarządzania
+powiadomieniami) idą w kolejnych PR-ach — za duże/zbyt różne żeby robić je razem.
+
+**1. "Pytaj o wypłatę" domyślnie WYŁĄCZONE.** User: *"teraz to już nie ma sensu skoro
+daliśmy szablon — jak wykryje powiadomienie... automatycznie miało przypisać że to
+praca"*. Bank rule templates (`bankRulesStore.ts`, sekcja "Auto-wydatki z banku") już
+rozpoznają nadawcę jako "Wypłata/przychód" i księgują automatycznie — ręczny prompt na
+dashboardzie ("Dostałeś wypłatę?") dubluje to dla userów z skonfigurowanym szablonem.
+Doprecyzowane (AskUserQuestion): kod ZOSTAJE (przydatny bez auto-wykrywania z banku),
+tylko domyślnie wyłączony. Nowa jednorazowa migracja `migratePaydayDefaultOff()`
+(`payday.ts`, ten sam wzorzec co `migrateBalanceModel`) wymusza `enabled: false` RAZ dla
+istniejących userów którzy mieli to włączone z dawnych czasów (nowi userzy i tak dostają
+`false` domyślnie). Podpięta w `_layout.tsx` obok innych jednorazowych migracji.
+Zaktualizowany podpis przełącznika w Ustawieniach, tłumaczący kiedy jest zbędny.
+
+**2. "Ogranicz animacje (płynność)" — martwy przełącznik USUNIĘTY.** User: *"chyba już
+jest nie używany... to było do animacji hero kiedyś teraz useless zajmuje miejsce"* —
+zgadł trafnie. `liteMode` (`uiPrefs.ts`) sterował WYŁĄCZNIE `AnimatedCardBg.tsx`
+(animowane niebo/gwiazdy/chmury za kartą hero), ale `app/(tabs)/index.tsx` miał już tylko
+MARTWY `import AnimatedCardBg` — bez ŻADNEGO użycia w JSX (redesign hero w którymś
+momencie porzucił ten komponent, import i setting zostały osierocone). Usunięte: cały
+plik `AnimatedCardBg.tsx`, `liteMode`/`setLiteMode` z `uiPrefs.ts` (zostaje `tabSlide` —
+osobny, wciąż żywy pref), przełącznik + jego state w `settings.tsx`, martwy import w
+`index.tsx`.
+
+**3. Sekcja "Więcej" → "Skróty".** User: *"bo to realnie skróty do liczników pupila
+itp"*. Sekcja zawsze zawierała tylko 3 linki (Gablota osiągnięć/Liczniki i odliczania/
+Pupil) — "Więcej" nic nie mówiło co w środku. Samo `title` zmienione (`id` zostaje
+`'wiecej'` — stabilność wewnętrzna, `'więcej'` zostaje też w `keywords` pod starą nazwę
+w wyszukiwarce Ustawień).
+
+**Explicite NIE zrobione w tej rundzie**: pozostałe 4 zgłoszenia z tej samej wiadomości
+usera — nowy dedykowany ekran "Statystyki" z wykresami w czasie (obecny
+`usageStatsStore.ts` ma tylko agregat count+lastOpenedAt, bez historii — wymaga nowego
+modelu danych); przebudowa "Kopia zapasowa" (dziś zawsze rozwinięta, poza mechanizmem
+akordeonu Ustawień) w kolejną, zwijalną/osobną podstronę; overhaul całej sekcji "Auto-
+wydatki z banku" (czytelność, historia odczytanych powiadomień, jaśniejszy związek
+szablon→kategoria/tagi — user przesłał zrzut z konkretnymi uwagami); ulepszenie
+zarządzania powiadomieniami w apce (kiedy/personalizacja wyglądu każdego typu).
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (bez nowych — `payday.ts` nie ma
+dedykowanych testów jednostkowych, `paycheck.test.ts` to coś innego — rozpoznawanie
+nadawcy w `bankNotification.ts`, nietknięte).
+
+**Priorytet testu na urządzeniu**: (1) świeży install (albo user z już włączonym "Pytaj o
+wypłatę") → po aktualizacji przełącznik powinien być WYŁĄCZONY (chyba że świadomie
+włączysz go z powrotem — migracja działa RAZ, ponowne włączenie zostaje); (2) Ustawienia
+→ Personalizacja → "Ogranicz animacje" powinno całkowicie zniknąć z listy; (3) sekcja
+dawniej "Więcej" pokazuje się teraz jako "Skróty" z tymi samymi 3 linkami.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

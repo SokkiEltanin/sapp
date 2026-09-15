@@ -31,6 +31,7 @@ import { flushThrottledStorage } from '@/utils/throttledStorage';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
+import { migratePaydayDefaultOff } from '@/utils/payday';
 import { loadNonFood } from '@/utils/food';
 import { loadOwnName } from '@/utils/ownName';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
@@ -209,6 +210,7 @@ export default function RootLayout() {
 
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
+  useEffect(() => { migratePaydayDefaultOff().catch(() => {}); }, []);
   useEffect(() => { loadNonFood().catch(() => {}); }, []);   // "to nie jedzenie" exclusions → module set
   useEffect(() => { loadOwnName().catch(() => {}); }, []);   // własne imię → wykrywanie przelewów do siebie (bankNotification.ts)
 
