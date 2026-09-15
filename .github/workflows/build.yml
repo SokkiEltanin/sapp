@@ -128,9 +128,24 @@ jobs:
           cat android/app/google-services.json | grep -E "package_name|certificate_hash"
 
       - name: Print keystore SHA-1 (for verification)
+        # Zmienione na non-blocking + pełny output (2026-09-15) — poprzednia wersja piper'owała
+        # `keytool` PROSTO w `grep "SHA1:"` bez `continue-on-error`. Gdy `keytool` faktycznie
+        # się wywalał (złe hasło z sekretu, uszkodzony plik keystore z base64), jego prawdziwy
+        # komunikat błędu nie zawierał "SHA1:" → grep nie znajdował dopasowania → exit 1 → CAŁY
+        # job padał TU, zanim dotarł do właściwego budowania/podpisywania — i przez `2>&1 | grep`
+        # realny komunikat błędu z keytoola NIGDY nie trafiał do logów (grep go po prostu
+        # odrzucał). Efekt: 2 buildy z rzędu (#216 rotacja keystore'a, #217) padły z zerową
+        # informacją o PRAWDZIWEJ przyczynie. Teraz: krok nigdy nie zatrzymuje joba
+        # (`continue-on-error`) i zawsze drukuje CAŁY output keytoola (SHA1 jeśli się uda,
+        # inaczej realny błąd) — kolejny krok (`Build release APK`, który i tak używa TEGO
+        # SAMEGO hasła/pliku do prawdziwego podpisywania) i tak ujawni czy sekrety są złe, ale
+        # teraz będzie wiadomo DLACZEGO już na tym wcześniejszym, tańszym kroku.
+        continue-on-error: true
         env:
           MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass "$MYAPP_UPLOAD_STORE_PASSWORD" 2>&1 | grep "SHA1:"
+        run: |
+          keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass "$MYAPP_UPLOAD_STORE_PASSWORD" 2>&1 | tee /tmp/keytool-out.txt
+          grep -q "SHA1:" /tmp/keytool-out.txt && echo "OK: keystore/password readable" || echo "FAIL: keytool could not read the keystore with this password — see output above"
 
       # Pre-install the NDK explicitly, with retries + cleanup of any corrupt partial
       # download. Gradle's own auto-install has no retry, so a single bad download
