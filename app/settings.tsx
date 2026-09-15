@@ -55,7 +55,6 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { useWorkStore } from '@/store/workStore';
 import { useDashboardLayout } from '@/store/dashboardLayout';
 import { useHeroFont, HERO_FONTS } from '@/store/heroFont';
-import { useUiPrefs } from '@/store/uiPrefs';
 import { runSamsungBackfill, backfillRange, isBackfillDone } from '@/utils/samsungBackfill';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { ingestBankNotification } from '@/services/bankIngest';
@@ -111,8 +110,6 @@ export default function SettingsScreen() {
   const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
   const themeMode = useThemeStore(s => s.mode);
-  const liteMode = useUiPrefs(s => s.liteMode);
-  const setLiteMode = useUiPrefs(s => s.setLiteMode);
   const { birthdate, gender, trainingLevel, setBirthdate, setGender, setTrainingLevel } = useProfileStore();
   const age = ageFrom(birthdate);
 
@@ -749,13 +746,6 @@ export default function SettingsScreen() {
           keywords: ['wibracje', 'haptyka', 'dotyk', 'feedback', 'klik'],
           control: { kind: 'switch', value: hapticsOn, onChange: (v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); } },
         },
-        {
-          id: 'lite-mode', title: 'Ogranicz animacje (płynność)',
-          subtitle: 'Wyłącza animowane tło (chmury/gwiazdy/pogoda) — najcięższy efekt. Włącz, jeśli apka klatkuje.',
-          icon: LucideIcons.Zap, accentColor: '#2AC68F',
-          keywords: ['animacje', 'płynność', 'fps', 'klatkowanie', 'wydajność', 'lag', 'tło'],
-          control: { kind: 'switch', value: liteMode, onChange: (v) => { haptic.tap(); setLiteMode(v); } },
-        },
       ],
     },
     {
@@ -1169,8 +1159,14 @@ export default function SettingsScreen() {
       keywords: ['pensja', 'przychód', 'payday'],
       items: [
         {
+          // Domyślnie WYŁĄCZONE od 2026-09-15 (patrz migratePaydayDefaultOff w payday.ts)
+          // — user: "teraz to już nie ma sensu skoro daliśmy szablon... jak wykryje
+          // powiadomienie... automatycznie miało przypisać że to praca". Jeśli masz
+          // skonfigurowany szablon banku na swojego pracodawcę (Auto-wydatki z banku →
+          // szablon, rodzaj "Wypłata/przychód"), wypłata księguje się sama i ten prompt
+          // jest zbędny — zostaje dla kogoś BEZ auto-wykrywania z banku.
           id: 'payday-enabled', title: 'Pytaj o wypłatę',
-          subtitle: 'Dashboard zapyta, czy dostałeś wypłatę — po potwierdzeniu doda przychód i ustawi ostatnią wypłatę.',
+          subtitle: 'Ręczny prompt na dashboardzie — zbędny, jeśli masz szablon banku na wypłatę (Auto-wydatki z banku), bo ten księguje ją automatycznie. Włącz, jeśli nie korzystasz z auto-wykrywania.',
           icon: Wallet, accentColor: '#2AC68F',
           keywords: ['wypłata', 'pytanie', 'przypomnienie', 'przychód', 'dzień wypłaty'],
           control: { kind: 'switch', value: paydayEnabled, onChange: (v) => { haptic.tap(); setPaydayEnabled(v); savePayday(v, paydayDay); } },
@@ -1635,8 +1631,11 @@ export default function SettingsScreen() {
       ],
     },
     {
-      id: 'wiecej', title: 'Więcej', icon: LucideIcons.MoreHorizontal, color: '#8A93A8', defaultOpen: false,
-      keywords: ['osiągnięcia', 'liczniki', 'pupil'],
+      // Nazwa "Skróty" (2026-09-15, było "Więcej") — user: "bo to realnie skróty do
+      // liczników pupila itp" — sekcja to zawsze była tylko 3 linki-skróty (osiągnięcia/
+      // liczniki/pupil), "Więcej" nic nie mówiło o tym co w środku.
+      id: 'wiecej', title: 'Skróty', icon: LucideIcons.MoreHorizontal, color: '#8A93A8', defaultOpen: false,
+      keywords: ['osiągnięcia', 'liczniki', 'pupil', 'więcej', 'skróty'],
       items: [
         {
           id: 'more-achievements', title: 'Gablota osiągnięć', subtitle: 'Odznaki, serie, legendy i grzeszki',

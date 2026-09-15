@@ -40,6 +40,24 @@ export async function setPaydayConfig(c: PaydayConfig): Promise<void> {
   ]);
 }
 
+// One-time migration (2026-09-15, user: "teraz to już nie ma sensu skoro daliśmy
+// szablon... jak wykryje powiadomienie... automatycznie miało przypisać że to praca" —
+// bank rule templates, patrz bankRulesStore.ts, już rozpoznają nadawcę jako "Wypłata/
+// przychód" i księgują automatycznie, więc ten starszy, ręczny "zapytaj czy dostałeś
+// wypłatę" prompt na dashboardzie dubluje to dla userów którzy już skonfigurowali
+// szablon. Kod ZOSTAJE (świadomie, user: "wyłącz domyślnie, zostaw kod" — ktoś bez
+// bankowego auto-wykrywania nadal może go chcieć), tylko WYŁĄCZONY jednorazowo dla
+// istniejących userów którzy mieli go włączonego z dawnych czasów — nowi userzy i tak
+// dostają `enabled: false` domyślnie (patrz getPaydayConfig).
+const MIGRATION_KEY_OFF = 'payday_migration_off_v1';
+export async function migratePaydayDefaultOff(): Promise<void> {
+  try {
+    if (await AsyncStorage.getItem(MIGRATION_KEY_OFF)) return;
+    await AsyncStorage.setItem(MIGRATION_KEY_OFF, '1');
+    await AsyncStorage.setItem(K_ENABLED, 'false');
+  } catch {}
+}
+
 export async function getPaydayHandledMonth(): Promise<string | null> {
   return AsyncStorage.getItem(K_HANDLED);
 }

@@ -150,7 +150,6 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { usePillFlash } from '@/store/pillFlashStore';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
-import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
