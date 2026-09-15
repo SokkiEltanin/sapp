@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -32,6 +32,30 @@ import { haptic } from '@/utils/haptics';
 
 const GROUP_ORDER: AchGroup[] = ['Legendy', 'Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Życie', 'Konsekwencja', 'Grzeszki'];
 
+// Zmemoizowany wiersz gabloty (2026-09-15, audyt wydajności — ten sam kształt co §13 fix
+// #1, notes.tsx). Lista ma dziś 99 odznak; dotąd każda była gołym `TouchableOpacity` w
+// `.map()` z inline'owym `onPress={() => { haptic.tap(); setDetail(st); }}` — nowa closure
+// per wiersz na KAŻDY render rodzica, więc samo otwarcie/zamknięcie modala szczegółów
+// (`setDetail`) przerysowywało wszystkie 99 komórek (w tym `BadgeArt` — Image/halo/pulse
+// per odznaka), mimo że żadna z nich się realnie nie zmieniła. `s`/`c` idą jako propsy
+// (nie osobne `useColors()`/`useMemo` w każdej z 99 instancji) — rodzic i tak je już liczy
+// raz, po co subskrybować się 99 razy do tego samego stabilnego obiektu.
+const AchievementCell = memo(function AchievementCell({ state, s, c, onSelect }: {
+  state: AchState; s: ReturnType<typeof makeS>; c: ReturnType<typeof useColors>; onSelect: (st: AchState) => void;
+}) {
+  return (
+    <TouchableOpacity style={s.cell} activeOpacity={0.8} onPress={() => onSelect(state)}>
+      <BadgeArt id={state.a.id} tier={state.a.tier} unlocked={state.unlocked} bad={state.a.kind === 'bad'} size={72} />
+      <Text style={[s.cellTitle, !state.unlocked && { color: c.text.muted }]} numberOfLines={1}>{state.a.title}</Text>
+      {!state.unlocked && state.a.target > 1 && (
+        <View style={s.cellBar}>
+          <View style={{ width: `${Math.round(state.progress * 100)}%`, height: '100%', backgroundColor: state.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[state.a.tier], borderRadius: 2 }} />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
+
 export default function Achievements() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -50,6 +74,7 @@ export default function Achievements() {
   const [cardPeak, setCardPeak] = useState(0);
   const [earned, setEarnedMap] = useState<EarnedMap>({});
   const [detail, setDetail] = useState<AchState | null>(null);
+  const handleSelectAchievement = useCallback((st: AchState) => { haptic.tap(); setDetail(st); }, []);
 
   useEffect(() => { getEarned().then(setEarnedMap).catch(() => {}); }, []);
   useEffect(() => { getHealthHistory(200).then(setHealthDays).catch(() => {}); }, []);
@@ -142,16 +167,7 @@ export default function Achievements() {
               <Text style={[s.groupTitle, isBad && { color: BAD_COLOR }, isLegend && { color: TIER_COLOR[4] }]}>{isBad ? 'Grzeszki (antyodznaki)' : isLegend ? '✦ Legendy' : g}</Text>
               <View style={s.grid}>
                 {byGroup[g].map(st => (
-                  <TouchableOpacity key={st.a.id} style={s.cell} activeOpacity={0.8}
-                    onPress={() => { haptic.tap(); setDetail(st); }}>
-                    <BadgeArt id={st.a.id} tier={st.a.tier} unlocked={st.unlocked} bad={st.a.kind === 'bad'} size={72} />
-                    <Text style={[s.cellTitle, !st.unlocked && { color: c.text.muted }]} numberOfLines={1}>{st.a.title}</Text>
-                    {!st.unlocked && st.a.target > 1 && (
-                      <View style={s.cellBar}>
-                        <View style={{ width: `${Math.round(st.progress * 100)}%`, height: '100%', backgroundColor: st.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[st.a.tier], borderRadius: 2 }} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  <AchievementCell key={st.a.id} state={st} s={s} c={c} onSelect={handleSelectAchievement} />
                 ))}
               </View>
             </View>

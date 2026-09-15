@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Optymalizacja wydajności — runda 2, statyczny audyt (2026-09-15)
+
+Kontynuacja §13 (2026-09-02) po tygodniu nowego kodu. Agent Explore przeskanował
+kodobazę pod kątem trzech znanych klas bugów (niestabilne closures w długich listach,
+drogie przeliczenia per-klawisz, przewymiarowane assety) + `StyleSheet.create` poza
+`themedStyles()`. Trzy realne, potwierdzone i naprawione — pełny opis w §103:
+1. Finanse — wyszukiwarka tagu przeliczała filtr + zagnieżdżony skan `receiptItems` nad
+   CAŁĄ historią transakcji na KAŻDY klawisz (gorszy wariant buga z §13).
+2. Gablota (Osiągnięcia) — 99 odznak bez memoizacji, każdy render rodzica przerysowywał
+   wszystkie.
+3. Ręczny paragon — edytor pozycji (`ItemRow`) bez memoizacji, ten sam kształt.
+
+Assety graficzne i `StyleSheet.create` sprawdzone — bez regresji, nic do poprawy.
+`tsc`/`jest` czyste, zero zmian logiki biznesowej.
+
+**Priorytet testu na urządzeniu**: patrz checklist w §103 (wyszukiwarka tagu w Finansach,
+scroll/klik w Gablocie, edycja wieloproduktowego ręcznego paragonu).
+
 ## ✅ Sprzątanie Ustawień — WSZYSTKIE 5 rund zrobione, batch zamknięty (2026-09-15)
 
 User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku,
