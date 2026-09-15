@@ -13,12 +13,38 @@ export interface PendingBankTx extends ParsedBankTx {
   auto?: boolean;                // trusted merchant → auto-accept on next app open
   jd?: boolean;                  // income: log as a [JD] paycheck (salary + work tag)
   flagReason?: string;           // set → held for confirmation (something looked off), shown in review
+  matchedSource?: 'template' | 'learned' | 'guess'; // how category/tags got picked — see bankIngest.ts
   addedAt: number;
 }
 
 // Cap on the notification-dedup memory below — bounded so it can never grow unbounded
 // (roughly a year+ of daily bank traffic at typical volume; old entries just age out).
 const SEEN_NOTIFICATIONS_MAX = 500;
+
+// Ingestion history (2026-09-15, user, dwa razy: "dodajmy historie zczytywania tutaj,
+// dodajmy informacje itp zeby szablony przepisywała do kategorii i tagow") — dotąd
+// jedynym śladem odczytanego powiadomienia był `pending` (znika po zatwierdzeniu/
+// odrzuceniu) i `seenNotifications` (gołe klucze dedup, bez żadnych metadanych do
+// pokazania). Ten log jest tylko do wglądu w Ustawieniach — nic go nie czyta z powrotem
+// przy księgowaniu — więc trzyma zdenormalizowaną kopię pól potrzebnych do wyświetlenia
+// (sklep/kwota/kategoria/tagi/źródło dopasowania), nie referencję do `pending`. Capped
+// jak `seenNotifications` wyżej — rolling window, nie pełny audit trail.
+const HISTORY_MAX = 150;
+
+export interface BankIngestHistoryEntry {
+  id: string;
+  at: number;
+  store: string;
+  amount: number;
+  currency: string;
+  direction: 'in' | 'out';
+  category: ExpenseCategory | 'transfer';
+  tags?: string[];
+  matchedSource?: 'template' | 'learned' | 'guess';
+  jd?: boolean;
+  auto: boolean;
+  flagReason?: string;
+}
 
 interface BankQueueState {
   pending: PendingBankTx[];
@@ -41,6 +67,7 @@ interface BankQueueState {
   // odebrania) — sprawdzana W `ingestBankNotification` PRZED parsowaniem, więc dokładnie ten
   // sam event nigdy nie trafi do kolejki drugi raz, niezależnie ile dni minęło.
   seenNotifications: string[];
+  history: BankIngestHistoryEntry[];
   setEnabled: (v: boolean) => void;
   setAutoAll: (v: boolean) => void;
   wasNotificationSeen: (key: string) => boolean;
@@ -49,6 +76,7 @@ interface BankQueueState {
   update: (id: string, patch: Partial<PendingBankTx>) => void;
   remove: (id: string) => void;
   clear: () => void;
+  clearHistory: () => void;
 }
 
 export const useBankQueue = create<BankQueueState>()(
@@ -58,6 +86,7 @@ export const useBankQueue = create<BankQueueState>()(
       enabled: false,
       autoAll: false,
       seenNotifications: [],
+      history: [],
       setEnabled: (v) => set({ enabled: v }),
       wasNotificationSeen: (key) => get().seenNotifications.includes(key),
       markNotificationSeen: (key) => set((s) => ({
@@ -81,12 +110,25 @@ export const useBankQueue = create<BankQueueState>()(
           Math.abs(new Date(p.dateISO).getTime() - new Date(tx.dateISO).getTime()) < 3 * 60000,
         );
         if (dup) return false;
-        set((s) => ({ pending: [{ ...tx, id: `bnk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, addedAt: Date.now() }, ...s.pending] }));
+        const id = `bnk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const at = Date.now();
+        set((s) => ({
+          pending: [{ ...tx, id, addedAt: at }, ...s.pending],
+          history: [
+            {
+              id, at, store: tx.store, amount: tx.amount, currency: tx.currency,
+              direction: tx.direction, category: tx.category as any, tags: tx.tags,
+              matchedSource: tx.matchedSource, jd: tx.jd, auto: !!tx.auto, flagReason: tx.flagReason,
+            },
+            ...s.history,
+          ].slice(0, HISTORY_MAX),
+        }));
         return true;
       },
       update: (id, patch) => set((s) => ({ pending: s.pending.map(p => p.id === id ? { ...p, ...patch } : p) })),
       remove: (id) => set((s) => ({ pending: s.pending.filter(p => p.id !== id) })),
       clear: () => set({ pending: [] }),
+      clearHistory: () => set({ history: [] }),
     }),
     { name: 'bank-queue-v1', storage: throttledPersistStorage() },
   ),

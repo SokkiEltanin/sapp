@@ -7146,6 +7146,86 @@ dawniej "Więcej" pokazuje się teraz jako "Skróty" z tymi samymi 3 linkami.
 
 ---
 
+## 99. Sprzątanie Ustawień, runda 2: historia odczytów banku + czytelność sekcji "Auto-wydatki z banku"
+
+User (dwukrotnie, z tym samym zrzutem "Auto-wydatki z banku (PeoPay)"): *"realnie
+usprawnijmy i ulepszmy wizualnie te zakładkę na screenie, duzo tutaj tekstu informacji
+malo czytelnosci i czy wszystko działa, dodajmy historie zczytywania tutaj, dodajmy
+informacje itp zeby szablony przepisywała do kategorii i tagow i wgle okie specjalisty
+zerknij"* — czwarte z pięciu dużych zgłoszeń odłożonych w §98.
+
+**1. Historia odczytów (nowość).** Dotąd JEDYNYM śladem odczytanego powiadomienia był
+`pending` (znika po zatwierdzeniu/odrzuceniu w `/bank-review`) i `seenNotifications`
+(gołe klucze dedup `pkg:postTime`, bez żadnych metadanych — patrz §-komentarz w
+`bankQueueStore.ts`). Dodano `history: BankIngestHistoryEntry[]` (capped na 150, ten sam
+wzorzec co `seenNotifications`) + akcję `clearHistory()` w `bankQueueStore.ts`. Zapis
+dzieje się w JEDNYM miejscu — wewnątrz `enqueue()`, tuż obok wstawienia do `pending` — nie
+w `bankIngest.ts` przy każdym z 3 call-site'ów, żeby nie dublować logiki i mieć
+gwarancję że historia i `pending` nigdy się nie rozjadą. Wpis: sklep, kwota+waluta,
+kierunek, kategoria (albo `'transfer'` dla przelewu własnego), tagi, `auto`/`flagReason`,
+`jd` (czy oznaczone jako wypłata) i nowe pole `matchedSource`.
+
+**2. `matchedSource` — skąd wzięła się kategoria (odpowiedź na "żeby szablony
+przepisywała do kategorii i tagów").** Nowe opcjonalne pole na `PendingBankTx`:
+`'template' | 'learned' | 'guess'`. Ustawiane w `bankIngest.ts` w dwóch miejscach, gdzie
+kategoria/`jd` faktycznie się rozstrzyga: przychód → `'template'` gdy trafił
+`incomeRule` (szablon "Wypłata"), inaczej brak (zwykły przelew, nic nie dopasowało);
+wydatek → `'learned'` (nauczony sklep z `merchantMemory.ts`, wygrywa zawsze) →
+`'template'` (dopasowany `bankRulesStore` rule) → `'guess'` (sztywny słownik-zgadywacz w
+`guessCategory`). Self-transfer nie ustawia nic — zawsze jednoznacznie "przelew własny",
+nie trzeba tłumaczyć skąd.
+
+**3. UI: `BankHistorySection.tsx`** (nowy, `src/components/settings/`, wzorowany 1:1 na
+istniejącym `UsageStatsSection.tsx` — `themedStyles` + `useMemo`, top-6 z "pokaż
+wszystkie", `ConfirmDialog` na czyszczenie). Każdy wiersz: kolorowa ikonka wg kategorii
+(`CATEGORY_META`, dynamiczny lookup `(LucideIcons as any)[meta.icon]` — ten sam wzorzec co
+`ExpenseItem.tsx`) albo specjalny wygląd dla przychodu/wypłaty/przelewu własnego, nazwa
+sklepu, druga linia = kategoria/tagi + etykieta źródła ("wg szablonu" / "nauczony sklep" /
+"zgadywane" — właśnie ten fragment odpowiada na "informacje żeby szablony przepisywała do
+kategorii i tagów"), kwota ze znakiem +/−, znacznik czasu + "auto" jeśli zaksięgowano bez
+przeglądu. Podpięte jako nowy `custom` item `'bank-history'` na końcu sekcji `'bank'` w
+`settings.tsx`, widoczny tylko gdy `bankEnabled` (jak reszta sekcji).
+
+**4. Czytelność sekcji ("dużo tekstu, mało czytelności").** Sekcja była jedną ścianą
+kolejnych `TextInput`/przycisków bez żadnego wizualnego grupowania poza pojedynczymi
+`borderTopWidth`. Dodane trzy male-caps etykiety-nagłówki (nowy styl `bankGroupLabel`,
+custom itemy bez własnej ramki, żeby nie dublować obramowania z itemem który po nich
+następuje): "Rozwiązywanie problemów i test" (przed dostępem do powiadomień/testem
+odczytu), "Szablony i dopasowania" (przed formularzem szablonów), "Historia" (przed nowym
+logiem). Włączenie/własne imię/auto-księgowanie zostają bez nagłówka — to rdzeń sekcji,
+zawsze pierwsze. Same formularze (szablony, test) NIE zmienione strukturalnie — user prosił
+o czytelność przez grupowanie, nie przez usuwanie pól.
+
+**5. "Czy wszystko działa" — przegląd kodu (bez dostępu do urządzenia).** Przeczytany od
+nowa cały pipeline: `bankNotificationDrain.ts` → `bankIngest.ts` → `bankQueueStore.ts` →
+`bankAutoProcess.ts`/`/bank-review`. Bez znalezionych błędów — dedup (`seenNotifications`
++ 3-minutowe okno w `enqueue`), kolejność `learned` → `rule` → `guessCategory`, i
+próg "nietypowo wysoka kwota" (>1500 zł) trzymający się konsekwentnie działają zgodnie z
+komentarzami w kodzie. To przegląd czytelności kodu, NIE test na żywym urządzeniu z
+prawdziwymi powiadomieniami z banku — patrz checklist testu niżej.
+
+**Explicite NIE zrobione w tej rundzie**: `matchedSource` nie jest pokazywany NIGDZIE poza
+nową historią (np. `/bank-review` review screen go nie czyta — mógłby, ale user prosił o
+to konkretnie "tutaj", w Ustawieniach); pozostałe 3 duże zgłoszenia z §98 (panel
+Statystyk, przebudowa nawigacji Ustawień/Kopii zapasowej, zarządzanie powiadomieniami w
+apce) wciąż czekają, każde jako osobny PR.
+
+`tsc --noEmit` czyste. `jest`: 72 suity/958 testów (bez nowych — `bankQueueStore.ts` i
+`bankIngest.ts` nie mają dedykowanych testów jednostkowych; istniejące `paycheck.test.ts`
+testuje rozpoznawanie nadawcy w `bankNotification.ts`, nietknięte tą zmianą).
+
+**Priorytet testu na urządzeniu**: (1) wklej testowe powiadomienie w "Test odczytu
+powiadomień" → sprawdź że nowa "Historia odczytów" niżej w sekcji pokaże wpis z poprawną
+kategorią/kwotą i etykietą źródła; (2) zapisz nowy szablon (Szablony i dopasowania),
+wywołaj pasujące powiadomienie testowe → wpis w historii powinien pokazać "wg szablonu";
+(3) realna płatność kartą od nieznanego sklepu → wpis powinien pokazać "zgadywane"; (4) ta
+sama płatność po kilku akceptacjach (sklep "nauczony") → kolejny wpis "nauczony sklep";
+(5) sprawdź że nagłówki grup ("Rozwiązywanie problemów i test" / "Szablony i dopasowania"
+/ "Historia") wizualnie rozdzielają sekcję i nie ma podwójnych linii/dziwnych odstępów;
+(6) "Wyczyść historię" faktycznie czyści listę i nie rusza zapisanych szablonów/wydatków.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

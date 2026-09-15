@@ -3,15 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sprzątanie Ustawień — runda 1 z 5 zrobiona, 4 duże zostają (2026-09-15)
+## 🆕 Sprzątanie Ustawień — runda 2 z 5 zrobiona (bank overhaul), 3 duże zostają (2026-09-15)
 
-User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku). Pełny
-opis rundy 1 w ARCHITECTURE.md §98. **Zrobione**: "Pytaj o wypłatę" domyślnie wyłączone
-(zbędne przy skonfigurowanym szablonie banku), martwy przełącznik "Ogranicz animacje"
-usunięty (jego jedyny konsument, `AnimatedCardBg.tsx`, już nigdzie się nie renderował),
-sekcja "Więcej" → "Skróty".
+User w jednej wiadomości dał 7 zgłoszeń do Ustawień (+ zrzut ekranu sekcji banku, przesłany
+dwukrotnie). Runda 1 (§98): "Pytaj o wypłatę" domyślnie wyłączone, martwy przełącznik
+"Ogranicz animacje" usunięty, sekcja "Więcej" → "Skróty". **Runda 2 (§99, ta sesja)**:
+overhaul sekcji "Auto-wydatki z banku" — nowa "Historia odczytów" (`BankHistorySection.tsx`,
+log w `bankQueueStore.history`, capped 150), nowe pole `matchedSource` na każdym wpisie
+pokazujące skąd wzięła się kategoria ("wg szablonu"/"nauczony sklep"/"zgadywane"), trzy
+nagłówki grupujące resztę sekcji (Rozwiązywanie problemów i test / Szablony i dopasowania /
+Historia) zamiast jednej ściany tekstu. Kod pipeline'u (`bankIngest.ts`,
+`bankAutoProcess.ts`) przejrzany — bez znalezionych błędów, ale NIE testowane na
+urządzeniu z prawdziwymi powiadomieniami — patrz priorytet testu w §99.
 
-**Zostają do zrobienia (4 większe, każde osobnym PR-em)**:
+**Zostają do zrobienia (3 większe, każde osobnym PR-em)**:
 1. **Panel "Statystyki"** w Ustawieniach — pełny ekran z wykresami W CZASIE (kiedy/ile
    razy korzystam z czego). Obecny `usageStatsStore.ts` ma TYLKO agregat
    `{count, lastOpenedAt}` per ekran — żadnej historii per-otwarcie, więc wymaga
@@ -21,11 +26,7 @@ sekcja "Więcej" → "Skróty".
    przenieść na osobną podstronę (user zaproponował wzorzec android-owy: kliknięcie
    sekcji → osobny ekran, zamiast rozwijania w miejscu — "rozwijane rzeczy też
    wprowadzają chaos").
-3. **Overhaul sekcji "Auto-wydatki z banku (PeoPay)"** — user przesłał zrzut: za dużo
-   tekstu/informacji, mało czytelności, sprawdzić czy wszystko działa, dodać historię
-   odczytanych powiadomień (log co się złapało/nie złapało), jaśniej pokazać że szablon
-   przepisuje na kategorię+tagi.
-4. **Zarządzanie powiadomieniami w apce** — user: niejasne kiedy dane powiadomienie
+3. **Zarządzanie powiadomieniami w apce** — user: niejasne kiedy dane powiadomienie
    przyjdzie + chce personalizacji wyglądu KAŻDEGO typu osobno. Istnieje już
    `/notifications` (link "Zarządzaj powiadomieniami" w Ustawieniach) — sprawdzić co
    tam jest, zanim projektować rozszerzenie.

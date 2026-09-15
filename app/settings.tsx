@@ -32,6 +32,7 @@ import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, r
 import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
 import UsageStatsSection from '@/components/settings/UsageStatsSection';
+import BankHistorySection from '@/components/settings/BankHistorySection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
@@ -1689,6 +1690,11 @@ export default function SettingsScreen() {
           keywords: ['automatyczne', 'bez zatwierdzania', 'karta', 'auto-accept'],
           control: { kind: 'switch' as const, value: bankAutoAll, onChange: (v: boolean) => { setBankAutoAll(v); haptic.tap(); if (v) { import('@/services/bankAutoProcess').then(m => m.processAutoBankQueue()).catch(() => {}); toast.success('Płatności kartą będą dodawane automatycznie'); } } },
         }] : []),
+        ...(bankEnabled ? [{
+          id: 'bank-group-troubleshoot', title: 'Rozwiązywanie problemów i test',
+          keywords: ['diagnostyka', 'test', 'powiadomienia', 'dostęp', 'problem'],
+          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Rozwiązywanie problemów i test</Text> },
+        }] : []),
         ...(bankEnabled && Platform.OS === 'android' ? [{
           id: 'bank-notif-access', title: 'Dostęp do powiadomień',
           keywords: ['dostęp do powiadomień', 'bateria', 'uśpienie', 'notification listener', 'samsung'],
@@ -1754,6 +1760,11 @@ export default function SettingsScreen() {
               </PressableScale>
             </View>
           ) },
+        }] : []),
+        ...(bankEnabled ? [{
+          id: 'bank-group-templates', title: 'Szablony i dopasowania',
+          keywords: ['szablon', 'kategoria', 'tagi', 'dopasowanie'],
+          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Szablony i dopasowania</Text> },
         }] : []),
         ...(bankEnabled ? [{
           id: 'bank-templates', title: 'Szablony powiadomień',
@@ -1883,6 +1894,17 @@ export default function SettingsScreen() {
               )}
             </View>
           ) },
+        }] : []),
+        ...(bankEnabled ? [{
+          id: 'bank-group-history', title: 'Historia',
+          keywords: ['historia', 'log', 'odczyt', 'dziennik'],
+          control: { kind: 'custom' as const, render: () => <Text style={styles.bankGroupLabel}>Historia</Text> },
+        }] : []),
+        ...(bankEnabled ? [{
+          id: 'bank-history', title: 'Historia odczytów',
+          subtitle: 'Ostatnie rozpoznane powiadomienia z banku',
+          keywords: ['historia', 'log', 'odczyt', 'dziennik', 'szablon', 'kategoria', 'tagi'],
+          control: { kind: 'custom' as const, render: () => <BankHistorySection /> },
         }] : []),
       ],
     },
@@ -2217,6 +2239,10 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2],
   },
   diagTitle: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8 },
+  bankGroupLabel: {
+    fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase',
+    paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[1],
+  },
   diagItem: { gap: 1 },
   diagItemLabel: { fontSize: 10.5, color: c.text.muted, fontWeight: '500' },
   diagItemVal: { fontSize: 13, fontWeight: '700', color: c.text.primary },
