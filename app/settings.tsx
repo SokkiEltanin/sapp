@@ -746,7 +746,11 @@ export default function SettingsScreen() {
     const mh = parseInt(morningHour), mm = parseInt(morningMin);
     const bh = parseInt(briefingHour), bm = parseInt(briefingMin);
     const hh = parseInt(habitHour), hmm = parseInt(habitMin);
-    if (isNaN(eh) || eh < 0 || eh > 23 || isNaN(em) || em < 0 || em > 59) {
+    // Walidacja godziny wieczornej TYLKO gdy Humor jest włączony (2026-09-15, audyt
+    // poprawności) — pole jest wtedy w ogóle niewidoczne (patrz `notif-evening`,
+    // renderowane tylko gdy `moodEnabled`), więc nie ma powodu blokować zapisu
+    // Porannego/Listy zadań/Nawyków błędem o polu, którego user nawet nie widzi.
+    if (moodEnabled && (isNaN(eh) || eh < 0 || eh > 23 || isNaN(em) || em < 0 || em > 59)) {
       Alert.alert('Błąd', 'Podaj poprawny czas wieczorny');
       return;
     }
@@ -757,7 +761,16 @@ export default function SettingsScreen() {
         return;
       }
       await AsyncStorage.setItem('notif_enabled', 'true').catch(() => {});
-      await notificationsService.scheduleDailyMoodReminder(eh, em, useMoodStore.getState().todayEntry != null);
+      // Bez tej bramy "Zapisz przypomnienia" po cichu z powrotem włączało Humor nawet
+      // gdy user jawnie wyłączył go osobnym przełącznikiem (2026-09-15, audyt
+      // poprawności) — `scheduleDailyMoodReminder` samo zapisuje `notif_mood_enabled:
+      // 'true'` przy okazji planowania, więc wołanie go bezwarunkowo tutaj cofało
+      // wcześniejszy wybór usera przy zapisie JAKIEJKOLWIEK innej zmiany na tym ekranie.
+      if (moodEnabled) {
+        await notificationsService.scheduleDailyMoodReminder(eh, em, useMoodStore.getState().todayEntry != null);
+      } else {
+        await notificationsService.cancelDailyMoodReminder();
+      }
       if (morningEnabled) {
         await AsyncStorage.setItem('notif_morning_enabled', 'true');
         await notificationsService.scheduleMorningMoodReminder(mh, mm);

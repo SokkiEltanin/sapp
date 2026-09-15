@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Audyt poprawności — 3 realne bugi naprawione, priorytet testu (2026-09-15)
+
+Po dwóch rundach optymalizacji (§13, §103) ten sam agent-audyt, tym razem szukający
+bugów logicznych zamiast wolnej pracy. Pełny opis w ARCHITECTURE.md §104:
+1. **Przełącznik "Przelew własny" w edycji transakcji** nie działał dla przelewów
+   wykrytych automatycznie z banku (patrzył tylko na tag 'przelew', a bank zapisuje
+   `category: 'transfer'` + tag 'revolut') — user nie miał jak cofnąć klasyfikacji z tego
+   ekranu. Naprawione: przełącznik czyta/pisze pełną semantykę `isSelfTransfer`.
+2. **"Zapisz przypomnienia" po cichu z powrotem włączało Humor**, nawet gdy user go
+   jawnie wyłączył osobnym przełącznikiem — zapis DOWOLNEGO innego ustawienia na tym
+   ekranie cofał tę decyzję. Ten sam kształt buga co dwa już naprawione w §101.
+3. **Self-transfer wyciekał do jedzenia/słodyczy/rozbicia "wg kategorii"** w
+   `statWidgets.ts` — niespójność WEWNĄTRZ tych samych funkcji (siostrzane `case`
+   'spend'/'income' już wykluczały, 'food'/'sweets'/'byCategory' nie). Ten sam kształt
+   buga co §93 (wtedy 8 miejsc), teraz 3 kolejne + 3 nowe testy regresyjne.
+
+Jeden kandydat (wyścig przy migracji `migratePaydayDefaultOff`) świadomie NIE naprawiony
+— niepewny, niski wpływ (najwyżej jeden nieaktualny prompt "dostałeś wypłatę?" raz).
+
+**PRIORYTET testu na urządzeniu** (realne bugi funkcjonalne, nie kosmetyka): (1) auto-
+wykryty przelew Revolut → edytuj → przełącznik pokazuje WŁĄCZONY, wyłącz+zapisz →
+transakcja liczy się normalnie; (2) wyłącz Humor, zapisz coś innego na tym ekranie → Humor
+MA zostać wyłączony; (3) statystyki jedzenia/słodyczy i rozbicie "wg kategorii" nie
+uwzględniają przelewów własnych.
+
 ## 🆕 Optymalizacja wydajności — runda 2, statyczny audyt (2026-09-15)
 
 Kontynuacja §13 (2026-09-02) po tygodniu nowego kodu. Agent Explore przeskanował

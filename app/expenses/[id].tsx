@@ -22,13 +22,13 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { saveMerchant, saveMerchantTags } from '@/utils/merchantMemory';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
+import { Expense, ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
 import { vehiclesService } from '@/services/vehiclesService';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases, loadTagMemory, applyTagMemory, allKnownTags, tagsMatchingWords } from '@/utils/productMemory';
 import { isFoodItem, NONFOOD_TAGS, removeNonFood } from '@/utils/food';
 import { getPayers, addPayer } from '@/utils/payers';
-import { isSelfTransfer } from '@/utils/statWidgets';
+import { isSelfTransfer, SELF_TRANSFER_TAGS } from '@/utils/statWidgets';
 import { fvSplitOf, bucketOf, FvBucket } from '@/utils/fixedVariable';
 import FvBadge from '@/components/expenses/FvBadge';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -461,6 +461,30 @@ export default function ExpenseDetailScreen() {
 
   const toggleTag = (tag: string) =>
     setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+
+  // "Przelew własny" — 2026-09-15, poprawka bugu z audytu poprawności. Przełącznik
+  // dotąd patrzył WYŁĄCZNIE na tag 'przelew', ale `isSelfTransfer` (statWidgets.ts)
+  // uznaje za self-transfer też `category === 'transfer'` (tak zapisują się auto-
+  // wykryte przelewy własne z banku, patrz bankIngest.ts — `category: 'transfer',
+  // tags: ['revolut']`, NIGDY 'przelew') oraz tagi oszczednosci/oszczędnościowe/
+  // revolut. Efekt: dla transakcji wykrytej przez bank przełącznik w trybie edycji
+  // pokazywał WYŁĄCZONY mimo że tryb odczytu (ten sam ekran, kawałek wyżej) poprawnie
+  // pokazywał "Tak" — a próba wyłączenia (dodanie/usunięcie samego tagu 'przelew')
+  // nic nie zmieniała, bo `category` zostawała 'transfer'. Teraz przełącznik czyta i
+  // zapisuje PEŁNĄ semantykę `isSelfTransfer`, nie tylko jeden tag.
+  const editCategory = editIsIncome ? incCat : expCat;
+  const editSelfTransferOn = isSelfTransfer({ category: editCategory, tags } as Expense);
+  const toggleSelfTransfer = () => {
+    haptic.tap();
+    if (editSelfTransferOn) {
+      setTags(prev => prev.filter(t => !SELF_TRANSFER_TAGS.includes(t.toLowerCase())));
+      if ((editCategory as string) === 'transfer') {
+        if (editIsIncome) setIncCat('other_income'); else setExpCat('other');
+      }
+    } else {
+      toggleTag('przelew');
+    }
+  };
 
   const addCustomTag = () => {
     const t = customTag.trim().toLowerCase();
@@ -933,10 +957,9 @@ export default function ExpenseDetailScreen() {
               dotąd JEDYNA droga do selfTransfer to auto-wykrycie z powiadomienia banku
               (słowa-klucze Revolut/oszczędności albo dopasowanie imienia z ownName.ts);
               ręcznie dodany wydatek/przychód, albo taki gdzie parser się nie złapał, nie
-              miał ŻADNEJ opcji. Tag "przelew" jest już rozpoznawany przez isSelfTransfer
-              (statWidgets.ts) — ten przełącznik po prostu dodaje/usuwa go, więc żadna nowa
-              logika klasyfikująca nie powstaje, tylko brakujący manualny dostęp do
-              istniejącej. */}
+              miał ŻADNEJ opcji. Przełącznik czyta/pisze PEŁNĄ semantykę `isSelfTransfer`
+              (patrz `toggleSelfTransfer` wyżej) — nie tylko tag 'przelew', bo auto-wykryte
+              przelewy z banku mają `category: 'transfer'` i tag 'revolut', nigdy 'przelew'. */}
           <View style={s.card}>
             <View style={s.transferRow}>
               <View style={{ flex: 1, marginRight: spacing[3] }}>
@@ -947,10 +970,10 @@ export default function ExpenseDetailScreen() {
               </View>
               {editing ? (
                 <Switch
-                  value={tags.includes('przelew')}
-                  onValueChange={() => { haptic.tap(); toggleTag('przelew'); }}
+                  value={editSelfTransferOn}
+                  onValueChange={toggleSelfTransfer}
                   trackColor={{ false: colors.fill.strong, true: accentColor + '99' }}
-                  thumbColor={tags.includes('przelew') ? colors.text.primary : colors.text.muted}
+                  thumbColor={editSelfTransferOn ? colors.text.primary : colors.text.muted}
                 />
               ) : (
                 <Text style={s.transferValue}>{isSelfTransfer(expense) ? 'Tak' : 'Nie'}</Text>
