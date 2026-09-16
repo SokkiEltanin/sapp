@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "1020705470960-nel2cekaackgi2ctbf0qgcujmfs2p9p9.apps.googleusercontent.com",
+          "client_id": "1020705470960-0fd36sa1b2r7sksoqfbd2pe0brvp74l3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.sokki.sapp",
-            "certificate_hash": "a07035432fe53944e21f00f6738dada27eeafc88"
+            "certificate_hash": "c48f6718aac1a5db5ccce9d8b7ea6c84199a4a6a"
           }
         },
         {
