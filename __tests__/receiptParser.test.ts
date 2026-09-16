@@ -1,4 +1,12 @@
 import { categorize, getFoodTags, parseReceiptText } from '@/utils/receiptParser';
+import { foodSubcat } from '@/utils/food';
+import { ReceiptItem } from '@/types';
+
+// Wygodny helper do testów niżej — foodSubcat() bierze ReceiptItem, nie sam string.
+const item = (o: Partial<ReceiptItem>): ReceiptItem => ({
+  name: 'x', price: 5, category: 'groceries', quantity: 1, unitPrice: 5, tags: [], ...o,
+});
+const subcatFor = (name: string): string => foodSubcat(item({ name, tags: getFoodTags(name) }));
 
 // Klasyfikacja słodyczy — po tym apka liczy „Słodycze vs jedzenie", kalendarz bez słodyczy itd.
 describe('getFoodTags — wykrywanie słodyczy', () => {
@@ -288,5 +296,69 @@ describe('parseReceiptText — Lidl paragon ze zwrotem kaucji (2026-08-20)', () 
   test('suma pozycji (subtotal) zgadza się z realnie zapłaconą kwotą (total)', () => {
     const r = parseReceiptText(LIDL_RECEIPT_WITH_DEPOSIT);
     expect(r.subtotal).toBeCloseTo(r.total, 2);
+  });
+});
+
+// 2026-09-16 — user: "jak mamy wydatki per kategoria z jedzeniem proponuję lekko
+// rozbudowac o inne kategorie bo ciężko dopasować i sporo jest w inne". 8 nowych kategorii
+// (jajka/makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/przyprawy/konserwy
+// i przetwory/mrożonki) + realny fix dla 'sosy' (istniał w FOOD_SUBCATS ale miał ZERO słów
+// kluczowych tutaj — nic nigdy się pod niego nie podpinało). Testy zweryfikowane
+// URUCHOMIENIEM na realnych nazwach produktów, nie samym czytaniem regexów/list.
+describe('getFoodTags/foodSubcat — 8 nowych kategorii + fix dla "sosy" (2026-09-16)', () => {
+  test('nowe samodzielne kategorie', () => {
+    expect(subcatFor('Jajka M 10szt')).toBe('jajka');
+    expect(subcatFor('Makaron spaghetti 500g')).toBe('makarony');
+    expect(subcatFor('Ryż jaśminowy')).toBe('ryż i kasze');
+    expect(subcatFor('Kasza gryczana')).toBe('ryż i kasze');
+    expect(subcatFor('Mąka pszenna typ 500')).toBe('mąka i produkty sypkie');
+    expect(subcatFor('Olej rzepakowy')).toBe('oleje i tłuszcze');
+    expect(subcatFor('Oliwa z oliwek extra virgin')).toBe('oleje i tłuszcze');
+    expect(subcatFor('Pieprz czarny mielony')).toBe('przyprawy');
+  });
+
+  test('"sosy" — wcześniej ZERO słów kluczowych, teraz realnie łapie', () => {
+    expect(subcatFor('Ketchup łagodny')).toBe('sosy');
+    expect(subcatFor('Majonez dekoracyjny')).toBe('sosy');
+    // "Sos pomidorowy" zawiera "pomidor" (słowo kluczowe warzyw) — sosy musi wygrać,
+    // to sos, nie świeży pomidor. Dokładnie dlatego 'sosy' stoi WYSOKO w FOOD_SUBCATS
+    // (zaraz po 'mięso'), przed 'warzywa'.
+    expect(subcatFor('Sos pomidorowy 500ml')).toBe('sosy');
+  });
+
+  test('kategorie "stanu przetworzenia" (sosy/konserwy/przetwory) wygrywają nad surowym składnikiem w nazwie', () => {
+    // "Dżem truskawkowy" nie jest świeżą truskawką, "Ogórki konserwowe" nie są
+    // świeżym ogórkiem — te wygrywają dzięki kolejności w FOOD_SUBCATS, nie dzięki
+    // samej obecności słowa kluczowego (oba tagi ZAWSZE się dopasują, liczy się
+    // priorytet rozstrzygania w foodSubcat()).
+    expect(subcatFor('Dżem truskawkowy')).toBe('konserwy i przetwory');
+    expect(subcatFor('Ogórki konserwowe')).toBe('konserwy i przetwory');
+    expect(subcatFor('Kapusta kiszona')).toBe('konserwy i przetwory');
+  });
+
+  test('mrożonki — fallback TYLKO gdy nic bardziej konkretnego nie pasuje', () => {
+    expect(subcatFor('Mieszanka warzyw mrożonych')).toBe('mrożonki');
+    // Ale specyficzne kategorie (ryby/dania gotowe) nadal wygrywają dla mrożonych
+    // produktów, które mają swoją własną, bardziej konkretną tożsamość.
+    expect(subcatFor('Mrożony łosoś filet')).toBe('ryby');
+    expect(subcatFor('Pizza mrożona Ristorante')).toBe('dania gotowe');
+  });
+
+  test('jajka wydzielone z nabiału, istniejące dopasowania nabiału nietknięte', () => {
+    expect(subcatFor('Jajka wiejskie L')).toBe('jajka');
+    expect(subcatFor('Serek wiejski')).toBe('nabiał');
+    expect(subcatFor('Mleko 2%')).toBe('nabiał');
+  });
+
+  // Znana, zaakceptowana granica: "Przyprawa do kurczaka" łapie się i pod 'przyprawy'
+  // (słowo "przyprawa") i pod 'mięso' (słowo "kurczak") — mięso wygrywa, bo stoi
+  // wcześniej. Odwrócenie kolejności naprawiłoby TEN przypadek, ale zepsułoby
+  // "Pieprzowa kiełbasa" (prawdziwy produkt mięsny, powinien zostać 'mięso', nie
+  // 'przyprawy') — nie da się rozstrzygnąć obu poprawnie samym dopasowaniem
+  // podciągów bez analizy kolejności słów w nazwie. Test dokumentuje BIEŻĄCE,
+  // świadomie zaakceptowane zachowanie, nie "poprawne" w sensie idealnym.
+  test('znana granica: "Przyprawa do X" z nazwą mięsa w środku łapie się jako mięso, nie przyprawy', () => {
+    expect(subcatFor('Przyprawa do kurczaka')).toBe('mięso');
+    expect(subcatFor('Pieprzowa kiełbasa')).toBe('mięso');
   });
 });

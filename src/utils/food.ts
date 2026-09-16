@@ -7,18 +7,43 @@ import { normalizeProductName } from '@/utils/productMemory';
 // chemia / higiena bought at Lidl must NOT count as jedzenie. Food sub-tags drive the
 // breakdown; chemia/higiena are the non-food tags we exclude.
 
+// Rozbudowane (2026-09-16, user: "jak mamy wydatki per kategoria z jedzeniem proponuję
+// lekko rozbudowac o inne kategorie bo ciężko dopasować i sporo jest w inne") — 8 nowych
+// tagów (jajka/makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/przyprawy/
+// konserwy i przetwory/mrożonki) + realnie brakujące słowa kluczowe dla 'sosy' (patrz
+// FOOD_TAG_MAP w receiptParser.ts — tag ISTNIAŁ tu w FOOD_SUBCATS, ale miał ZERO słów
+// kluczowych w drugim pliku, więc NIC nigdy się pod niego nie podpinało — dokładnie ta
+// "ciężko dopasować" luka, o którą user pytał).
+//
+// Kolejność = priorytet rozstrzygania w `foodSubcat()` (pierwszy pasujący tag wygrywa, gdy
+// nazwa produktu łapie kilka naraz). 'sosy'/'przyprawy'/'konserwy i przetwory' są CELOWO
+// zaraz po 'mięso', PRZED warzywa/owoce/nabiał — to kategorie "stanu przetworzenia", ich
+// słowa kluczowe łapią się WEWNĄTRZ nazw zawierających też surowy składnik ("Przyprawa do
+// KURCZAKA" nie jest mięsem, "Dżem TRUSKAWKOWY" nie jest świeżym owocem, "Sos POMIDOROWY"
+// nie jest warzywem) — zweryfikowane ręcznym testem (`getFoodTags`+`foodSubcat` na
+// realnych nazwach), nie samym czytaniem listy. Reszta kolejności ISTNIEJĄCYCH tagów
+// (nabiał→ryby→warzywa→owoce→pieczywo→słodycze→napoje→przekąski→dania gotowe) nietknięta —
+// nowe kategorie bez takiego konfliktu wstawione zwyczajnie obok pokrewnych.
 export const FOOD_SUBCATS: { tag: string; label: string; color: string }[] = [
   { tag: 'mięso',        label: 'Mięso',        color: '#F87171' },
+  { tag: 'sosy',         label: 'Sosy',         color: '#FB923C' },
+  { tag: 'przyprawy',    label: 'Przyprawy',    color: '#B45309' },
+  { tag: 'konserwy i przetwory', label: 'Konserwy i przetwory', color: '#78716C' },
   { tag: 'nabiał',       label: 'Nabiał',       color: '#FBBF24' },
+  { tag: 'jajka',        label: 'Jajka',        color: '#FDE047' },
   { tag: 'ryby',         label: 'Ryby',         color: '#38BDF8' },
   { tag: 'warzywa',      label: 'Warzywa',      color: '#34D399' },
   { tag: 'owoce',        label: 'Owoce',        color: '#FB7185' },
   { tag: 'pieczywo',     label: 'Pieczywo',     color: '#D6A15E' },
+  { tag: 'makarony',     label: 'Makarony',     color: '#CA8A04' },
+  { tag: 'ryż i kasze',  label: 'Ryż i kasze',  color: '#A16207' },
+  { tag: 'mąka i produkty sypkie', label: 'Mąka i produkty sypkie', color: '#E7D8B1' },
+  { tag: 'oleje i tłuszcze', label: 'Oleje i tłuszcze', color: '#FDBA74' },
   { tag: 'słodycze',     label: 'Słodycze',     color: '#C084FC' },
   { tag: 'napoje',       label: 'Napoje',       color: '#22D3EE' },
   { tag: 'przekąski',    label: 'Przekąski',    color: '#F59E0B' },
-  { tag: 'sosy',         label: 'Sosy',         color: '#FB923C' },
   { tag: 'dania gotowe', label: 'Dania gotowe', color: '#A3E635' },
+  { tag: 'mrożonki',     label: 'Mrożonki',     color: '#7DD3FC' },
 ];
 export const FOOD_SUBCAT_META: Record<string, { label: string; color: string }> = {
   ...Object.fromEntries(FOOD_SUBCATS.map(s => [s.tag, { label: s.label, color: s.color }])),

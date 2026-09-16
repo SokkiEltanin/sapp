@@ -175,9 +175,21 @@ export default function FinancesScreen() {
       const mine = isMine(e);
       const isCash = e.paymentMethod === 'cash';
       // Money totals & balance: only what I paid / received.
-      if (mine) {
-        if (isIncome) { allInc += e.amount; if (isCash) cashInc += e.amount; }
-        else if (isExpense) { allExp += e.amount; if (isCash) cashExp += e.amount; }
+      // Fix (2026-09-16, user: "czy naprawione jest ze jak place gotowka to naprawdę nie
+      // liczy sie do sumy calej... to nie ma byc kartą + gotowka") — `allExp`/`allInc`
+      // (jedyny konsument: `balance` niżej, pokazywany jako "Saldo NA KARCIE") liczyły
+      // WSZYSTKO, gotówkę też, mimo etykiety i komentarza mówiącego że to ma być czysto
+      // karta. `cashExp`/`cashInc` obok były liczone POPRAWNIE osobno, ale nigdy nie
+      // były odjęte od `allExp`/`allInc` — Saldo pokazywało kartę+gotówkę zamiast samej
+      // karty. Teraz gotówka NIE wchodzi już do `allExp`/`allInc` w ogóle (ten sam
+      // filtr co `updateCardBalancePeak` w accountBalance.ts: `paymentMethod !== 'cash'`).
+      if (mine && !isCash) {
+        if (isIncome) allInc += e.amount;
+        else if (isExpense) allExp += e.amount;
+      }
+      if (mine && isCash) {
+        if (isIncome) cashInc += e.amount;
+        else if (isExpense) cashExp += e.amount;
       }
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
       // Self-transfers (savings / Revolut) move money but aren't spend/income — they

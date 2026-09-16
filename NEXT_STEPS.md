@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: Saldo dashboardu liczyło gotówkę mimo etykiety "na karcie" + 8 nowych kategorii jedzenia (2026-09-16)
+
+Pełny opis w ARCHITECTURE.md §110-111. Dwa osobne zgłoszenia: (1) "Saldo" na dashboardzie
+finansów (`app/(tabs)/finances.tsx`) sumowało kartę I gotówkę mimo etykiety "NA KARCIE" —
+`allExp`/`allInc` nie filtrowały `paymentMethod`, `cashExp`/`cashInc` liczone osobno ale
+nigdy nie odjęte. Naprawione. (2) Rozbudowa kategorii jedzenia w rozkładzie wydatków — 8
+nowych (jajka/makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/przyprawy/
+konserwy i przetwory/mrożonki) + realny fix brakujących słów kluczowych dla "sosy" (tag
+istniał, ale nigdy nic się pod niego nie łapało). Do zrobienia (user, na urządzeniu):
+sprawdzić parę realnych paragonów pod kątem czy nowe kategorie sensownie się przypisują, i
+czy Saldo teraz faktycznie nie rusza się przy płatnościach gotówką.
+
 ## ✅ Fix: tło lokacji misji trafiało za GearPanel zamiast tylko do paska ładowania (2026-09-15)
 
 Pełny opis w ARCHITECTURE.md §107. Art `LOKALIZACJA_LODOWA.png` (i przyszłe lokacje pod
