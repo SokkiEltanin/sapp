@@ -16,6 +16,12 @@ const INCOMING_WPLYW_TITLE = { title: 'Wpływ', text: 'Wpłynęło 3752,78 PLN n
 // żadnego słowa-klucza typu "Revolut"/"oszczędności", rozpoznawany WYŁĄCZNIE po dopasowaniu
 // `odbiorca` do zadeklarowanego w Ustawieniach imienia+nazwiska (3. argument parsera).
 const SELF_OUT_BY_NAME = 'Wykonano przelew 150,00 PLN z konta *6332 na konto *9911, odbiorca: Wiktor Rudziński. Bank Pekao S.A.';
+// 2026-09-16, user: "a czy takie złapie dobrze ze to płatność kartą (bo BLik) i ze to
+// z decathlon?" — realny przykład. BLIK push'e Pekao mówią "z konta *XXXX" (obciążone
+// konto), TAK SAMO jak prawdziwe przelewy — `isTransferOut` kiedyś łapał tę samą frazę i
+// błędnie kwalifikował TĘ notyfikację jako "Przelew wychodzący" zamiast płatności BLIK w
+// Decathlonie (sklep i method gubione). Naprawione (patrz komentarz w bankNotification.ts).
+const BLIK_DECATHLON = 'Zapłacono BLIK-iem na kwotę 59,98 PLN z konta *6332 w DECATHLON SP. Z O.O.. Bank Pekao S.A.';
 
 describe('parseBankNotification (Pekao)', () => {
   test('płatność kartą → wydatek (out), kwota + sklep + data z treści', () => {
@@ -72,5 +78,15 @@ describe('parseBankNotification (Pekao)', () => {
     expect(tx!.amount).toBeCloseTo(3752.78);
     expect(tx!.direction).toBe('in');
     expect(tx!.store).toBe('MARKETING INVESTMENT GROUP SA');
+  });
+
+  test('płatność BLIK ("z konta *X" jak prawdziwy przelew) → wydatek, method blik, sklep z treści (nie "Przelew wychodzący")', () => {
+    const tx = parseBankNotification('Wykonano operację BLIK', BLIK_DECATHLON);
+    expect(tx).not.toBeNull();
+    expect(tx!.amount).toBeCloseTo(59.98);
+    expect(tx!.direction).toBe('out');
+    expect(tx!.method).toBe('blik');
+    expect(tx!.store.toLowerCase()).toContain('decathlon');
+    expect(tx!.storeKey).toBe('decathlon');
   });
 });
