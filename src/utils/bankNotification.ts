@@ -93,7 +93,15 @@ export function parseBankNotification(title: string, text: string, ownName?: str
   // to your OWN account (Revolut / savings) is a self-transfer: it leaves the main
   // account (so it's NOT income) but isn't real spending either — the app tracks it as
   // "odłożone", excluded from spend, via a transfer category downstream.
-  const isTransferOut = /wykonano\s+przelew|zlecono\s+przelew|z\s+konta\s+\*?\d/i.test(body);
+  // Fix (2026-09-16, user: BLIK płatność w Decathlonie łapana jako "Przelew wychodzący")
+  // — `z\s+konta\s+\*?\d` USUNIĘTE stąd (zostaje w `paidOut` wyżej, tam jest nieszkodliwe,
+  // bo tylko ustala kierunek). Pekao's BLIK/kartowe push'e TEŻ wspominają "z konta *XXXX"
+  // (konto obciążone), nie tylko prawdziwe przelewy — np. "Zapłacono BLIK-iem na kwotę
+  // 59,98 PLN z konta *6332 w DECATHLON..." fałszywie trafiało w tę gałąź (sklep gubił się
+  // na rzecz generycznego "Przelew wychodzący", method='transfer' zamiast 'blik'). Prawdziwe
+  // przelewy Pekao zawsze zaczynają się od "Wykonano przelew"/"Zlecono przelew" — te dwa
+  // wystarczą, trzeci alternatyw był zbędny I fałszywie dopasowywał karty/BLIK.
+  const isTransferOut = /wykonano\s+przelew|zlecono\s+przelew/i.test(body);
   if (isTransferOut) {
     const rcpM = body.match(/odbiorca:?\s*(.+?)(?:\s*(?:tytu[łl]|tyt\.?|nr\b|rachun|kwot|dnia|\.\s*Bank|$))/i);
     let store = (rcpM?.[1] ?? 'Przelew wychodzący').replace(/\s+/g, ' ').trim();

@@ -7742,6 +7742,28 @@ tego typu nagrody jest widoczny w pasku segmentowym, samego rozkładu rzadkości
 dodać identycznym wzorcem co `coinRarityBreakdown`/`gearRarityBreakdown`, jeśli user
 zapyta.
 
+## 109. Fix: parser powiadomień bankowych mylił płatność BLIK z przelewem wychodzącym
+
+User (test na dokładnym stringu, zgodnie z zasadą #5 w CLAUDE.md): *"a czy takie złapie
+dobrze ze to płatność kartą (bo BLik) i ze to z decathlon?"* — `"Zapłacono BLIK-iem na
+kwotę 59,98 PLN z konta *6332 w DECATHLON SP. Z O.O.. Bank Pekao S.A."`.
+
+**Bug** (`src/utils/bankNotification.ts`, `isTransferOut`, linia ~96): regex miał trzeci
+alternatyw `z\s+konta\s+\*?\d`, myślany jako fallback dla prawdziwych przelewów, ale Pekao
+używa DOKŁADNIE tej samej frazy ("z konta *XXXX" = konto obciążone) w powiadomieniach
+BLIK/kartowych. Efekt: ta konkretna notyfikacja BLIK trafiała w gałąź "Outgoing TRANSFER"
+zamiast "Outgoing card payment" — kwota i kierunek (`out`) wychodziły poprawnie, ale sklep
+gubił się na rzecz generycznego `"Przelew wychodzący"` i `method` było `'transfer'`
+zamiast `'blik'`. Potwierdzone REALNYM URUCHOMIENIEM parsera (jednorazowy plik testowy w
+`__tests__/`, usunięty po weryfikacji), nie samym czytaniem regexów.
+
+**Fix**: `z\s+konta\s+\*?\d` usunięty z `isTransferOut` (zostaje w `paidOut` wyżej — tam
+tylko ustala kierunek out/in, nieszkodliwe). Prawdziwe przelewy Pekao zawsze zaczynają się
+od "Wykonano przelew"/"Zlecono przelew" — te dwa alternatywy już wystarczają, jak pokazują
+istniejące testy `SELF_OUT`/`SELF_OUT_BY_NAME`. Nowy test regresyjny w
+`__tests__/bankNotification.test.ts` (`BLIK_DECATHLON`) pilnuje że się nie powtórzy —
+`tsc`/`jest` czyste (972/972).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
