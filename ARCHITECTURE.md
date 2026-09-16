@@ -7764,6 +7764,85 @@ istniejące testy `SELF_OUT`/`SELF_OUT_BY_NAME`. Nowy test regresyjny w
 `__tests__/bankNotification.test.ts` (`BLIK_DECATHLON`) pilnuje że się nie powtórzy —
 `tsc`/`jest` czyste (972/972).
 
+## 110. Fix: "Saldo (na karcie)" na dashboardzie finansów liczyło też gotówkę
+
+User: *"czy naprawione jest ze jak place gotowka to naprawdę nie liczy sie do sumy calej
+(bo ta wyświetlana to Suma na karcie mojej [to nie ma byc kartą + gotowka]"*.
+
+**Bug** (`app/(tabs)/finances.tsx`, `monthTotals` useMemo): `allExp`/`allInc` (jedyny
+konsument: `balance` = "Saldo", etykieta "NA KARCIE" wprost w komentarzu w kodzie)
+sumowały KAŻDY wydatek/przychód `mine`, bez filtra po `paymentMethod` — gotówka wchodziła
+do tej samej sumy co karta. `cashExp`/`cashInc` obok były liczone POPRAWNIE osobno (dla
+przyszłego rozbicia kartowego/gotówkowego), ale nigdy nie zostały odjęte od
+`allExp`/`allInc` przy liczeniu `balance` — czysto martwy kod, nic go nie czytało.
+
+**Fix**: `allExp`/`allInc` teraz WYKLUCZAJĄ `paymentMethod === 'cash'` już przy akumulacji
+(ten sam filtr co `updateCardBalancePeak()` w `accountBalance.ts`:
+`e.paymentMethod !== 'cash'` — dwa niezależne miejsca w kodzie implementujące "saldo karty"
+były niespójne, teraz jedno z nich naprawione do zgodności z drugim). `cashExp`/`cashInc`
+zostają bez zmian (dalej liczone, dalej niewykorzystywane nigdzie indziej — nie w zakresie
+tego zgłoszenia, żeby to naprawić/dodać osobny widok gotówki). `tsc` czyste — logika jest
+inline w komponencie (`useMemo`, nie eksportowana czysta funkcja), więc bez jednostkowego
+testu; zweryfikowane ręcznie czytaniem jedynego konsumenta (`balance` w linii ~262).
+
+## 111. Rozbudowa kategorii jedzenia (8 nowych) + fix brakujących słów kluczowych "sosy"
+
+User: *"na dashbordzie jak mamy wydatki per kategoria z jedzeniem proponuję lekko
+rozbudowac o inne kategorie bo ciężko dopasować i sporo jest w inne"* — lista: Inne
+jedzenie, Nabiał, Pieczywo, Owoce, Sosy, Mięso, Słodycze, Przekąski, Warzywa, Ryby, Napoje,
+Jajka, Makarony, Ryż i kasze, Konserwy i przetwory, Mąka i produkty sypkie, Oleje i
+tłuszcze, Przyprawy, Mrożonki, Gotowe dania.
+
+**Dwa systemy, jeden słownik tagów** (patrz też §14): `FOOD_SUBCATS` (`src/utils/food.ts`)
+= label+kolor+KOLEJNOŚĆ PRIORYTETU dla `foodSubcat()`; `FOOD_TAG_MAP`
+(`src/utils/receiptParser.ts`) = realne słowa kluczowe dla `getFoodTags()`, które
+auto-tagują pozycje paragonu. Oba muszą się zgadzać string-for-string.
+
+**Real bug znaleziony przy okazji**: tag `sosy` ISTNIAŁ już w `FOOD_SUBCATS`, ale miał
+**ZERO** słów kluczowych w `FOOD_TAG_MAP` — żaden sos/ketchup/majonez nigdy się pod niego
+nie podpinał, zawsze lądował w "Inne". Dokładnie ta "ciężko dopasować" luka, o którą user
+pytał — nie tylko subiektywne wrażenie, realna dziura w danych.
+
+**8 nowych tagów**: jajka (wydzielone z nabiału, wcześniej 'jaj'/'jajca' siedziały tam),
+makarony, ryż i kasze, mąka i produkty sypkie, oleje i tłuszcze, przyprawy, konserwy i
+przetwory, mrożonki (wydzielone z 'dania gotowe' — bare 'mrożon' tam łapało też np.
+"Warzywa mrożone mix", nie tylko gotowe dania).
+
+**Kolejność w `FOOD_SUBCATS` = priorytet rozstrzygania** (pierwszy pasujący tag wygrywa,
+`foodSubcat()`) — zweryfikowane URUCHOMIENIEM testów na realnych nazwach, nie samym
+czytaniem list (zgodnie z zasadą #5 w CLAUDE.md), bo pierwsza wersja miała 2 realne
+kolizje: "Dżem truskawkowy" łapał się jako 'owoce' (przez "truskawk"), "Sos pomidorowy"
+jako 'warzywa' (przez "pomidor"). Fix: `sosy`/`przyprawy`/`konserwy i przetwory` (kategorie
+"stanu przetworzenia") przesunięte WYSOKO, zaraz po `mięso`, PRZED
+warzywa/owoce/nabiał/ryby — te trzy łapią się WEWNĄTRZ nazw zawierających też surowy
+składnik i muszą wygrywać. `mrożonki` zostaje NISKO (po `dania gotowe`) — fallback tylko
+gdy nic konkretniejszego nie pasuje ("Mrożony łosoś" nadal → ryby, "Pizza mrożona" → dania
+gotowe, tylko goły "Mrożonki mix" bez nic innego → mrożonki). Kolejność ISTNIEJĄCYCH tagów
+między sobą (nabiał→ryby→warzywa→owoce→pieczywo→słodycze→napoje→przekąski→dania gotowe)
+CELOWO nietknięta — nic co wcześniej działało poprawnie się nie zmienia.
+
+**Świadomie NIE naprawione** (udokumentowana granica, nie bug): "Przyprawa do kurczaka"
+łapie się jako `mięso` (przez "kurczak"), nie `przyprawy` — odwrócenie kolejności
+naprawiłoby to, ale zepsułoby "Pieprzowa kiełbasa" (prawdziwy produkt mięsny, musi zostać
+`mięso`). Nie da się rozstrzygnąć obu poprawnie samym dopasowaniem podciągów bez analizy
+kolejności słów w nazwie — test w `receiptParser.test.ts` dokumentuje to jako znane
+zachowanie, nie próbuje "naprawić" kosztem czegoś innego.
+
+**UI**: oba miejsca czytające `FOOD_SUBCATS`/`FOOD_SUBCAT_META` (chip-picker kategorii w
+`app/food/product.tsx` — `flexWrap:'wrap'`, i lista rozkładu wydatków w
+`app/(tabs)/index.tsx` — zwykła pionowa lista wierszy) skalują się do więcej kategorii bez
+żadnej zmiany kodu — sprawdzone czytaniem stylów (`catWrap: {flexWrap:'wrap'}`), nie
+zgadywaniem.
+
+Nowe testy w `__tests__/receiptParser.test.ts` (8 nowych kategorii + fix sosów + 2
+kolizje-teraz-naprawione + 1 udokumentowana granica) — `tsc`/`jest` czyste (74 suity/978
+testów).
+
+**Świadomie NIE zrobione**: przy okazji "Kto jadł" na paragonach — user pytał czy to
+usunięte. NIE — to inny, celowo zachowany feature z §78 (widget DASHBOARDU "Kto zjadł
+słodycze" usunięty na życzenie 2026-09-08, ale per-pozycji "Kto jadł" w edycji paragonu
+(`app/expenses/[id].tsx`) zostało celowo, sprawdzone że dalej działa w bieżącym kodzie).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

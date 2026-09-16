@@ -324,10 +324,13 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'prosciutto','chorizo','kaszank','krupniok',
   ]],
   ['nabiał',     [
-    'mleko','ser','jogurt','kefir','śmietana','twaróg','jaj','masło','śmietank',
+    'mleko','ser','jogurt','kefir','śmietana','twaróg','masło','śmietank',
     'maślanka','mascarpone','ricotta','brie','camembert','gouda','edam',
-    'mozzarella','parmezan','feta','topiony','skyr','cottage','jajca',
+    'mozzarella','parmezan','feta','topiony','skyr','cottage',
   ]],
+  // Jajka (2026-09-16) — wydzielone z 'nabiał' (user: rozbudowa kategorii jedzenia w
+  // statystykach, żeby mniej lądowało w "Inne"). Te same trzony co wcześniej w nabiale.
+  ['jajka',      ['jaj','jajca','jajko','jajek']],
   ['ryby',       [
     'łosoś','tuńczyk','dorsz','makrela','śledź','anchois','krewetk','pstrąg',
     'tilapia','mintaj','karp','sardynk','halibut','flądra','morszczuk',
@@ -371,6 +374,29 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'żytni','razow','brioche','focaccia','ciabatt','croissant','rogal',
     'drożdżówk','kajzerek','pączek','chałka','sucharki','pieczywo chrup',
   ]],
+  // 5 nowych kategorii spiżarniowych (2026-09-16, user: rozbudowa kategorii jedzenia).
+  ['makarony',   [
+    'makaron','spaghetti','penne','fusilli','tagliatelle','tortellini','ravioli',
+    'kluski','nitki','świderki','farfalle','linguine','cannelloni','łazank',
+  ]],
+  ['ryż i kasze', [
+    'ryż','kasza','kuskus','kus kus','bulgur','komosa','quinoa',
+  ]],
+  ['mąka i produkty sypkie', [
+    'mąka','cukier','sól','otręby','płatki owsian','musli','muesli','skrobia',
+    'drożdż','proszek do piecz','żelatyn',
+  ]],
+  ['oleje i tłuszcze', [
+    'olej','oliwa','smalec','margaryn','tłuszcz',
+  ]],
+  ['przyprawy',  [
+    // 'curry' celowo POMINIĘTE — koliduje z 'curry gotow' w 'dania gotowe' (danie curry
+    // vs przyprawa curry, nie do rozróżnienia po samej nazwie), a dania gotowe mają
+    // pierwszeństwo semantyczne dla gotowego dania.
+    'przyprawa','przypraw','pieprz','cynamon','wanili','oregano','bazyli',
+    'tymianek','kurkuma','majeranek','zioła prowansal','gałka muszkatoł',
+    'ziele angielskie','liść laurow','kmin rzymski',
+  ]],
   ['napoje',     [
     'woda','sok','piwo','wino','cola','fanta','sprite','pepsi','energy',
     'herbata','kawa','napój','lemoniada','kombucha','smoothie','cydr',
@@ -388,6 +414,17 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     // rozszerzenie 2026-08-31 — patrz komentarz przy słodyczach wyżej
     'mieszanka studencka',
   ]],
+  ['konserwy i przetwory', [
+    'konserw','przetw','dżem','powidł','kompot','marynat','kiszon','passata',
+    'koncentrat pomidor',
+  ]],
+  // Sosy (2026-09-16) — tag ISTNIAŁ w FOOD_SUBCATS (food.ts), ale nie miał TU żadnych słów
+  // kluczowych, więc nigdy nic się pod niego nie podpinało (user: "ciężko dopasować i sporo
+  // jest w inne" — to dokładnie ta luka). Realny fix, nie tylko rozbudowa.
+  ['sosy',       [
+    'sos','ketchup','majonez','musztard','chrzan','dresing','dressing','pesto',
+    'sos sojow','sos worcest','tabasco','sriracha',
+  ]],
   ['chemia',     [
     'szampon','mydło','proszek','płyn do','chusteczk','papier toalet',
     'zmywak','gąbk','dezodorant','płyn do płukan','worek na śmiec',
@@ -402,10 +439,16 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'krem do rąk','krem do twarzy','balsam do ciała','żel pod prysznic',
     'płyn micel',
   ]],
-  ['dania gotowe',['pierogi','naleśnik','pizza mrożon','gotow','mrożon','zupa gotow',
+  ['dania gotowe',['pierogi','naleśnik','pizza mrożon','gotow','zupa gotow',
     'obiad gotow','potrawa gotow','danie gotow','kotlet gotow','lasagna',
     'gnocchi','risotto','paella','tikka masala','curry gotow',
   ]],
+  // Mrożonki (2026-09-16) — bare 'mrożon' WYDZIELONE z 'dania gotowe' (gdzie łapało też
+  // np. "Warzywa mrożone mix", nie tylko gotowe dania). Kategorie ze specyficznymi
+  // produktami (mięso/ryby/warzywa/owoce/dania gotowe — wszystkie WCZEŚNIEJ w tej liście,
+  // patrz kolejność w FOOD_SUBCATS) nadal wygrywają dla np. "Mrożony łosoś"/"Pizza mrożona"
+  // — to jest fallback TYLKO dla samego słowa "mrożon" bez nic innego konkretnego.
+  ['mrożonki',   ['mrożon']],
 ];
 
 // Whole-word(ish) keyword match so short keywords don't fire inside longer food
