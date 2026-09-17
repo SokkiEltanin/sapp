@@ -8051,6 +8051,33 @@ zamykania → tapnij w tło (nie w X) żeby zamknąć → jeśli slot ma nie-za�
 "Sprzedaj X niezałożonych" i sprawdź że policzone monety się zgadzają i że założony item
 ZOSTAJE.
 
+## 117. Audyt self-transfer, runda 3 — 2 kolejne miejsca naprawione (2026-09-17)
+
+Kontynuacja audytu z §93 (2026-08, 8 miejsc)/§104 (2026-09-15, 3 miejsca) — agent-audyt
+szukał TEGO SAMEGO kształtu buga (siostrzana funkcja/case w tym samym pliku już wyklucza
+`isSelfTransfer`, druga nie) w miejscach jeszcze nie sprawdzonych. Dwa realne trafienia:
+
+1. **`src/utils/dashboard/spend.ts` — `groceryTotal` i `sweetsTotal`** nie wykluczały
+   self-transferu, mimo że siostrzane `allSpend`/`weekIncome` w TYM SAMYM pliku robią to od
+   2026-09-14. Wpływ: karta dashboardu w `app/(tabs)/index.tsx` pokazuje `weekTotal`/
+   `monthTotal` (przez `allSpend`, bez self-transferu) RAZEM z `weekFood`/`monthFood`
+   (przez `groceryTotal`) i `weekSweets`/`monthSweets` (przez `sweetsTotal`) — te dwie
+   ostatnie mogły zawyżać się o przelew własny mimo że sąsiedni total na tej samej karcie
+   już go wykluczał. `sweetsTotal` feeduje też `menaceStats.ts` (trigger "nemesis
+   miesiąca").
+2. **`src/utils/statWidgets.ts` — `bucketValue`'s `case 'tagSpend'`** (widget "Wydatki na
+   tag…") nie wykluczał self-transferu, mimo że siostrzany `case 'sweets'` PIĘĆ linii niżej
+   ma dokładnie tę samą strukturę (receiptItems po tagu, fallback e.tags/e.amount) i już to
+   robi od §104.
+
+Naprawione oba (dopisane `!isSelfTransfer(e)`/`isSelfTransfer(e) continue`), + 3 nowe
+testy regresyjne (`__tests__/dashboardSpend.test.ts` ×2, `__tests__/financePredicates.test.ts`
+×1) — każdy faktycznie failował przed poprawką, potwierdzenie że to nie false-positive
+audytu. `tsc`/`jest` czyste (981 testów, +3).
+**Priorytet testu na urządzeniu**: niski (numerycznie drobna korekta) — jeśli masz jakiś
+przelew własny otagowany 'słodycze'/'przekąski' albo w kategorii 'groceries', sprawdź że
+karta jedzenia/słodyczy na dashboardzie już go nie liczy.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt self-transfer, runda 3 — 2 kolejne miejsca (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §117. Agent-audyt (background, "optymalizuj szukaj bugów")
+znalazł kolejne 2 miejsca z tym samym powtarzającym się kształtem buga co §93/§104:
+`groceryTotal`/`sweetsTotal` w `dashboard/spend.ts` i `case 'tagSpend'` w
+`statWidgets.ts` nie wykluczały self-transferu, mimo że sąsiednie funkcje/case w tych
+samych plikach już to robią. Naprawione + 3 nowe testy regresyjne. `tsc`/`jest` czyste
+(981 testów). Do zrobienia (user, niski priorytet): brak — poprawka dotyczy tylko rzadkiej
+kombinacji (przelew własny z tagiem słodycze/przekąski lub kategorią groceries).
+
 ## 🆕 Redesign ekwipunku pupila — zakładki, tap-outside, sprzedaż zbiorcza (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §116. User: skarga na 4 rzeczy w `GearPanel.tsx` — malutkie

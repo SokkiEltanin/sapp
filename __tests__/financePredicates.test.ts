@@ -65,6 +65,18 @@ describe('statWidgets — self-transfer wykluczony z food/sweets/byCategory', ()
     expect(rows.find(r => r.label === 'transfer')).toBeUndefined();
     expect(rows.find(r => r.label === 'groceries')?.value).toBe(30);
   });
+
+  // 2026-09-17 — trzecia runda tego samego audytu: siostrzany `case 'tagSpend'` (bucketValue)
+  // NIE wykluczał self-transferu, mimo że `case 'sweets'` tuż niżej w tej samej funkcji już
+  // to robi od 2026-09-15 (wyżej w tym describe).
+  test('metricNumber tagSpend (bucketValue) pomija self-transfer', () => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const transferTagged = e({ category: 'transfer' as any, tags: ['revolut', 'internet'], amount: 80, date: `${ym}-05T09:00:00` });
+    const realTagged = e({ category: 'other', tags: ['internet'], amount: 40, date: `${ym}-05T09:00:00` });
+    expect(metricNumber('tagSpend', ctx([transferTagged]), 'month', 'internet').value).toBe(0);
+    expect(metricNumber('tagSpend', ctx([transferTagged, realTagged]), 'month', 'internet').value).toBe(40);
+  });
 });
 
 describe('recurringBills — looksLikeBill', () => {

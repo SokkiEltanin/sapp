@@ -11,10 +11,12 @@ export const SWEETS_TAGS = ['słodycze', 'przekąski'];
 
 const onDays = (dates: string[]) => new Set(dates);
 
-// Suma wydatków kategorii 'groceries' w podanych dniach.
+// Suma wydatków kategorii 'groceries' w podanych dniach. Self-transfery wyłączone — ten sam
+// powód co w `allSpend` niżej (2026-09-17: był to jedyny sibling w tym pliku bez tego
+// filtra, mimo że `allSpend`/`weekIncome` mają go od dawna).
 export function groceryTotal(expenses: Expense[], dates: string[]): number {
   const set = onDays(dates);
-  return expenses.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && set.has(e.date.slice(0, 10)))
+  return expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && e.category === 'groceries' && set.has(e.date.slice(0, 10)))
     .reduce((s, e) => s + e.amount, 0);
 }
 
@@ -55,12 +57,16 @@ export function weekdaySpendPattern(expenses: Expense[]): { label: string; avg: 
 }
 
 // Suma wartości pozycji „słodycze/przekąski" (per-item price) w podanych dniach, w danym
-// zakresie konsumpcji (Ja/Wszyscy). Liczy pozycje paragonu, nie całe wydatki.
+// zakresie konsumpcji (Ja/Wszyscy). Liczy pozycje paragonu, nie całe wydatki. Self-transfery
+// wyłączone (2026-09-17, ten sam powód co `allSpend`/`groceryTotal` wyżej) — brak paragonu
+// przy przelewie własnym w praktyce, ale gdyby jakiś self-transfer miał tag/pozycję, nie ma
+// wchodzić do "śmieciowej" statystyki.
 export function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = 'all'): number {
   const set = onDays(dates);
   let total = 0;
   for (const e of expenses) {
     if (e.type && e.type !== 'expense') continue;
+    if (isSelfTransfer(e)) continue;
     if (!set.has(e.date.slice(0, 10))) continue;
     for (const it of (e.receiptItems ?? [])) {
       if (consumesInScope(it, scope) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price;
