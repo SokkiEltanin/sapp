@@ -8078,6 +8078,54 @@ audytu. `tsc`/`jest` czyste (981 testów, +3).
 przelew własny otagowany 'słodycze'/'przekąski' albo w kategorii 'groceries', sprawdź że
 karta jedzenia/słodyczy na dashboardzie już go nie liczy.
 
+## 118. Audyt wydajności, runda 3 — memo scope + React.memo + themedStyles (2026-09-17)
+
+Trzecia część background-audytu z tego samego "optymalizuj szukaj bugów" zgłoszenia —
+kontynuacja §13 (2026-09-02)/§103 (2026-09-15). Cztery realne, potwierdzone i naprawione:
+
+1. **`app/food/products.tsx` — `entries` (Kompozycje i dania) miał ten sam kształt buga co
+   dawna wyszukiwarka tagu w `finances.tsx` (§103)**: budowa `fromPresets`/`fromRecipes`
+   (mapowanie WSZYSTKICH presetów/dań, `presetIngredientNames`/`presetKcal`, join+normalize
+   każdej listy składników) NIE zależy od `query`, ale żyła w JEDNYM `useMemo` z filtrem po
+   `query` — więc przeliczała się na KAŻDY klawisz w wyszukiwarce zakładki "Kompozycje i
+   dania", nie tylko przy zmianie presetów/produktów. Rozdzielone na `entriesBase`
+   (deps: `[presets, products]`) + `entries` (deps: `[entriesBase, query]`), ten sam wzorzec
+   co finalny fix w `finances.tsx`.
+2. **`src/components/expenses/ExpenseItem.tsx` bez `React.memo`** — rendered przez
+   `SectionList` w `app/(tabs)/finances.tsx`, ten sam kształt co Gablota/99-odznak (§103):
+   KAŻDY render listy (scroll-tracking, zmiana filtra) przeliczał `getCategoryMeta`/ikonę/
+   `billTagFor` dla wszystkich widocznych wierszy. Owinięte `memo(...)`. Wymagało DRUGIEJ
+   zmiany w `finances.tsx` — `onPress`/`onLongPress` były gołymi strzałkami zdefiniowanymi
+   WEWNĄTRZ `renderItem`, więc nawet z `React.memo` child i tak by się przerenderowywał
+   (nowa referencja funkcji za każdym razem) — wyniesione do `handleExpensePress`/
+   `handleExpenseLongPress` przez `useCallback` na poziomie komponentu ekranu.
+3. **`app/habits.tsx` — `HabitRow`'s `makeHr`** i **`app/notes.tsx` — `NoteCard`'s `makeNc`**
+   to były gołe `(c: any) => StyleSheet.create(...)`, NIE przez `themedStyles()` — dokładnie
+   reguła #1 z CLAUDE.md ("nigdy per-komponent makeStyles(c)"). `themedStyles.ts` (patrz
+   jego własny komentarz) dokumentuje TEN SAM wzorzec jako źródło realnych ANR (receipt
+   scanner 30 produktów, dashboard editor 20 wierszy) — `useMemo(() => makeHr(colors), ...)`
+   jest PER KOMPONENT, więc N wierszy nawyków/notatek = N osobnych kopii tego samego
+   stylesheetu zamiast jednej współdzielonej (cache `themedStyles` po obiekcie `colors`).
+   `NoteCard` był już `React.memo` — to NIE zwalnia z tej reguły, memo chroni przed
+   nadmiarowym renderem, nie przed N-krotną budową tego samego stylesheetu przy mount.
+   Prosty mechaniczny fix — owinięcie `themedStyles(...)`, zero zmian w logice/wygladzie.
+
+Świadomie NIE naprawione (odłożone, wyższy koszt/ryzyko niż wart w tej rundzie):
+`app/expenses/scan.tsx`'s `ProductRow`/`CustomProductRow` — te same braki memoizacji, ale
+~15 wzajemnie zależnych callbacków per wiersz (onToggle/onCategoryPress/onPriceChange/
+onNameChange/onMerge/onTagsChange/onWeightChange/onQuantityChange/onEatersChange...)
+tworzonych inline w `.map()` w miejscu wołania — memoizacja samego komponentu bez
+ustabilizowania WSZYSTKICH tych callbacków (przez id-keyed stabilne referencje) nie dałaby
+żadnej korzyści, a zrobienie tego źle groziłoby stale closures. Do zrobienia w osobnej,
+dedykowanej rundzie.
+
+`tsc`/`jest` czyste (981 testów, bez zmian w liczbie — czysto strukturalne zmiany, brak
+nowej logiki do testowania jednostkowo).
+**Priorytet testu na urządzeniu**: niski/średni — Finanse (scroll długiej listy powinien
+być gładszy, tap/long-press na kafelku wciąż działa jak wcześniej), zakładka Jedzenie →
+Kompozycje i dania (wpisywanie w szukajkę powinno być bez zacinania na większej liczbie
+presetów), Nawyki i Notatki (wizualnie bez zmian, tylko wewnętrzna budowa stylów).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
