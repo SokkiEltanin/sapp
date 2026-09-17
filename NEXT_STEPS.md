@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: edycja tagów/kategorii w Finanse → Produkty nic nie zapisywała wstecz (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §112. Tag/kategoria trafiały tylko do `productMemory`
+(podpowiedź na przyszłość), nigdy nie były zapisywane wstecz na już istniejących pozycjach
+paragonów, a ekran Produkty czyta tagi wprost z historii — więc "Zapisz" wizualnie nic nie
+zmieniało. Naprawione: teraz retroaktywnie nadpisuje wszystkie pasujące pozycje. Przy
+okazji: dodana "Historia zakupów" (gdzie/kiedy, tap → do paragonu) + lepszy chip-picker
+tagów (ten sam wzorzec co w edycji pojedynczego paragonu). Do zrobienia (user, na
+urządzeniu): zmień tag produktu w Finanse → Produkty, sprawdź że lista NATYCHMIAST to
+pokazuje, i że link do "Historia zakupów" prowadzi do właściwego paragonu.
+
 ## ✅ Fix: Saldo dashboardu liczyło gotówkę mimo etykiety "na karcie" + 8 nowych kategorii jedzenia (2026-09-16)
 
 Pełny opis w ARCHITECTURE.md §110-111. Dwa osobne zgłoszenia: (1) "Saldo" na dashboardzie

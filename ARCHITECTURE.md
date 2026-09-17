@@ -7843,6 +7843,44 @@ usunięte. NIE — to inny, celowo zachowany feature z §78 (widget DASHBOARDU "
 słodycze" usunięty na życzenie 2026-09-08, ale per-pozycji "Kto jadł" w edycji paragonu
 (`app/expenses/[id].tsx`) zostało celowo, sprawdzone że dalej działa w bieżącym kodzie).
 
+## 112. Fix: edycja tagów/kategorii w Finanse → Produkty nic wizualnie nie zmieniała
+
+User (opisując dokładny scenariusz, caps-lock z frustracji): *"FINANSE>PRODUKTY>WYSZUKAJ>
+JAJA WPISAŁEM > KLIKNĄŁEM ZMIENIŁEM TAG NA "JAJA" KLIKNĄŁEM ZAPISZ > WRÓCIŁO MI DO
+PRODUKTY (Z TYM WYSZUKANYM JAJA) ALE NIE ZAPISAŁO MI PRODUKTU I MUSZĘ MIEĆ TAM ODNOŚNIK
+GDZIE W FINANSACH JEST TEN PRODUKT I KIEDY DO PARAGONU ORAZ LEPSZĄ EDYCJĘ TAM TYCH TAGÓW
+MOŻE"*.
+
+**Bug** (`app/products.tsx`, `saveEdit()`): tag/kategoria trafiały WYŁĄCZNIE do
+`productMemory`'s `saveCustomTagsToMemory`/`saveCustomProductsToMemory` — podpowiedź na
+PRZYSZŁOŚĆ (następny skan/edycja produktu o tej nazwie), nigdy nie zapisywane WSTECZ na
+już istniejących pozycjach paragonów. Sam ekran "Produkty" wyświetla tagi CZYTAJĄC WPROST
+z historycznych `expenses.receiptItems` (`products` useMemo, linia ~89-104) — więc
+"Zapisz" faktycznie coś zapisywało (do memory), ale ekran, na który user wracał, nigdy
+tego nie odzwierciedlał. Dokładnie ta "wróciło do Produkty, ale nie zapisało" obserwacja.
+
+**Fix**: `saveEdit()` teraz DODATKOWO retroaktywnie nadpisuje `tags`/`category` na KAŻDEJ
+pozycji paragonu pasującej do tego produktu (ta sama normalizacja nazwy —
+`normalizeProductName(canonicalProductName(...))` — co przy grupowaniu w `products`),
+przez `expensesService.update(id, { receiptItems: newItems })` na każdym pasującym
+wydatku, potem `reload()`. `productMemory` zostaje bez zmian (dalej karmi podpowiedzi przy
+przyszłych skanach) — to dodatek, nie zamiennik.
+
+**Dwie dodatkowe rzeczy z tego samego zgłoszenia**:
+1. **"Odnośnik gdzie i kiedy"** — nowa sekcja "Historia zakupów" w modalu edycji: lista
+   {data, sklep, cena} dla każdego wystąpienia produktu, tap → prosto do tego konkretnego
+   `/expenses/[id]` (ten sam wzorzec nawigacji co `search.tsx`/`vehicles.tsx`).
+2. **"Lepsza edycja tagów"** — zamiast surowego pola tekstowego (przecinki, żadnej
+   podpowiedzi, łatwo o literówkę rozjeżdżającą się z resztą słownika), teraz chip-picker
+   identyczny z już istniejącym w `app/expenses/[id].tsx` (`ITEM_TAGS` + `allKnownTags`
+   z pamięci tagów + pole "własny") — ta sama, sprawdzona konwencja UI, nie nowy wzorzec.
+
+`tsc`/`jest` czyste (74 suity/978 testów, logika ekranu nie jest wydzielona do czystej
+funkcji więc bez nowego testu jednostkowego — zweryfikowane czytaniem, ten sam wzorzec co
+§110). **Priorytet testu na urządzeniu**: Finanse → Produkty → znajdź produkt → zmień tag
+→ Zapisz → sprawdź że lista NATYCHMIAST pokazuje nowy tag (nie tylko przy następnym
+skanie) i że "Historia zakupów" faktycznie prowadzi do właściwego paragonu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

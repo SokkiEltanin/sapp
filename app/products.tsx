@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, X } from 'lucide-react-native';
+import { ChevronLeft, Search, X, Plus, Receipt } from 'lucide-react-native';
 
 import { expensesService } from '@/services/expensesService';
 import { Expense } from '@/types';
@@ -16,6 +16,7 @@ import {
   loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
   saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases,
   productNameSimilarity, removeNameAliases,
+  loadTagMemory, allKnownTags,
 } from '@/utils/productMemory';
 import { looksLikeFood } from '@/utils/calories';
 import { ExpenseCategory } from '@/types';
@@ -28,6 +29,21 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
 type Product = { name: string; key: string; count: number; category: string; tags: string[] };
+
+function fmtHistoryDate(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// Ta sama bazowa lista co w app/expenses/[id].tsx (ITEM_TAGS) — plik-lokalna tam też,
+// celowo nie wydzielona współdzielona (mała, stała lista domenowa).
+const ITEM_TAGS = [
+  'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
+  'słodycze', 'pieczywo', 'napoje', 'przekąski', 'sosy',
+  'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
+];
 
 export default function ProductsScreen() {
   const c = useColors();
@@ -44,8 +60,19 @@ export default function ProductsScreen() {
   const [editing, setEditing]   = useState<Product | null>(null);
   const [editName, setEditName] = useState('');
   const [editWeightG, setEditWeightG] = useState('');
-  const [editTags, setEditTags] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [editCat, setEditCat]   = useState<ExpenseCategory>('groceries');
+  const [customTag, setCustomTag] = useState('');
+  const [tagMemory, setTagMemory] = useState<Record<string, string[]>>({});
+  useEffect(() => { loadTagMemory().then(setTagMemory).catch(() => {}); }, []);
+  const knownTags = useMemo(() => [...new Set([...ITEM_TAGS, ...editTags, ...allKnownTags(tagMemory)])], [tagMemory, editTags]);
+  const toggleEditTag = (t: string) => setEditTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  const addCustomTag = () => {
+    const t = customTag.trim().toLowerCase();
+    setCustomTag('');
+    if (!t) return;
+    setEditTags(prev => prev.includes(t) ? prev : [...prev, t]);
+  };
   // Pairs the user said are NOT the same — MUST persist, else the same pair keeps
   // reappearing every time you reopen the screen ("klikam że to nie to samo, nie zapisuje").
   const [dismissedDup, setDismissedDup] = useState<Set<string>>(new Set());
@@ -150,17 +177,34 @@ export default function ProductsScreen() {
     setEditName(p.name);
     const w = weightFor(p.name, weightMem);
     setEditWeightG(w ? String(Math.round(w * 1000)) : '');
-    setEditTags((p.tags ?? []).join(', '));
+    setEditTags([...new Set(p.tags ?? [])]);
     setEditCat((p.category as ExpenseCategory) || 'groceries');
     setEditing(p);
   };
+
+  // Gdzie i kiedy ten produkt się pojawił — user: "muszę mieć tam odnośnik gdzie w
+  // finansach jest ten produkt i kiedy do paragonu" (2026-09-17). Tap → prosto do tego
+  // konkretnego wydatku/paragonu (`/expenses/[id]`, ten sam wzorzec co search.tsx).
+  const purchaseHistory = useMemo(() => {
+    if (!editing) return [];
+    const rows: { expenseId: string; date: string; price: number; storeName?: string }[] = [];
+    for (const e of expenses) {
+      if (e.type === 'income') continue;
+      for (const it of e.receiptItems ?? []) {
+        if (normalizeProductName(canonicalProductName(it.name, aliases)) === editing.key) {
+          rows.push({ expenseId: e.id, date: e.date ?? '', price: it.price, storeName: e.storeName });
+        }
+      }
+    }
+    return rows.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 20);
+  }, [editing, expenses, aliases]);
 
   const saveEdit = async () => {
     if (!editing) return;
     haptic.success();
     const newName = editName.trim() || editing.name;
     const wG = parseFloat(editWeightG.replace(',', '.'));
-    const tags = editTags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    const tags = editTags.map(t => t.trim().toLowerCase()).filter(Boolean);
     try {
       // Rename → alias: the old name folds into the new one (a manual MERGE).
       if (newName.toLowerCase() !== editing.name.toLowerCase()) {
@@ -171,10 +215,28 @@ export default function ProductsScreen() {
       if (!isNaN(wG) && wG > 0) await saveWeightMemory([{ name: newName, kg: wG / 1000 }]);
       await saveCustomProductsToMemory([{ name: newName, category: editCat }]);
       if (tags.length > 0) await saveCustomTagsToMemory([{ name: newName, tags }]);
+      // Fix (2026-09-17, user: "wroclo mi do produkty ale nie zapisalo mi produktu") —
+      // do tego momentu tag/kategoria trafiały TYLKO do `productMemory` (podpowiedź na
+      // PRZYSZŁOŚĆ, przy kolejnym skanie/edycji), nigdy nie były zapisywane wstecz na już
+      // istniejących pozycjach paragonów — a ten ekran wyświetla tagi CZYTAJĄC WPROST z
+      // historycznych `expenses.receiptItems`, więc "zapisz" wizualnie nic nie zmieniało.
+      // Teraz retroaktywnie nadpisuje tagi/kategorię na KAŻDEJ pozycji paragonu, która
+      // pasuje do tego produktu (ta sama normalizacja co przy grupowaniu w `products`).
+      const matching = expenses.filter(e => e.type !== 'income'
+        && (e.receiptItems ?? []).some(it => normalizeProductName(canonicalProductName(it.name, aliases)) === editing.key));
+      await Promise.all(matching.map(e => {
+        const newItems = (e.receiptItems ?? []).map(it =>
+          normalizeProductName(canonicalProductName(it.name, aliases)) === editing.key
+            ? { ...it, tags, category: editCat }
+            : it,
+        );
+        return expensesService.update(e.id, { receiptItems: newItems });
+      }));
       await Promise.all([
         loadWeightMemory().then(setWeightMem),
         loadNameAliases().then(setAliases),
       ]);
+      reload();
       setEditing(null);
       toast.success('Zapisano produkt');
     } catch { haptic.error(); toast.error('Nie udało się zapisać'); }
@@ -244,8 +306,27 @@ export default function ProductsScreen() {
               <Text style={s.sheetLabel}>Waga domyślna (g/szt, opcjonalnie)</Text>
               <TextInput value={editWeightG} onChangeText={setEditWeightG} keyboardType="number-pad" placeholder="np. 250" placeholderTextColor={c.text.muted} style={s.fieldInput} />
 
-              <Text style={s.sheetLabel}>Tagi (przecinek)</Text>
-              <TextInput value={editTags} onChangeText={setEditTags} placeholder="np. ser, nabiał" placeholderTextColor={c.text.muted} style={s.fieldInput} autoCapitalize="none" />
+              <Text style={s.sheetLabel}>Tagi</Text>
+              <View style={s.catRow}>
+                {knownTags.map(t => {
+                  const on = editTags.includes(t);
+                  return (
+                    <TouchableOpacity key={t} onPress={() => { haptic.tap(); toggleEditTag(t); }} style={[s.catChip, on && { borderColor: '#4ECBA8', backgroundColor: '#4ECBA822' }]}>
+                      <Text style={[s.catChipText, on && { color: '#4ECBA8', fontWeight: '700' }]}>{t}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <View style={[s.catChip, { flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
+                  <Plus size={11} color={c.text.muted} />
+                  <TextInput
+                    value={customTag} onChangeText={setCustomTag}
+                    onSubmitEditing={addCustomTag} onBlur={addCustomTag}
+                    placeholder="własny" placeholderTextColor={c.text.muted}
+                    autoCapitalize="none" returnKeyType="done"
+                    style={{ minWidth: 54, fontSize: 12, color: c.text.primary, padding: 0 }}
+                  />
+                </View>
+              </View>
 
               <Text style={s.sheetLabel}>Kategoria</Text>
               <View style={s.catRow}>
@@ -259,6 +340,30 @@ export default function ProductsScreen() {
                   );
                 })}
               </View>
+
+              {/* Gdzie i kiedy — user: "muszę mieć tam odnośnik gdzie w finansach jest ten
+                  produkt i kiedy do paragonu" (2026-09-17). Tap → prosto do tego wydatku. */}
+              {purchaseHistory.length > 0 && (
+                <>
+                  <Text style={s.sheetLabel}>Historia zakupów ({purchaseHistory.length})</Text>
+                  <View style={{ gap: 6 }}>
+                    {purchaseHistory.map((row, i) => (
+                      <TouchableOpacity
+                        key={`${row.expenseId}-${i}`} activeOpacity={0.7}
+                        onPress={() => { haptic.tap(); setEditing(null); router.push(`/expenses/${row.expenseId}` as any); }}
+                        style={s.historyRow}
+                      >
+                        <Receipt size={13} color={c.text.muted} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.historyDate} numberOfLines={1}>{fmtHistoryDate(row.date)}{row.storeName ? ` · ${row.storeName}` : ''}</Text>
+                        </View>
+                        <Text style={s.historyPrice}>{row.price.toFixed(2)} zł</Text>
+                        <ChevronLeft size={13} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
             </ScrollView>
             <TouchableOpacity style={s.saveBtn} onPress={saveEdit} activeOpacity={0.85}>
               <Text style={s.saveBtnText}>Zapisz</Text>
@@ -371,4 +476,11 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   catChipText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
   saveBtn: { backgroundColor: '#FB923C', paddingVertical: 13, borderRadius: radius.md, alignItems: 'center', marginTop: spacing[1] },
   saveBtnText: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
+  historyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: c.bg.elevated, borderRadius: radius.sm, borderWidth: 1, borderColor: c.border.subtle,
+    paddingHorizontal: spacing[3], paddingVertical: 9,
+  },
+  historyDate: { fontSize: 12, color: c.text.secondary, fontWeight: '600' },
+  historyPrice: { fontSize: 12, color: c.text.primary, fontWeight: '700' },
 }));
