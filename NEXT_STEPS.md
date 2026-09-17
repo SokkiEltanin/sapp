@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Edytor układu walki — poligon, jeszcze NIE podpięty do realnej walki (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §120. User: chce dostosować tło areny + wielkość/pozycję
+pupila, bossa i ich pasków HP, potem wyeksportować i "zrobić dla wszystkich". Zbudowany
+`app/battle-layout-lab.tsx` (link: Ustawienia → Dane → "Edytor układu walki (beta)") —
+pełny WYSIWYG podgląd tymi samymi komponentami co realna walka, przeciągalne dotykiem
+pupil/boss/oba paski HP (dodatkowy offset NA WIERZCHU istniejącego flex-layoutu, nie
+zamiast niego — zero ryzyka dla delikatnej, powiązanej geometrii `projectile.top`/cieni/
+poświat), steppery rozmiaru, wybór z 4 istniejących teł, eksport jako zaznaczalny JSON +
+Udostępnij. **DO ZROBIENIA (user, na urządzeniu)**: wytunować układ, wyeksportować JSON i
+WKLEIĆ GO W ROZMOWIE — to jest właściwy sygnał żeby podpiąć wartości jako nowe stałe w
+`app/boss-fight.tsx` dla wszystkich trybów walki. Do tego momentu real walka jest
+NIEZMIENIONA.
+
 ## ✅ Self-review §118 — martwy `index` prop unieważniał React.memo (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §119. `ExpenseItem.tsx`'s `index: number` w `Props` był

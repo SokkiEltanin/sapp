@@ -33,6 +33,7 @@ import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
 import UsageStatsSection from '@/components/settings/UsageStatsSection';
 import BoxStatsSection from '@/components/settings/BoxStatsSection';
+import BattleLayoutLabSection from '@/components/settings/BattleLayoutLabSection';
 import BankHistorySection from '@/components/settings/BankHistorySection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
@@ -2298,6 +2299,7 @@ export default function SettingsScreen() {
                 <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
                 <UsageStatsSection />
                 <BoxStatsSection />
+                <BattleLayoutLabSection />
               </View>
             )}
           </>
