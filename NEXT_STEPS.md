@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Redesign ekwipunku pupila — zakładki, tap-outside, sprzedaż zbiorcza (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §116. User: skarga na 4 rzeczy w `GearPanel.tsx` — malutkie
+ikonki slotów wymuszające zamykanie/otwieranie modala dla każdego slotu, brak tap-outside
+(tylko malutki X), goły `sellLink` bez paddingu (ciężko trafić), i brak zbiorczej sprzedaży
+"podobnych itemów z gorszym floatem" (czyli: innych itemów tego samego slotu, nie
+duplikatów TEGO SAMEGO itemu — te są auto-kompensowane monetami przy zdobyciu). Naprawione
+wszystkie 4: pasek zakładek wszystkich 6 slotów, tap na tło zamyka, przycisk Sprzedaj z
+realnym paddingiem+ikoną, "Sprzedaj X niezałożonych" per slot. `tsc`/`jest` czyste. Do
+zrobienia (user, na urządzeniu): pełny flow — przełączanie zakładek, tap-outside, zbiorcza
+sprzedaż z policzoną sumą monet, założony item NIE znika przy zbiorczej sprzedaży.
+
 ## ✅ Self-review #224: bug w logu "Historia zmian" dla pojazdu (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §115. Kolejna runda po "dawaj dalej" — `after.vehicle` w

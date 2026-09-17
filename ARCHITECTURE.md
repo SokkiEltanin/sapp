@@ -8012,6 +8012,45 @@ komponencie, nie osobna czysta funkcja do testu jednostkowego).
 przełącz na Przychód i zapisz, sprawdź w "Historia zmian" że linijka Pojazd (jeśli się
 pojawi) pokazuje `→ —`, nie starą nazwę pojazdu.
 
+## 116. Redesign ekwipunku pupila — pasek zakładek, tap-outside, sprzedaż zbiorcza (2026-09-17)
+
+User: *"redesign ekwipunku pupila zeby o kliknięciu w sloty otwierał sie ekwipunek
+pelnoprawny jednak bo klikanie w te ikonki małe to ból dupy potem zeby trafić w sprzedaj
+albo doczytać sie co robi item i wgle, zeby wyjść z eq chciałem kliknąć poza niego ale nie
+traf w malutki x zeby wyjść a potem sprzedawanie podobnych itemow z gorszym floatem to tez
+masakra"*. Cztery zmiany w `src/components/pet/GearPanel.tsx`, w JEDNYM modalu (nie osobny
+full-screen route — mniej ryzyka w nawigacji, ten sam bottom-sheet co dotąd):
+
+1. **Pasek zakładek WSZYSTKICH 6 slotów** u góry modala (ikony z istniejącej `SLOT_ICON`
+   mapy) — to jest "ekwipunek pełnoprawny": przełączanie między slotami BEZ zamykania i
+   ponownego trafiania w malutką ikonkę na kotku. Żółta kropka na zakładce = są tam
+   nie-założone itemy do przejrzenia (ten sam sygnał co dawna `slotDot`).
+2. **Tap na tło ZA arkuszem zamyka** — dawniej `overlay`/`sheet` to gołe `View`, jedyna
+   droga wyjścia to mały `X` (20px + hitSlop 10). Teraz `overlay` to `Pressable` z
+   `onPress={onClose}`, `sheet` to ZAGNIEŻDŻONY `Pressable` z no-op `onPress={() => {}}` —
+   standardowy RN wzorzec "backdrop zamyka, zawartość arkusza nie" (touch trafia w
+   najgłębszy odpowiadający responder, więc tap wewnątrz arkusza nie bąbelkuje do
+   `overlay`). `X` i tak zostaje, powiększony (22px, hitSlop 16, dodatkowy padding).
+3. **Przycisk Sprzedaj z realnym hit-targetem** — dawny `sellLink` to był goły podkreślony
+   `Text` bez paddingu w ogóle (user: "ciężko trafić w sprzedaż"). Teraz `sellBtn` z tym
+   samym paddingiem/kształtem co `equipBtn` obok, plus ikona `Trash2` dla jasności.
+4. **Sprzedaż zbiorcza "niezałożonych"** — przycisk nad listą itemów danego slotu
+   (widoczny gdy jest ≥1 nie-założony item), JEDNO potwierdzenie sprzedaje WSZYSTKIE
+   nie-założone itemy tego slotu naraz (suma monet policzona z góry i pokazana w
+   potwierdzeniu), zamiast N razy osobno przez pojedynczy `sellTarget`. Ważne rozróżnienie
+   znalezione przy czytaniu `gear.ts`/`petStore.ts`: "podobne itemy z gorszym floatem" NIE
+   są duplikatami TEGO SAMEGO itemu (te są auto-kompensowane monetami przy zdobyciu,
+   `grantGear`/`isGearUpgrade`, `ownedGear` trzyma jedną najlepszą kopię per id) — to są
+   INNE itemy tego samego slotu (np. 3 różne hełmy odblokowane na różnych poziomach),
+   każdy pod własnym id, więc trzeba je sprzedawać ręcznie. Stąd zbiorczy przycisk per slot.
+
+`tsc`/`jest` czyste (74/978, bez zmian w liczbie testów — czysto UI, logika sprzedaży
+nadal przez istniejący `sellGear()` w `petStore.ts`, tylko wołany w pętli).
+**Priorytet testu na urządzeniu**: otwórz Ekwipunek z kotka → przełącz kilka zakładek bez
+zamykania → tapnij w tło (nie w X) żeby zamknąć → jeśli slot ma nie-założone itemy, użyj
+"Sprzedaj X niezałożonych" i sprawdź że policzone monety się zgadzają i że założony item
+ZOSTAJE.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
