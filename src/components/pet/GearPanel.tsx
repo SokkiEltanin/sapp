@@ -1,6 +1,6 @@
 import { ReactNode, useMemo, useState } from 'react';
-import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { X, Check, HardHat, Shield, Footprints, Link2, Gem, Coins, LucideIcon } from 'lucide-react-native';
+import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native';
+import { X, Check, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePetStore } from '@/store/petStore';
@@ -72,19 +72,34 @@ export default function GearPanel({ children }: { children: ReactNode }) {
         <View style={s.catCol}>{children}</View>
         <View style={s.flankCol}>{RIGHT_SLOTS.map(slotButton)}</View>
       </View>
-      <GearSlotModal slot={openSlot} onClose={() => setOpenSlot(null)} />
+      <GearSlotModal slot={openSlot} onSelectSlot={setOpenSlot} onClose={() => setOpenSlot(null)} />
     </>
   );
 }
 
-function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () => void }) {
+// Redesign (2026-09-17, user: "kliknięcie w sloty otwierał sie ekwipunek pełnoprawny...
+// klikanie w te ikonki małe to ból dupy potem zeby trafić w sprzedaz albo doczytać sie co
+// robi item... zeby wyjść z eq chciałem kliknąć poza niego ale nie traf w malutki x... a
+// sprzedawanie podobnych itemow z gorszym floatem to tez masakra") — cztery zmiany w JEDNYM
+// modalu (nie osobny full-screen route — mniej ryzyka w nawigacji, ten sam bottom-sheet):
+// (1) pasek zakładek WSZYSTKICH 6 slotów u góry, przełącza się bez zamykania/ponownego
+// otwierania z malutkich ikonek na kotku (to jest "ekwipunek pełnoprawny" — cały ekwipunek
+// w jednym miejscu, nie pojedynczy slot na raz); (2) tap na tło ZA arkuszem zamyka (obok X,
+// nie tylko X); (3) X i przycisk Sprzedaj powiększone/z paddingiem (dawny `sellLink` był
+// gołym podkreślonym tekstem bez paddingu — realnie ciężko trafić); (4) "Sprzedaj słabsze"
+// — jeden przycisk sprzedaje WSZYSTKIE nie-założone itemy tego slotu za jednym
+// potwierdzeniem, zamiast N razy osobno.
+function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null; onSelectSlot: (s: GearSlot) => void; onClose: () => void }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { ownedGear, equippedGear, equipGear, unequipGear, sellGear } = usePetStore();
-  // Sprzedaż (2026-08-20, user: "co robimy z itemami co sa słabsze ale je mamy w eq? mozna
-  // je sprzedać? jak tak dodaj przycisk sprzedaj z potwierdzeniem") — potwierdzenie przez
-  // ISTNIEJĄCY `ConfirmDialog`, ten sam wzorzec co reszta destrukcyjnych akcji w apce.
+  // Sprzedaż pojedynczego itemu (2026-08-20, user: "co robimy z itemami co sa słabsze ale je
+  // mamy w eq? mozna je sprzedać? jak tak dodaj przycisk sprzedaj z potwierdzeniem") —
+  // potwierdzenie przez ISTNIEJĄCY `ConfirmDialog`, ten sam wzorzec co reszta destrukcyjnych
+  // akcji w apce.
   const [sellTarget, setSellTarget] = useState<{ id: string; name: string; coins: number; wasEquipped: boolean } | null>(null);
+  // Sprzedaż zbiorcza (2026-09-17) — patrz komentarz nad komponentem, punkt (4).
+  const [bulkSell, setBulkSell] = useState<{ slot: GearSlot; ids: string[]; coins: number } | null>(null);
 
   if (!slot) return null;
   const items = gearBySlot(slot).filter(g => ownedGear[g.id]);
@@ -93,21 +108,48 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
   const equippedOwned = equippedId ? ownedGear[equippedId] : undefined;
   const equippedVal = equippedOwned ? equippedOwned.value : 0;
   const stat = SLOT_STAT[slot];
+  const nonEquipped = items.filter(item => item.id !== equippedId);
+  const nonEquippedTotal = nonEquipped.reduce((sum, item) => sum + gearSellValue(item, ownedGear[item.id]!.rarity), 0);
 
   return (
     <>
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.overlay}>
-        <View style={s.sheet}>
+      <Pressable style={s.overlay} onPress={onClose}>
+        <Pressable style={s.sheet} onPress={() => {}}>
           <View style={s.sheetHead}>
-            <Text style={s.sheetTitle}>{SLOT_META[slot].icon} {SLOT_META[slot].label}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
+            <Text style={s.sheetTitle}>Ekwipunek</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={16} style={s.closeBtn}><X size={22} color={c.text.primary} /></TouchableOpacity>
           </View>
+
+          <View style={s.tabRow}>
+            {GEAR_SLOTS.map(sl => {
+              const TabIcon = SLOT_ICON[sl];
+              const active = sl === slot;
+              const hasDot = gearBySlot(sl).some(g => ownedGear[g.id]) && !equippedGear[sl];
+              return (
+                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
+                  <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />
+                  {hasDot && <View style={s.tabDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={s.slotLabel}>{SLOT_META[slot].icon} {SLOT_META[slot].label}</Text>
 
           {items.length === 0 ? (
             <Text style={s.emptyTxt}>Brak jeszcze itemów do tego slotu — zdobądź w skrzynkach albo sklepie dnia.</Text>
           ) : (
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+            <>
+            {nonEquipped.length > 0 && (
+              <TouchableOpacity
+                style={s.bulkSellBtn}
+                onPress={() => { haptic.tap(); setBulkSell({ slot, ids: nonEquipped.map(i => i.id), coins: nonEquippedTotal }); }}
+              >
+                <Trash2 size={13} color={c.accent.red ?? '#EF4444'} />
+                <Text style={s.bulkSellTxt}>Sprzedaj {nonEquipped.length} niezałożonych (+{nonEquippedTotal} 🪙)</Text>
+              </TouchableOpacity>
+            )}
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               {items.map(item => {
                 const owned = ownedGear[item.id]!;
                 const rarity = owned.rarity;
@@ -138,17 +180,21 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => { haptic.tap(); setSellTarget({ id: item.id, name: item.name, coins: gearSellValue(item, rarity), wasEquipped: isEquipped }); }}
+                        style={s.sellBtn}
+                        hitSlop={6}
                       >
-                        <Text style={s.sellLink}>Sprzedaj +{gearSellValue(item, rarity)} 🪙</Text>
+                        <Trash2 size={12} color={c.text.muted} />
+                        <Text style={s.sellBtnTxt}>+{gearSellValue(item, rarity)} 🪙</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                 );
               })}
             </ScrollView>
+            </>
           )}
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
 
     <ConfirmDialog
@@ -163,6 +209,24 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
         setSellTarget(null);
       }}
       onCancel={() => setSellTarget(null)}
+    />
+
+    <ConfirmDialog
+      visible={!!bulkSell}
+      title="Sprzedać niezałożone?"
+      message={bulkSell ? `${bulkSell.ids.length} itemów (${SLOT_META[bulkSell.slot].label}) — otrzymasz łącznie ${bulkSell.coins} monet. Założony item zostaje. Tej operacji nie można cofnąć.` : ''}
+      confirmLabel="Sprzedaj wszystkie"
+      cancelLabel="Anuluj"
+      destructive
+      onConfirm={() => {
+        if (bulkSell) {
+          const earned = bulkSell.ids.reduce((sum, id) => sum + sellGear(id), 0);
+          haptic.success();
+          toast.success(`Sprzedano ${bulkSell.ids.length} itemów — +${earned} 🪙`);
+        }
+        setBulkSell(null);
+      }}
+      onCancel={() => setBulkSell(null)}
     />
     </>
   );
@@ -186,9 +250,26 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
   sheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[2] },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[2] },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  // Powiększony hit-target zamknięcia (2026-09-17, user: "nie traf w malutki x zeby wyjść")
+  // — dawny gołe 20px z hitSlop 10 zostaje 22px + hitSlop 16 + padding, razem ~54×54 efektywnie.
+  // Backdrop (tap poza arkuszem, `overlay` Pressable w renderze) teraz też zamyka — to jest
+  // GŁÓWNY fix, X jest już tylko zapasową drogą wyjścia.
+  closeBtn: { padding: spacing[1] },
+  // Pasek zakładek WSZYSTKICH slotów (2026-09-17) — "ekwipunek pełnoprawny": przełączanie
+  // między slotami bez zamykania modala i szukania ponownie malutkiej ikonki na kotku.
+  tabRow: { flexDirection: 'row', gap: spacing[1], marginBottom: spacing[2] },
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: radius.md, backgroundColor: c.fill.subtle, position: 'relative' },
+  tabActive: { backgroundColor: c.accent.blue + '22' },
+  tabDot: { position: 'absolute', top: 5, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: '#FBBF24' },
+  slotLabel: { fontSize: 13, fontWeight: '800', color: c.text.primary, marginBottom: spacing[2] },
   emptyTxt: { fontSize: 12.5, color: c.text.muted, lineHeight: 18, paddingVertical: spacing[4], textAlign: 'center' },
+
+  // Sprzedaż zbiorcza (2026-09-17, user: "sprzedawanie podobnych itemow z gorszym floatem to
+  // tez masakra") — jeden przycisk nad listą, zamiast osobnego "Sprzedaj" + potwierdzenia per item.
+  bulkSellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, borderColor: (c.accent.red ?? '#EF4444') + '55', backgroundColor: (c.accent.red ?? '#EF4444') + '14', paddingVertical: 9, marginBottom: spacing[2] },
+  bulkSellTxt: { fontSize: 11.5, fontWeight: '700', color: c.accent.red ?? '#EF4444' },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, backgroundColor: c.bg.card, marginBottom: spacing[2] },
   itemImg: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, backgroundColor: c.fill.subtle },
@@ -200,5 +281,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   equipBtnOn: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
   equipBtnTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
   equipBtnTxtOn: { color: c.bg.primary },
-  sellLink: { fontSize: 10, fontWeight: '700', color: c.text.muted, textDecorationLine: 'underline' },
+  // Przycisk Sprzedaj (2026-09-17) — dawny `sellLink` to był goły podkreślony `Text` bez
+  // paddingu (user: "ciezko trafic w sprzedaz") — teraz pełnoprawny przycisk z ikoną, tym
+  // samym paddingiem co `equipBtn` obok niego, więc oba mają porównywalny hit-target.
+  sellBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.border.default },
+  sellBtnTxt: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
 }));
