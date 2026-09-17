@@ -593,11 +593,10 @@ export default function FinancesScreen() {
               <Text style={st.sectionTotal}>{((section as any).total as number).toFixed(0)} PLN</Text>
             </View>
           )}
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <View style={st.itemPad}>
               <ExpenseItem
                 expense={item}
-                index={index}
                 onPress={handleExpensePress}
                 // 2026-09-17, user: "jak przytrzymuje kafelek z tranzakcja jakaś od razu sie
                 // przenosi na panel edycji" — `onLongPress` już istniał w ExpenseItem, ale

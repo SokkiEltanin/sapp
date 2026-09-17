@@ -8126,6 +8126,28 @@ być gładszy, tap/long-press na kafelku wciąż działa jak wcześniej), zakła
 Kompozycje i dania (wpisywanie w szukajkę powinno być bez zacinania na większej liczbie
 presetów), Nawyki i Notatki (wizualnie bez zmian, tylko wewnętrzna budowa stylów).
 
+## 119. Self-review §118 — martwy `index` prop unieważniał świeży `React.memo` (2026-09-17)
+
+User: *"dawaj dalej"* — self-review właśnie zmergowanego §118 (`ExpenseItem` memo).
+Znalazłem: `index: number` w `Props` interfejsie `ExpenseItem.tsx` był MARTWY już PRZED
+§118 (zadeklarowany, nigdy nie destrukturowany/używany w ciele komponentu) — nieszkodliwy
+dopóki komponent nie był memoizowany. Domyślny `React.memo` porównuje WSZYSTKIE propsy
+płytko, niezależnie od tego czy komponent faktycznie z nich korzysta — a `index` zmienia
+się dla wielu wierszy w danej sekcji przy KAŻDYM dodaniu/usunięciu transakcji (przesunięcie
+pozycji). Efekt: memo dodane w §118 byłoby cicho unieważniane dla sąsiadujących wierszy w
+dokładnie tym scenariuszu, w którym miało dać najwięcej (dodanie jednej transakcji nie
+powinno przemalowywać całej reszty listy poniżej). Fix: `index` USUNIĘTE z `Props` i z
+wywołania w `finances.tsx` (`renderItem={({ item }) => ...}`, `index={index}` skasowane).
+Przy okazji zweryfikowane (nie tylko przeczytane): `structuralFiltered`/`sections` w
+`finances.tsx` budują `items` przez `.filter()` na już istniejącej tablicy transakcji —
+zachowuje referencje obiektów `Expense` bez ich klonowania, więc `expense` prop faktycznie
+zostaje STABILNY między renderami gdy dana transakcja się nie zmieniła (warunek konieczny
+żeby memo cokolwiek dawało).
+
+`tsc`/`jest` czyste (981 testów, bez zmian — usunięcie nieużywanego propsu, nie nowa logika).
+**Priorytet testu na urządzeniu**: brak — czysto wewnętrzna optymalizacja, zero zmian
+widocznych/funkcjonalnych.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
