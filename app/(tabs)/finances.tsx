@@ -590,6 +590,11 @@ export default function FinancesScreen() {
                 expense={item}
                 index={index}
                 onPress={e => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }}
+                // 2026-09-17, user: "jak przytrzymuje kafelek z tranzakcja jakaś od razu sie
+                // przenosi na panel edycji" — `onLongPress` już istniał w ExpenseItem, ale
+                // nigdy nie był tu podpięty (no-op). `?edit=1` w [id].tsx otwiera od razu w
+                // trybie edycji zamiast trybu odczytu.
+                onLongPress={e => { haptic.medium(); router.navigate(`/expenses/${e.id}?edit=1` as any); }}
               />
             </View>
           )}

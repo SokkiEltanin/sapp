@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Redesign szczegółów transakcji + historia zmian + long-press na liście (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §113. Skonsolidowany tryb odczytu (jedna karta "Szczegóły"
+zamiast 4-5), tap na dowolny wiersz → od razu edycja, sticky pasek Zapisz/Anuluj nad
+klawiaturą, nowa "Historia zmian" per transakcja (co edytowano + co nauczono/zapisano do
+pamięci — `src/store/editHistoryStore.ts`), i long-press na kafelku w Finansach → od razu
+tryb edycji (prop `onLongPress` istniał w `ExpenseItem.tsx` od dawna, ale nigdy nie był
+podpięty). Do zrobienia (user, na urządzeniu): przejść cały nowy flow — patrz checklist w
+ARCHITECTURE.md §113 (5 punktów: czytelność Szczegółów, sticky pasek nad klawiaturą,
+Anuluj faktycznie cofa zmiany, Historia zmian pokazuje sensowny opis, long-press z listy).
+
 ## ✅ Fix: edycja tagów/kategorii w Finanse → Produkty nic nie zapisywała wstecz (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §112. Tag/kategoria trafiały tylko do `productMemory`

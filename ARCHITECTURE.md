@@ -7881,6 +7881,73 @@ funkcji więc bez nowego testu jednostkowego — zweryfikowane czytaniem, ten sa
 → Zapisz → sprawdź że lista NATYCHMIAST pokazuje nowy tag (nie tylko przy następnym
 skanie) i że "Historia zakupów" faktycznie prowadzi do właściwego paragonu.
 
+## 113. Redesign szczegółów transakcji (`app/expenses/[id].tsx`) + historia zmian + long-press
+
+User przysłał 3 screeny (przychód/paragon/wydatek) z pytaniem: *"moze zrobimy ładniej w
+końcu czytelniej i wgle te szczegolowe podglądy finansow i paragonów?"*. Po propozycji
+(skondensować rozdrobnione karty w jedną, "Przelew własny" nie zasługuje na całą kartę,
+duplikat kategorii w hero+karcie) user: *"Okej zrob ufam ci... tylko to ze edytowania sie
+pokazują tez spoko ale moze byc gdzieś szczegóły i tam każdorazowo co edytowano i np co
+nauczono lub zapisano do pamięci, I wtedy na głównej finansow możemy dodać ze jak
+przytrzymuje kafelek z tranzakcja jakaś od razu sie przenosi na panel edycji tak samo jak
+wchodzę na podgląd i klikam na kategorie daje mi mozliwosc edycji a przycis zapisz zeby
+byl nad klawiatura zawsze czy cos bo boli wracać w prawy górny"*.
+
+**1. Skonsolidowany tryb odczytu.** Kategoria/Przelew własny/Tagi/Kto zapłacił+Płatność+
+Pojazd — dawniej 4-5 osobnych pełnowymiarowych kart — teraz JEDNA karta "Szczegóły" ze
+zwartymi wierszami etykieta→wartość (model: sekcja PRODUKTY, która już tak wyglądała).
+Tryb EDYCJI zostaje NIETKNIĘTY (te same duże pickery/gridy co wcześniej — edycja
+potrzebuje miejsca na interakcję, konsolidacja miała sens tylko dla biernego odczytu).
+
+**2. Tap-to-edit.** Każdy wiersz w "Szczegóły" jest teraz `TouchableOpacity` →
+`setEditing(true)` — dotknięcie Kategorii (albo dowolnego innego pola) od razu otwiera
+pełny tryb edycji, bez szukania ołówka w prawym górnym rogu. Ołówek w nagłówku ZOSTAJE
+(druga, równoległa droga).
+
+**3. Sticky pasek Zapisz/Anuluj nad klawiaturą.** Nowy `stickyBar` — POZA `ScrollView`,
+ale WEWNĄTRZ tego samego `KeyboardAvoidingView` co reszta ekranu, więc unosi się razem z
+klawiaturą zamiast chować się pod nią. Ikona Zapisz w nagłówku zostaje jako druga,
+szybsza droga (bez klawiatury). **"Anuluj" naprawia realny bug, który by inaczej
+wprowadził**: tryb odczytu czyta z TYCH SAMYCH zmiennych stanu co edycja (`tags`/`payer`/
+`paymentMethod`/...) — samo `setEditing(false)` bez przywrócenia stanu z `expense`
+zostawiłoby niezapisane zmiany "wiszące" w widoku odczytu. Nowa `cancelEdit()` odtwarza
+dokładnie tę samą logikę synchronizacji co `useEffect` przy `[expense?.id,
+expense?.updatedAt]` (linia ~365), tylko wywołaną ręcznie.
+
+**4. Historia zmian** (`src/store/editHistoryStore.ts`, nowy store) — capped log (500,
+ten sam wzorzec co `usageStatsStore`/`bankQueueStore`/`boxStatsStore`), WYŁĄCZNIE lokalny.
+Jeden wpis PER ZAPIS (nie per pole, jak commit message) — `summarizeChanges()` porównuje
+GOTOWE, już sformatowane stringi (etykiety kategorii, "Karta"/"Gotówka", nazwa pojazdu —
+nie surowe klucze) między stanem `expense` sprzed edycji a nowymi wartościami, składa w
+`"Kategoria: Zakupy → Jedzenie; Tagi: — → słodycze"`. Osobne wpisy z `handleItemSave()`
+(edycja pojedynczej pozycji paragonu). Pole `learned` osobno notuje gdy coś TRAFIŁO do
+pamięci (kategoria/tagi sprzedawcy w `merchantMemory`, kategoria/tagi produktu w
+`productMemory`) — user chciał widzieć nie tylko CO się zmieniło, ale i CO apka
+"zapamiętała" na przyszłość. Wyświetlane w rozwijanej sekcji "Historia zmian" pod kartą
+Szczegóły, tylko wpisy dla TEJ transakcji (`forExpense(id)`).
+
+**5. Long-press na kafelku listy → od razu tryb edycji.** `ExpenseItem.tsx` miał prop
+`onLongPress` od dawna zadeklarowany, ale NIGDY niepodpięty w `app/(tabs)/finances.tsx`
+(martwy kod — long-press był fizycznym no-opem). Podpięty: `onLongPress` →
+`router.navigate('/expenses/${id}?edit=1')`; `[id].tsx` czyta `?edit=1` i inicjalizuje
+`editing` stan od razu na `true`.
+
+**Świadomie NIE zrobione**: prawdziwe pole-po-polu inline editing bez globalnego trybu
+edycji (np. tap na Kategorię pokazujący TYLKO grid kategorii w miejscu, bez przechodzenia
+w pełny tryb edycji reszty pól) — to byłby dużo większy przepis architektury tego ekranu
+(1300+ linii, wiele współzależnych pól: kwota/data/typ/kategoria/tagi/płatnik). Obecne
+rozwiązanie (tap → pełny tryb edycji) daje 90% wygody przy ułamku ryzyka.
+
+`tsc`/`jest` czyste (74 suity/978 testów — brak nowych testów jednostkowych, logika w
+komponencie ekranu, ten sam wzorzec co §110/§112). **Priorytet testu na urządzeniu**: (a)
+otwórz dowolną transakcję, sprawdź że karta "Szczegóły" jest czytelna i dotknięcie
+dowolnego wiersza otwiera edycję; (b) w edycji sprawdź że pasek Zapisz/Anuluj jest
+widoczny NAD klawiaturą po dotknięciu pola tekstowego; (c) zmień coś, kliknij Anuluj,
+sprawdź że wróciło do STARYCH wartości (nie tylko trybu odczytu); (d) zapisz zmianę,
+rozwiń "Historia zmian", sprawdź że opisuje faktycznie to co zmieniono; (e) na liście w
+Finansach przytrzymaj dowolny kafelek — powinno otworzyć transakcję OD RAZU w trybie
+edycji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
