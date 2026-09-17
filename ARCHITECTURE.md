@@ -8148,6 +8148,65 @@ zostaje STABILNY między renderami gdy dana transakcja się nie zmieniła (warun
 **Priorytet testu na urządzeniu**: brak — czysto wewnętrzna optymalizacja, zero zmian
 widocznych/funkcjonalnych.
 
+## 120. Edytor układu walki — poligon do wyklikania pozycji/rozmiarów przed podpięciem (2026-09-17)
+
+User: *"Daj mi mozliwosc zmienic sam obrazek tla walk żebym dostosował i moze tez wielkość i
+pozycje pupila, bossa i ich pasków HP, wtedy wyeksportować i zrobisz dla wszystkich"*.
+
+**Stan przed**: `app/boss-fight.tsx` nie ma ŻADNEGO per-elementowego pozycjonowania —
+`PORTRAIT_SIZE`/`CAT_PORTRAIT_SIZE` to globalne stałe rozmiaru, `SPRITE_GROUND_SHIFT` to
+JEDEN, WSPÓLNY offset Y dla obu sprite'ów, paski HP to zwykłe flex-children pod portretem,
+bez własnego offsetu. Tło areny idzie przez `fightArenaBg`/`arenaBgFor`/`MISSION_LOCATION_BG`
+w `bossIcons.ts` — jedyne miejsce, gdzie coś JEST już konfigurowalne per tryb/miniboss.
+
+**Decyzja architektoniczna**: NIE zastąpiłem tego flex-layoutu absolutnym pozycjonowaniem
+(co dałoby "prawdziwie niezależne X/Y od zera") — istniejąca geometria ma sporo
+POWIĄZANYCH, starannie wyliczonych zależności (`projectile.top` liczony wprost z wysokości
+`tilePortrait`, `GroundShadow`/`RadialGlow` skalowane względem `PORTRAIT_SIZE`, wspólny
+`SPRITE_GROUND_SHIFT` na obu sprite'ach) — zastąpienie tego całkiem nowym systemem byłoby
+ryzykownym, dużym rewrite'em rdzenia ekranu walki. Zamiast tego: DODATKOWY offset
+(`translateX`/`translateY`) NA WIERZCHU istniejącego flex-layoutu, niezależny dla każdego z
+4 elementów (pupil/boss/pasek HP pupila/pasek HP bossa) — przy offsetach=0 (domyślne)
+wynik jest PIKSEL-W-PIKSEL identyczny z dzisiejszą realną areną.
+
+**Co zbudowane** (poligon, NIE dotyka `app/boss-fight.tsx`):
+- `src/store/battleLayoutDraftStore.ts` — persisted draft (`bg`, `catSize`, `bossSize`, 4×
+  `offsetX/Y` par), domyślne wartości = dzisiejsze realne stałe.
+- `app/battle-layout-lab.tsx` — pełny podgląd używający TYCH SAMYCH komponentów co realna
+  walka (`CatArt`/`BossArt`/`RadialGlow`/`GroundShadow`, ten sam palette usera przez
+  `usePetStore`+`paletteById`, ta sama grafika tła+scrim+mgiełka). Pupil/boss/oba paski HP
+  są przeciągalne dotykiem (`Draggable` — `PanResponder` z `posRef`/`onDragRef` żeby uniknąć
+  stale closure, bo `PanResponder.create` woła się RAZ przez `useRef`); rozmiar pupila/bossa
+  przez steppery +/−; wybór tła z 4 istniejących plików w `assets/lokalizacje/`; boss
+  podglądu cyklowany przyciskiem (czysto kosmetyczne, nie wpływa na eksport). Pozycje mają
+  też zapasową drogę liczbową (te same steppery) dla precyzyjnych korekt o 1px.
+- Eksport: `JSON.stringify(draft, null, 2)` w NIEEDYTOWALNYM, zaznaczalnym `TextInput`
+  (`selectTextOnFocus`) + przycisk „Udostępnij" (`Share.share()`, wbudowane w RN, zero
+  nowych zależności) — świadomie NIE `expo-clipboard`: to nowy natywny moduł, wymagałby
+  świeżego builda APK zamiast działać od razu przez OTA (CLAUDE.md #2), za dużo kosztu na
+  wygodę "kopiuj-wklej" w jednorazowym narzędziu tuningowym.
+- Link w Ustawienia → Dane (`BattleLayoutLabSection.tsx`, ten sam wzorzec karty co
+  `BoxStatsSection`).
+- Fix po drodze: pierwsza wersja czytała `usePetStore` gołym obiektem-literałem jako
+  selektor (`usePetStore(st => ({...}))`) — TEN SAM anti-pattern niestabilnej referencji,
+  który naprawiałem gdzie indziej w tej sesji (§115 i inne). Złapane i poprawione na
+  `useShallow` PRZED zmergowaniem, nie po.
+
+**Świadomie NIE zrobione teraz**: podpięcie wyeksportowanych wartości do
+`app/boss-fight.tsx` — to następny, ODDZIELNY krok, PO tym jak user wytunuje układ na
+urządzeniu i wklei mi wynikowy JSON. Wtedy `PORTRAIT_SIZE`/`CAT_PORTRAIT_SIZE` zostaną
+zastąpione wartościami z `catSize`/`bossSize`, a 4 nowe stałe offsetu dodadzą się do
+istniejących transformów sprite'ów/pasków HP — global, dla WSZYSTKICH trybów walki (user:
+"zrobisz dla wszystkich"), bo tak już działa dzisiejszy layout (jeden wspólny dla
+kampanii/raidu/eventu/questu/mad/misji).
+
+`tsc`/`jest` czyste (981 testów, bez zmian w liczbie — czysto nowy ekran/store, brak nowej
+logiki biznesowej do testowania jednostkowo).
+**Priorytet testu na urządzeniu**: Ustawienia → Dane → „Edytor układu walki (beta)" → Otwórz
+edytor → przeciągnij pupila/bossa/oba paski HP, zmień rozmiary i tło, sprawdź że eksport
+pokazuje poprawne, zaokrąglone liczby i że wartości PRZETRWAJĄ zamknięcie i ponowne
+otwarcie ekranu (persisted draft).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
