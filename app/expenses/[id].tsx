@@ -31,6 +31,8 @@ import { getPayers, addPayer } from '@/utils/payers';
 import { isSelfTransfer, SELF_TRANSFER_TAGS } from '@/utils/statWidgets';
 import { fvSplitOf, bucketOf, FvBucket } from '@/utils/fixedVariable';
 import FvBadge from '@/components/expenses/FvBadge';
+import { useEditHistory } from '@/store/editHistoryStore';
+import { History } from 'lucide-react-native';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -49,6 +51,22 @@ const ITEM_TAGS = [
   'słodycze', 'pieczywo', 'napoje', 'przekąski', 'sosy',
   'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
 ];
+
+// Log zmian (2026-09-17, patrz editHistoryStore.ts) — jedna linijka na zapis, zbudowana
+// z gotowych, już sformatowanych stringów (nie surowych kluczy kategorii/id pojazdu), żeby
+// diff był czytelny bez osobnego mapowania w miejscu wyświetlania.
+const FIELD_LABELS: Record<string, string> = {
+  type: 'Typ', amount: 'Kwota', category: 'Kategoria', tags: 'Tagi', payer: 'Płatnik',
+  paymentMethod: 'Płatność', vehicle: 'Pojazd', date: 'Data', note: 'Notatka',
+};
+function summarizeChanges(before: Record<string, string>, after: Record<string, string>): string {
+  const parts: string[] = [];
+  for (const key of Object.keys(FIELD_LABELS)) {
+    if ((before[key] ?? '') === (after[key] ?? '')) continue;
+    parts.push(`${FIELD_LABELS[key]}: ${before[key] || '—'} → ${after[key] || '—'}`);
+  }
+  return parts.join('; ');
+}
 
 // ─── Inline item editor ───────────────────────────────────────────────────────
 
@@ -339,11 +357,14 @@ const makeIe = themedStyles((c: any) => StyleSheet.create({
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ExpenseDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit: editParam } = useLocalSearchParams<{ id: string; edit?: string }>();
   const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore();
   const expense = expenses.find(e => e.id === id);
   const colors = useColors();
   const s = useMemo(() => makeS(colors), [colors]);
+  const recordEditHistory = useEditHistory(st => st.record);
+  const editHistory = useEditHistory(st => st.forExpense(id ?? ''));
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     if (expenses.length === 0) {
@@ -381,7 +402,10 @@ export default function ExpenseDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expense?.id, expense?.updatedAt]);
 
-  const [editing, setEditing]   = useState(false);
+  // Otwórz od razu w trybie edycji, gdy przyszliśmy z long-press na kafelku listy
+  // (2026-09-17, user: "jak przytrzymuje kafelek z tranzakcja jakaś od razu sie przenosi
+  // na panel edycji") — `?edit=1` w URL, patrz `ExpenseItem.tsx`'s onLongPress.
+  const [editing, setEditing]   = useState(editParam === '1');
   const [amount, setAmount]     = useState(expense?.amount.toString() ?? '');
   const [note, setNote]         = useState(expense?.note ?? '');
   const [txType, setTxType]     = useState<TransactionType>(expense?.type ?? 'expense');
@@ -525,12 +549,24 @@ export default function ExpenseDetailScreen() {
 
     // Save to shared product memory so future receipt scans auto-apply corrections
     const tagsChanged = JSON.stringify(orig.tags) !== JSON.stringify(updated.tags);
-    const changed = orig.category !== updated.category || tagsChanged || orig.name !== updated.name;
+    const priceChanged = Math.abs((orig.price ?? 0) - (updated.price ?? 0)) > 0.005;
+    const changed = orig.category !== updated.category || tagsChanged || orig.name !== updated.name || priceChanged;
     if (changed) {
       saveCustomProductsToMemory([{ name: updated.name, category: updated.category }]).catch(() => {});
       if (updated.tags.length > 0) {
         saveCustomTagsToMemory([{ name: updated.name, tags: updated.tags }]).catch(() => {});
       }
+    }
+    // Historia zmian (2026-09-17) — jedna linijka per zapisana pozycja, ten sam wzorzec
+    // co `handleSave` wyżej.
+    if (changed) {
+      const bits: string[] = [];
+      if (orig.name !== updated.name) bits.push(`Produkt: ${orig.name} → ${updated.name}`);
+      if (priceChanged) bits.push(`Cena (${orig.name}): ${orig.price.toFixed(2)} → ${updated.price.toFixed(2)}`);
+      if (orig.category !== updated.category) bits.push(`Kategoria (${updated.name}): ${getCategoryMeta(orig.category).label} → ${getCategoryMeta(updated.category).label}`);
+      if (tagsChanged) bits.push(`Tagi (${updated.name}): ${(orig.tags ?? []).join(', ') || '—'} → ${updated.tags.join(', ') || '—'}`);
+      const learned = updated.tags.length > 0 ? `${updated.name} → tagi ${updated.tags.join(', ')}` : undefined;
+      recordEditHistory({ expenseId: id!, summary: bits.join('; '), learned });
     }
     // Name changed → offer to apply the new name to EVERY product called the old
     // name (learns a canonical alias → all past & future entries group/show under
@@ -565,6 +601,30 @@ export default function ExpenseDetailScreen() {
     handleItemSave(idx, { ...it, tags: nextTags });
   };
 
+  // Anuluj (2026-09-17, nowy sticky pasek nad klawiaturą) — wcześniej JEDYNA droga z
+  // trybu edycji to udany Zapisz; teraz "Anuluj" musi też ODRZUCIĆ niezapisane zmiany
+  // (przywrócić stan lokalny z `expense`), inaczej tryb odczytu (który czyta z TYCH
+  // SAMYCH zmiennych co edycja — `tags`/`payer`/`paymentMethod`/itd.) pokazałby
+  // niezapisane, "wiszące" wartości zamiast tego co faktycznie jest zapisane.
+  const cancelEdit = () => {
+    haptic.tap();
+    const inc = expense.type === 'income';
+    setAmount(expense.amount.toString());
+    setNote(expense.note ?? '');
+    setTxType(expense.type ?? 'expense');
+    setExpCat((inc ? 'other' : expense.category ?? 'other') as ExpenseCategory);
+    setIncCat((inc ? expense.category ?? 'salary' : 'salary') as IncomeCategory);
+    setTags([...new Set(expense.tags ?? [])]);
+    setPayer(expense.payer ?? '');
+    setPaymentMethod(expense.paymentMethod ?? 'card');
+    setVehicleId(expense.vehicleId);
+    setEditedItems(expense.receiptItems ?? []);
+    const d = new Date(expense.date ?? Date.now());
+    const p = (n: number) => String(n).padStart(2, '0');
+    setDateInput(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`);
+    setEditing(false);
+  };
+
   const handleSave = async () => {
     const parsed = parseFloat(amount.replace(',', '.'));
     if (!parsed || isNaN(parsed) || parsed <= 0) {
@@ -592,13 +652,48 @@ export default function ExpenseDetailScreen() {
         receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
       };
+
+      // Historia zmian (2026-09-17, editHistoryStore.ts) — porównanie GOTOWYCH, już
+      // sformatowanych wartości (nie surowych kluczy kategorii/id pojazdu), zbudowane
+      // PRZED zapisem, bo `expense` (stan sprzed edycji) to jedyne miejsce, gdzie stare
+      // wartości jeszcze istnieją.
+      const catMeta = editIsIncome ? INCOME_CATEGORY_META : CATEGORY_META;
+      const oldCatMeta = expense.type === 'income' ? INCOME_CATEGORY_META : CATEGORY_META;
+      const before = {
+        type: expense.type === 'income' ? 'Przychód' : 'Wydatek',
+        amount: expense.amount.toFixed(2),
+        category: (oldCatMeta as any)[expense.category]?.label ?? String(expense.category),
+        tags: (expense.tags ?? []).join(', '),
+        payer: expense.payer ?? '',
+        paymentMethod: (expense.paymentMethod ?? 'card') === 'cash' ? 'Gotówka' : 'Karta',
+        vehicle: vehicles.find(v => v.id === expense.vehicleId)?.name ?? '',
+        date: expense.date ? new Date(expense.date).toLocaleDateString('pl-PL') : '',
+        note: expense.note ?? '',
+      };
+      const after = {
+        type: editIsIncome ? 'Przychód' : 'Wydatek',
+        amount: parsed.toFixed(2),
+        category: (catMeta as any)[updates.category]?.label ?? String(updates.category),
+        tags: tags.join(', '),
+        payer: payer ?? '',
+        paymentMethod: paymentMethod === 'cash' ? 'Gotówka' : 'Karta',
+        vehicle: vehicles.find(v => v.id === vehicleId)?.name ?? '',
+        date: dateParsed ? new Date(dateParsed).toLocaleDateString('pl-PL') : '',
+        note: note.trim(),
+      };
+      const changeSummary = summarizeChanges(before, after);
+
       updateExpense(id!, updates);
       // Ucz auto-łapacza: gdy zmieniasz kategorię wydatku ze sklepem, zapamiętaj ją dla
       // tego sprzedawcy → kolejne auto-złapane płatności z tego sklepu dostają poprawną
       // kategorię (ten sam storeKey = pierwsze słowo nazwy, co parser powiadomień).
+      const learnedBits: string[] = [];
       if (!editIsIncome && expense.storeName && expCat !== expense.category) {
         const storeKey = expense.storeName.trim().split(/\s+/)[0]?.toLowerCase();
-        if (storeKey) saveMerchant(storeKey, { category: expCat, name: expense.storeName }).catch(() => {});
+        if (storeKey) {
+          saveMerchant(storeKey, { category: expCat, name: expense.storeName }).catch(() => {});
+          learnedBits.push(`${expense.storeName} → kategoria ${CATEGORY_META[expCat]?.label ?? expCat}`);
+        }
       }
       // Ucz auto-łapacza tagów (2026-08-24, user: "chciałbym móc jej nadać że to jest
       // opłata za internet, żeby mi łapało jak z wypłatą") — gdy dotkniesz tagów na
@@ -607,7 +702,13 @@ export default function ExpenseDetailScreen() {
       // merchantFor().tags), bez osobnego potwierdzania za każdym razem.
       if (!editIsIncome && expense.storeName && JSON.stringify(tags) !== JSON.stringify(expense.tags ?? [])) {
         const storeKey = expense.storeName.trim().split(/\s+/)[0]?.toLowerCase();
-        if (storeKey) saveMerchantTags(storeKey, tags, expense.storeName).catch(() => {});
+        if (storeKey) {
+          saveMerchantTags(storeKey, tags, expense.storeName).catch(() => {});
+          learnedBits.push(`${expense.storeName} → tagi ${tags.join(', ') || '(brak)'}`);
+        }
+      }
+      if (changeSummary || learnedBits.length > 0) {
+        recordEditHistory({ expenseId: id!, summary: changeSummary, learned: learnedBits.join('; ') || undefined });
       }
       await expensesService.update(id!, updates);
       haptic.success();
@@ -906,86 +1007,65 @@ export default function ExpenseDetailScreen() {
             </View>
           )}
 
-          {/* ── Category ─────────────────────────────────────────────────────── */}
-          <View style={s.card}>
-            <Text style={s.cardLabel}>Kategoria</Text>
-            {editing ? (
-              // Edit mode: the full picker grid (all options selectable).
-              <View style={s.catGrid}>
-                {(editIsIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
-                  const IconComp = (LucideIcons as any)[meta.icon];
-                  const selected = editIsIncome ? incCat === key : expCat === key;
-                  return (
-                    <PressableScale
-                      key={key}
-                      onPress={() => {
-                        editIsIncome ? setIncCat(key as IncomeCategory) : setExpCat(key as ExpenseCategory);
-                      }}
-                      style={[s.catItem, selected && { borderColor: meta.color + '80', backgroundColor: meta.color + '12' }]}
-                    >
-                      <View style={s.catIcon}>
-                        {IconComp && <IconComp size={14} color={selected ? meta.color : colors.text.muted} />}
-                      </View>
-                      <Text style={[s.catLabel, selected && { color: meta.color, fontWeight: '700' }]}>
-                        {meta.label}
-                      </Text>
-                      {selected && <View style={[s.checkDot, { backgroundColor: meta.color }]}><Check size={8} color="#000" /></View>}
-                    </PressableScale>
-                  );
-                })}
+          {editing ? (
+            <>
+              {/* ── Category (edit) ──────────────────────────────────────────── */}
+              <View style={s.card}>
+                <Text style={s.cardLabel}>Kategoria</Text>
+                <View style={s.catGrid}>
+                  {(editIsIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
+                    const IconComp = (LucideIcons as any)[meta.icon];
+                    const selected = editIsIncome ? incCat === key : expCat === key;
+                    return (
+                      <PressableScale
+                        key={key}
+                        onPress={() => {
+                          editIsIncome ? setIncCat(key as IncomeCategory) : setExpCat(key as ExpenseCategory);
+                        }}
+                        style={[s.catItem, selected && { borderColor: meta.color + '80', backgroundColor: meta.color + '12' }]}
+                      >
+                        <View style={s.catIcon}>
+                          {IconComp && <IconComp size={14} color={selected ? meta.color : colors.text.muted} />}
+                        </View>
+                        <Text style={[s.catLabel, selected && { color: meta.color, fontWeight: '700' }]}>
+                          {meta.label}
+                        </Text>
+                        {selected && <View style={[s.checkDot, { backgroundColor: meta.color }]}><Check size={8} color="#000" /></View>}
+                      </PressableScale>
+                    );
+                  })}
+                </View>
               </View>
-            ) : (
-              // Read mode: just THIS transaction's category, big and clear — no grid.
-              (() => {
-                const meta = getCategoryMeta(expense.category as any);
-                const IconComp = (LucideIcons as any)[meta.icon];
-                return (
-                  <View style={[s.catValueChip, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
-                    <View style={[s.catValueIcon, { backgroundColor: meta.color + '26' }]}>
-                      {IconComp && <IconComp size={16} color={meta.color} />}
-                    </View>
-                    <Text style={[s.catValueText, { color: meta.color }]}>{meta.label}</Text>
+
+              {/* ── Przelew własny (edit) ────────────────────────────────────── */}
+              {/* 2026-09-13, user: "mam opcje dosac własną kategorie jakby?? Czyli właśnie ten
+                  przelew wlasny? Który sie nie wlicza bo to do siebie na inne konto wysyłam" —
+                  dotąd JEDYNA droga do selfTransfer to auto-wykrycie z powiadomienia banku
+                  (słowa-klucze Revolut/oszczędności albo dopasowanie imienia z ownName.ts);
+                  ręcznie dodany wydatek/przychód, albo taki gdzie parser się nie złapał, nie
+                  miał ŻADNEJ opcji. Przełącznik czyta/pisze PEŁNĄ semantykę `isSelfTransfer`
+                  (patrz `toggleSelfTransfer` wyżej) — nie tylko tag 'przelew', bo auto-wykryte
+                  przelewy z banku mają `category: 'transfer'` i tag 'revolut', nigdy 'przelew'. */}
+              <View style={s.card}>
+                <View style={s.transferRow}>
+                  <View style={{ flex: 1, marginRight: spacing[3] }}>
+                    <Text style={s.cardLabel}>Przelew własny</Text>
+                    <Text style={s.transferHint}>
+                      Przelew między Twoimi kontami — nie liczy się jako {editIsIncome ? 'przychód' : 'wydatek'}
+                    </Text>
                   </View>
-                );
-              })()
-            )}
-          </View>
-
-          {/* ── Przelew własny ───────────────────────────────────────────────── */}
-          {/* 2026-09-13, user: "mam opcje dosac własną kategorie jakby?? Czyli właśnie ten
-              przelew wlasny? Który sie nie wlicza bo to do siebie na inne konto wysyłam" —
-              dotąd JEDYNA droga do selfTransfer to auto-wykrycie z powiadomienia banku
-              (słowa-klucze Revolut/oszczędności albo dopasowanie imienia z ownName.ts);
-              ręcznie dodany wydatek/przychód, albo taki gdzie parser się nie złapał, nie
-              miał ŻADNEJ opcji. Przełącznik czyta/pisze PEŁNĄ semantykę `isSelfTransfer`
-              (patrz `toggleSelfTransfer` wyżej) — nie tylko tag 'przelew', bo auto-wykryte
-              przelewy z banku mają `category: 'transfer'` i tag 'revolut', nigdy 'przelew'. */}
-          <View style={s.card}>
-            <View style={s.transferRow}>
-              <View style={{ flex: 1, marginRight: spacing[3] }}>
-                <Text style={s.cardLabel}>Przelew własny</Text>
-                <Text style={s.transferHint}>
-                  Przelew między Twoimi kontami — nie liczy się jako {editIsIncome ? 'przychód' : 'wydatek'}
-                </Text>
+                  <Switch
+                    value={editSelfTransferOn}
+                    onValueChange={toggleSelfTransfer}
+                    trackColor={{ false: colors.fill.strong, true: accentColor + '99' }}
+                    thumbColor={editSelfTransferOn ? colors.text.primary : colors.text.muted}
+                  />
+                </View>
               </View>
-              {editing ? (
-                <Switch
-                  value={editSelfTransferOn}
-                  onValueChange={toggleSelfTransfer}
-                  trackColor={{ false: colors.fill.strong, true: accentColor + '99' }}
-                  thumbColor={editSelfTransferOn ? colors.text.primary : colors.text.muted}
-                />
-              ) : (
-                <Text style={s.transferValue}>{isSelfTransfer(expense) ? 'Tak' : 'Nie'}</Text>
-              )}
-            </View>
-          </View>
 
-          {/* ── Tags ─────────────────────────────────────────────────────────── */}
-          <View style={s.card}>
-            <Text style={s.cardLabel}>Tagi</Text>
-            {editing ? (
-              <>
+              {/* ── Tags (edit) ──────────────────────────────────────────────── */}
+              <View style={s.card}>
+                <Text style={s.cardLabel}>Tagi</Text>
                 <View style={s.tagsWrap}>
                   {quickTags.map(tag => (
                     <Chip
@@ -1017,100 +1097,162 @@ export default function ExpenseDetailScreen() {
                     ))}
                   </View>
                 )}
-              </>
-            ) : (
-              tags.length > 0 ? (
+              </View>
+
+              {/* ── Kto/Płatność/Pojazd (edit) ───────────────────────────────── */}
+              <View style={s.card}>
+                <Text style={s.cardLabel}>{editIsIncome ? 'Kto otrzymał' : 'Kto zapłacił'}</Text>
                 <View style={s.tagsWrap}>
-                  {tags.map(tag => (
-                    <View key={tag} style={s.tagBadge}>
-                      <Text style={s.tagBadgeText}>{tag}</Text>
+                  {payers.map(p => {
+                    const active = payer === p;
+                    return (
+                      <PressableScale key={p} onPress={() => { haptic.tap(); setPayer(active ? '' : p); }} style={[s.payerChip, active && s.payerChipActive]}>
+                        <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{p}</Text>
+                      </PressableScale>
+                    );
+                  })}
+                  {addingPayer ? (
+                    <TextInput
+                      value={newPayer}
+                      onChangeText={setNewPayer}
+                      placeholder="Imię…"
+                      placeholderTextColor={colors.text.muted}
+                      style={s.payerInput}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={async () => {
+                        const name = newPayer.trim();
+                        if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
+                        setNewPayer(''); setAddingPayer(false);
+                      }}
+                      onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
+                    />
+                  ) : (
+                    <PressableScale onPress={() => { haptic.tap(); setAddingPayer(true); }} style={s.payerAddChip}>
+                      <Text style={s.payerAddText}>+ osoba</Text>
+                    </PressableScale>
+                  )}
+                </View>
+
+                <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Płatność</Text>
+                <View style={s.tagsWrap}>
+                  {(['card', 'cash'] as const).map(m => {
+                    const active = paymentMethod === m;
+                    return (
+                      <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[s.payerChip, active && s.payerChipActive]}>
+                        <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+
+                {!editIsIncome && vehicles.length > 0 && (
+                  <>
+                    <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Pojazd</Text>
+                    <View style={s.tagsWrap}>
+                      <PressableScale onPress={() => { haptic.tap(); setVehicleId(undefined); }} style={[s.payerChip, !vehicleId && s.payerChipActive]}>
+                        <Text style={[s.payerChipText, !vehicleId && s.payerChipTextActive]}>Brak</Text>
+                      </PressableScale>
+                      {vehicles.map(v => {
+                        const active = vehicleId === v.id;
+                        return (
+                          <PressableScale key={v.id} onPress={() => { haptic.tap(); setVehicleId(active ? undefined : v.id); }} style={[s.payerChip, active && { backgroundColor: v.color + '22', borderColor: v.color }]}>
+                            <Text style={[s.payerChipText, active && { color: v.color }]}>{v.name}</Text>
+                          </PressableScale>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </View>
+            </>
+          ) : (
+            // ── Szczegóły (read mode) — SKONSOLIDOWANE (2026-09-17, user ze screenami:
+            // "moze zrobimy ładniej w końcu czytelniej te szczegolowe podglądy") — było 4-5
+            // osobnych pełnowymiarowych kart (Kategoria/Przelew własny/Tagi/Kto zapłacił+
+            // Płatność+Pojazd) na te same proste pary etykieta→wartość, dużo scrollowania i
+            // wizualnego szumu. Teraz jedna karta, zwarte wiersze — model z sekcji PRODUKTY
+            // wyżej, która już tak wyglądała. Każdy wiersz TAPPABLE → od razu tryb edycji
+            // (user: "tak samo jak wchodzę na podgląd i klikam na kategorie daje mi
+            // mozliwosc edycji"), bez osobnego szukania ołówka w prawym górnym rogu.
+            <View style={s.card}>
+              <Text style={s.cardLabel}>Szczegóły</Text>
+              {(() => {
+                const meta = getCategoryMeta(expense.category as any);
+                const IconComp = (LucideIcons as any)[meta.icon];
+                return (
+                  <TouchableOpacity style={s.detailRow} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                    <Text style={s.detailRowLabel}>Kategoria</Text>
+                    <View style={[s.catValueChip, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
+                      <View style={[s.catValueIcon, { backgroundColor: meta.color + '26' }]}>
+                        {IconComp && <IconComp size={14} color={meta.color} />}
+                      </View>
+                      <Text style={[s.catValueText, { color: meta.color }]}>{meta.label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })()}
+              <TouchableOpacity style={[s.detailRow, s.detailRowBorder]} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                <Text style={s.detailRowLabel}>Przelew własny</Text>
+                <Text style={s.detailRowValue}>{isSelfTransfer(expense) ? 'Tak' : 'Nie'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.detailRow, s.detailRowBorder, { alignItems: 'flex-start' }]} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                <Text style={[s.detailRowLabel, { marginTop: 2 }]}>Tagi</Text>
+                {tags.length > 0 ? (
+                  <View style={[s.tagsWrap, { flex: 1, justifyContent: 'flex-end' }]}>
+                    {tags.map(tag => (
+                      <View key={tag} style={s.tagBadge}>
+                        <Text style={s.tagBadgeText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={s.emptyTags}>Brak — stuknij, by dodać</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.detailRow, s.detailRowBorder]} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                <Text style={s.detailRowLabel}>{editIsIncome ? 'Kto otrzymał' : 'Kto zapłacił'}</Text>
+                <Text style={s.detailRowValue}>{payer || 'Nie określono'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.detailRow, s.detailRowBorder]} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                <Text style={s.detailRowLabel}>Płatność</Text>
+                <Text style={s.detailRowValue}>{paymentMethod === 'cash' ? 'Gotówka' : 'Karta'}</Text>
+              </TouchableOpacity>
+              {!editIsIncome && vehicles.length > 0 && (
+                <TouchableOpacity style={[s.detailRow, s.detailRowBorder]} activeOpacity={0.7} onPress={() => { haptic.tap(); setEditing(true); }}>
+                  <Text style={s.detailRowLabel}>Pojazd</Text>
+                  <Text style={s.detailRowValue}>{vehicles.find(v => v.id === vehicleId)?.name ?? 'Brak'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* ── Historia zmian (2026-09-17, editHistoryStore.ts) — user: "moze byc gdzieś
+              szczegóły i tam każdorazowo co edytowano i np co nauczono lub zapisano do
+              pamięci". Tylko dla TEJ transakcji (`forExpense`), najnowsze pierwsze. ──── */}
+          {editHistory.length > 0 && (
+            <View style={s.card}>
+              <TouchableOpacity style={s.receiptHeader} onPress={() => { haptic.tap(); setShowAllHistory(x => !x); }} activeOpacity={0.7}>
+                <History size={14} color={colors.text.secondary} />
+                <Text style={[s.cardLabel, { flex: 1 }]}>Historia zmian ({editHistory.length})</Text>
+                {showAllHistory ? <ChevronUp size={14} color={colors.text.muted} /> : <ChevronDown size={14} color={colors.text.muted} />}
+              </TouchableOpacity>
+              {showAllHistory && (
+                <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                  {editHistory.map(entry => (
+                    <View key={entry.id} style={s.historyEntry}>
+                      <Text style={s.historyWhen}>
+                        {new Date(entry.at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })}
+                        {' '}{new Date(entry.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      {!!entry.summary && <Text style={s.historyText}>{entry.summary}</Text>}
+                      {!!entry.learned && <Text style={s.historyLearned}>Nauczono: {entry.learned}</Text>}
                     </View>
                   ))}
                 </View>
-              ) : (
-                <Text style={s.emptyTags}>Brak tagów</Text>
-              )
-            )}
-          </View>
-
-          {/* Who paid */}
-          <View style={s.card}>
-            <Text style={s.cardLabel}>{editIsIncome ? 'Kto otrzymał' : 'Kto zapłacił'}</Text>
-            {editing ? (
-              <View style={s.tagsWrap}>
-                {payers.map(p => {
-                  const active = payer === p;
-                  return (
-                    <PressableScale key={p} onPress={() => { haptic.tap(); setPayer(active ? '' : p); }} style={[s.payerChip, active && s.payerChipActive]}>
-                      <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{p}</Text>
-                    </PressableScale>
-                  );
-                })}
-                {addingPayer ? (
-                  <TextInput
-                    value={newPayer}
-                    onChangeText={setNewPayer}
-                    placeholder="Imię…"
-                    placeholderTextColor={colors.text.muted}
-                    style={s.payerInput}
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={async () => {
-                      const name = newPayer.trim();
-                      if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
-                      setNewPayer(''); setAddingPayer(false);
-                    }}
-                    onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
-                  />
-                ) : (
-                  <PressableScale onPress={() => { haptic.tap(); setAddingPayer(true); }} style={s.payerAddChip}>
-                    <Text style={s.payerAddText}>+ osoba</Text>
-                  </PressableScale>
-                )}
-              </View>
-            ) : (
-              <Text style={s.payerValue}>{payer || 'Nie określono'}</Text>
-            )}
-
-            <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Płatność</Text>
-            {editing ? (
-              <View style={s.tagsWrap}>
-                {(['card', 'cash'] as const).map(m => {
-                  const active = paymentMethod === m;
-                  return (
-                    <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[s.payerChip, active && s.payerChipActive]}>
-                      <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            ) : (
-              <Text style={s.payerValue}>{paymentMethod === 'cash' ? 'Gotówka' : 'Karta'}</Text>
-            )}
-
-            {!editIsIncome && vehicles.length > 0 && (
-              <>
-                <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Pojazd</Text>
-                {editing ? (
-                  <View style={s.tagsWrap}>
-                    <PressableScale onPress={() => { haptic.tap(); setVehicleId(undefined); }} style={[s.payerChip, !vehicleId && s.payerChipActive]}>
-                      <Text style={[s.payerChipText, !vehicleId && s.payerChipTextActive]}>Brak</Text>
-                    </PressableScale>
-                    {vehicles.map(v => {
-                      const active = vehicleId === v.id;
-                      return (
-                        <PressableScale key={v.id} onPress={() => { haptic.tap(); setVehicleId(active ? undefined : v.id); }} style={[s.payerChip, active && { backgroundColor: v.color + '22', borderColor: v.color }]}>
-                          <Text style={[s.payerChipText, active && { color: v.color }]}>{v.name}</Text>
-                        </PressableScale>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text style={s.payerValue}>{vehicles.find(v => v.id === vehicleId)?.name ?? 'Brak'}</Text>
-                )}
-              </>
-            )}
-          </View>
+              )}
+            </View>
+          )}
 
           {/* Meta */}
           <Text style={s.meta}>
@@ -1125,6 +1267,23 @@ export default function ExpenseDetailScreen() {
             <Text style={s.deleteBtnText}>Usuń transakcję</Text>
           </PressableScale>
         </ScrollView>
+
+        {/* Sticky Zapisz/Anuluj NAD klawiaturą (2026-09-17, user: "przycis zapisz zeby byl
+            nad klawiaturą zawsze czy cos bo boli wracać w prawy górny") — poza ScrollView,
+            wewnątrz TEGO SAMEGO KeyboardAvoidingView, więc unosi się razem z klawiaturą
+            zamiast chować się pod nią. Ikona w nagłówku ZOSTAJE (przyzwyczajenie/szybka
+            ścieżka bez klawiatury), ten pasek to dodatkowa, zawsze widoczna droga. */}
+        {editing && (
+          <View style={s.stickyBar}>
+            <TouchableOpacity style={s.stickyCancelBtn} onPress={cancelEdit} activeOpacity={0.8}>
+              <Text style={s.stickyCancelText}>Anuluj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.stickySaveBtn, saving && { opacity: 0.6 }]} onPress={saving ? undefined : handleSave} activeOpacity={0.8}>
+              <Save size={16} color={colors.bg.primary} />
+              <Text style={s.stickySaveText}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       <ConfirmDialog
@@ -1206,6 +1365,44 @@ const makeS = (c: any) => StyleSheet.create({
     fontSize: 10, fontWeight: '600', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
+
+  // ── Szczegóły (read mode, skonsolidowane, 2026-09-17) ─────────────────────
+  detailRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: spacing[2], paddingVertical: spacing[2],
+  },
+  detailRowBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
+  detailRowLabel: { fontSize: 13, color: c.text.secondary, fontWeight: '600' },
+  detailRowValue: { fontSize: 13, color: c.text.primary, fontWeight: '600' },
+
+  // ── Historia zmian ─────────────────────────────────────────────────────────
+  historyEntry: {
+    borderLeftWidth: 2, borderLeftColor: c.border.default,
+    paddingLeft: spacing[2], gap: 2,
+  },
+  historyWhen: { fontSize: 10, color: c.text.muted, fontWeight: '700' },
+  historyText: { fontSize: 12, color: c.text.secondary, lineHeight: 16 },
+  historyLearned: { fontSize: 11, color: c.accent.green, fontStyle: 'italic' },
+
+  // ── Sticky Zapisz/Anuluj nad klawiaturą ──────────────────────────────────────
+  stickyBar: {
+    flexDirection: 'row', gap: spacing[2],
+    padding: spacing[3], paddingBottom: spacing[3],
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+    backgroundColor: c.bg.primary,
+  },
+  stickyCancelBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 13, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
+  },
+  stickyCancelText: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
+  stickySaveBtn: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: 13, borderRadius: radius.md,
+    backgroundColor: c.text.primary,
+  },
+  stickySaveText: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
 
   typeToggle: {
     flexDirection: 'row', gap: spacing[2],
