@@ -701,7 +701,7 @@ export default function ExpenseDetailScreen() {
         tags: tags.join(', '),
         payer: payer ?? '',
         paymentMethod: paymentMethod === 'cash' ? 'Gotówka' : 'Karta',
-        vehicle: vehicles.find(v => v.id === vehicleId)?.name ?? '',
+        vehicle: vehicles.find(v => v.id === updates.vehicleId)?.name ?? '',
         date: dateParsed ? new Date(dateParsed).toLocaleDateString('pl-PL') : '',
         note: note.trim(),
       };

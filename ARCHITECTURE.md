@@ -7985,6 +7985,33 @@ konkretnej transakcji z `?edit=1` (albo: zamknij apkę całkowicie, otwórz Fina
 przytrzymaj kafelek) → formularz edycji powinien pokazać PRAWDZIWE wartości tej
 transakcji, nie puste pola.
 
+## 115. Self-review #224 — 1 realny bug w logu "Historia zmian" (2026-09-17)
+
+User: *"dawaj dalej"* po zmergowaniu #224 (self-review §113/§114) — trzecia runda tego
+samego odruchu: przeczytać na nowo `handleSave()` w `app/expenses/[id].tsx`, zamiast
+czekać na kolejne zgłoszenie.
+
+**Bug — diff pojazdu w "Historia zmian" mógł pokazać STARĄ nazwę pojazdu w kolumnie "po",
+mimo że faktycznie zapisany `vehicleId` był `undefined`.** `updates.vehicleId` (to, co
+faktycznie idzie do `expensesService.update()`) poprawnie czyści pojazd, gdy `editIsIncome`
+jest `true` (`vehicleId: editIsIncome ? undefined : (vehicleId || undefined)`, linia 674)
+— bo pojazd nie ma sensu na przychodzie. Ale `after.vehicle` (string budowany do logu
+`summarizeChanges`) liczył się z SUROWEGO lokalnego stanu `vehicleId`, które NIE jest
+czyszczone przy przełączeniu typu na Przychód (`setVehicleId` nigdzie na to nie reaguje —
+patrz linia 443/1177-1183). Efekt: user edytuje wydatek z przypisanym pojazdem, w tym samym
+zapisie przełącza typ na "Przychód" → dane zapisują się poprawnie (bez pojazdu), ale log
+Historii zmian pokazuje `Pojazd: Toyota → Toyota` (żadnej zmiany) zamiast `Pojazd: Toyota →
+—`, czyli log mówi coś innego niż to, co faktycznie trafiło do bazy. Rzadki przypadek
+(zmiana typu I zapisanego pojazdu w jednym zapisie), ale skoro cały sens Historii zmian to
+"co się NAPRAWDĘ zmieniło", warto miał być zgodny z `updates`. Fix: `after.vehicle` czyta
+teraz `updates.vehicleId` (to samo pole co realny zapis), nie surowe `vehicleId`.
+
+`tsc`/`jest` czyste (74/978, bez zmian w liczbie testów — poprawka jednej linijki w
+komponencie, nie osobna czysta funkcja do testu jednostkowego).
+**Priorytet testu na urządzeniu**: niski — edytuj wydatek z pojazdem, w tym samym zapisie
+przełącz na Przychód i zapisz, sprawdź w "Historia zmian" że linijka Pojazd (jeśli się
+pojawi) pokazuje `→ —`, nie starą nazwę pojazdu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

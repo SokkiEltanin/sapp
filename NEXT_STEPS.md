@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Self-review #224: bug w logu "Historia zmian" dla pojazdu (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §115. Kolejna runda po "dawaj dalej" — `after.vehicle` w
+`summarizeChanges()` (`app/expenses/[id].tsx`) liczył się z surowego `vehicleId`, nie z
+`updates.vehicleId` (to, co faktycznie zapisuje `editIsIncome ? undefined : vehicleId`) —
+przy przełączeniu typu na Przychód w tym samym zapisie log Historii zmian mógł pokazać
+brak zmiany pojazdu, mimo że pojazd faktycznie został wyczyszczony. Naprawione — jedna
+linijka. `tsc`/`jest` czyste. Do zrobienia (user, na urządzeniu, niski priorytet): edytuj
+wydatek z pojazdem, przełącz na Przychód w tym samym zapisie, sprawdź log.
+
 ## ✅ Self-review §113: 2 bugi znalezione i naprawione przed testem na urządzeniu (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §114. Po "DAWAJ DALEJ" (bez konkretnego zgłoszenia) zrobiłem
