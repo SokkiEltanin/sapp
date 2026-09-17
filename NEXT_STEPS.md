@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Self-review §113: 2 bugi znalezione i naprawione przed testem na urządzeniu (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §114. Po "DAWAJ DALEJ" (bez konkretnego zgłoszenia) zrobiłem
+przegląd właśnie zmergowanego #223 zamiast czekać na zgłoszenie buga. Znalazłem: (1) hydracja
+formularza edycji w `app/expenses/[id].tsx` mogła zwrócić PUSTY formularz przy cold-starcie
+przez deep-link `?edit=1` (lub long-press zaraz po otwarciu apki), jeśli `expense` z store'a
+jeszcze się nie załadował na pierwszym renderze — naprawione flagiem `hydratedOnce`. (2)
+`editHistoryStore.ts` miał niestabilny selektor Zustand (`forExpense(id)` budował nową
+tablicę przy każdym wywołaniu) — usunięty, `app/expenses/[id].tsx` teraz filtruje przez
+`useMemo` na surowym `st.entries` (wzorzec jak `useBankQueue`). `tsc`/`jest` czyste (978
+testów, bez zmiany liczby). Do zrobienia (user, na urządzeniu): force-stop apki → deep-link
+do transakcji z `?edit=1` (albo od razu long-press kafelka w Finansach po świeżym starcie) →
+sprawdzić że formularz pokazuje REALNE dane transakcji, nie puste pola.
+
 ## 🆕 Redesign szczegółów transakcji + historia zmian + long-press na liście (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §113. Skonsolidowany tryb odczytu (jedna karta "Szczegóły"

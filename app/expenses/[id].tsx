@@ -363,7 +363,16 @@ export default function ExpenseDetailScreen() {
   const colors = useColors();
   const s = useMemo(() => makeS(colors), [colors]);
   const recordEditHistory = useEditHistory(st => st.record);
-  const editHistory = useEditHistory(st => st.forExpense(id ?? ''));
+  // Fix (2026-09-17, self-review): `st.forExpense(id)` as the selector itself would
+  // build a NEW filtered+sorted array on every call — an unstable Zustand selector, the
+  // same class of bug this session's own performance audits (§13/§103) flagged
+  // elsewhere. Read the RAW, stable `entries` array (matches `useBankQueue`'s
+  // `st => st.history` pattern in BankHistorySection.tsx) and filter in a `useMemo`.
+  const allEditHistory = useEditHistory(st => st.entries);
+  const editHistory = useMemo(
+    () => allEditHistory.filter(e => e.expenseId === id).sort((a, b) => b.at - a.at),
+    [allEditHistory, id],
+  );
   const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
@@ -383,8 +392,23 @@ export default function ExpenseDetailScreen() {
   // would never appear and a save could wipe it. Guarded by `!editing` so it
   // never clobbers input while the user is mid-edit; re-runs after saves
   // (updatedAt changes) to keep the view in sync with persisted data.
+  //
+  // Fix (2026-09-17, self-review after shipping `?edit=1` long-press-to-edit):
+  // `editing` can now be `true` on the VERY FIRST render (long-press deep-link),
+  // something that was impossible before (editing only ever flipped true via an
+  // explicit tap AFTER expense was already loaded/displayed). If `expense` isn't
+  // in the store yet on that first render (cold start via deep link, or a fresh
+  // app launch), THIS EXACT effect — whose own comment calls out that scenario —
+  // would never populate local state at all, because `editing` was already true,
+  // leaving the edit form showing blank/default values instead of the real
+  // transaction. `hydratedOnce` lets the FIRST successful population through
+  // regardless of `editing`, while still protecting genuine mid-edit re-renders
+  // (a save elsewhere bumping `updatedAt`) from clobbering unsaved input.
+  const hydratedOnce = useRef(false);
   useEffect(() => {
-    if (!expense || editing) return;
+    if (!expense) return;
+    if (editing && hydratedOnce.current) return;
+    hydratedOnce.current = true;
     const inc = expense.type === 'income';
     setAmount(expense.amount.toString());
     setNote(expense.note ?? '');

@@ -21,18 +21,22 @@ const MAX_ENTRIES = 500;
 interface EditHistoryState {
   entries: EditHistoryEntry[];
   record: (e: Omit<EditHistoryEntry, 'id' | 'at'>) => void;
-  forExpense: (expenseId: string) => EditHistoryEntry[];
   clear: () => void;
 }
 
+// Świadomie BEZ selektora typu `forExpense(id)` na store — zwracałby nową
+// przefiltrowaną+posortowaną tablicę przy KAŻDYM wywołaniu, co jako selektor Zustand
+// (`useEditHistory(st => st.forExpense(id))`) byłoby niestabilne (nowa referencja przy
+// każdym renderze). Konsument (`app/expenses/[id].tsx`) czyta surowe, stabilne
+// `st.entries` i filtruje we własnym `useMemo` — ten sam wzorzec co `useBankQueue`'s
+// `st => st.history` w `BankHistorySection.tsx`.
 export const useEditHistory = create<EditHistoryState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       entries: [],
       record: (e) => set((state) => ({
         entries: [...state.entries, { ...e, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, at: Date.now() }].slice(-MAX_ENTRIES),
       })),
-      forExpense: (expenseId) => get().entries.filter(e => e.expenseId === expenseId).sort((a, b) => b.at - a.at),
       clear: () => set({ entries: [] }),
     }),
     {
