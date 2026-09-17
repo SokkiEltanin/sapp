@@ -64,6 +64,17 @@ describe('dashboard/spend — agregacje wydatków', () => {
     ];
     expect(weekIncome(exp, D)).toBeCloseTo(1000);
   });
+
+  // 2026-09-17 — kontynuacja audytu z 2026-09-14: `groceryTotal` był jedynym siblingiem w
+  // tym pliku bez wykluczenia self-transferu, mimo że `allSpend`/`weekIncome` wyżej mają je
+  // od dawna (ten sam kształt buga co §93/§104/§110).
+  test('groceryTotal pomija self-transfer (tag "przelew")', () => {
+    const exp = [
+      e({ category: 'groceries', amount: 30, date: '2026-08-04T09:00:00' }),
+      e({ category: 'groceries', amount: 200, date: '2026-08-04T09:00:00', tags: ['przelew'] }), // self-transfer
+    ];
+    expect(groceryTotal(exp, D)).toBeCloseTo(30);
+  });
 });
 
 describe('dashboard/spend — sweetsTotal (per-pozycja + scope)', () => {
@@ -94,6 +105,15 @@ describe('dashboard/spend — sweetsTotal (per-pozycja + scope)', () => {
     ] as any })];
     expect(sweetsTotal(exp, D, 'mine')).toBeCloseTo(8);
     expect(sweetsTotal(exp, D, 'all')).toBeCloseTo(13);
+  });
+
+  // 2026-09-17 — patrz komentarz przy `groceryTotal` self-transfer test wyżej.
+  test('pomija self-transfer (tag "przelew")', () => {
+    const exp = [
+      e({ date: '2026-08-04T09:00:00', receiptItems: [{ name: 'Baton', price: 5, tags: ['słodycze'] }] as any }),
+      e({ date: '2026-08-04T09:00:00', tags: ['przelew'], receiptItems: [{ name: 'Baton', price: 90, tags: ['słodycze'] }] as any }), // self-transfer
+    ];
+    expect(sweetsTotal(exp, D)).toBeCloseTo(5);
   });
 });
 

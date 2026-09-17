@@ -153,11 +153,14 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
   const exp = ctx.expenses;
   switch (metric) {
     case 'tagSpend': {
+      // Wyłączenie self-transferu (2026-09-17) — ten sam kształt buga co §93/§104: siostrzany
+      // `case 'sweets'` niżej już wyklucza przelewy własne, ten NIE wykluczał (mimo tej samej
+      // struktury: sprawdź receiptItems po tagu, fallback na e.tags/e.amount).
       if (!tag) return 0;
       let total = 0;
       for (const e of exp) {
         if (e.type && e.type !== 'expense') continue;
-        if (!inScope(e, ctx.scope) || !pred(e)) continue;
+        if (isSelfTransfer(e) || !inScope(e, ctx.scope) || !pred(e)) continue;
         // A receipt counts ONLY its matching items, never the whole shop.
         const items = e.receiptItems ?? [];
         if (items.length > 0) {
