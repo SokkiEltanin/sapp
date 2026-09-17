@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -28,7 +28,14 @@ interface Props {
   onLongPress?: (expense: Expense) => void;
 }
 
-export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
+// React.memo (2026-09-17, audyt wydajności — ta sama klasa buga co Gablota/§103) — lista
+// transakcji w Finansach renderuje to per wiersz przez `SectionList`; bez memoizacji KAŻDY
+// render listy (np. scroll-tracking, zmiana filtra) przeliczał `getCategoryMeta`/ikonę/
+// `billTagFor` dla WSZYSTKICH widocznych wierszy, nie tylko tych które faktycznie się
+// zmieniły. Wymaga stabilnych `onPress`/`onLongPress` u wołającego (patrz `finances.tsx`
+// `handleExpensePress`/`handleExpenseLongPress`, wyniesione z `renderItem` z tego samego
+// powodu) — bez tego memo i tak nie chroniłoby niczego.
+export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const [expanded, setExpanded] = useState(false);
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -166,7 +173,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
       )}
     </View>
   );
-}
+});
 
 const makeStyles = themedStyles((c: any) => StyleSheet.create({
   wrap: {

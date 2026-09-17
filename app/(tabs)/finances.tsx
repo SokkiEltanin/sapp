@@ -360,6 +360,15 @@ export default function FinancesScreen() {
   const filteredTotal = useMemo(() => sections.reduce((s, sec) => s + sec.total, 0), [sections]);
   const filteredCount = useMemo(() => sections.reduce((s, sec) => s + sec.data.length, 0), [sections]);
 
+  // Uchwyty WYNIESIONE z `renderItem` (2026-09-17, audyt wydajności) — dawniej były
+  // gołymi strzałkami zdefiniowanymi WEWNĄTRZ `renderItem`, więc każdy re-render tej listy
+  // tworzył nowe funkcje dla KAŻDEGO widocznego wiersza, co (razem z memoizacją `ExpenseItem`
+  // niżej) i tak nie dawało żadnej ochrony przed rerenderem — ten sam kształt buga co
+  // Gablota/§103 (99 odznak bez memoizacji). Stabilne referencje `useCallback`, żeby
+  // `React.memo(ExpenseItem)` faktycznie coś dawało.
+  const handleExpensePress = useCallback((e: Expense) => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }, []);
+  const handleExpenseLongPress = useCallback((e: Expense) => { haptic.medium(); router.navigate(`/expenses/${e.id}?edit=1` as any); }, []);
+
   return (
     <SafeAreaView style={st.root} edges={[]}>
       <View style={{ flex: 1 }}>
@@ -589,12 +598,12 @@ export default function FinancesScreen() {
               <ExpenseItem
                 expense={item}
                 index={index}
-                onPress={e => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }}
+                onPress={handleExpensePress}
                 // 2026-09-17, user: "jak przytrzymuje kafelek z tranzakcja jakaś od razu sie
                 // przenosi na panel edycji" — `onLongPress` już istniał w ExpenseItem, ale
                 // nigdy nie był tu podpięty (no-op). `?edit=1` w [id].tsx otwiera od razu w
                 // trybie edycji zamiast trybu odczytu.
-                onLongPress={e => { haptic.medium(); router.navigate(`/expenses/${e.id}?edit=1` as any); }}
+                onLongPress={handleExpenseLongPress}
               />
             </View>
           )}

@@ -600,7 +600,13 @@ const NoteCard = memo(function NoteCard({ note, onPress, onPin, onDelete, onConv
   );
 });
 
-const makeNc = (c: any) => StyleSheet.create({
+// themedStyles (2026-09-17, audyt wydajności) — było gołe `(c: any) => StyleSheet.create(...)`
+// wołane per-instancja `NoteCard` (`useMemo(() => makeNc(colors), [colors])` wyżej), mimo że
+// `NoteCard` jest już `React.memo` — memo chroni przed nadmiarowym RENDEREM, ale nie przed
+// tym, że N kart notatek = N osobnych kopii tego samego stylesheetu przy pierwszym mount
+// (ten sam kształt co udokumentowany w `themedStyles.ts` — "receipt scanner"/"dashboard
+// editor" ANR).
+const makeNc = themedStyles((c: any) => StyleSheet.create({
   wrap: {
     backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: V.cardBorder,
@@ -627,7 +633,7 @@ const makeNc = (c: any) => StyleSheet.create({
   pinnedBadge: { marginLeft: 'auto' },
   actions: { flexDirection: 'row', gap: spacing[1] },
   actionBtn: { padding: 3 },
-});
+}));
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 

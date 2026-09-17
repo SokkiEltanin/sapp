@@ -204,7 +204,12 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   );
 }
 
-const makeHr = (c: any) => StyleSheet.create({
+// themedStyles (2026-09-17, audyt wydajności) — było gołe `(c: any) => StyleSheet.create(...)`
+// wołane per-instancja `HabitRow` (`useMemo(() => makeHr(colors), [colors])` wyżej) — sam
+// `useMemo` jest PER KOMPONENT, więc N wierszy nawyków = N osobnych kopii tego samego
+// stylesheetu zamiast JEDNEJ współdzielonej (ten sam kształt co udokumentowany w
+// `themedStyles.ts` — "receipt scanner 30 produktów"/"dashboard editor 20 wierszy" ANR).
+const makeHr = themedStyles((c: any) => StyleSheet.create({
   wrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     backgroundColor: c.bg.card,
@@ -274,7 +279,7 @@ const makeHr = (c: any) => StyleSheet.create({
   },
   countBtnWide: { width: 44 },
   countNum: { fontSize: 13, fontWeight: '800', color: c.text.primary, minWidth: 20, textAlign: 'center' },
-});
+}));
 
 // ─── 30-day month heatmap ─────────────────────────────────────────────────────
 

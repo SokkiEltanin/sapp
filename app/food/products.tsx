@@ -52,7 +52,12 @@ export default function FoodBase() {
   }, [products, query]);
 
   // ── Kompozycje i dania tab (presets + recipe dishes) ──
-  const entries: Entry[] = useMemo(() => {
+  // Rozdzielone na dwa memo (2026-09-17, audyt wydajności — ten sam kształt buga co
+  // `finances.tsx` wyszukiwarka tagu z §103) — budowa `fromPresets`/`fromRecipes` (mapowanie
+  // WSZYSTKICH presetów/dań, `presetIngredientNames`/`presetKcal`, join+normalize każdej listy
+  // składników) nie zależy od `query`, ale była w JEDNYM memo z filtrem po `query` — więc
+  // przeliczała się NA KAŻDY KLAWISZ w wyszukiwarce, nie tylko przy zmianie presetów/produktów.
+  const entriesBase: Entry[] = useMemo(() => {
     const fromPresets: Entry[] = presets.map(p => {
       const ingredients = presetIngredientNames(p);
       return {
@@ -71,13 +76,16 @@ export default function FoodBase() {
         ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
       };
     });
-    const all = [...fromPresets, ...fromRecipes];
+    return [...fromPresets, ...fromRecipes];
+  }, [presets, products]);
+
+  const entries: Entry[] = useMemo(() => {
     const nq = normalizeProductName(query);
-    if (!nq) return all;
+    if (!nq) return entriesBase;
     const toks = nq.split(' ').filter(Boolean);
     const hit = (hay: string) => hay.includes(nq) || (toks.length > 1 && toks.every(t => hay.includes(t)));
     const out: Entry[] = [];
-    for (const e of all) {
+    for (const e of entriesBase) {
       const nameHay = normalizeProductName(e.name + ' ' + presetCatLabel(e.cat));
       const nameHit = hit(nameHay);
       const ingHit = hit(e.ingHay);
@@ -90,7 +98,7 @@ export default function FoodBase() {
       out.push({ ...e, note });
     }
     return out;
-  }, [presets, products, query]);
+  }, [entriesBase, query]);
 
   const sections = useMemo(() => {
     const pinned = entries.filter(e => e.pinned).sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name, 'pl'));

@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt wydajności, runda 3 — memo scope + React.memo + themedStyles (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §118. Kontynuacja tego samego background-audytu: memo scope
+w `app/food/products.tsx` (wyszukiwarka "Kompozycje i dania" przeliczała drogą część na
+każdy klawisz), `ExpenseItem.tsx` bez `React.memo` (+ wyniesienie `onPress`/`onLongPress`
+w `finances.tsx` do `useCallback`), i DWA prawdziwe naruszenia reguły #1 z CLAUDE.md —
+`HabitRow`/`NoteCard` budowały style gołym `StyleSheet.create` a nie przez `themedStyles()`.
+Wszystko naprawione, `tsc`/`jest` czyste. Świadomie NIE zrobione: `scan.tsx`'s
+`ProductRow`/`CustomProductRow` — ta sama brakująca memoizacja, ale ~15 zależnych
+callbacków per wiersz, wyższe ryzyko/koszt, odłożone na osobną rundę. Do zrobienia (user,
+na urządzeniu, niski/średni priorytet): scroll długiej listy w Finansach, szukajka w
+Jedzenie → Kompozycje i dania, wizualna kontrola Nawyków/Notatek (bez zmian, tylko
+wewnętrzna budowa stylów).
+
 ## ✅ Audyt self-transfer, runda 3 — 2 kolejne miejsca (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §117. Agent-audyt (background, "optymalizuj szukaj bugów")
