@@ -7924,7 +7924,8 @@ nie surowe klucze) między stanem `expense` sprzed edycji a nowymi wartościami,
 pamięci (kategoria/tagi sprzedawcy w `merchantMemory`, kategoria/tagi produktu w
 `productMemory`) — user chciał widzieć nie tylko CO się zmieniło, ale i CO apka
 "zapamiętała" na przyszłość. Wyświetlane w rozwijanej sekcji "Historia zmian" pod kartą
-Szczegóły, tylko wpisy dla TEJ transakcji (`forExpense(id)`).
+Szczegóły, tylko wpisy dla TEJ transakcji (patrz §114 — filtrowanie PRZENIESIONE ze
+store'u do `useMemo` w komponencie).
 
 **5. Long-press na kafelku listy → od razu tryb edycji.** `ExpenseItem.tsx` miał prop
 `onLongPress` od dawna zadeklarowany, ale NIGDY niepodpięty w `app/(tabs)/finances.tsx`
@@ -7947,6 +7948,42 @@ sprawdź że wróciło do STARYCH wartości (nie tylko trybu odczytu); (d) zapis
 rozwiń "Historia zmian", sprawdź że opisuje faktycznie to co zmieniono; (e) na liście w
 Finansach przytrzymaj dowolny kafelek — powinno otworzyć transakcję OD RAZU w trybie
 edycji.
+
+## 114. Self-review §113 przed testem na urządzeniu — 2 realne bugi znalezione i naprawione
+
+User: *"DAWAJ DALEJ"* (bez konkretnego zgłoszenia) — po zamknięciu §113 (świeży, duży
+redesign, wysokie ryzyko) druga runda własna: przeczytać na nowo to co się właśnie
+wysłało, zanim user zdąży to złapać na urządzeniu. Ten sam odruch co audyty §103/§104 w
+tej sesji.
+
+**Bug 1 — `?edit=1` długo-naciśnięty deep-link mógł otworzyć PUSTY formularz edycji.**
+Efekt synchronizujący lokalny stan z `expense` (`useEffect` przy `[expense?.id,
+expense?.updatedAt]`, linia ~386) był chroniony `if (!expense || editing) return` — co
+było BEZPIECZNE zanim `editing` mogło być `true` już na PIERWSZYM renderze (wcześniej
+`editing` zawsze startował jako `false`, flip na `true` następował dopiero po tym, jak ten
+efekt już raz zdążył wypełnić stan). §113 dodał `useState(editParam === '1')` — `editing`
+może być `true` od razu przy pierwszym renderze (long-press na liście), a jeśli `expense`
+nie był jeszcze w store (cold start przez deep-link, świeże uruchomienie apki) — TEN SAM
+efekt, którego własny komentarz mówi wprost "deep-linked / cold start", nigdy by nie
+wypełnił stanu, bo `editing` było już `true`. Efekt: formularz edycji pokazujący puste/
+domyślne wartości zamiast prawdziwej transakcji. Fix: `hydratedOnce` ref przepuszcza
+PIERWSZE udane wypełnienie niezależnie od `editing`, chroniąc tylko KOLEJNE (prawdziwe
+"nie nadpisuj mnie w trakcie edycji").
+
+**Bug 2 — niestabilny selektor Zustand.** `useEditHistory(st => st.forExpense(id))` —
+`forExpense()` budował NOWĄ przefiltrowaną+posortowaną tablicę przy KAŻDYM wywołaniu.
+Jako selektor Reacta to niestabilna referencja (ten sam kształt problemu co "niestabilne
+closures" z audytu wydajności §103) — nie zawiesza apki, ale niepotrzebne rerendery przy
+KAŻDEJ zmianie store'u (nawet innej transakcji). Fix: `forExpense()` USUNIĘTE ze store'u;
+komponent czyta surowe, stabilne `st.entries` i filtruje przez `useMemo` — dokładnie ten
+sam wzorzec co `useBankQueue(st => st.history)` w `BankHistorySection.tsx`.
+
+`tsc`/`jest` czyste (74/978, bez zmian w liczbie testów — obie poprawki to logika
+komponentu/store'u bez nowych czystych funkcji do przetestowania jednostkowo).
+**Priorytet testu na urządzeniu**: wymuś zimny start (force-stop apki) → otwórz link do
+konkretnej transakcji z `?edit=1` (albo: zamknij apkę całkowicie, otwórz Finanse, od razu
+przytrzymaj kafelek) → formularz edycji powinien pokazać PRAWDZIWE wartości tej
+transakcji, nie puste pola.
 
 ---
 
