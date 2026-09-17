@@ -3,6 +3,15 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Self-review §118 — martwy `index` prop unieważniał React.memo (2026-09-17)
+
+Pełny opis w ARCHITECTURE.md §119. `ExpenseItem.tsx`'s `index: number` w `Props` był
+martwy (nigdy nie użyty w ciele komponentu) już przed poprzednim fixem — nieszkodliwe,
+dopóki komponent nie był memoizowany. Świeżo dodany `React.memo` (§118) porównuje WSZYSTKIE
+propsy płytko, więc zmieniający się `index` przy każdym dodaniu/usunięciu transakcji cicho
+unieważniał memo dla sąsiadujących wierszy. Usunięty z Props i z wywołania w
+`finances.tsx`. `tsc`/`jest` czyste. Do zrobienia: brak — czysto wewnętrzne.
+
 ## ✅ Audyt wydajności, runda 3 — memo scope + React.memo + themedStyles (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §118. Kontynuacja tego samego background-audytu: memo scope

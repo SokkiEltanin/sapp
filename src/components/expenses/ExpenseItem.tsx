@@ -23,7 +23,6 @@ if (Platform.OS === 'android') {
 
 interface Props {
   expense: Expense;
-  index: number;
   onPress?: (expense: Expense) => void;
   onLongPress?: (expense: Expense) => void;
 }
@@ -34,7 +33,12 @@ interface Props {
 // `billTagFor` dla WSZYSTKICH widocznych wierszy, nie tylko tych które faktycznie się
 // zmieniły. Wymaga stabilnych `onPress`/`onLongPress` u wołającego (patrz `finances.tsx`
 // `handleExpensePress`/`handleExpenseLongPress`, wyniesione z `renderItem` z tego samego
-// powodu) — bez tego memo i tak nie chroniłoby niczego.
+// powodu) — bez tego memo i tak nie chroniłoby niczego. Z TEGO SAMEGO powodu `index` (nigdy
+// nieużywane wewnątrz tego komponentu) zostało USUNIĘTE z Props (2026-09-17, self-review) —
+// domyślny shallow-compare `memo` porównuje WSZYSTKIE propsy niezależnie od tego czy
+// komponent ich używa, a `index` zmienia się dla wielu wierszy przy każdym dodaniu/usunięciu
+// transakcji w danej sekcji — zostawione, cichaczem unieważniałoby memo dla sąsiadów, których
+// treść wcale się nie zmieniła.
 export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const [expanded, setExpanded] = useState(false);
   const colors = useColors();
