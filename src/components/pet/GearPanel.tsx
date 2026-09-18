@@ -3,6 +3,7 @@ import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pre
 import { X, Check, ChevronDown, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, Minus, Plus, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore } from '@/store/petStore';
 import {
   GEAR_SLOTS, GearSlot, GearItemDef, GearInstance, RARITY_META, SLOT_META, SLOT_STAT,
@@ -42,7 +43,12 @@ function groupOwnedBySlot(ownedGear: OwnedMap, slot: GearSlot): GearGroup[] {
 export default function GearPanel({ children }: { children: ReactNode }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { ownedGear, equippedGear } = usePetStore();
+  // useShallow (2026-09-18, audyt wydajności runda 4) — gołe `usePetStore()` subskrybowało
+  // CAŁY store (dziesiątki pól: energia, questy, kosmetyka, raid...), więc ten permanentnie
+  // zamontowany panel (renderowany cały czas na ekranie pupila, opasujący kotka) re-renderował
+  // się przy KAŻDEJ zmianie w petStore, nie tylko przy zmianie ekwipunku. `app/pet.tsx` (rodzic)
+  // już ma tę samą optymalizację (2026-09-09) — ten komponent po prostu nigdy jej nie dostał.
+  const { ownedGear, equippedGear } = usePetStore(useShallow((s) => ({ ownedGear: s.ownedGear, equippedGear: s.equippedGear })));
   const [openSlot, setOpenSlot] = useState<GearSlot | null>(null);
 
   const slotButton = (slot: GearSlot) => {
@@ -86,7 +92,14 @@ export default function GearPanel({ children }: { children: ReactNode }) {
 function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null; onSelectSlot: (s: GearSlot) => void; onClose: () => void }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { ownedGear, equippedGear, equipGear, unequipGear, sellGear } = usePetStore();
+  // useShallow (2026-09-18, audyt wydajności runda 4) — patrz komentarz w `GearPanel` wyżej;
+  // ten modal jest zamontowany (i subskrybuje store) CAŁY CZAS, nawet gdy `slot` jest `null`
+  // i nic się nie renderuje (early return NIŻEJ, po hookach) — bez selektora re-renderowałby
+  // się na każdą zmianę petStore również w tym stanie.
+  const { ownedGear, equippedGear, equipGear, unequipGear, sellGear } = usePetStore(useShallow((s) => ({
+    ownedGear: s.ownedGear, equippedGear: s.equippedGear,
+    equipGear: s.equipGear, unequipGear: s.unequipGear, sellGear: s.sellGear,
+  })));
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   // Sprzedaż JEDNEJ konkretnej instancji.
   const [sellTarget, setSellTarget] = useState<{ id: string; name: string; coins: number; wasEquipped: boolean } | null>(null);

@@ -8538,6 +8538,85 @@ sprawdź że powiadomienie "koniec zmiany" przychodzi PO jej końcu z realną kw
 0 zł; (2) jeśli robisz przelewy własne (Revolut/oszczędności), sprawdź że "Podsumowanie
 tygodnia" i alert budżetu per-kategoria ich NIE liczą jako wydatku.
 
+## 127. Audyt logika/optymalizacja, runda 2 — streak tygodniowy z hard-capem, self-transfer #5, wydajność runda 4 (2026-09-18)
+
+User: "dawaj dalej logika i optymalizacja" (kolejna kontynuacja). Dwa równoległe
+agent-audyty: (1) świeże obszary logiki — streak nawyków + health sync/correlations;
+(2) wydajność, runda 4 (dokończenie odłożonego w §118 `scan.tsx`, świeży sweep pod te same
+2 klasy błędów co poprzednie rundy).
+
+**1. Streak nawyku z celem TYGODNIOWYM miał sztywny limit `w<=3` (max 4) — ta sama klasa
+buga co udokumentowany "BUG FIX #2" w tym samym pliku, nigdy nie naprawiona dla gałęzi
+tygodniowej.** (`src/hooks/useHabits.ts`, `getStreak()`). Realny, wielomiesięczny nawyk
+"3×/tydzień" pokazywałby płomyk "4" NA ZAWSZE, niezależnie jak długo user dotrzymuje celu.
+
+**2. `app/habit-year.tsx` w ogóle nie znało `weeklyTarget` — jawna sprzeczność liczb dla
+TEGO SAMEGO nawyku między dwoma ekranami.** `stateFor`/`stats.current` liczyły surowy
+dzienny streak (goal-hit per dzień), ignorując cel tygodniowy całkowicie. Zweryfikowany
+konkretny scenariusz (nawyk "3×/tydzień", dziś=niedziela, zrobiony pon/śr/pt — cel
+dotrzymany): lista Nawyków pokazuje płomyk **4** i badge **3/3 (zielony)**, habit-year (po
+wejściu w SZCZEGÓŁY tego samego nawyku) pokazuje **"0 dni z rzędu"**.
+
+Fix (oba naraz, jeden algorytm): `weeklyTargetStreak()` — WYDZIELONA, czysta funkcja (bez
+sztywnego limitu, tylko bezpiecznik `MAX_STREAK_LOOKBACK_DAYS` jak gałąź dzienna) —
+przeniesiona do `src/utils/habits.ts` (nie zostaje w `useHabits.ts`, bo ten transitively
+importuje `notificationsService.ts` → `expo-notifications`, natywny ESM moduł którego jest
+node-environment nie potrafi sparsować — `utils/habits.ts` jest czysty, testowalny wprost).
+`getStreak()` (dashboard) i `habit-year.tsx`'s `stats.current`/`stats.longest` (dla nawyku z
+`weeklyTarget`) wołają TERAZ DOKŁADNIE tę samą funkcję — jedno źródło prawdy, fizycznie nie
+mogą się już rozjechać. Dzienna gałąź i kolorowanie siatki dni (per-dzień goal-hit) ZOSTAJĄ
+nietknięte — to inny, legalny wskaźnik ("czy user coś zrobił tego dnia"), niezwiązany z
+kontrastem który spowodował bug. 5 nowych testów w `__tests__/habitStreak.test.ts`
+(bezpośrednio na wyeksportowanej funkcji — pierwszy raz cokolwiek z tej domeny logiki jest
+testowalne, `habitsDoneOn` też nigdy wcześniej nie miało testu z tego samego powodu).
+
+**3. Self-transfer leak #5 (piąta runda tego samego, powtarzającego się typu buga)** —
+`app/(tabs)/index.tsx`'s karta korelacji "Zależności" (sen/kroki/nastrój ↔ wydatek dnia),
+`spendByDay` w `correlations` useMemo, brakowało `isSelfTransfer`/`inScope` mimo że każdy
+sąsiedni agregator w tym samym pliku (część naprawiona w §126, ta sama runda audytu co ten
+wpis) już je ma. Przelew własny (np. na Revolut) zawyżał "wydatek dnia" wchodzący
+BEZPOŚREDNIO w korelacje Pearsona sen↔wydatki i nastrój↔wydatki pokazywane userowi.
+Naprawione (ten sam filtr co reszta pliku).
+
+**4. Wydajność, runda 4** — trzy fixy: (a) `app/(tabs)/tasks.tsx`'s `SwipeRow` (realny
+FlatList `renderItem`, callbacki już stabilne przez `useCallback`) owinięte `React.memo` —
+ten sam wzorzec/klasa co `ExpenseItem.tsx` (§118), po prostu nigdy nie dostał tego samego
+traktowania; (b) `src/components/pet/GearPanel.tsx`/`GearSlotModal` — gołe `usePetStore()`
+zamienione na `useShallow` z jawnym wyborem pól, mimo że `app/pet.tsx` (rodzic, permanentnie
+montujący ten panel na ekranie pupila) ma tę optymalizację od 2026-09-09 — `GearPanel` po
+prostu nigdy jej nie dostał, więc re-renderował się na KAŻDĄ zmianę w petStore (tick energii,
+quest gdzie indziej), nie tylko przy zmianie ekwipunku; (c) `app/pet.tsx`'s własne gołe
+`useExpensesStore()` (tuż obok już zoptymalizowanego `usePetStore`) zamienione na selektor
+pojedynczego pola.
+
+**Explicite NIE zrobione (odłożone, priorytety niżej lub wymagają decyzji)**:
+- `app/expenses/scan.tsx`'s `ProductRow`/`CustomProductRow` — POTWIERDZONY, wysoki-impact
+  bug wydajnościowy (jedna literka w polu jednego produktu re-renderuje WSZYSTKIE ~20-30
+  wierszy paragonu), ale wymaga większego refaktoru (~15 callbacków × 2 komponenty na
+  stabilne, indeksowane referencje + customowy comparator `React.memo`, bo kilka propsów to
+  świeże tablice per render). Odłożone DRUGI RAZ (pierwszy raz w §118) — świadomie, nie
+  przez przeoczenie, ze względu na skalę zmiany bez siatki testów dla ekranów RN.
+- Trzy NIEZGODNE definicje "tygodnia" w trzech miejscach (rolujące okno `getStreak`/
+  `weeklyTargetStreak` vs. kalendarzowy tydzień pon-nd w badge'u "X/Y tydz." na karcie
+  nawyku w `app/habits.tsx`) — to wymaga decyzji produktowej (który tydzień user chce
+  widzieć), nie samego bugfixa; obecny fix eliminuje SPRZECZNOŚĆ liczb dashboard↔habit-year,
+  ale nie ujednolica z trzecią definicją.
+- Zachowanie streaka tygodniowego W TRAKCIE bieżącego tygodnia (czy "jeszcze żywy, czas
+  zostaje" czy już liczy się jako przerwany) — flagowane przez audyt jako niejednoznaczne,
+  nie potwierdzone jako błędne.
+- Asymetria okna sprawdzania snu nocnego w `readHealthDay` (30h lookback) vs
+  `readHealthRange` (brak) w `healthConnectService.ts` — niska pewność, wymaga
+  zweryfikowania na urządzeniu z Health Connect.
+- ~18 pozostałych gołych `useExpensesStore()` (poza `app/pet.tsx`, już naprawione) — realne,
+  ale niższy impact (ekrany rzadziej re-renderowane niż permanentnie zamontowany `GearPanel`).
+
+`tsc`/`jest` czyste (993 testy, +5 nowych).
+**Priorytet testu na urządzeniu**: średni. (1) Nawyk z celem tygodniowym — sprawdź że lista
+Nawyków i habit-year (szczegóły tego nawyku) pokazują TĘ SAMĄ liczbę dni z rzędu; (2) karta
+"Zależności" na dashboardzie po przelewie własnym — sprawdź że korelacja sen/nastrój↔wydatki
+nie skacze; (3) ekran Zadania — przewiń długą listę, sprawdź że scroll/interakcje są płynne
+(regresja niemożliwa do zaobserwować wprost, tylko brak nowych problemów).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

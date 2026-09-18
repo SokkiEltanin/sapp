@@ -2038,8 +2038,12 @@ export default function DashboardScreen() {
   const correlations = useMemo(() => {
     if (!deferredReady) return [];   // patrz komentarz przy `funFacts` — sam staging JSX
     const spendByDay: Record<string, number> = {};
+    // isSelfTransfer + inScope (2026-09-18, agent-audyt) — brakowało obu, mimo że reszta
+    // agregatorów spend w tym pliku je już ma (część z nich, jak weeklySummary/budgetAlertCard,
+    // dostała ten sam fix w tej samej rundzie audytu). Bez tego przelew własny (np. na
+    // Revolut) zawyżał "wydatek dnia" wchodzący w korelacje sen↔wydatki i nastrój↔wydatki.
     for (const e of expenses) {
-      if (e.type === 'income') continue;
+      if (e.type === 'income' || isSelfTransfer(e) || !inScope(e, scope)) continue;
       const d = (e.date ?? '').slice(0, 10);
       if (d) spendByDay[d] = (spendByDay[d] ?? 0) + (e.amount ?? 0);
     }
@@ -2056,7 +2060,7 @@ export default function DashboardScreen() {
       });
     });
     return correlationInsights(points);
-  }, [deferredReady, expenses, healthDays, moodByDay]);
+  }, [deferredReady, expenses, healthDays, moodByDay, scope]);
 
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
   // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the

@@ -250,7 +250,11 @@ export default function Pet() {
   const palette = useMemo(() => paletteById(catColor), [catColor]);
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
-  const { expenses } = useExpensesStore();
+  // Selektor pojedynczego pola (2026-09-18, audyt wydajności runda 4) — gołe
+  // `useExpensesStore()` obok już zoptymalizowanego `usePetStore(useShallow(...))` tuż nad tą
+  // linią subskrybowało CAŁY store wydatków (pendingSync/filters/isLoading/error...), więc ten
+  // ekran re-renderował się też na zmiany niezwiązane z samymi wydatkami.
+  const expenses = useExpensesStore((s) => s.expenses);
   const { health, stepGoal, budgets } = usePetHealthSync();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   // Onboarding (2026-08-19) — pierwsze uruchomienie otwiera modal imienia+kosmetyki
