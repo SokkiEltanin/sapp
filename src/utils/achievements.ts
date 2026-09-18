@@ -619,6 +619,25 @@ export function evaluateAchievements(ctx: AchCtx): AchState[] {
 const K_EARNED = 'achievements_earned';
 export type EarnedMap = Record<string, string>;
 
+// Trwała podłoga z persisted `earned` (2026-09-18, audyt gabloty, user: "rzuć okiem...
+// czy to wgle dziala i liczy dobrze") — BEZ tego odznaka raz zdobyta mogła "zniknąć" (wrócić
+// do stanu zablokowanej w siatce/liczniku trofeów), jeśli jej ŻYWA wartość spadła z powrotem
+// poniżej progu. Dotyczy KAŻDEJ odznaki opartej o bieżący streak (habitBestStreak — mimo
+// nazwy, `useHabits().getStreak()` liczy AKTUALNĄ serię, nie rekord — plus logStreak/
+// goodMoodStreak/goodSleepStreak/noJunkStreak/noSpendStreak/produceVarietyStreak/
+// foodLogStreak/loginStreak/monthsUnderBudgetStreak/neutralMoodStreak…), która z NATURY
+// może się zresetować (np. 100-dniowy "Nieugięty" zdobyty, user opuszcza jeden dzień —
+// `habitBestStreak` spada blisko zera). `earned`/`syncEarned` istnieją WŁAŚNIE po to, żeby
+// zapamiętać "kiedy pierwszy raz zdobyte" jako TRWAŁY rekord — Gablota to gablota TROFEÓW,
+// nie żywy podgląd bieżącego stanu, więc raz zdobyta odznaka musi zostać odznaczona jako
+// zdobyta na zawsze, niezależnie co się dzieje z żywymi danymi później. Wołane PO
+// `evaluateAchievements` w obu miejscach, które renderują/liczą odznaki
+// (`app/achievements.tsx`, `app/(tabs)/index.tsx`) — `syncEarned` sam nadal dostaje SUROWE
+// (nie podbite) stany, żeby wykrywanie "nowo zdobyte" bazowało na realnym przekroczeniu progu.
+export function applyEarnedFloor(states: AchState[], earned: EarnedMap): AchState[] {
+  return states.map(s => (!s.unlocked && earned[s.a.id]) ? { ...s, unlocked: true, progress: 1 } : s);
+}
+
 export async function getEarned(): Promise<EarnedMap> {
   try { const raw = await AsyncStorage.getItem(K_EARNED); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
 }

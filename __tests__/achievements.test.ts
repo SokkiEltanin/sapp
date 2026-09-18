@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, buildAchCtx, evaluateAchievements, AchCtx } from '@/utils/achievements';
+import { ACHIEVEMENTS, buildAchCtx, evaluateAchievements, applyEarnedFloor, AchCtx } from '@/utils/achievements';
 import { Expense } from '@/types';
 
 const exp = (o: Partial<Expense>): Expense => ({
@@ -124,5 +124,34 @@ describe('achievements — evaluateAchievements unlocks a saver badge once its f
     const saver5000 = states.find(s => s.a.id === 'saver-5000')!;
     expect(saver1000.unlocked).toBe(true);
     expect(saver5000.unlocked).toBe(false);
+  });
+});
+
+// 2026-09-18, audyt gabloty (user: "rzuć okiem na gablotę... czy to wgle dziala i liczy
+// dobrze") — `habitBestStreak` (mimo nazwy) to AKTUALNA seria (useHabits().getStreak()),
+// nie rekord wszech czasów, więc raz zdobyty streak-owy badge mógłby wizualnie "wrócić do
+// zablokowanego" w gridzie/liczniku gdy streak się zresetuje, mimo że jest już w `earned`.
+describe('achievements — applyEarnedFloor keeps an earned badge unlocked after its live value regresses', () => {
+  test('a badge past target stays as evaluateAchievements says (unaffected by floor)', () => {
+    const ctx = buildAchCtx({ ...emptyArgs, habitBestStreak: 30 });
+    const states = evaluateAchievements(ctx);
+    const floored = applyEarnedFloor(states, { 'habit-streak-7': '2026-08-01T00:00:00.000Z' });
+    expect(floored.find(s => s.a.id === 'habit-streak-7')!.unlocked).toBe(true);
+  });
+  test('a badge whose live streak dropped back to 0 is STILL shown unlocked once it is in `earned`', () => {
+    const ctx = buildAchCtx({ ...emptyArgs, habitBestStreak: 0 }); // streak reset after earning it
+    const states = evaluateAchievements(ctx);
+    const raw = states.find(s => s.a.id === 'habit-streak-7')!;
+    expect(raw.unlocked).toBe(false); // the bug: live evaluation alone says "locked"
+    const floored = applyEarnedFloor(states, { 'habit-streak-7': '2026-08-01T00:00:00.000Z' });
+    const flooredState = floored.find(s => s.a.id === 'habit-streak-7')!;
+    expect(flooredState.unlocked).toBe(true);
+    expect(flooredState.progress).toBe(1);
+  });
+  test('a badge NOT in `earned` and not live-unlocked stays locked', () => {
+    const ctx = buildAchCtx({ ...emptyArgs, habitBestStreak: 0 });
+    const states = evaluateAchievements(ctx);
+    const floored = applyEarnedFloor(states, {});
+    expect(floored.find(s => s.a.id === 'habit-streak-7')!.unlocked).toBe(false);
   });
 });
