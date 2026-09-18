@@ -23,7 +23,7 @@ import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AchCtx, buildAchCtx, evaluateAchievements, syncEarned, getEarned, EarnedMap,
-  fmtProgress, AchState, AchGroup, TIER_COLOR, BAD_COLOR,
+  applyEarnedFloor, fmtProgress, AchState, AchGroup, TIER_COLOR, BAD_COLOR,
 } from '@/utils/achievements';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -121,19 +121,24 @@ export default function Achievements() {
     })().catch(() => {});
   }, [states]);
 
+  // Podłoga z `earned` (2026-09-18, patrz `applyEarnedFloor` w achievements.ts) — WSZYSTKIE
+  // poniższe (siatka, licznik, sortowanie) czytają TO, nie surowe `states`, żeby raz zdobyta
+  // odznaka nie wróciła do stanu "zablokowanej" gdy jej żywa wartość (streak) spadnie.
+  const displayStates = useMemo(() => applyEarnedFloor(states, earned), [states, earned]);
+
   // Trophy progress counts only the "good" badges (Grzeszki are shame, not progress).
-  const goodStates = states.filter(st => st.a.kind !== 'bad');
+  const goodStates = displayStates.filter(st => st.a.kind !== 'bad');
   const unlockedCount = goodStates.filter(st => st.unlocked).length;
   const pct = goodStates.length ? unlockedCount / goodStates.length : 0;
 
   const byGroup = useMemo(() => {
     const map = {} as Record<AchGroup, AchState[]>;
     for (const g of GROUP_ORDER) map[g] = [];
-    for (const st of states) (map[st.a.group] ??= []).push(st);
+    for (const st of displayStates) (map[st.a.group] ??= []).push(st);
     // unlocked first, then by progress desc
     for (const g of GROUP_ORDER) map[g].sort((a, b) => Number(b.unlocked) - Number(a.unlocked) || b.progress - a.progress);
     return map;
-  }, [states]);
+  }, [displayStates]);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>

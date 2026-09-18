@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt Gabloty — zdobyta odznaka mogła "wrócić do zablokowanej" (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §123. User: "rzuć okiem na gablotę... czy to wgle dziala i
+liczy dobrze". Znaleziony i naprawiony 1 poważny bug: `habitBestStreak` i inne
+streak-owe pola (loginStreak/goodMoodStreak/noJunkStreak/...) to AKTUALNE serie, nie
+rekordy wszech czasów — Gablota renderowała `unlocked` z żywych danych, więc raz zdobyta
+streak-owa odznaka (np. "Nieugięty" 100 dni) wizualnie WRACAŁA DO ZABLOKOWANEJ po
+zresetowaniu streaka, mimo że była trwale zapisana w `earned`. Naprawione (`applyEarnedFloor`
+— raz zdobyte, zostaje pokazywane jako zdobyte na zawsze). Reszta systemu (loginStreak,
+cardBalancePeak, dishesCreated, wszystkie pola AchCtx, neutralMoodStreak) sprawdzona i
+czysta. Osobno: 17/99 odznak nie ma własnej grafiki (fallback na generyczną ikonę,
+udokumentowane, nie zepsute — do decyzji usera czy dorysować). `tsc`/`jest` czyste (+3
+testy). Do zrobienia (user, na urządzeniu, wysoki priorytet jeśli masz zdobyte streak-owe
+trofea): otwórz Gablotę, sprawdź że wszystkie wcześniej zdobyte odznaki nadal pokazują się
+jako zdobyte.
+
 ## ✅ Fix: brakujące kategorie jedzenia w pickerze tagów (jajka/przyprawy/makarony/...) (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §122. User: auto-wykrywanie "jaja" i kategorii

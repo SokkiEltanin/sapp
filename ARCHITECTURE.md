@@ -8293,6 +8293,60 @@ sprawdź że w pickerze tagów widać teraz jajka/sosy/przyprawy/konserwy i prze
 makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/mrożonki jako klikalne chipy,
 i że kliknięcie ich na STARYM produkcie faktycznie retagguje go (widoczne w statystykach).
 
+## 123. Audyt Gabloty — zdobyta odznaka mogła "wrócić do zablokowanej" (2026-09-18)
+
+User: *"rzuć okiem na gablote wszystko po kolei co jest podłączone z tych osiągnięć co nie
+jest itp, czy to wgle dziala i liczy dobrze"*. Przeczytany cały `achievements.ts` (99
+odznak) + delegowany agent-audyt na dane wejściowe (`AchCtx`), które wymagały sprawdzenia w
+INNYCH plikach.
+
+**Znalezione i naprawione — 1 realny bug, poważny w skutkach**: `habitBestStreak` (mimo
+nazwy) to AKTUALNA seria nawyku (`useHabits().getStreak()` liczy wstecz od dziś do
+pierwszego zerwanego dnia — patrz `useHabits.ts:212-242`, brak jakiegokolwiek zapisanego
+rekordu wszech czasów), nie najlepsza-kiedykolwiek. Siatka gabloty (`app/achievements.tsx`)
+i licznik trofeów na dashboardzie (`app/(tabs)/index.tsx`) renderowały `unlocked`/sortowanie
+z SUROWEGO, ŻYWEGO `evaluateAchievements()` — NIE z trwałej mapy `earned` (która istnieje
+właśnie po to, żeby pamiętać "kiedy pierwszy raz zdobyte", i której `syncEarned` TYLKO
+dopisuje, nigdy nie usuwa). Efekt: user zdobywa "Nieugięty" (100 dni tego samego nawyku z
+rzędu) albo "cyborg-365" (365 dni), opuszcza JEDEN dzień, `habitBestStreak` spada blisko
+zera — odznaka wizualnie WRACA DO ZABLOKOWANEJ w siatce (wyszarzona, spada w sortowaniu,
+znika z licznika "X/Y zdobyte"), mimo że `earned[id]` cały czas trzyma oryginalną datę
+zdobycia. Dotyczy KAŻDEJ odznaki opartej o streak, który z natury może się zresetować —
+nie tylko habitBestStreak: logStreak/goodMoodStreak/goodSleepStreak/noJunkStreak/
+noSpendStreak/produceVarietyStreak/foodLogStreak/loginStreak/monthsUnderBudgetStreak/
+neutralMoodStreak — to co najmniej kilkanaście z 99 odznak.
+
+Fix: nowa `applyEarnedFloor(states, earned)` w `achievements.ts` — raz odznaka w
+persisted `earned`, ZOSTAJE pokazywana jako zdobyta na zawsze (progress=1), niezależnie od
+tego co się dzieje z żywymi danymi później (Gablota to gablota TROFEÓW, nie żywy podgląd
+bieżącego stanu). Podpięte w OBU miejscach, które renderują/liczą odznaki
+(`app/achievements.tsx`'s siatka/licznik/sortowanie, `app/(tabs)/index.tsx`'s karta
+"Gablota" + `earnedBadges` licznik) — `syncEarned` nadal dostaje SUROWE stany (musi widzieć
+realne przekroczenie progu, żeby wykryć NOWO zdobyte). 3 nowe testy regresyjne.
+
+**Sprawdzone i potwierdzone CZYSTE** (agent-audyt + moja weryfikacja): `loginStreak`
+(petStore.ts) — poprawna semantyka kalendarzowa, bezpiecznie liczy dalej ponad tabelę
+wypłat monet (capowaną na 7). `cardBalancePeak` (accountBalance.ts) — prawdziwe
+monotoniczne maximum, replay CAŁEJ historii wydatków, persisted, nigdy nie się nie cofa.
+`dishesCreated`/`isRecipeProduct` (foodStore.ts) — liczy WYŁĄCZNIE dania z `recipe.ingredients`
+zapisane przez usera w kreatorze przepisu, brak danych seed które by zawyżały licznik.
+Wszystkie 79 pól `AchCtx` faktycznie ustawiane w `buildAchCtx` (żadne martwe/zahardkodowane).
+`neutralMoodStreak`/`poker-face` — `MoodLevel` to `1|2|3|4|5`, `mood: 0` nigdy nie jest
+realną wartością, strażnik `if (day && m.mood)` nigdy nie pomija prawdziwego wpisu.
+
+**Pokrycie ikon (art, nie logika)** — 17 z 99 odznak nie ma własnej grafiki PNG (fallback
+na generyczną ikonę lucide, UDOKUMENTOWANE i celowe w komentarzu `badgeIcons.ts`), z czego
+10 nie ma nawet dedykowanego fallbacku (goły Award/Skull): `fat-wallet`, `poker-face`,
+`unplugged`, `first-key`, `groceries-100`, `first-week`, `sweet-tooth`, `crime-scene`,
+`grumpy`, `jester`. Nic nie jest zepsute (fallback renderuje się poprawnie), tylko wizualnie
+mniej rozpoznawalne — zostawione userowi do decyzji (dorysować, czy zostawić).
+
+`tsc`/`jest` czyste (984 testy, +3 nowe regresyjne).
+**Priorytet testu na urządzeniu**: wysoki dla kogoś ze zdobytymi streak-owymi odznakami —
+otwórz Gablotę, sprawdź że WSZYSTKIE wcześniej zdobyte trofea (zwłaszcza streak-owe:
+Nieugięty/cyborg-365/centurion/zen/stoic-30 itp.) dalej pokazują się jako odznaczone,
+niezależnie od aktualnego stanu streaków.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

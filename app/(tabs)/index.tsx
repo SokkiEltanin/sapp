@@ -108,7 +108,7 @@ import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
 import { fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, FvBucket } from '@/utils/fixedVariable';
-import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
+import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFloor, EarnedMap } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
@@ -1112,7 +1112,16 @@ export default function DashboardScreen() {
     loginStreak: usePetStore.getState().loginStreak,
     ...achFlags,
   })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak, foodMeals, dishesCreated, achFlags]);
-  const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
+  // Podłoga z `earned` (2026-09-18, patrz `applyEarnedFloor` w achievements.ts) — bez tego
+  // ten licznik (i karta "Gablota" niżej) mógłby cofnąć się poniżej liczby TRWALE zdobytych
+  // odznak, gdy żywa wartość jakiejś odznaki opartej o streak (np. seria nawyku) spadnie z
+  // powrotem poniżej progu po już zdobyciu trofeum.
+  const [earnedMap, setEarnedMap] = useState<EarnedMap>({});
+  useEffect(() => { getEarned().then(setEarnedMap).catch(() => {}); }, []);
+  const earnedBadges = useMemo(
+    () => applyEarnedFloor(achStates, earnedMap).filter(st => st.unlocked && st.a.kind !== 'bad').length,
+    [achStates, earnedMap],
+  );
   const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {
     (async () => {
@@ -1122,6 +1131,7 @@ export default function DashboardScreen() {
       // an update that adds many badges you already qualify for) is seeded silently —
       // no avalanche of full-screen modals to tap through.
       if (fresh.length && !firstEver && fresh.length <= 3) celebrate(fresh);
+      if (fresh.length) setEarnedMap(await getEarned());
     })().catch(() => {});
   }, [achStates]);
 
