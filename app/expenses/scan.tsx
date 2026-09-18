@@ -10,7 +10,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
-import { foodSubcat } from '@/utils/food';
+import { foodSubcat, FOOD_ITEM_TAGS } from '@/utils/food';
 import { sameLocalDay } from '@/utils/bankNotification';
 import { toast } from '@/store/toastStore';
 import { localISO } from '@/utils/date';
@@ -45,7 +45,9 @@ export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 
 type SortMode = 'order' | 'category' | 'price';
 
-const ITEM_TAGS = ['słodycze', 'przekąski', 'nabiał', 'mięso', 'ryby', 'warzywa', 'owoce', 'pieczywo', 'napoje', 'chemia', 'higiena', 'dania gotowe'];
+// Współdzielone przez `FOOD_ITEM_TAGS` (2026-09-18) — było plik-lokalną kopią, patrz
+// komentarz przy `FOOD_ITEM_TAGS` w food.ts za powód zmiany.
+const ITEM_TAGS = [...FOOD_ITEM_TAGS, 'chemia', 'higiena'];
 
 const SORT_OPTS: { mode: SortMode; label: string }[] = [
   { mode: 'order',    label: 'Paragon'   },

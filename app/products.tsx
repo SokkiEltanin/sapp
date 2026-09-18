@@ -19,6 +19,7 @@ import {
   loadTagMemory, allKnownTags,
 } from '@/utils/productMemory';
 import { looksLikeFood } from '@/utils/calories';
+import { FOOD_ITEM_TAGS } from '@/utils/food';
 import { ExpenseCategory } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { GitMerge, Check, RotateCcw } from 'lucide-react-native';
@@ -37,13 +38,9 @@ function fmtHistoryDate(iso: string): string {
   return d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// Ta sama bazowa lista co w app/expenses/[id].tsx (ITEM_TAGS) — plik-lokalna tam też,
-// celowo nie wydzielona współdzielona (mała, stała lista domenowa).
-const ITEM_TAGS = [
-  'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
-  'słodycze', 'pieczywo', 'napoje', 'przekąski', 'sosy',
-  'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
-];
+// Współdzielone przez `FOOD_ITEM_TAGS` (2026-09-18) — było plik-lokalną kopią, patrz
+// komentarz przy `FOOD_ITEM_TAGS` w food.ts za powód zmiany.
+const ITEM_TAGS = [...FOOD_ITEM_TAGS, 'chemia', 'higiena', 'nie jedzenie'];
 
 export default function ProductsScreen() {
   const c = useColors();
