@@ -8696,6 +8696,32 @@ etykiety co już były w realnej walce PRZED edytorem, nie artefakt samego edyto
 niżej, a pocisk między nimi leci PRZEZ sprite'y (nie nad/pod), we wszystkich 6 trybach
 (kampania/raid/event/quest/mad/misja).
 
+## 130. Fix: nieopisany pasek "% celu snu" na karcie Sen (2026-09-18)
+
+User: "zakładka zdrowie jest mało czytelna" → doprecyzowane przez `AskUserQuestion`: "Chodzi o
+sen jest duzo kresek i slupkow ale malo danych i szzegolow nic prawie nie opisane nie
+wiadomo". Zbadana karta Sen (`app/(tabs)/health.tsx`) — okazało się że ma DWA paski jeden pod
+drugim: `stageBar` (fazy głęboki/REM/lekki) ma pełny legend z dokładnymi minutami pod spodem
+(już dobrze opisany), ale `microBar` TUŻ NAD nim — kolorowy pasek pokazujący `sleepPct =
+min(1, sleepSecs / 9h)` (% z 9-godzinnego "celu") — miał ZERO tekstu obok siebie, nigdzie w
+pliku. User widział samą kolorową kreskę bez żadnej wskazówki co ona znaczy ani jaka jest jej
+skala — dokładnie pasuje do skargi "kreski i słupki, nic nie opisane".
+
+Fix: dodany podpis pod paskiem (`{pct}% celu (9h) · {h}h {m}m`) — jedna linia, ten sam
+wzorzec typografii co `sleepInsightSub` obok. Przy okazji doprecyzowane "wahania ±X min" →
+"wahania noc do nocy ±X min" (był to std.dev wg `sleepConsistency`, bez żadnego kontekstu co
+"wahania" mierzy). Reszta karty (legenda faz snu, tygodniowy wykres z liczbami pod słupkami,
+sekcja "szczegóły" z tile'ami/etykietami) już była dobrze opisana — nietknięta.
+
+**Świadomie NIE zrobione**: user w `AskUserQuestion` odrzucił opcję "pigułka ZADANIE W TOKU
+zasłania górny rząd kafelków" (wybrał "co innego") — mimo że na screenie wyglądało to jak
+realny overlap (`TopPill` w `app/(tabs)/_layout.tsx` to `position:'absolute', zIndex:50`
+floating nad każdą zakładką) — NIE ruszane, bo user explicit powiedział że nie o to chodzi.
+
+`tsc`/`jest` czyste (1000 testów, czysto UI-tekst, bez zmian w logice).
+**Priorytet testu na urządzeniu**: niski — Zdrowie → karta Sen → sprawdź że pod kolorowym
+paskiem pojawia się teraz podpis z %/godzinami.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
