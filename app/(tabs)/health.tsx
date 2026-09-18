@@ -792,12 +792,19 @@ export default function HealthScreen() {
           </TouchableOpacity>
 
           {!(sleepH === 0 && sleepM === 0) && (
-            <View style={styles.microBar}>
-              <View style={[styles.microFill, {
-                width: `${sleepPct * 100}%`,
-                backgroundColor: sleepQuality ? QUALITY_COLORS[sleepQuality] : colors.text.secondary,
-              }]} />
-            </View>
+            <>
+              <View style={styles.microBar}>
+                <View style={[styles.microFill, {
+                  width: `${sleepPct * 100}%`,
+                  backgroundColor: sleepQuality ? QUALITY_COLORS[sleepQuality] : colors.text.secondary,
+                }]} />
+              </View>
+              {/* Podpis (2026-09-18) — pasek pokazuje % z 9h "celu" snu, wcześniej bez ŻADNEGO
+                  opisu (user: "duzo kresek... nic prawie nie opisane, nie wiadomo"). */}
+              <Text style={styles.microBarCaption}>
+                {Math.round(sleepPct * 100)}% celu (9h) · {sleepH}h {pad(sleepM)}m
+              </Text>
+            </>
           )}
 
           {/* Sleep stages (deep / REM / light) — when the watch reports them */}
@@ -866,7 +873,7 @@ export default function HealthScreen() {
                   {diff != null && <Text style={{ color: diff >= 0 ? T.accent : colors.accent.red, fontWeight: '800' }}>{`   dziś ${diff >= 0 ? '+' : ''}${diff} h vs średnia`}</Text>}
                 </Text>
                 <Text style={styles.sleepInsightSub}>
-                  Najlepiej {(healthStats.sleepBest.sleepMinutes / 60).toFixed(1)} h · najgorzej {(healthStats.sleepWorst.sleepMinutes / 60).toFixed(1)} h · wahania ±{healthStats.sleepConsistency} min
+                  Najlepiej {(healthStats.sleepBest.sleepMinutes / 60).toFixed(1)} h · najgorzej {(healthStats.sleepWorst.sleepMinutes / 60).toFixed(1)} h · wahania noc do nocy ±{healthStats.sleepConsistency} min
                 </Text>
               </View>
             );
@@ -1679,6 +1686,10 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
 
   microBar: { height: 5, backgroundColor: c.fill.medium, borderRadius: radius.full, overflow: 'hidden' },
   microFill: { height: '100%', borderRadius: radius.full },
+  // Podpis paska nad `microBar` (2026-09-18, user: "sen jest duzo kresek i slupkow ale malo
+  // danych... nic prawie nie opisane nie wiadomo") — pasek pokazywał % z 9h snu bez ŻADNEGO
+  // tekstu obok, więc user widział samą kolorową kreskę bez wiedzy co ona znaczy.
+  microBarCaption: { fontSize: 10, color: c.text.muted, marginTop: 4 },
   stageBar: { flexDirection: 'row', height: 12, borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.border.subtle },
   stageLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
   stageItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },

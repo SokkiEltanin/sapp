@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: nieopisany pasek "% celu snu" na karcie Sen w Zdrowie (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §130. User: "zdrowie mało czytelne" → doprecyzowane: chodzi o
+kartę Sen, "duzo kresek i slupkow ale malo danych... nic prawie nie opisane". Znaleziony
+realny gap: `microBar` (pasek % z 9h "celu" snu) nie miał ŻADNEGO tekstu opisującego co
+pokazuje — dodany podpis. Doprecyzowane też "wahania ±X min" → "wahania noc do nocy ±X min".
+`tsc`/`jest` czyste. Priorytet testu: niski, czysto tekst.
+
+**Nie ruszane**: user w pytaniu doprecyzowującym ODRZUCIŁ opcję "pigułka ZADANIE W TOKU
+zasłania górny rząd kafelków na dashboardzie/zdrowiu" (`TopPill`, `app/(tabs)/_layout.tsx`,
+`position:absolute` floating nad każdą zakładką) — mimo że na screenie wyglądało jak realny
+overlap, user wybrał "co innego". Jeśli to jednak realny problem, wróci jako osobne zgłoszenie.
+
 ## ✅ Rozbudowa panelu "Statystyki apki" — okresy, trendy, kolejność ekranów, odbicia (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §128. User: brakowało w panelu (Ustawienia → Dane →
