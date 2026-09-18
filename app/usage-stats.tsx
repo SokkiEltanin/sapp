@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, CalendarClock, Clock3, Trophy, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, CalendarClock, Clock3, Trophy, Trash2, TrendingUp, TrendingDown, Minus, ArrowRightLeft, Shuffle } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -13,9 +13,11 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { useUsageStats } from '@/store/usageStatsStore';
 import { screenInfoFor } from '@/utils/screenStats';
-import { bucketByDay, bucketByHour, oldestEventDate } from '@/utils/usageStatsAnalysis';
+import { bucketByDay, bucketByHour, oldestEventDate, periodCounts, screenTrends, screenTransitions, bouncePairs } from '@/utils/usageStatsAnalysis';
 
 const DAYS_SHOWN = 14;
+const TRANSITIONS_SHOWN = 6;
+const TRENDS_SHOWN = 5;
 
 function fmtDayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -29,6 +31,40 @@ function fmtWhen(iso: string): string {
   const time = d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
   if (sameDay) return `dziś ${time}`;
   return `${d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })} ${time}`;
+}
+
+function labelFor(screenId: string): string {
+  return screenInfoFor(screenId)?.label ?? screenId;
+}
+
+type Tone = 'up' | 'down' | 'flat';
+function toneOf(delta: number): Tone { return delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'; }
+function toneColorOf(c: ReturnType<typeof useColors>, tone: Tone): string {
+  return tone === 'up' ? '#2AC68F' : tone === 'down' ? (c.accent.red ?? '#EF4444') : c.text.muted;
+}
+
+// Kafelek "dziś/ten tydzień/ten miesiąc" z porównaniem do poprzedniego okresu — jedna
+// definicja użyta 3× w karcie "Otwarcia" (2026-09-18, user: "Porównań otwarc").
+function PeriodTile({ label, current, previous, prevLabel, s, c }: {
+  label: string; current: number; previous: number; prevLabel: string;
+  s: ReturnType<typeof makeStyles>; c: ReturnType<typeof useColors>;
+}) {
+  const delta = current - previous;
+  const tone = toneOf(delta);
+  const color = toneColorOf(c, tone);
+  const Icon = tone === 'up' ? TrendingUp : tone === 'down' ? TrendingDown : Minus;
+  return (
+    <View style={s.periodTile}>
+      <Text style={s.periodVal}>{current}</Text>
+      <Text style={s.periodLabel}>{label}</Text>
+      <View style={s.periodDeltaRow}>
+        <Icon size={11} color={color} />
+        <Text style={[s.periodDeltaTxt, { color }]}>
+          {tone === 'flat' ? `jak ${prevLabel}` : `${delta > 0 ? '+' : ''}${delta} vs ${prevLabel}`}
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 // Pełny panel "Statystyki apki" (2026-09-15, §102) — user: "chciałem mieć w USTAWIENIACH >
@@ -48,6 +84,15 @@ export default function UsageStatsScreen() {
   const dayBuckets = useMemo(() => bucketByDay(events, DAYS_SHOWN), [events]);
   const hourBuckets = useMemo(() => bucketByHour(events), [events]);
   const oldest = useMemo(() => oldestEventDate(events), [events]);
+  // Rozbudowa (2026-09-18, user: "nie ma otwiarc dzisiaj łącznie... i Porównań otwarc,
+  // Porównań ekranów, jakie ekrany po sobie, czy się jakieś zacinają pomiędzy sobie") —
+  // cztery nowe agregaty, wszystkie czyste funkcje z usageStatsAnalysis.ts (testowalne bez
+  // renderowania tego ekranu).
+  const periods = useMemo(() => periodCounts(events), [events]);
+  const trends = useMemo(() => screenTrends(events).slice(0, TRENDS_SHOWN).filter(t => t.delta !== 0), [events]);
+  const allTransitions = useMemo(() => screenTransitions(events), [events]);
+  const transitions = useMemo(() => allTransitions.slice(0, TRANSITIONS_SHOWN), [allTransitions]);
+  const bounces = useMemo(() => bouncePairs(allTransitions), [allTransitions]);
 
   const ranking = useMemo(() => {
     return Object.entries(screens)
@@ -86,6 +131,22 @@ export default function UsageStatsScreen() {
           <View style={s.summaryTile}>
             <Text style={s.summaryVal}>{oldest ? Math.max(1, Math.ceil((Date.now() - oldest.getTime()) / 86400000)) : 0}</Text>
             <Text style={s.summaryLabel}>dni danych</Text>
+          </View>
+        </View>
+
+        {/* Otwarcia dziś/tydzień/miesiąc + porównanie do poprzedniego okresu (2026-09-18,
+            user: "nie ma otwiarc dzisiaj łącznie, w tym tygodniu i miesiącu łącznie, i
+            Porównań otwarc") — dawny summaryRow wyżej miał TYLKO "od zawsze", bez podziału
+            na okresy i bez trendu. */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <ArrowRightLeft size={15} color={c.text.secondary} />
+            <Text style={s.cardTitle}>Otwarcia</Text>
+          </View>
+          <View style={s.periodRow}>
+            <PeriodTile label="dziś" current={periods.today} previous={periods.yesterday} prevLabel="wczoraj" s={s} c={c} />
+            <PeriodTile label="ten tydzień" current={periods.thisWeek} previous={periods.lastWeek} prevLabel="zeszły tydz." s={s} c={c} />
+            <PeriodTile label="ten miesiąc" current={periods.thisMonth} previous={periods.lastMonth} prevLabel="zeszły mies." s={s} c={c} />
           </View>
         </View>
 
@@ -168,6 +229,86 @@ export default function UsageStatsScreen() {
           )}
         </View>
 
+        {/* Trendy ekranów: ten tydzień vs zeszły (2026-09-18, user: "Porównań ekranów") —
+            które ekrany zyskały/straciły otwarcia, nie tylko surowy ranking od zawsze. */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <ArrowRightLeft size={15} color={c.text.secondary} />
+            <Text style={s.cardTitle}>Trendy ekranów (ten tydzień vs zeszły)</Text>
+          </View>
+          {trends.length === 0 ? (
+            <Text style={s.empty}>Za mało danych z dwóch tygodni pod rząd.</Text>
+          ) : (
+            <View style={s.list}>
+              {trends.map((t, i) => {
+                const tone = toneOf(t.delta);
+                const color = toneColorOf(c, tone);
+                const Icon = tone === 'up' ? TrendingUp : TrendingDown;
+                return (
+                  <View key={t.screenId} style={[s.rankRow, i > 0 && s.rankRowBorder]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.rankLabel} numberOfLines={1}>{labelFor(t.screenId)}</Text>
+                      <Text style={s.rankWhen}>{t.previous} → {t.current}</Text>
+                    </View>
+                    <View style={s.trendBadge}>
+                      <Icon size={12} color={color} />
+                      <Text style={[s.trendBadgeTxt, { color }]}>{t.delta > 0 ? '+' : ''}{t.delta}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Kolejność ekranów: z jakiego na jaki NAJCZĘŚCIEJ (2026-09-18, user: "jakie
+            ekrany po sobie") — kolejne otwarcia w oknie 30 min, patrz screenTransitions(). */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <ArrowRightLeft size={15} color={c.text.secondary} />
+            <Text style={s.cardTitle}>Najczęstsza kolejność ekranów</Text>
+          </View>
+          {transitions.length === 0 ? (
+            <Text style={s.empty}>Jeszcze za mało danych.</Text>
+          ) : (
+            <View style={s.list}>
+              {transitions.map((t, i) => (
+                <View key={`${t.from}→${t.to}`} style={[s.rankRow, i > 0 && s.rankRowBorder]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.rankLabel} numberOfLines={1}>{labelFor(t.from)} → {labelFor(t.to)}</Text>
+                  </View>
+                  <Text style={s.rankCount}>{t.count}×</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Ekrany "na przemian" (2026-09-18, user: "czy się jakieś zacinają pomiędzy
+            sobie") — pary ekranów gdzie user odbija się w OBIE strony często, patrz
+            bouncePairs(). Sygnał że coś nie jest wygodnie dostępne z jednego miejsca. */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Shuffle size={15} color={c.text.secondary} />
+            <Text style={s.cardTitle}>Ekrany na przemian</Text>
+          </View>
+          {bounces.length === 0 ? (
+            <Text style={s.empty}>Nie wykryto — nie odbijasz się często między dwoma ekranami.</Text>
+          ) : (
+            <View style={s.list}>
+              {bounces.map((b, i) => (
+                <View key={`${b.a}|${b.b}`} style={[s.rankRow, i > 0 && s.rankRowBorder]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.rankLabel} numberOfLines={1}>{labelFor(b.a)} ⇄ {labelFor(b.b)}</Text>
+                    <Text style={s.rankWhen}>{b.aToB}× tam, {b.bToA}× z powrotem</Text>
+                  </View>
+                  <Text style={s.rankCount}>{b.total}×</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         <PressableScale onPress={() => { haptic.tap(); setConfirmReset(true); }}>
           <View style={s.resetBtn}>
             <Trash2 size={13} color={c.text.muted} />
@@ -236,6 +377,17 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   rankLabel: { fontSize: 13, fontWeight: '600', color: c.text.primary },
   rankWhen: { fontSize: 10.5, color: c.text.muted, marginTop: 1 },
   rankCount: { fontSize: 12, fontWeight: '800', color: c.text.secondary, minWidth: 32, textAlign: 'right' },
+  // Karta "Otwarcia" (2026-09-18) — 3 kafelki dziś/tydzień/miesiąc, każdy z deltą vs
+  // poprzedni okres pod wartością główną.
+  periodRow: { flexDirection: 'row', gap: spacing[2] },
+  periodTile: { flex: 1, alignItems: 'center', gap: 2 },
+  periodVal: { fontSize: 22, fontWeight: '900', color: c.text.primary },
+  periodLabel: { fontSize: 10.5, color: c.text.muted, textAlign: 'center' },
+  periodDeltaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  periodDeltaTxt: { fontSize: 9.5, fontWeight: '700' },
+  // Badge trendu ekranu (2026-09-18) — obok wpisu w "Trendy ekranów".
+  trendBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: c.fill.subtle, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 4 },
+  trendBadgeTxt: { fontSize: 11, fontWeight: '800' },
   resetBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.md,
