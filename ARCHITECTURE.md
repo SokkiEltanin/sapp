@@ -8207,6 +8207,52 @@ edytor → przeciągnij pupila/bossa/oba paski HP, zmień rozmiary i tło, spraw
 pokazuje poprawne, zaokrąglone liczby i że wartości PRZETRWAJĄ zamknięcie i ponowne
 otwarcie ekranu (persisted draft).
 
+## 121. Audyt dat, runda 2 — Podsumowanie tygodnia liczyło praktycznie zera (2026-09-18)
+
+User: *"szukaj dalej błędów logicznych ewentualnie optymalizuj"* — background-audyt
+szukający TEGO SAMEGO kształtu buga co reguła CLAUDE.md #5 (data porównywana bez
+`.slice(0,10)`), w miejscach jeszcze nie sprawdzonych. Audyt combat-logiki (6 trybów walki)
+wyszedł czysty — nic do naprawy. Audyt dat znalazł jeden, ale poważny, realny bug.
+
+**`app/weekly.tsx` — Finanse tydzień: suma wydatków/przychodów i dzienny wykres liczyły
+praktycznie SAME ZERA.** `Expense.date` to PEŁNY lokalny timestamp (`localISO()`, np.
+`"2026-09-20T16:45:00"`), a `dates`/`prevDates` (z `getWeekDates()`) to gołe
+`"YYYY-MM-DD"`. Cztery porównania stringów BEZ obcięcia:
+- `weekExp`/`weekInc` (linia 290/295): `e.date <= dates[6]` — string z dopisanym czasem i
+  tym samym prefiksem sortuje się jako WIĘKSZY niż goła data (`"...T16:45:00" > "2026-09-20"`
+  w porównaniu leksykograficznym — zweryfikowane realnie w Node, nie tylko wyczytane), więc
+  KAŻDY wydatek/przychód z OSTATNIEGO dnia tygodnia wypadał z sumy.
+- `prevExp` (linia 300): to samo, dla tygodnia poprzedniego.
+- `expDailyV` (linia 306, dzienny wykres słupkowy) — `e.date === d`: pełny timestamp
+  praktycznie NIGDY nie jest bajt-w-bajt równy gołej dacie (chyba że transakcja padła
+  DOKŁADNIE o północy), więc ten wykres renderował się jako praktycznie same zera na
+  KAŻDY dzień, nie tylko ostatni.
+- Dolna granica (`>= dates[0]`) działała PRZYPADKIEM poprawnie (dłuższy string z tym samym
+  prefiksem i tak sortuje się ≥ gołej daty tego dnia) — dlatego bug był niewidoczny przy
+  pobieżnym teście "czy suma w ogóle coś pokazuje", tylko przy realnej weryfikacji
+  konkretnych dni.
+- Ten sam plik/funkcja ma siostrzany filtr nastroju (linia 224, `mood.filter(e => e.date >=
+  dates[0] && e.date <= dates[6])`) — TAM to bezpieczne, bo `MoodEntry.date` jest już gołą
+  datą, nie timestampem. Ten sam kształt "jeden sąsiad bezpieczny, drugi nie" co reszta
+  audytów tej sesji, tylko międzytypowy (Expense vs MoodEntry), nie międzyfunkcyjny.
+
+Fix: `.slice(0, 10)` na `e.date` we wszystkich 4 porównaniach z gołą datą. Zweryfikowane
+realnie w Node (`"2026-09-20T16:45:00" <= "2026-09-20"` → `false`, `... === "2026-09-20"` →
+`false`), nie tylko wyczytane z kodu.
+
+Resztę audytu dat (toISOString()-day-boundary, siostrzana niekonsekwencja, matematyka
+streak/cooldown) sprawdzone szerzej — WSZĘDZIE INDZIEJ już bezpieczne wzorce (`ymd()`/
+`todayStr()` przez getFullYear/getMonth/getDate, `atMidnight` kotwiczony na lokalnym
+`T00:00:00`, streak liczony przez `dashboard/dates.ts`) — nic więcej do naprawy.
+
+`tsc`/`jest` czyste (981 testów, bez zmian — poprawka inline w komponencie ekranu, nie
+osobna czysta funkcja do testu jednostkowego, ten sam wzorzec co wcześniejszy fix Saldo w
+finances.tsx).
+**Priorytet testu na urządzeniu**: średni-wysoki (widoczny, realny bug UI) — otwórz Finanse
+→ Tydzień, sprawdź że suma wydatków/przychodów tygodnia uwzględnia transakcje z NIEDZIELI
+(ostatni dzień), i że dzienny wykres słupkowy pokazuje realne kwoty na WSZYSTKIE dni, nie
+same zera.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
