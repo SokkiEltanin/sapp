@@ -286,24 +286,34 @@ export default function WeeklyScreen() {
   const isExpense = (e: any) => (!e.type || e.type === 'expense') && !isSelfTransfer(e);
   const isIncome  = (e: any) => e.type === 'income' && !isSelfTransfer(e);
 
+  // `.slice(0,10)` (2026-09-18, audyt dat) — `Expense.date` to PEŁNY lokalny timestamp
+  // (`localISO()`, np. "2026-09-20T16:45:00"), a `dates`/`prevDates` to gołe "YYYY-MM-DD".
+  // Porównanie stringów BEZ obcięcia było ciche i błędne: dłuższy string ze wspólnym
+  // prefiksem sortuje się jako WIĘKSZY (np. "...T16:45:00" > "2026-09-20"), więc
+  // `<= dates[6]` odrzucał KAŻDY wydatek/przychód z OSTATNIEGO dnia tygodnia — a
+  // `e.date === d` (dzienny wykres) nie łapał praktycznie NICZEGO (pełny timestamp prawie
+  // nigdy nie jest bajt-w-bajt równy gołej dacie), więc `expDailyV` renderował się jako
+  // praktycznie same zera. Dolna granica (`>= dates[0]`) działała przypadkiem poprawnie
+  // (dłuższy string z prefiksem TEGO dnia i tak sortuje się ≥ gołej daty), więc bug był
+  // niewidoczny w testach ad-hoc sprawdzających tylko "czy coś się liczy".
   const weekExp = useMemo(() =>
-    expenses.filter(e => isExpense(e) && e.date >= dates[0] && e.date <= dates[6])
+    expenses.filter(e => isExpense(e) && e.date >= dates[0] && e.date.slice(0, 10) <= dates[6])
       .reduce((s, e) => s + e.amount, 0),
     [expenses, dates]);
 
   const weekInc = useMemo(() =>
-    expenses.filter(e => isIncome(e) && e.date >= dates[0] && e.date <= dates[6])
+    expenses.filter(e => isIncome(e) && e.date >= dates[0] && e.date.slice(0, 10) <= dates[6])
       .reduce((s, e) => s + e.amount, 0),
     [expenses, dates]);
 
   const prevExp = useMemo(() =>
-    expenses.filter(e => isExpense(e) && e.date >= prevDates[0] && e.date <= prevDates[6])
+    expenses.filter(e => isExpense(e) && e.date >= prevDates[0] && e.date.slice(0, 10) <= prevDates[6])
       .reduce((s, e) => s + e.amount, 0),
     [expenses, prevDates]);
 
   const expDiff   = weekExp - prevExp;
   const expDailyV = useMemo(() =>
-    dates.map(d => expenses.filter(e => isExpense(e) && e.date === d).reduce((s, e) => s + e.amount, 0)),
+    dates.map(d => expenses.filter(e => isExpense(e) && e.date.slice(0, 10) === d).reduce((s, e) => s + e.amount, 0)),
     [expenses, dates]);
   const maxExpDay = Math.max(...expDailyV, 1);
 

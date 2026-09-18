@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: Podsumowanie tygodnia (Finanse) liczyło praktycznie same zera (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §121. Background-audyt dat znalazł: `app/weekly.tsx` porównywał
+pełny timestamp `Expense.date` z gołą datą `dates[6]`/`d` BEZ `.slice(0,10)` — suma wydatków/
+przychodów tygodnia gubiła KAŻDĄ transakcję z ostatniego dnia (niedziela), a dzienny wykres
+słupkowy renderował praktycznie same zera na wszystkie dni (nie tylko ostatni). Zweryfikowane
+realnie w Node, nie tylko wyczytane. Naprawione (4 miejsca). `tsc`/`jest` czyste. Do
+zrobienia (user, na urządzeniu, średni-wysoki priorytet): Finanse → Tydzień, sprawdź że suma
+uwzględnia niedzielne transakcje i że dzienny wykres pokazuje realne kwoty.
+
 ## 🆕 Edytor układu walki — poligon, jeszcze NIE podpięty do realnej walki (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §120. User: chce dostosować tło areny + wielkość/pozycję
