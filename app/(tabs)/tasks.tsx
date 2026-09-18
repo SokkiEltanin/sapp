@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, memo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, Pressable, TextInput, KeyboardAvoidingView,
@@ -502,7 +502,15 @@ const makeSs = (c: any, g: any) => StyleSheet.create({
 
 // ─── Swipe row ────────────────────────────────────────────────────────────────
 
-function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQuickSnooze }: {
+// React.memo (2026-09-18, audyt wydajności runda 4) — ten sam wzorzec/klasa buga co
+// ExpenseItem.tsx (§118): FlatList `renderItem` w tym pliku jest gołym inline closure, więc
+// bez memoizacji SAMEGO wiersza każda zmiana stanu ekranu (quickText w polu szybkiego dodawania,
+// doneCollapsed, sortOpen...) re-renderowała WSZYSTKIE widoczne wiersze zadań, nie tylko ten
+// dotknięty. Callbacki przekazywane do `SwipeRow` (handleCompletePress/handleEditPress/
+// handleEditDirect/handleQuickSnooze, patrz `TasksScreen` niżej) są już stabilne przez
+// `useCallback`, więc goły `memo()` bez customowego comparatora wystarcza — inaczej niż
+// scan.tsx (audyt tej samej rundy), które MA gołe callbacki inline i memo tam nic by nie dało.
+const SwipeRow = memo(function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQuickSnooze }: {
   task: Task; pomodoroTaskId?: string;
   onComplete: (task: Task) => void; onEdit: (task: Task) => void;
   onEditDirect: (task: Task) => void; onQuickSnooze: (id: string) => void;
@@ -536,7 +544,7 @@ function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQu
       <TaskCard task={task} pomodoroTaskId={pomodoroTaskId} onComplete={onComplete} onEdit={onEdit} onEditDirect={onEditDirect} />
     </ReanimatedSwipeable>
   );
-}
+});
 
 const makeSw = (c: any, g: any) => StyleSheet.create({
   leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: g.accent, borderRadius: 18 },

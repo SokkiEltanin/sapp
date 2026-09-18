@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
-import { getHabits, saveHabits, getCounts, getCountsRange, setCounts, stepFor, computeAvoidCounts, persistAvoidCounts } from '@/utils/habits';
+import {
+  getHabits, saveHabits, getCounts, getCountsRange, setCounts, stepFor, computeAvoidCounts, persistAvoidCounts,
+  habitDateStr, habitOffsetDate, MAX_STREAK_LOOKBACK_DAYS, goalFor, isHabitDone, weeklyTargetStreak,
+} from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useFoodStore } from '@/store/foodStore';
@@ -15,20 +18,9 @@ function applyReminder(habit: Habit) {
   }
 }
 
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function dateStr(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+const dateStr = habitDateStr;
 function todayStr() { return dateStr(new Date()); }
-function offsetDate(from: string, days: number): string {
-  const d = new Date(from + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return dateStr(d);
-}
-
-// Bezpiecznik dla getStreak() (2026-08-25) — NIE realny limit serii, tylko granica przed
-// nieskończoną pętlą wstecz w razie zepsutych/brakujących danych. 10 lat.
-const MAX_STREAK_LOOKBACK_DAYS = 3650;
+const offsetDate = habitOffsetDate;
 
 // Ile dni `completions` wczytujemy do pamięci (2026-08-27, user ze screenshotem: "dashboard
 // pokazuje 29 mimo że mam 33 jak wejdę [w habit-year]") — BUG FIX #3, TA SAMA rodzina co #1/#2
@@ -42,14 +34,7 @@ const MAX_STREAK_LOOKBACK_DAYS = 3650;
 // 371 = ten sam rok co habit-year.tsx, żeby te dwa miejsca fizycznie nie mogły się rozjechać.
 const LOAD_WINDOW_DAYS = 371;
 
-function goalFor(habit: Habit): number {
-  if (!habit.type || habit.type === 'check') return 1;
-  return habit.dailyGoal ?? 1;
-}
-
-function isDone(habit: Habit, count: number): boolean {
-  return count >= goalFor(habit);
-}
+const isDone = isHabitDone;
 
 // Stan pojedynczego dnia w widoku serii: zaliczony / uratowany zamrożeniem / pominięty.
 // Zamrożony pokazujemy INACZEJ (niebieski) — user chce widzieć „wtedy był freeze".
@@ -242,16 +227,23 @@ export function useHabits() {
       return streak;
     }
 
-    // Weekly streak: consecutive 7-day windows meeting the target
-    let streak = 0;
-    for (let w = 0; w <= 3; w++) {
-      const windowDone = Array.from({ length: 7 }, (_, i) =>
-        isDoneOrFrozen(habit, offsetDate(today, -(w * 7) - i))).filter(Boolean).length;
-      if (windowDone >= target) streak++;
-      else break;
-    }
-    return streak;
-  }, [isDoneOrFrozen, today, habits]);
+    // Weekly streak: consecutive 7-day windows meeting the target.
+    //
+    // BUG FIX #4 (2026-09-18, agent-audyt) — pętla miała SZTYWNY limit `w<=3` (max 4 okna),
+    // ta sama klasa buga co udokumentowany BUG FIX #2 wyżej dla gałęzi dziennej, tylko nigdy
+    // nie naprawiona TUTAJ: user z realnym, wielomiesięcznym nawykiem "3×/tydzień" widziałby
+    // płomyk "4" NA ZAWSZE, niezależnie jak długo dotrzymuje celu. Wyniesione do
+    // `weeklyTargetStreak()` (ten sam plik, wzorzec `habitsDoneOn`) — bez sztywnego limitu,
+    // tylko bezpiecznik `MAX_STREAK_LOOKBACK_DAYS` jak gałąź dzienna. `habit-year.tsx` woła
+    // TĘ SAMĄ funkcję dla swojej karty, więc obie liczby (dashboard + habit-year) nie mogą
+    // się już rozjechać dla nawyku z celem tygodniowym.
+    return weeklyTargetStreak(
+      habit,
+      (d) => completions[d]?.[habit.id] ?? 0,
+      (d) => !!frozen[`${habit.id}|${d}`],
+      today,
+    ).current;
+  }, [isDoneOrFrozen, today, habits, completions, frozen]);
 
   const getLast7 = useCallback((habitId: string): DayState[] => {
     const habit = habits.find((h) => h.id === habitId);

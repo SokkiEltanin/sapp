@@ -8,6 +8,7 @@ import { ChevronLeft, Flame, Snowflake } from 'lucide-react-native';
 
 import { Habit } from '@/types';
 import { getHabits } from '@/utils/habits';
+import { weeklyTargetStreak } from '@/utils/habits';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useCounters, matchesAvoid, matchedEatDays, resolveAvoidKeyword, type Counter } from '@/store/countersStore';
 import { useFoodStore } from '@/store/foodStore';
@@ -159,6 +160,19 @@ export default function HabitYear() {
     if (isCounter) {
       // seria licznika = dni „czysto" z rzędu do DZIŚ (wpadka dziś = 0)
       for (let i = seq.length - 1; i >= 0; i--) { if (seq[i] === 'done') current++; else break; }
+    } else if (habit?.weeklyTarget && habit.weeklyTarget < 7) {
+      // BUG FIX (2026-09-18, agent-audyt) — ta karta w ogóle nie znała `weeklyTarget` i
+      // liczyła "dni z rzędu" jako surowy DZIENNY streak (pętla wyżej), dokładnie tak samo
+      // jak dla nawyku bez celu tygodniowego. Efekt: dla nawyku "3×/tydzień" zrobionego co
+      // pon/śr/pt lista Nawyków (dashboard `getStreak`, useHabits.ts) pokazywała np. "4", a
+      // ten ekran "0 dni z rzędu" dla TEGO SAMEGO nawyku tego samego dnia — jawna sprzeczność
+      // na ekranie, który miał dawać WIĘCEJ szczegółów, nie inną liczbę. Teraz DOKŁADNIE ten
+      // sam algorytm co dashboard (`weeklyTargetStreak`, useHabits.ts) — jedno źródło prawdy,
+      // `longest` też przeliczone tym algorytmem (surowy dzienny `longest` z pętli wyżej
+      // mierzył inną, mylącą rzecz dla nawyku z celem tygodniowym).
+      const wt = weeklyTargetStreak(habit, (ds) => counts[ds] ?? 0, (ds) => !!frozen[`${habitId}|${ds}`], todayKey);
+      current = wt.current;
+      longest = wt.longest;
     } else {
       // nawyk: jak dashboard getStreak — jeśli DZIŚ jeszcze nie zrobione, licz od wczoraj
       const nSeq = seq.length;

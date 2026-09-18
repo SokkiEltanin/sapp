@@ -6,6 +6,67 @@ const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
 const legacyKey = (date: string) => `habits_done_${date}`;
 
+// ── Streak/date helpers — WYDZIELONE z useHabits.ts (2026-09-18, agent-audyt) ──────────────
+// Były tam, ale useHabits.ts transitively importuje `notificationsService.ts` →
+// `expo-notifications` (ESM natywny moduł), przez co NIC z tego pliku nie dało się
+// zaimportować w testach jest (środowisko `node`, brak transformu dla tego pakietu — patrz
+// jest.config.js "Nie ruszamy komponentów RN"). Ten plik (`utils/habits.ts`) jest czysty
+// (tylko AsyncStorage + typy), więc `weeklyTargetStreak` (i jego zależności) żyją tu, testowalne
+// bezpośrednio; `useHabits.ts` importuje je stąd zamiast trzymać własne kopie.
+function pad(n: number) { return String(n).padStart(2, '0'); }
+export function habitDateStr(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+export function habitOffsetDate(from: string, days: number): string {
+  const d = new Date(from + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return habitDateStr(d);
+}
+
+// Bezpiecznik dla streak-pętli (2026-08-25) — NIE realny limit serii, tylko granica przed
+// nieskończoną pętlą wstecz w razie zepsutych/brakujących danych. 10 lat.
+export const MAX_STREAK_LOOKBACK_DAYS = 3650;
+
+export function goalFor(habit: Habit): number {
+  if (!habit.type || habit.type === 'check') return 1;
+  return habit.dailyGoal ?? 1;
+}
+
+export function isHabitDone(habit: Habit, count: number): boolean {
+  return count >= goalFor(habit);
+}
+
+// Bieżąca i najdłuższa seria nawyku z celem TYGODNIOWYM — kolejne, nienachodzące na siebie
+// 7-dniowe okna (zakotwiczone na `today`, licząc wstecz) spełniające cel. WYDZIELONE
+// (2026-09-18, agent-audyt) z ciała `getStreak()` w useHabits.ts, tak żeby habit-year.tsx
+// mogło użyć DOKŁADNIE tego samego algorytmu zamiast własnej, rozjeżdżającej się kopii (real
+// bug: ta sama seria pokazywała np. "4" na liście Nawyków i "0 dni z rzędu" na habit-year dla
+// TEGO SAMEGO nawyku, bo habit-year w ogóle nie znał `weeklyTarget` i liczył surowy dzienny
+// streak). `countFor`/`isFrozen` jako callbacki, nie wprost mapy `completions`/`frozen` —
+// habit-year.tsx trzyma liczniki w innym kształcie (płaski `Record<string,number>` dla
+// JEDNEGO nawyku, nie zagnieżdżony `Record<string,Record<string,number>>` dla wszystkich).
+export function weeklyTargetStreak(
+  habit: Habit,
+  countFor: (date: string) => number,
+  isFrozen: (date: string) => boolean,
+  today: string,
+  lookbackWindows = Math.floor(MAX_STREAK_LOOKBACK_DAYS / 7),
+): { current: number; longest: number } {
+  const target = habit.weeklyTarget!;
+  const doneOrFrozen = (d: string) => isHabitDone(habit, countFor(d)) || isFrozen(d);
+  let current = 0, longest = 0, run = 0, stillCounting = true;
+  for (let w = 0; w <= lookbackWindows; w++) {
+    const windowDone = Array.from({ length: 7 }, (_, i) =>
+      doneOrFrozen(habitOffsetDate(today, -(w * 7) - i))).filter(Boolean).length;
+    const met = windowDone >= target;
+    if (met) { run++; if (run > longest) longest = run; } else { run = 0; }
+    // `current` przestaje rosnąć przy PIERWSZYM nietrafionym oknie, ale pętla leci dalej
+    // (do `lookbackWindows`) żeby dokończyć liczenie `longest` po całej historii.
+    if (stillCounting) { if (met) current++; else stillCounting = false; }
+  }
+  return { current, longest };
+}
+
 // How much one tap adds/removes for a count habit. Only an explicitly ml-based goal
 // steps by a glass (250 ml) so you don't tap 250 times; everything else — including
 // the glasses-based water habit (unit 'szkl.', goal in glasses) — steps by 1.

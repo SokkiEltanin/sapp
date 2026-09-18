@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt logika/optymalizacja, runda 2 — streak tygodniowy + self-transfer #5 + wydajność (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §127. User: "dawaj dalej logika i optymalizacja". Znalezione i
+naprawione: (1) streak nawyku z celem TYGODNIOWYM miał sztywny limit "max 4 tygodnie" —
+realny, wielomiesięczny nawyk 3×/tydzień pokazywałby "4" na zawsze; (2) `habit-year.tsx` w
+ogóle nie znało celu tygodniowego, więc dla TEGO SAMEGO nawyku lista Nawyków i habit-year
+pokazywały RÓŻNE liczby dni z rzędu (np. "4" vs "0 dni z rzędu") — oba miejsca teraz wołają
+jedną, wyeksportowaną i przetestowaną funkcję (`weeklyTargetStreak`, `src/utils/habits.ts`);
+(3) self-transfer leak #5 (piąta runda) — karta "Zależności" na dashboardzie liczyła przelew
+własny jako wydatek w korelacjach sen/nastrój↔wydatki; (4) wydajność runda 4 — `TaskCard`/
+`SwipeRow` (Zadania) dostały `React.memo`, `GearPanel`/`GearSlotModal` i `app/pet.tsx`
+przestały subskrybować całe store'y bez selektora. `tsc`/`jest` czyste (993 testy, +5
+nowych). Priorytet testu na urządzeniu: średni — patrz checklist w §127.
+
+**Odłożone świadomie (patrz §127 "explicite NIE zrobione")**: `scan.tsx`'s `ProductRow`/
+`CustomProductRow` — potwierdzony, wysoki-impact bug wydajnościowy (literka w jednym produkcie
+re-renderuje CAŁY paragon), ale duży refaktor (~15 callbacków × 2 komponenty), odłożony DRUGI
+raz świadomie. Kandydat na kolejną rundę, jeśli user zauważy lag przy skanowaniu długich
+paragonów.
+
 ## ✅ Audyt logika/optymalizacja — nocna zmiana w powiadomieniach + 3 dziury self-transfer (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §126. User: "dawaj dalej logika i optymalizacja". Fresh audyt
