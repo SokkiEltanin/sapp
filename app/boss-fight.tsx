@@ -47,7 +47,9 @@ const WEAK_COLOR: Record<string, string> = {
 // stylach niżej) — `tilePortrait.height`/`s.projectile`'s `top` w `makeS()` poniżej ZALEŻĄ
 // od tej wartości (patrz komentarze tam), żeby zmiana rozmiaru w jednym miejscu nie
 // rozjeżdżała reszty geometrii areny.
-const PORTRAIT_SIZE = 130;
+// 130→150 (2026-09-18) — wartość z Edytora układu walki (`app/battle-layout-lab.tsx`), user
+// wytunował i wkleił eksport w rozmowie, patrz `CAT_PORTRAIT_SIZE`/offsety niżej.
+const PORTRAIT_SIZE = 150;
 // Kotek dostaje WIĘKSZY `size` niż boss przy tym samym `PORTRAIT_SIZE` (2026-09-03, user:
 // "kotka powiększyć bo jest teraz mniejszy od wroga znacznie") — CatArt to SVG z viewBox
 // 2000×2000, ale sam kotek zajmuje w nim wyraźnie mniej niż całą ramkę (sporo pustego
@@ -55,22 +57,32 @@ const PORTRAIT_SIZE = 130;
 // przy IDENTYCZNYM `size` boss zawsze wygląda znacznie większy. Podbite o ~35%, nie 1:1 z
 // PORTRAIT_SIZE, bo oba portrety dzielą tę samą wysokość kafelka (`tilePortrait`, patrz
 // niżej) — zbyt duży skok zacząłby wychodzić poza scenę areny (ma `overflow:'hidden'`).
-const CAT_PORTRAIT_SIZE = 175;
-// 2026-09-11, user (zrzut z "Misja"): "podczas walki żeby pupil i boss byli troszeczkę niżej
-// bo jakby lewitowali teraz w powietrzu". Root cause: oba sprite'y są WYŚRODKOWANE w
-// `tilePortrait` (wspólna wysokość dla obu kolumn, patrz komentarz przy `tilePortrait` niżej)
-// — środek jest ZAWSZE ten sam niezależnie od rozmiaru sprite'a, ale to zostawia sporo pustej
-// przestrzeni PONIŻEJ (zwłaszcza bossa — `PORTRAIT_SIZE` jest mniejszy od `CAT_PORTRAIT_SIZE`),
-// więc `GroundShadow` (już istniejący, patrz komponent) siada tuż pod stopami sprite'a, ale ta
-// para (sprite+cień) floatuje wysoko nad wizualną "podłogą" areny (blisko paska HP). Przesuwa
-// OBA sprite'y (razem z ich `GroundShadow`, bo transform jest na WSPÓLNYM boxie) o tę samą
-// wartość w dół przez `transform`, więc geometria layoutu (środek dla pocisku, patrz
-// `projectile.top` niżej) zostaje nietknięta — tylko dolicz `SPRITE_GROUND_SHIFT` tam, gdzie
-// coś zależy od realnego, pomalowanego środka sprite'a.
-// 14→21 (2026-09-12, user: "obniżyć... pozycje w trakcie walki w wartości Y... o 7px czy coś
-// w dół", bez ruszania paska zdrowia ani tła — oba są architektonicznie odizolowane od tego
-// transformu, patrz komentarz wyżej, więc podbicie tej jednej stałej wystarcza).
-const SPRITE_GROUND_SHIFT = 21;
+// 175→205 (2026-09-18) — jw., z Edytora układu walki.
+const CAT_PORTRAIT_SIZE = 205;
+
+// Wysokość wspólnej kolumny portretu — obie kolumny (Pupil/Boss) dzielą tę samą wysokość
+// `tilePortrait`, żeby etykieta+HP pod spodem wyrównywały się w tym samym rzędzie mimo różnych
+// rozmiarów portretów. WYDZIELONE do stałej (2026-09-18) — `projectile.top` niżej zależy od
+// niej przez osobny wzór (środek portretu), trzymanie dwóch miejsc do ręcznej synchronizacji
+// przy każdej zmianie PORTRAIT_SIZE/CAT_PORTRAIT_SIZE było kruche.
+const TILE_PORTRAIT_HEIGHT = Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18;
+
+// Niezależne przesunięcia pupila/bossa/ich pasków HP (2026-09-18) — z Edytora układu walki
+// (`app/battle-layout-lab.tsx`, patrz komentarz tam i w `battleLayoutDraftStore.ts`), user
+// wytunował i wkleił eksport w rozmowie: { catSize:205, bossSize:150, catOffsetY:45,
+// bossOffsetY:45, catHpOffsetY:10, bossHpOffsetY:10, wszystkie X:0, bg:gorskislas — już
+// domyślne, bez zmian }. Zastępuje dawne `SPRITE_GROUND_SHIFT` (JEDNO, wspólne przesunięcie
+// obu sprite'ów, 2026-09-11/12) — teraz każdy z 4 elementów ma WŁASNY, niezależny offset,
+// dokładnie to czego brakowało wg komentarza w `battleLayoutDraftStore.ts`.
+const CAT_OFFSET_X = 0, CAT_OFFSET_Y = 45;
+const BOSS_OFFSET_X = 0, BOSS_OFFSET_Y = 45;
+const CAT_HP_OFFSET_X = 0, CAT_HP_OFFSET_Y = 10;
+const BOSS_HP_OFFSET_X = 0, BOSS_HP_OFFSET_Y = 10;
+// Uśrednione przesunięcie Y obu sprite'ów, TYLKO dla `projectile.top` niżej (pocisk leci
+// MIĘDZY nimi, potrzebuje jednego punktu odniesienia) — zastępuje dawne wspólne
+// `SPRITE_GROUND_SHIFT`. Oba offsety akurat wyszły równe w tym eksporcie (45/45), średnia
+// zostaje poprawna też gdyby user kiedyś wyeksportował różne wartości dla obu.
+const SPRITE_OFFSET_Y_AVG = (CAT_OFFSET_Y + BOSS_OFFSET_Y) / 2;
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
@@ -799,8 +811,10 @@ export default function BossFight() {
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
                 {/* Wszystkie 3 tryby mają teraz realny kontratak (2026-08-12) — pasek HP kotka
                     pokazuje się zawsze, nie tylko w kampanii/wydarzeniu. */}
-                <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} /></View>
-                <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
+                <View style={s.tileHpBlockCat}>
+                  <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} /></View>
+                  <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
+                </View>
               </View>
 
               <View style={s.tile}>
@@ -835,8 +849,10 @@ export default function BossFight() {
                   </View>
                 </View>
                 <Text style={[s.tileLabel, { color: WEAK_COLOR[target.weakness] ?? '#fff' }]} numberOfLines={1}>{target.name}</Text>
-                <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(targetRemaining / target.maxHp * 100)}%` }]} /></View>
-                <Text style={s.tileHpTxt}>{targetRemaining} / {target.maxHp}</Text>
+                <View style={s.tileHpBlockBoss}>
+                  <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(targetRemaining / target.maxHp * 100)}%` }]} /></View>
+                  <Text style={s.tileHpTxt}>{targetRemaining} / {target.maxHp}</Text>
+                </View>
               </View>
             </View>
 
@@ -1136,12 +1152,20 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // Wysokość liczona z WIĘKSZEGO z dwóch portretów (kotek > boss, patrz `CAT_PORTRAIT_SIZE`)
   // — obie kolumny (Pupil/Boss) dzielą tę samą wysokość `tilePortrait`, żeby etykieta+HP pod
   // spodem wyrównywały się w tym samym rzędzie mimo różnych rozmiarów portretów.
-  tilePortrait: { height: Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18, width: '100%', justifyContent: 'center', alignItems: 'center' },
+  tilePortrait: { height: TILE_PORTRAIT_HEIGHT, width: '100%', justifyContent: 'center', alignItems: 'center' },
   // Box DOKŁADNIE rozmiaru danego sprite'a (nie całej `tilePortrait`) — patrz komentarz przy
   // użyciu w JSX: `GroundShadow` wewnątrz siada `bottom:0` względem TEGO boxa, więc cień
   // trafia pod faktyczne łapki sprite'a, nie pod pusty margines wspólnego, wyższego kafelka.
-  spriteBoxCat: { width: CAT_PORTRAIT_SIZE, height: CAT_PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: SPRITE_GROUND_SHIFT }] },
-  spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: SPRITE_GROUND_SHIFT }] },
+  // Transform = NIEZALEŻNY offset per element (2026-09-18, z Edytora układu walki) zamiast
+  // dawnego wspólnego `SPRITE_GROUND_SHIFT`, patrz stałe `CAT_OFFSET_*`/`BOSS_OFFSET_*` u góry.
+  spriteBoxCat: { width: CAT_PORTRAIT_SIZE, height: CAT_PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateX: CAT_OFFSET_X }, { translateY: CAT_OFFSET_Y }] },
+  spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center', transform: [{ translateX: BOSS_OFFSET_X }, { translateY: BOSS_OFFSET_Y }] },
+  // Bloki paska HP (2026-09-18) — WYDZIELONE z gołych `tileHpTrack`/`tileHpTxt` jako
+  // bezpośrednich dzieci `tile`, żeby dało się im dać WŁASNY transform-offset (Edytor układu
+  // walki, `catHpOffset*`/`bossHpOffset*`). `gap:6` = ten sam odstęp co dawniej dawał `tile.gap`
+  // między tymi dwoma elementami — wizualnie zero różnicy przy offsecie {0,0}.
+  tileHpBlockCat: { width: '100%', alignItems: 'center', gap: 6, transform: [{ translateX: CAT_HP_OFFSET_X }, { translateY: CAT_HP_OFFSET_Y }] },
+  tileHpBlockBoss: { width: '100%', alignItems: 'center', gap: 6, transform: [{ translateX: BOSS_HP_OFFSET_X }, { translateY: BOSS_HP_OFFSET_Y }] },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
   // Stałe jasne kolory + text-shadow (2026-09-14, zamiast `c.text.muted`/`c.text.secondary`) —
@@ -1201,13 +1225,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
   clawFx: { position: 'absolute', width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
-  // top przeliczony (108→91, 2026-09-03) — portret jest teraz PIERWSZYM elementem kafelka
-  // (etykieta+HP przeniesione pod spód, patrz JSX), więc jego pionowy środek to już tylko
-  // `tile.padding-top + tilePortrait.height/2`, bez zgadywania wysokości linijek tekstu, co
-  // wcześniej stało nad nim: 8 (padding spacing[2]) + 193/2 (tilePortrait, patrz wyżej) -
-  // 14 (połowa wysokości samej ikony pocisku, 28px) = 90.5 → 91. +14 (91→105, 2026-09-11) —
-  // `SPRITE_GROUND_SHIFT` przesuwa OBA sprite'y (transform, patrz `spriteBoxCat`/`Boss`) o tyle
-  // w dół, więc realny, POMALOWANY środek jest teraz niżej o tę samą wartość — bez tego pocisk
-  // leciałby nad, nie przez, przesunięte sprite'y.
-  projectile: { position: 'absolute', top: 91 + SPRITE_GROUND_SHIFT, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // top = środek portretu w pionie: `tile.padding-top + tilePortrait.height/2 - połowa ikony
+  // pocisku (28px/2=14) + przesunięcie sprite'ów w dół`. Policzone z NAZWANYCH stałych
+  // (2026-09-18), nie ręcznie przeliczony magiczny numerek jak dawniej (`91 +
+  // SPRITE_GROUND_SHIFT`, historia w komentarzu wcześniejszej wersji) — ten wzór był już raz
+  // pominięty przy zmianie PORTRAIT_SIZE w TEJ SAMEJ zmianie (patrz `TILE_PORTRAIT_HEIGHT` u
+  // góry pliku), więc teraz obie zależności czytają jedną definicję zamiast dwóch kopii do
+  // ręcznej synchronizacji.
+  projectile: { position: 'absolute', top: spacing[2] + TILE_PORTRAIT_HEIGHT / 2 - 14 + SPRITE_OFFSET_Y_AVG, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));

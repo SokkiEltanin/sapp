@@ -125,19 +125,19 @@ realnie w Node, nie tylko wyczytane. Naprawione (4 miejsca). `tsc`/`jest` czyste
 zrobienia (user, na urządzeniu, średni-wysoki priorytet): Finanse → Tydzień, sprawdź że suma
 uwzględnia niedzielne transakcje i że dzienny wykres pokazuje realne kwoty.
 
-## 🆕 Edytor układu walki — poligon, jeszcze NIE podpięty do realnej walki (2026-09-17)
+## ✅ Edytor układu walki — eksport podpięty do realnej walki (2026-09-17 → 2026-09-18)
 
-Pełny opis w ARCHITECTURE.md §120. User: chce dostosować tło areny + wielkość/pozycję
-pupila, bossa i ich pasków HP, potem wyeksportować i "zrobić dla wszystkich". Zbudowany
-`app/battle-layout-lab.tsx` (link: Ustawienia → Dane → "Edytor układu walki (beta)") —
-pełny WYSIWYG podgląd tymi samymi komponentami co realna walka, przeciągalne dotykiem
-pupil/boss/oba paski HP (dodatkowy offset NA WIERZCHU istniejącego flex-layoutu, nie
-zamiast niego — zero ryzyka dla delikatnej, powiązanej geometrii `projectile.top`/cieni/
-poświat), steppery rozmiaru, wybór z 4 istniejących teł, eksport jako zaznaczalny JSON +
-Udostępnij. **DO ZROBIENIA (user, na urządzeniu)**: wytunować układ, wyeksportować JSON i
-WKLEIĆ GO W ROZMOWIE — to jest właściwy sygnał żeby podpiąć wartości jako nowe stałe w
-`app/boss-fight.tsx` dla wszystkich trybów walki. Do tego momentu real walka jest
-NIEZMIENIONA.
+Pełny opis w ARCHITECTURE.md §120 (edytor) i §129 (podpięcie). User wytunował układ w
+`/battle-layout-lab`, wkleił eksport w rozmowie — podpięte do `app/boss-fight.tsx` dla
+WSZYSTKICH 6 trybów walki: pupil/boss większe (150/205), oba mają NIEZALEŻNE offsety pozycji
+(zastąpiły dawne wspólne `SPRITE_GROUND_SHIFT`), paski HP dostały WŁASNY offset (wcześniej
+nie miały żadnego). `tsc`/`jest` czyste. **Priorytet testu na urządzeniu: wysoki** — sprawdź
+wszystkie 6 trybów (kampania/raid/event/quest/mad/misja), zwłaszcza że pocisk leci PRZEZ
+sprite'y, nie nad/pod nimi.
+
+**Odłożone (user wspomniał, bez konkretnej specyfikacji)**: przemianowanie/wywalenie starych
+bossów, przesunięcie cienia bliżej, usunięcie lodowej areny (zła perspektywa) — czeka na
+konkretniejszą instrukcję co dokładnie i jak.
 
 ## ✅ Self-review §118 — martwy `index` prop unieważniał React.memo (2026-09-17)
 
