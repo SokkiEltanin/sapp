@@ -8347,6 +8347,86 @@ otwórz Gablotę, sprawdź że WSZYSTKIE wcześniej zdobyte trofea (zwłaszcza s
 Nieugięty/cyborg-365/centurion/zen/stoic-30 itp.) dalej pokazują się jako odznaczone,
 niezależnie od aktualnego stanu streaków.
 
+## 124. Redesign ekwipunku pupila — każdy drop to trwała instancja, nie "1 slot per item" (2026-09-18)
+
+User (ze screenshotem zakładki Buty): *"musimy operować inaczej z itemami bo w eq sie nie
+mieszczą, i jak dropie je np te same to czasami mi mówi masz trzymaj voiny ale czasami mi
+znika jakby sie łączył i nie mam ani itemu ani coinow, moze każdy item bedzie miał id swoje
+np id itemi to 1222 a po dwukropku numer od resetu który raz drapałem czyli np 1222:001,
+1233:035 co sadzisz?"*. Doradziłem OSTROŻNIEJ (lżejszą alternatywę), user explicit
+odrzucił i potwierdził pełny redesign: *"Zrob tak jak pisalem ale jak sa takie same te
+pierwsze kody to pokazuje ze mam kilka xd i jak kliknę pokazuje float ich i jakie mają
+wartości a jak sa dosłownie takie same moge je sprzedac i wtedy wybieram ile xd a eq
+możemy w górę i usun z niego emotki"*.
+
+**Zanim zaimplementowano — znaleziony realny, wcześniej nieodkryty bug** dokładnie
+matchujący skargę usera ("czasami mi znika... nie mam ani itemu ani coinow"): trzy
+NIEZALEŻNE ścieżki dropu gearu (`grantGear`, `buyDailyGear` w petStore.ts, i `openCrate()`
+tamże — skrzynka sardynek za głaskanie) miały TRZY osobne kopie logiki
+"czy to ulepszenie" (dawne `isGearUpgrade`). `grantGear`/`buyDailyGear` przy gorszym dropie
+KOMPENSOWAŁY monetami; `openCrate()` miała WŁASNĄ, nieskopiowaną wersję tej logiki, która
+przy gorszym dropie PO CICHU GO ODRZUCAŁA BEZ ŻADNEJ KOMPENSATY (ani item, ani coins) —
+a `CrateModal.tsx`'s reveal UI bezwarunkowo wypisywało "🎁 Ekwipunek: {name}" niezależnie od
+tego, czy drop faktycznie został zachowany. Modal aktywnie okłamywał usera.
+
+**Nowy model — każdy drop = własna, trwała instancja** (`GearInstance extends OwnedGear {
+itemId, seq }`, `gearInstanceId`/`parseGearInstanceId` w gear.ts konwertują między parą
+(itemId, seq) a złożonym kluczem `itemId:seq`, np. `helm_slomiany:001`). `ownedGear` w
+petStore.ts zmienia typ z `Partial<Record<string, OwnedGear>>` (jeden slot per item) na
+`Partial<Record<string, GearInstance>>` (flat mapa KAŻDEJ posiadanej kopii, kluczowana
+złożonym id). `equippedGear` zostaje typem `Partial<Record<GearSlot, string>>`, ale
+wartości to teraz id INSTANCJI, nie itemu. `isGearUpgrade()` USUNIĘTE CAŁKOWICIE — nic już
+nie ocenia "czy lepsze", nic nie jest odrzucane/kompensowane automatycznie, user sam
+decyduje w Ekwipunku co zatrzymać/sprzedać. `grantGear`/`buyDailyGear`/`openCrate()`
+przepisane na wspólny wzorzec: `nextGearSeq()` liczy kolejny numer PO MAX dotychczasowym
+sequ danego itemu (nie po liczbie wpisów — sprzedanie środkowej instancji nie powtarza jej
+numeru), zawsze tworzą NOWĄ instancję, nigdy nie czytają/nie wołają starej logiki
+porównującej. `sellGear(instanceId)` usuwa jedną konkretną kopię. Migracja w
+`onRehydrateStorage` (idempotentna — działa na KAŻDYM starcie apki, nie tylko raz;
+rozpoznaje stary format przez brak `.itemId`) remapuje istniejące `ownedGear` na
+`itemId:001` per stary wpis i przepisuje `equippedGear` przez tę samą tabelę id.
+
+**GearPanel.tsx przepisany pod nowy model** — dawne `ownedGear[g.id]`/`gearById(equippedId)`
+(bezpośrednie lookupy po bare item id) były złamane po zmianie klucza na złożone id; teraz
+grupuje instancje po `itemId` (`groupOwnedBySlot`), pokazuje kartę per item z odznaką
+"×N" gdy user ma kilka kopii (user: "pokazuje ze mam kilka"), rozwijalną listę
+POJEDYNCZYCH kopii z ich realnym rzadkość+wartość ("float" usera) i osobnymi przyciskami
+Załóż/Sprzedaj na KAŻDĄ instancję, plus "Sprzedaj kilka…" per grupa — stepper +/- wybiera
+ile najsłabszych niezałożonych kopii sprzedać za jednym potwierdzeniem (user: "moge je
+sprzedac i wtedy wybieram ile"). Emoji usunięte z etykiety slotu w tym modalu
+(`SLOT_META[slot].label` bez `.icon` — user: "usun z niego emotki"; `.icon` ZOSTAJE
+używane w pet-shop.tsx/BoxRevealModal.tsx, to celowe). `app/pet.tsx`: `GearPanel`
+przeniesiony PRZED `s.tip` (linijkę statusu pupila) — renderuje się teraz bezpośrednio pod
+nagłówkiem nazwa/lvl (user: "eq możemy w górę").
+
+**Konsekwencja usunięcia kompensaty**: `BoxRevealModal.tsx`/`pet-shop.tsx`/`app/pet.tsx`
+straciły cały koncept `dupeCoins` ("masz już ten przedmiot, +N monet") — gear box reveal
+zawsze pokazuje realnie zdobyty item, bo zawsze jest realnie zachowany. `pet-shop.tsx`'s
+`alreadyOwnGear()` (blokada "już masz (lub lepszy), nie kupuj") USUNIĘTA — zakup dnia
+zawsze się udaje przy wystarczających monetach i wolnym slocie dnia, tworzy nową instancję
+obok starych.
+
+`tsc`/`jest` czyste (980 testów — `grantGear.test.ts`/`buyDailyGear.test.ts` przepisane pod
+nowe API, resztę bez zmian).
+
+**Explicite NIE zrobione**: brak UI do PORÓWNANIA dwóch konkretnych instancji side-by-side
+(tylko delta vs założona); brak sortowania/filtrowania listy instancji poza "najlepsza
+pierwsza"; combat-bonus funkcje (`gearCombatBonuses`/`gearFlatHp`/`gearCoinsMult`,
+`effectiveCatMaxHp`/`campaignEnergyMax`) NIE dotknięte — czytają `equippedGear[slot] →
+ownedGear[tegoKlucza].value/.rarity`, co działa identycznie z instance-id jak wcześniej z
+bare item id, bez zmian.
+
+**Priorytet testu na urządzeniu**: wysoki. (1) Zdropuj/kup 2+ kopie tego samego itemu —
+sprawdź że OBIE zostają widoczne (nie zlewają się, nie znikają), badge "×2" się pojawia;
+(2) rozwiń grupę, sprawdź że każda kopia pokazuje własną rzadkość/wartość; (3) "Sprzedaj
+kilka…" ze stepperem — zmień ilość, sprawdź że suma monet się przelicza, potwierdź, sprawdź
+że zostały sprzedane NAJSŁABSZE (nie losowe); (4) załóż jedną kopię, sprawdź że reszta
+niezałożonych kopii tego samego itemu dalej jest sprzedawalna niezależnie; (5) otwórz
+skrzynkę sardynek (głaskanie do pełna) kilka razy pod rząd, sprawdź że KAŻDY drop gearu
+faktycznie się pojawia w Ekwipunku (dawny bug: cichy zanik bez kompensaty); (6) apka z
+istniejącym starym zapisem ownedGear — po starcie sprawdź że stare itemy dalej są
+założone/widoczne pod nowymi id (migracja).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

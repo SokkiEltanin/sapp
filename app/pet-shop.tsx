@@ -21,7 +21,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { useBoxStats } from '@/store/boxStatsStore';
-import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
+import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, parseGearInstanceId, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -192,7 +192,7 @@ export default function PetShop() {
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
-  const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
+  const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
   // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
   // tap na kafelku szedł od razu do `onBuyDaily`/ConfirmDialog bez pokazania CO właściwie się
@@ -295,9 +295,10 @@ export default function PetShop() {
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
       const reward = rollBox(box, petLevel, ownedCombatItems);
-      let dupeCoins: number | undefined;
       if (reward.type === 'coins') addCoins(reward.coins);
-      else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
+      // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
+      // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
+      else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
       else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
       // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — czysta obserwacja wyniku
       // `rollBox()`, żadna wartość ekonomii się tu nie zmienia. `daily:false` bo to
@@ -308,7 +309,7 @@ export default function PetShop() {
         coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
       });
       haptic.success();
-      setReveal({ box, reward, dupeCoins });
+      setReveal({ box, reward });
     }, 'Otwórz', odds);
   };
 
@@ -322,23 +323,14 @@ export default function PetShop() {
   // Sklep dnia — 4 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
   // co dzień o 6:00 rano (dailyShopSlots w gear.ts, deterministycznie po `shopDayKey`).
   const dailySlots = useMemo(() => dailyShopSlots(shopDayKey(), petLevel), [petLevel]);
-  // Posiadasz już ten item w tej rzadkości LUB lepszej? (2026-08-26, user: "kupiłem item który
-  // już miałem przez co zniknęły mi pieniądze i nic nie dostałem" — dawniej ani lista, ani
-  // podgląd nie sprawdzały tego wprost, więc user nie miał jak się zorientować przed
-  // zakupem; prawdziwa blokada zakupu jest w `petStore.buyDailyGear`, to tu jest tylko UI
-  // pokazujące ten sam stan WCZEŚNIEJ, żeby nie trzeba było w ogóle próbować kupować).
-  // isGearUpgrade (2026-08-31) zamiast porównania samej rzadkości — patrz komentarz przy
-  // GearPreviewModal niżej. `value` teraz wymagany — Sklep dnia oferuje KONKRETNY roll
-  // (`dailyShopSlots`), więc "już masz (lub lepszy)" musi porównać z TYM rollem, nie tylko
-  // z rzadkością.
-  const alreadyOwnGear = (itemId: string, rarity: GearRarity, value: number) => {
-    return !isGearUpgrade({ rarity, value }, ownedGear[itemId]);
-  };
+  // 2026-09-18: zdjęta blokada "już masz ten przedmiot (lub lepszy)" — KAŻda kupiona kopia
+  // jest teraz trwałą, osobną instancją (patrz `GearInstance` w gear.ts), więc kupno
+  // duplikatu jest znowu prawidłową akcją, nie błędem do zablokowania. Jedyne blokady
+  // zostają w `petStore.buyDailyGear`: dzienny slot zakupu i wystarczające monety.
   const onBuyDaily = (itemId: string, rarity: ReturnType<typeof dailyShopSlots>[number]['rarity'], cost: number, value: number, name: string) => {
     haptic.tap();
     const dayKey = `gearDaily:${shopDayKey()}:${itemId}`;
     if (dayClaims[dayKey]) return;
-    if (alreadyOwnGear(itemId, rarity, value)) { haptic.error(); toast.error('Masz już ten przedmiot (lub lepszy)'); return; }
     if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
     confirmBuy(name, cost, () => {
       if (buyDailyGear(dayKey, itemId, rarity, cost, value)) { haptic.success(); toast.success(`Kupione: ${name}`); }
@@ -497,7 +489,6 @@ export default function PetShop() {
                 const { item, rarity, value, cost } = slot;
                 const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
                 const bought = !!dayClaims[dayKey];
-                const owned = alreadyOwnGear(item.id, rarity, value);
                 const meta = RARITY_META[rarity];
                 const afford = coins >= cost;
                 return (
@@ -524,7 +515,7 @@ export default function PetShop() {
                         możesz [dać regulację]") — jeden wspólny suwak dla wszystkich 4 itemów
                         Sklepu dnia naraz, dotąd sztywne 62%/62% bez regulacji. */}
                     <Image source={item.icon} style={[s.artSlotImg, { transform: [{ translateX: adjust.items.x }, { translateY: adjust.items.y }, { scale: adjust.items.scale }] }]} contentFit="contain" />
-                    {(bought || owned) ? (
+                    {bought ? (
                       <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
                         <Check size={11} color="#0B0E1A" strokeWidth={3} />
                       </View>
@@ -588,7 +579,6 @@ export default function PetShop() {
         boxColor={reveal?.box.color ?? '#9AA6B2'}
         boxEmoji={reveal?.box.emoji ?? '🎁'}
         boxIcon={reveal?.box.icon}
-        dupeCoins={reveal?.dupeCoins}
         onClose={() => setReveal(null)}
       />
 
@@ -683,20 +673,15 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
   const { item, rarity, cost, value: val } = slot;
   const meta = RARITY_META[rarity];
   const stat = SLOT_STAT[item.slot];
+  // `equippedGear[slot]` to teraz id KONKRETNEJ INSTANCJI (2026-09-18, patrz GearInstance w
+  // gear.ts), nie gołego itemu — `gearById` chce itemId, stąd `parseGearInstanceId`.
   const equippedId = equippedGear[item.slot];
-  const equippedItem = equippedId ? gearById(equippedId) : undefined;
+  const equippedItem = equippedId ? gearById(parseGearInstanceId(equippedId)?.itemId ?? equippedId) : undefined;
   const equippedOwned = equippedId ? ownedGear[equippedId] : undefined;
   const equippedVal = equippedOwned ? equippedOwned.value : 0;
   const delta = val - equippedVal;
   const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
   const bought = !!dayClaims[dayKey];
-  // Posiadasz już to (lub lepsze)? Osobny stan od `bought` (2026-08-26 fix) — `bought` jest
-  // TYLKO o dzisiejszym zakupie tego konkretnego slotu, więc item posiadany z KRZYŻA innego
-  // dnia albo ze skrzynki wcześniej pokazywał tu mylący przycisk "Kup", mimo że kupno by nic
-  // nie dało (patrz `buyDailyGear` w petStore.ts — teraz i tak by odrzuciło zakup).
-  // `isGearUpgrade` (2026-08-31) zamiast porównania samej rzadkości — ta sama rzadkość z
-  // LEPSZYM rollem niż posiadany dalej jest realnym ulepszeniem, patrz gear.ts.
-  const alreadyHave = !isGearUpgrade({ rarity, value: val }, ownedGear[item.id]);
   const afford = coins >= cost;
 
   return (
@@ -748,8 +733,6 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
           </View>
           {bought ? (
             <View style={s.previewBoughtRow}><Check size={16} color={meta.color} /><Text style={[s.previewBoughtTxt, { color: meta.color }]}>Już kupione dziś</Text></View>
-          ) : alreadyHave ? (
-            <View style={s.previewBoughtRow}><Check size={16} color={meta.color} /><Text style={[s.previewBoughtTxt, { color: meta.color }]}>Posiadasz ten przedmiot</Text></View>
           ) : (
             <TouchableOpacity
               style={[s.previewBuyBtn, !afford && { opacity: 0.5 }]}

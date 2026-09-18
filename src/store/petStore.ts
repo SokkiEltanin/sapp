@@ -8,7 +8,7 @@ import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST } from '@/utils/raid';
-import { GearSlot, GearRarity, OwnedGear, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, isGearUpgrade, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
+import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 import { PotionKind, ActivePotion, POTIONS, potionFlatHp, potionXpMult } from '@/utils/potions';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
@@ -68,6 +68,19 @@ function campaignEnergyMax(
   const loot = bossBonuses(ownedItems);
   const gear = gearCombatBonuses(equippedGear, ownedGear);
   return dailyAttempts(loot.energyMult + gear.energyMult);
+}
+
+// Kolejny numer "resetu"/rolla dla danego itemu (2026-09-18, patrz `GearInstance` w gear.ts)
+// — skanuje WSZYSTKIE posiadane instancje (kluczowane złożonym id `itemId:seq`), zwraca
+// najwyższy dotychczasowy `seq` + 1 (start od 1). Celowo NIE licznik długości listy — po
+// sprzedaniu środkowej instancji kolejny drop wciąż dostaje NOWY, nigdy wcześniej użyty
+// numer (żadne dwie instancje tego samego itemu, nawet w różnym czasie, nie dzielą id).
+function nextGearSeq(ownedGear: Partial<Record<string, GearInstance>>, itemId: string): number {
+  let max = 0;
+  for (const inst of Object.values(ownedGear)) {
+    if (inst && inst.itemId === itemId && inst.seq > max) max = inst.seq;
+  }
+  return max + 1;
 }
 
 // The companion blob's PERSISTED state: identity, growth (xp), the coin wallet,
@@ -244,14 +257,13 @@ interface PetState {
   ownedCombatItems: Partial<Record<CombatItemId, number>>;
   equippedCombatItems: CombatItemId[];   // max COMBAT_ITEM_SLOTS
   // ── ekwipunek pasywny (gear.ts) — 6 slotów, staty na stałe, w odróżnieniu od itemów
-  // bojowych powyżej (aktywne zdolności w walce). Klucz nieobecny = nieposiadany. Wartość =
-  // NAJLEPSZA dotąd zdobyta KOPIA tego itemu (S&F-style — dubel gorszy niż `isGearUpgrade`
-  // nic nie daje). Od 2026-08-31: rzadkość ORAZ konkretny wylosowany `.value` (nie tylko
-  // rzadkość — patrz `OwnedGear`/`isGearUpgrade` w gear.ts, "itemy mogą dropić w
-  // przedziałach"). Stary zapis (`Record<id, GearRarity>`, sama rzadkość jako string)
-  // migrowany w `onRehydrateStorage` niżej.
-  ownedGear: Partial<Record<string, OwnedGear>>;
-  equippedGear: Partial<Record<GearSlot, string>>;   // slot → id założonego itemu
+  // bojowych powyżej (aktywne zdolności w walce). Klucz = złożone id INSTANCJI (`itemId:seq`,
+  // patrz `GearInstance`/`gearInstanceId` w gear.ts, 2026-09-18) — KAŻDY drop dostaje własny,
+  // trwały wpis, żadne dwa nie dzielą klucza nawet gdy to ten sam bazowy item. Stary zapis
+  // (klucz = goły `itemId`, jedna "najlepsza" kopia per item) migrowany w `onRehydrateStorage`
+  // niżej — każda istniejąca kopia dostaje `seq: 1`.
+  ownedGear: Partial<Record<string, GearInstance>>;
+  equippedGear: Partial<Record<GearSlot, string>>;   // slot → id ZAŁOŻONEJ INSTANCJI (nie itemu)
   // Jednorazowy onboarding (imię + wygląd) przy pierwszym uruchomieniu — patrz setOnboarded.
   onboarded: boolean;
   // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila... jakby
@@ -378,7 +390,7 @@ interface PetState {
   grantOrLevelCombatItem: (id: CombatItemId, level: number) => void;            // ze skrzynek sklepowych (rollBox 'combatItem') — bezwarunkowo ustawia poziom, decyzję nowy/upgrade podjął już rollBox()
   equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
   unequipCombatItem: (id: CombatItemId) => void;
-  grantGear: (itemId: string, rarity: GearRarity, value: number) => number;   // ze skrzynki/daily shopu; zwraca 0 gdy przyznano/ulepszono item (isGearUpgrade), kwotę monet gdy NIE lepszy — skompensowano monetami zamiast go wyrzucić
+  grantGear: (itemId: string, rarity: GearRarity, value: number) => string;   // ze skrzynki/daily shopu — zawsze przyznaje NOWĄ instancję (2026-09-18), zwraca jej id ("itemId:seq")
   equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
   unequipGear: (slot: GearSlot) => void;
   sellGear: (itemId: string) => number;   // sprzedaje POSIADANY item za monety (auto-unequip jeśli założony); zwraca zarobione monety, 0 = nieposiadany
@@ -687,14 +699,22 @@ export const usePetStore = create<PetState>()(
             if (rarity) gearDropped = { itemId: item.id, name: item.name, rarity, value: rollGearValue(item, rarity) };
           }
         }
-        const gearUpgrade = gearDropped ? isGearUpgrade({ rarity: gearDropped.rarity, value: gearDropped.value }, s.ownedGear[gearDropped.itemId]) : false;
+        // 2026-09-18 FIX: dawniej ta gałąź wołała `isGearUpgrade` i po cichu ODRZUCAŁA drop
+        // BEZ ŻADNEJ kompensaty (ani itemu, ani monet) gdy nie był ulepszeniem — user zgłosił
+        // dokładnie to: "jak dropie je np te same to czasami... mi znika jakby sie łączył i
+        // nie mam ani itemu ani coinow". `grantGear`/`buyDailyGear` (niżej) miały już własne
+        // fixy tego samego kształtu buga (2026-08-27/08-26), ale ta gałąź ma WŁASNĄ, inline'ową
+        // kopię logiki (nie woła współdzielonego `grantGear`) — nikt jej wtedy nie poprawił.
+        // Teraz KAŻDY drop dostaje własną, trwałą instancję (`GearInstance`/`gearInstanceId`
+        // w gear.ts) — nic już nie ginie, karta odsłony (CrateModal.tsx) zawsze mówi prawdę.
+        const gearSeq = gearDropped ? nextGearSeq(s.ownedGear, gearDropped.itemId) : 0;
         set({
           pendingCrates: s.pendingCrates - 1,
           coins: s.coins + roll.coins,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
           ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
-          ...(gearDropped && gearUpgrade
-            ? { ownedGear: { ...s.ownedGear, [gearDropped.itemId]: { rarity: gearDropped.rarity, value: gearDropped.value } } } : {}),
+          ...(gearDropped
+            ? { ownedGear: { ...s.ownedGear, [gearInstanceId(gearDropped.itemId, gearSeq)]: { itemId: gearDropped.itemId, seq: gearSeq, rarity: gearDropped.rarity, value: gearDropped.value } } } : {}),
         });
         return { ...roll, itemDropped, itemLeveledUp, gearDropped };
       },
@@ -919,40 +939,29 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      // BUG (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu nic
-      // nie dostałem bo chyba miałem podobny albo wgle zniknął") — skrzynki (`onBuyBox`/
-      // `onDailyBox` w pet-shop.tsx i pet.tsx) wołały `grantGear` i OD RAZU pokazywały
-      // `BoxRevealModal` z "wygraną" kartą, ale gdy trafił się duplikat (item już posiadany w
-      // ≥ tej rzadkości) `grantGear` był CICHYM no-opem — ekwipunek się nie zmieniał, user nie
-      // dostawał NIC w zamian, mimo że modal właśnie pokazał mu "EKWIPUNEK! <nazwa>". Fix:
-      // duplikat teraz KOMPENSOWANY monetami (`gearSellValue`, ta sama stawka co ręczna
-      // sprzedaż w `sellGear` — spójna wewnętrzna wartość itemu) zamiast wyrzucany w próżnię;
-      // zwraca skompensowaną kwotę (0 = normalny przyznany item) żeby wołające UI mogło
-      // pokazać to uczciwie zamiast udawać że gracz dostał nową kopię (patrz `BoxRevealModal`
-      // prop `dupeCoins`).
-      //
-      // "Duplikat" od 2026-08-31 = `!isGearUpgrade` (rzadkość NIE wyższa, a przy równej —
-      // roll NIE lepszy), nie tylko "rzadkość nie wyższa" jak dawniej — user: "lepszy roll w
-      // tej samej rzadkości to realny upgrade". `gearSellValue` (kompensata) ZOSTAJE
-      // rarity-only (wewnętrzna "cena skupu" nie musi znać dokładnego rolla).
+      // BUG (2026-08-27/08-26, patrz historia NEXT_STEPS/ARCHITECTURE §wcześniejsze) — skrzynki
+      // dawniej wołały `grantGear` i OD RAZU pokazywały `BoxRevealModal` z "wygraną" kartą, ale
+      // gdy trafił się duplikat, był po cichu odrzucany albo kompensowany monetami (bez śladu w
+      // ekwipunku). 2026-09-18 (user: "musimy operować inaczej z itemami... moze każdy item
+      // bedzie miał id swoje... a po dwukropku numer od resetu") — KAŻDY drop dostaje WŁASNĄ,
+      // trwałą instancję (`gearInstanceId`, gear.ts), zawsze przyznawaną. Zero odrzucania, zero
+      // kompensaty — user sam decyduje w Ekwipunku, co zatrzymać/sprzedać (patrz `sellGear`
+      // niżej, teraz per-instancja, i grupowy "sprzedaj N" w GearPanel.tsx).
       grantGear: (itemId, rarity, value) => {
         const s = get();
-        const cur = s.ownedGear[itemId];
-        if (!isGearUpgrade({ rarity, value }, cur)) {
-          const item = gearById(itemId);
-          const coins = item ? gearSellValue(item, rarity) : 0;
-          if (coins > 0) set({ coins: s.coins + coins });
-          return coins;
-        }
-        set({ ownedGear: { ...s.ownedGear, [itemId]: { rarity, value } } });
-        return 0;
+        const seq = nextGearSeq(s.ownedGear, itemId);
+        const id = gearInstanceId(itemId, seq);
+        set({ ownedGear: { ...s.ownedGear, [id]: { itemId, seq, rarity, value } } });
+        return id;
       },
-      equipGear: (itemId) => {
+      equipGear: (instanceId) => {
         const s = get();
-        const item = gearById(itemId);
-        if (!item || !s.ownedGear[itemId]) return false;
+        const inst = s.ownedGear[instanceId];
+        if (!inst) return false;
+        const item = gearById(inst.itemId);
+        if (!item) return false;
         if (item.unlockLevel > levelFromXp(s.xp).level) return false;
-        set({ equippedGear: { ...s.equippedGear, [item.slot]: itemId } });
+        set({ equippedGear: { ...s.equippedGear, [item.slot]: instanceId } });
         return true;
       },
       unequipGear: (slot) => set((s) => {
@@ -961,44 +970,38 @@ export const usePetStore = create<PetState>()(
         return { equippedGear: next };
       }),
       // Sprzedaż (2026-08-20, user: "co robimy z itemami co sa słabsze ale je mamy w eq?
-      // mozna je sprzedać?"). Auto-zdejmuje ze slotu jeśli akurat założony (nie da się
-      // sprzedać czegoś co dalej "jest na kotku") — `gearSellValue` w gear.ts liczy monety
-      // (rarity-only, patrz komentarz przy `grantGear` wyżej).
-      sellGear: (itemId) => {
+      // mozna je sprzedać?"). Auto-zdejmuje ze slotu jeśli akurat założona (nie da się sprzedać
+      // czegoś co dalej "jest na kotku") — `gearSellValue` w gear.ts liczy monety (rarity-only).
+      // Operuje na id KONKRETNEJ INSTANCJI (2026-09-18), nie na id itemu — sprzedanie jednej
+      // kopii "Słomianego Kapelusza" nie rusza pozostałych.
+      sellGear: (instanceId) => {
         const s = get();
-        const owned = s.ownedGear[itemId];
-        const item = gearById(itemId);
+        const owned = s.ownedGear[instanceId];
+        const item = owned ? gearById(owned.itemId) : undefined;
         if (!owned || !item) return 0;
         const coinsEarned = gearSellValue(item, owned.rarity);
         const nextOwned = { ...s.ownedGear };
-        delete nextOwned[itemId];
+        delete nextOwned[instanceId];
         const nextEquipped = { ...s.equippedGear };
-        if (nextEquipped[item.slot] === itemId) delete nextEquipped[item.slot];
+        if (nextEquipped[item.slot] === instanceId) delete nextEquipped[item.slot];
         set({ ownedGear: nextOwned, equippedGear: nextEquipped, coins: s.coins + coinsEarned });
         return coinsEarned;
       },
-      // BUG (2026-08-26, user: "kupiłem item który już miałem przez co zniknęły mi pieniądze
-      // i nic nie dostałem") — dawniej ZAWSZE pobierało `cost` i ZUŻYWAŁO dzienny slot
-      // zakupu, nawet gdy `cur` (posiadana rzadkość) była już równa/lepsza od oferowanej —
-      // `better` wtedy tylko pomijał AKTUALIZACJĘ `ownedGear` (słusznie, nie chcemy
-      // DOWNGRADE'u), ale monety i tak znikały za nic. Teraz: `alreadyHave` blokuje CAŁY
-      // zakup wcześniej (return false, PRZED odjęciem monet/zużyciem slotu) — UI
-      // (`pet-shop.tsx`) i tak nie powinien nawet pokazać przycisku "Kup" w tym stanie, ale
-      // ten guard jest tu, na poziomie store'u, jako prawdziwe źródło prawdy (nie tylko UI).
-      // `alreadyHave` od 2026-08-31 = `!isGearUpgrade` (patrz `grantGear` wyżej) — sklep dnia
-      // teraz oferuje deterministyczny, ale KONKRETNY roll (`value`, patrz `dailyShopSlots`
-      // w gear.ts), więc "już mam" musi też uwzględniać czy TEN roll jest lepszy niż
-      // posiadany, nie tylko rzadkość.
+      // BUG historyczny (2026-08-26, "kupiłem item który już miałem przez co zniknęły mi
+      // pieniądze i nic nie dostałem") naprawiony wtedy przez blokadę zakupu "już masz (lub
+      // lepiej)". 2026-09-18: ta blokada ZDJĘTA — skoro KAŻDA instancja jest teraz trwale
+      // zachowana (patrz `grantGear`/`GearInstance` wyżej), kupno duplikatu z Sklepu dnia jest
+      // znowu prawidłową akcją (user widzi KONKRETNY roll w podglądzie przed zakupem i sam
+      // decyduje, czy warto) — jedyne blokady to dzienny slot zakupu i starczające monety.
       buyDailyGear: (dayKey, itemId, rarity, cost, value) => {
         const s = get();
         if (s.dayClaims[dayKey]) return false;
-        const cur = s.ownedGear[itemId];
-        if (!isGearUpgrade({ rarity, value }, cur)) return false;
         if (s.coins < cost) return false;
+        const seq = nextGearSeq(s.ownedGear, itemId);
         set({
           coins: s.coins - cost,
           dayClaims: { ...s.dayClaims, [dayKey]: true },
-          ownedGear: { ...s.ownedGear, [itemId]: { rarity, value } },
+          ownedGear: { ...s.ownedGear, [gearInstanceId(itemId, seq)]: { itemId, seq, rarity, value } },
         });
         return true;
       },
@@ -1107,14 +1110,47 @@ export const usePetStore = create<PetState>()(
         // dodaje z zaskoczenia. Brakujący `gearById` (item usunięty z katalogu — nie powinno
         // się zdarzyć, ale nie crashować migracji) po prostu pomija wpis.
         for (const id of Object.keys(state.ownedGear)) {
-          const cur = state.ownedGear[id];
+          const cur = state.ownedGear[id] as any;
           if (typeof cur === 'string') {
             const item = gearById(id);
-            if (item) state.ownedGear[id] = { rarity: cur, value: gearStatValue(item, cur) };
+            if (item) state.ownedGear[id] = { rarity: cur as GearRarity, value: gearStatValue(item, cur as GearRarity) } as any;
             else delete state.ownedGear[id];
           }
         }
         state.equippedGear = state.equippedGear ?? {};
+        // Migracja instancji (2026-09-18, patrz `GearInstance`/`gearInstanceId` w gear.ts) —
+        // stary zapis trzymał JEDNĄ "najlepszą" kopię per klucz-itemId (`ownedGear['helm_
+        // slomiany']`), nowy trzyma KAŻDĄ zdobytą kopię pod złożonym kluczem `itemId:seq`.
+        // Rozpoznanie starego wpisu: brak pola `.itemId` (nowy kształt zawsze je ma). Backfill:
+        // każdy stary wpis dostaje `seq: 1`, migruje się pod klucz `${staryKlucz}:001` — gracz
+        // nie traci ANI JEDNEJ dotąd posiadanej kopii. `equippedGear` (slot → id) remapowane
+        // RAZEM z tym przejściem przez `idMap`, żeby założony item dalej wskazywał na tę samą,
+        // teraz-przeniesioną instancję. Idempotentne jak migracja wyżej — już-nowe wpisy (mają
+        // `.itemId`) pomijane, bezpieczne uruchamiać przy KAŻDYM starcie apki.
+        {
+          const idMap: Record<string, string> = {};
+          for (const oldId of Object.keys(state.ownedGear)) {
+            const cur = state.ownedGear[oldId] as any;
+            if (cur && cur.itemId) continue;
+            idMap[oldId] = gearInstanceId(oldId, 1);
+          }
+          if (Object.keys(idMap).length > 0) {
+            const nextOwned: typeof state.ownedGear = {};
+            for (const [id, val] of Object.entries(state.ownedGear)) {
+              const newId = idMap[id];
+              const v = val as any;
+              if (newId) nextOwned[newId] = { itemId: id, seq: 1, rarity: v.rarity, value: v.value };
+              else nextOwned[id] = val;
+            }
+            state.ownedGear = nextOwned;
+            const nextEquipped: typeof state.equippedGear = {};
+            for (const [slot, id] of Object.entries(state.equippedGear)) {
+              if (!id) continue;
+              nextEquipped[slot as GearSlot] = idMap[id] ?? id;
+            }
+            state.equippedGear = nextEquipped;
+          }
+        }
         state.onboarded = state.onboarded ?? true;
         // Level-up celebration (2026-08-19) — stary zapis nie ma `lastSeenLevel`. Ustaw na
         // AKTUALNY poziom (nie na 1!), inaczej istniejący gracz na Lv20 dostałby przy
