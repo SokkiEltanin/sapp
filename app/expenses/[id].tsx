@@ -26,7 +26,7 @@ import { Expense, ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem,
 import { vehiclesService } from '@/services/vehiclesService';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases, loadTagMemory, applyTagMemory, allKnownTags, tagsMatchingWords } from '@/utils/productMemory';
-import { isFoodItem, NONFOOD_TAGS, removeNonFood } from '@/utils/food';
+import { isFoodItem, NONFOOD_TAGS, removeNonFood, FOOD_ITEM_TAGS } from '@/utils/food';
 import { getPayers, addPayer } from '@/utils/payers';
 import { isSelfTransfer, SELF_TRANSFER_TAGS } from '@/utils/statWidgets';
 import { fvSplitOf, bucketOf, FvBucket } from '@/utils/fixedVariable';
@@ -46,11 +46,9 @@ const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, ty
 const EXPENSE_TAGS = ['słodycze', 'warzywa', 'mięso', 'napoje', 'fast food', 'apteka', 'paliwo', 'bilety'];
 const INCOME_TAGS  = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 
-const ITEM_TAGS = [
-  'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
-  'słodycze', 'pieczywo', 'napoje', 'przekąski', 'sosy',
-  'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
-];
+// Współdzielone przez `FOOD_ITEM_TAGS` (2026-09-18) — było plik-lokalną kopią, patrz
+// komentarz przy `FOOD_ITEM_TAGS` w food.ts za powód zmiany.
+const ITEM_TAGS = [...FOOD_ITEM_TAGS, 'chemia', 'higiena', 'nie jedzenie'];
 
 // Log zmian (2026-09-17, patrz editHistoryStore.ts) — jedna linijka na zapis, zbudowana
 // z gotowych, już sformatowanych stringów (nie surowych kluczy kategorii/id pojazdu), żeby

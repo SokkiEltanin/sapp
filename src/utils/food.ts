@@ -50,6 +50,19 @@ export const FOOD_SUBCAT_META: Record<string, { label: string; color: string }> 
   inne: { label: 'Inne jedzenie', color: '#9CA3AF' },
 };
 
+// Płaska lista tagów jedzenia do picker-ów w UI (2026-09-18, user: "nadal nie pokazuje sie
+// kategoria produkty sypkie... i na kategorie makarony i ryżem kasze... zeby tam byly tagi
+// jaja tez i przyprawy") — 4 osobne, plik-lokalne kopie `ITEM_TAGS` (scan.tsx/manual.tsx/
+// products.tsx/expenses/[id].tsx) miały WŁASNE, niezależnie rozjeżdżające się listy, żadna
+// nie dostała 8 nowych kategorii z rozbudowy wyżej (jajka/sosy/przyprawy/konserwy i
+// przetwory/makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/mrożonki) — auto-
+// wykrywanie (`getFoodTags`) już je łapało poprawnie, ale user nie miał jak RĘCZNIE kliknąć
+// żadnej z nich (ani poprawić stary paragon zeskanowany PRZED tą rozbudową, którego pozycje
+// zostały z dawnym tagiem na stałe — nic nie re-tagguje wstecznie samo z siebie). Jedno
+// źródło prawdy: dodanie kolejnej kategorii do `FOOD_SUBCATS` wyżej automatycznie pokaże się
+// we WSZYSTKICH picker-ach, bez pamiętania o 4 rozrzuconych miejscach.
+export const FOOD_ITEM_TAGS: string[] = FOOD_SUBCATS.map(s => s.tag);
+
 const FOOD_TAG_SET = new Set(FOOD_SUBCATS.map(s => s.tag));
 export const NONFOOD_TAGS = new Set(['chemia', 'higiena', 'nie jedzenie']);
 

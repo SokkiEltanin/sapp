@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: brakujące kategorie jedzenia w pickerze tagów (jajka/przyprawy/makarony/...) (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §122. User: auto-wykrywanie "jaja" i kategorii
+makarony/ryż i kasze/mąka i produkty sypkie "nie działa" — zweryfikowane, DZIAŁA
+poprawnie (test na realnych nazwach). Prawdziwa przyczyna: 4 osobne, rozjeżdżające się
+kopie `ITEM_TAGS` (picker do ręcznego tagowania) nigdy nie dostały 8 nowych kategorii z
+§111 — user nie miał jak kliknąć ich ręcznie ani poprawić starego paragonu. Naprawione:
+jedno źródło prawdy (`FOOD_ITEM_TAGS` w food.ts). `tsc`/`jest` czyste. Do zrobienia (user,
+na urządzeniu): sprawdź picker tagów w Produktach/edycji paragonu — nowe kategorie powinny
+być teraz klikalne, w tym na starych, wcześniej zeskanowanych pozycjach.
+
 ## ✅ Fix: Podsumowanie tygodnia (Finanse) liczyło praktycznie same zera (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §121. Background-audyt dat znalazł: `app/weekly.tsx` porównywał

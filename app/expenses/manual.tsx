@@ -18,6 +18,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
+import { FOOD_ITEM_TAGS } from '@/utils/food';
 import {
   loadProductMemory, applyProductMemory, saveProductCategories,
   loadTagMemory, applyTagMemory, saveTagMemory,
@@ -61,7 +62,9 @@ function splitEven(total: number, n: number): number[] {
 }
 
 const ALL_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
-const ITEM_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje', 'chemia'];
+// Współdzielone przez `FOOD_ITEM_TAGS` (2026-09-18) — było plik-lokalną kopią, patrz
+// komentarz przy `FOOD_ITEM_TAGS` w food.ts za powód zmiany.
+const ITEM_TAGS = [...FOOD_ITEM_TAGS, 'chemia'];
 
 function CategoryPicker({ current, onSelect }: {
   current: ExpenseCategory;

@@ -8253,6 +8253,46 @@ finances.tsx).
 (ostatni dzień), i że dzienny wykres słupkowy pokazuje realne kwoty na WSZYSTKIE dni, nie
 same zera.
 
+## 122. Fix: 4 rozjeżdżające się listy tagów jedzenia w UI (2026-09-18)
+
+User: *"po targach [czyt. tagach] musi łapać tez jak sa jaja, Jajka (bo mi nie lapie jak sa
+jaja xd)... nadal nie pokazuje sie kategoria produkty sypkie... i na kategorie makarony i
+ryżem kasze. I jak dodasz to zeby jak bedzie cos miało makarony ryżem w nazwie to zeby ten
+tag byl tam do kliknięcia jakby albo wogloqle zeby tam byly tagi jaja tez i przyprawy"*.
+
+**Zweryfikowane najpierw, nie samo czytanie** (CLAUDE.md #5) — napisany tymczasowy test
+wołający realny `getFoodTags`/`categorize`/`foodSubcat` na "Jaja M", "Mąka pszenna",
+"Makaron spaghetti", "Ryż biały" itd.: WSZYSTKIE poprawnie zwracają właściwy tag (`jajka`,
+`mąka i produkty sypkie`, `makarony`, `ryż i kasze`). Auto-wykrywanie (§111) działa
+poprawnie — więc user NIE mówił o parserze.
+
+**Prawdziwa przyczyna**: 4 OSOBNE, plik-lokalne kopie `ITEM_TAGS` (chip-picker do
+RĘCZNEGO wybierania tagów) — `app/expenses/scan.tsx`, `app/expenses/manual.tsx`,
+`app/products.tsx`, `app/expenses/[id].tsx` — każda z własną, ręcznie wypisaną listą,
+żadna nie dostała 8 nowych kategorii z §111 (jajka/sosy/przyprawy/konserwy i przetwory/
+makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/mrożonki), a `scan.tsx`/
+`manual.tsx` brakowało nawet starszego `sosy`. Stary komentarz w `products.tsx` mówił
+wprost: *"celowo nie wydzielona współdzielona (mała, stała lista domenowa)"* — ta decyzja
+przestała się sprawdzać w miarę jak rosła liczba kategorii: user nie miał jak RĘCZNIE
+kliknąć żadnej z nowych, ani poprawić STARY paragon zeskanowany PRZED §111 (którego
+pozycje zostały z dawnym tagiem/bez tagu na stałe — nic nie re-tagguje wstecznie samo z
+siebie, stąd "nadal nie pokazuje się").
+
+**Fix**: `FOOD_ITEM_TAGS: string[] = FOOD_SUBCATS.map(s => s.tag)` — nowy eksport w
+`food.ts`, JEDNO źródło prawdy. Wszystkie 4 pliki teraz budują swój `ITEM_TAGS` jako
+`[...FOOD_ITEM_TAGS, ...własne-nie-jedzeniowe]` (każdy zachowuje swój dotychczasowy zestaw
+tagów nie-jedzeniowych — `chemia`/`higiena`/`nie jedzenie` — różny w każdym pliku, nie
+ujednolicony na siłę). Dodanie KOLEJNEJ kategorii do `FOOD_SUBCATS` w przyszłości
+automatycznie pokaże się we wszystkich 4 picker-ach, bez pamiętania o rozrzuconych
+miejscach — ten sam "jedno źródło prawdy" wzorzec co `FOOD_SUBCAT_META`.
+
+`tsc`/`jest` czyste (981 testów, bez zmian — czysto UI-owa lista, logika kategoryzacji
+niedotknięta, już przetestowana w §111).
+**Priorytet testu na urządzeniu**: Finanse → Produkty (albo edycja pozycji paragonu) →
+sprawdź że w pickerze tagów widać teraz jajka/sosy/przyprawy/konserwy i przetwory/
+makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/mrożonki jako klikalne chipy,
+i że kliknięcie ich na STARYM produkcie faktycznie retagguje go (widoczne w statystykach).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
