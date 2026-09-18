@@ -8427,6 +8427,45 @@ faktycznie się pojawia w Ekwipunku (dawny bug: cichy zanik bez kompensaty); (6)
 istniejącym starym zapisem ownedGear — po starcie sprawdź że stare itemy dalej są
 założone/widoczne pod nowymi id (migracja).
 
+## 125. Self-review §124 — kolizja w migracji instancji mogła po cichu nadpisać gear (2026-09-18)
+
+Ten sam "self-review dużej zmiany przed testem na urządzeniu" wzorzec co §114/§119/§123 —
+delegowany agent-audyt na sam redesign z §124 (bo type-checker łapie tylko kształt, nie
+logikę). Znalezione 1 realne, wąskie, ale realne miejsce: migracja instancji w
+`onRehydrateStorage` (petStore.ts) mapowała KAŻDY stary goły wpis (`ownedGear['helm_
+slomiany']`) na `${itemId}:001` NA OŚLEP, bez sprawdzenia czy ten klucz docelowy już istnieje.
+Przy "częściowym rehydrate" — user ma JUŻ zmigrowaną instancję `helm_slomiany:001` ORAZ
+wciąż stary goły wpis dla TEGO SAMEGO itemu (realny scenariusz: stary APK z GitHuba trzyma
+starszy build, który wciąż zapisuje gołym kluczem, na tym samym AsyncStorage co nowszy build
+— CLAUDE.md "APK z GitHub", brak wymuszonej auto-aktualizacji OTA) — obie wartości kolidowały
+na TYM SAMYM kluczu docelowym, druga po cichu nadpisywała pierwszą. Zero błędu, zero logu,
+po prostu jedna z dwóch posiadanych kopii (czasem założona) traciła swoje realne
+rarity/value albo cała jedna instancja znikała bez śladu — dokładnie ten sam rodzaj "cichej
+utraty gearu bez kompensaty", który był oryginalną skargą usera i powodem całego redesignu.
+
+Fix: `usedIds` śledzi WSZYSTKIE już zajęte klucze docelowe (już-nowe wpisy + nowo przydzielone
+w tej samej migracji), każdy stary wpis dostaje pierwszy WOLNY seq dla swojego itemu (nie
+zawsze `:001`) — poprawiona też migracja `nextOwned`, która wcześniej hardkodowała `seq: 1`
+w zapisanej instancji niezależnie od realnie przydzielonego klucza (drugi, mniejszy bug w tym
+samym miejscu, złapany przy naprawianiu pierwszego). 3 nowe testy regresyjne w
+`__tests__/gearMigration.test.ts` — testują `onRehydrateStorage` NAPRAWDĘ (nie przez mock
+AsyncStorage), przez testowalny seam zustand v5: `store.persist.getOptions()
+.onRehydrateStorage()` zwraca realny handler migracji, wołany tu wprost na ręcznie
+skonstruowanym stanie.
+
+**Sprawdzone i potwierdzone CZYSTE** (agent-audyt): `nextGearSeq` na pustym `ownedGear`;
+brak wyścigu między `grantGear`/`buyDailyGear`/`openCrate` (synchroniczne `get()`/`set()`,
+zero gapu na async); `equipGear`/`unequipGear`/`sellGear` nigdy nie zostawiają `equippedGear`
+wskazującego na usunięty klucz; sell-dialogi w GearPanel.tsx (blokujący natywny `Modal`,
+zero szansy na zmianę stanu między otwarciem a potwierdzeniem); cały repo zgrepowany pod
+`ownedGear[`/`equippedGear[` — brak zapomnianych lookupów po gołym item id.
+
+`tsc`/`jest` czyste (983 testy, +3 nowe).
+**Priorytet testu na urządzeniu**: niski-średni — dotyczy wąskiego scenariusza (mieszany
+stary+nowy format tego samego itemu naraz), ale jeśli user ma STARY zapis z przed §124 i
+zauważy że po aktualizacji jakiś item/rzadkość się "zmieniła" albo zniknęła, to jest to
+miejsce do sprawdzenia jako pierwsze.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

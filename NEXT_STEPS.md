@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Self-review §124 — kolizja w migracji instancji mogła po cichu nadpisać gear (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §125. Delegowany agent-audyt na redesign z §124 znalazł 1
+realny bug: migracja starych zapisów gearu mapowała KAŻDY stary wpis na `:001` na oślep,
+bez sprawdzenia czy ten klucz już zajęty — przy mieszanym stanie (stary goły wpis + już
+zmigrowana instancja tego samego itemu, realny scenariusz przy starym APK z GitHuba)
+jedna z dwóch kopii po cichu nadpisywała drugą, bez błędu/logu. Naprawione (migracja
+szuka pierwszego wolnego seq, nie zawsze `:001`) + 3 nowe testy regresyjne, które testują
+`onRehydrateStorage` naprawdę (przez zustand v5 `persist.getOptions()` seam, bez mocka
+AsyncStorage). `tsc`/`jest` czyste (983 testy). Priorytet testu na urządzeniu: niski-średni
+— tylko jeśli masz STARY zapis z przed §124 i coś w ekwipunku po aktualizacji wygląda
+nieoczekiwanie.
+
 ## 🆕 Redesign ekwipunku pupila — każdy drop = trwała instancja z własnym id (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §124. User (ze screenshotem Butów): duplikaty gearu czasem

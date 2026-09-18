@@ -8,7 +8,7 @@ import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST } from '@/utils/raid';
-import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
+import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, parseGearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 import { PotionKind, ActivePotion, POTIONS, potionFlatHp, potionXpMult } from '@/utils/potions';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
@@ -1127,19 +1127,41 @@ export const usePetStore = create<PetState>()(
         // RAZEM z tym przejściem przez `idMap`, żeby założony item dalej wskazywał na tę samą,
         // teraz-przeniesioną instancję. Idempotentne jak migracja wyżej — już-nowe wpisy (mają
         // `.itemId`) pomijane, bezpieczne uruchamiać przy KAŻDYM starcie apki.
+        //
+        // Self-review (2026-09-18, tuż po wdrożeniu §124): NAIWNA wersja mapowała każdy stary
+        // wpis na `${oldId}:001` NA OŚLEP, bez sprawdzenia czy ten klucz już istnieje. Przy
+        // "częściowym rehydrate" — user ma JUŻ zmigrowaną instancję `helm_slomiany:001` ORAZ
+        // wciąż stary goły wpis `helm_slomiany` dla TEGO SAMEGO itemu (np. stary APK z GitHuba,
+        // patrz CLAUDE.md "APK z GitHub" — brak wymuszonej auto-aktualizacji, więc realny
+        // scenariusz) — obie wartości kolidowały na TYM SAMYM kluczu docelowym, jedna po cichu
+        // nadpisywała drugą (zerowa utrata danych bez żadnego śladu). Fix: `usedIds` śledzi
+        // WSZYSTKIE już zajęte klucze (już-nowe wpisy + nowo przydzielone w tej migracji),
+        // każdy stary wpis dostaje pierwszy WOLNY seq dla swojego itemu, nie zawsze `:001`.
         {
+          const usedIds = new Set(
+            Object.entries(state.ownedGear)
+              .filter(([, v]) => v && (v as any).itemId)
+              .map(([id]) => id),
+          );
           const idMap: Record<string, string> = {};
           for (const oldId of Object.keys(state.ownedGear)) {
             const cur = state.ownedGear[oldId] as any;
             if (cur && cur.itemId) continue;
-            idMap[oldId] = gearInstanceId(oldId, 1);
+            let seq = 1;
+            let newId = gearInstanceId(oldId, seq);
+            while (usedIds.has(newId)) { seq += 1; newId = gearInstanceId(oldId, seq); }
+            usedIds.add(newId);
+            idMap[oldId] = newId;
           }
           if (Object.keys(idMap).length > 0) {
             const nextOwned: typeof state.ownedGear = {};
             for (const [id, val] of Object.entries(state.ownedGear)) {
               const newId = idMap[id];
               const v = val as any;
-              if (newId) nextOwned[newId] = { itemId: id, seq: 1, rarity: v.rarity, value: v.value };
+              // `seq` z faktycznie przydzielonego (niekolidującego) `newId`, NIE zawsze 1 —
+              // patrz komentarz nad `usedIds` wyżej (self-review, kolizja przy częściowym
+              // rehydrate inaczej dostałaby błędny seq zapisany w samej instancji).
+              if (newId) nextOwned[newId] = { itemId: id, seq: parseGearInstanceId(newId)!.seq, rarity: v.rarity, value: v.value };
               else nextOwned[id] = val;
             }
             state.ownedGear = nextOwned;
