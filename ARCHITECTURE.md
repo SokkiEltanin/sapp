@@ -8654,6 +8654,48 @@ Zobacz pełny panel; sprawdź że liczby w "Otwarcia" zgadzają się z ranking/w
 (np. suma słupków dzisiejszego dnia = "dziś" w nowej karcie), i że "Najczęstsza kolejność"/
 "Ekrany na przemian" pokazują sensowne, rozpoznawalne pary ekranów.
 
+## 129. Podpięcie eksportu z Edytora układu walki — niezależne offsety pupil/boss/paski HP (2026-09-18)
+
+User wyeksportował z `/battle-layout-lab` (§120) i wkleił w rozmowie: `{ bg:'gorskislas',
+catSize:205, bossSize:150, catOffsetX:0, catOffsetY:45, bossOffsetX:0, bossOffsetY:45,
+catHpOffsetX:0, catHpOffsetY:10, bossHpOffsetX:0, bossHpOffsetY:10 }`. `bg` = już domyślne
+(`DEFAULT_ARENA_BG`), zero zmian tam. Podpięte do `app/boss-fight.tsx`, GLOBALNIE dla
+wszystkich 6 trybów walki (dzielą tę samą arenę):
+
+- `PORTRAIT_SIZE` 130→150, `CAT_PORTRAIT_SIZE` 175→205.
+- Dawne WSPÓLNE `SPRITE_GROUND_SHIFT` (jeden przesunięcie dla obu sprite'ów, 2026-09-11/12)
+  ZASTĄPIONE czterema NIEZALEŻNYMI stałymi: `CAT_OFFSET_X/Y`, `BOSS_OFFSET_X/Y` (na
+  `spriteBoxCat`/`spriteBoxBoss`) — dokładnie to, czego brakowało wg komentarza w
+  `battleLayoutDraftStore.ts` ("realny ekran walki NIE MA dziś żadnego per-element
+  pozycjonowania").
+- NOWE `CAT_HP_OFFSET_X/Y`, `BOSS_HP_OFFSET_X/Y` — paski HP wcześniej nie miały ŻADNEGO
+  offsetu (gołe dzieci `tile`). Wydzielone do nowych stylów `tileHpBlockCat`/`tileHpBlockBoss`
+  (owijają `tileHpTrack`+`tileHpTxt`, `gap:6` = ten sam odstęp co dawniej dawał `tile.gap`
+  między tymi elementami bezpośrednio — zero wizualnej różnicy przy offsecie {0,0}).
+- `projectile.top` (pozycja pocisku między sprite'ami) PRZEPISANY z ręcznie przeliczanego
+  magicznego numerka (`91 + SPRITE_GROUND_SHIFT`) na wzór z nazwanych stałych (`spacing[2] +
+  TILE_PORTRAIT_HEIGHT/2 - 14 + SPRITE_OFFSET_Y_AVG`) — ten dawny wzór wymagał RĘCZNEGO
+  przeliczenia przy każdej zmianie `PORTRAIT_SIZE`/`CAT_PORTRAIT_SIZE` (komentarz w kodzie
+  sam dokumentował 3 takie przeliczenia w historii), realne ryzyko rozjazdu przy tej samej
+  zmianie gdybym to przeoczył. `SPRITE_OFFSET_Y_AVG` = średnia `CAT_OFFSET_Y`/`BOSS_OFFSET_Y`
+  (oba akurat równe w tym eksporcie — 45/45), zostaje sensowna gdyby user kiedyś
+  wyeksportował różne wartości dla obu.
+- `TILE_PORTRAIT_HEIGHT` (nowa stała, `Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18`) —
+  wydzielona z inline wyrażenia w `tilePortrait.height`, bo `projectile.top` też jej
+  potrzebuje; jedna definicja zamiast dwóch kopii do ręcznej synchronizacji.
+
+**Nie ruszane w tej zmianie** (user wspomniał, ale bez konkretnej specyfikacji do wdrożenia):
+przemianowanie/wywalenie starych bossów, przesunięcie cienia bliżej, usunięcie lodowej areny
+("zła perspektywa") — to brzmiało jak myślenie na głos, nie gotowa specyfikacja; czeka na
+konkretniejszą instrukcję. Etykiety "Pupil"/nazwa bossa nad portretami ZOSTAJĄ — to te same
+etykiety co już były w realnej walce PRZED edytorem, nie artefakt samego edytora.
+
+`tsc`/`jest` czyste (1000 testów, bez zmian w logice — czysto geometria/stałe).
+**Priorytet testu na urządzeniu**: wysoki — to zmiana wizualna w KAŻDYM trybie walki. Sprawdź
+że pupil/boss są większe i niżej (bliżej paska HP, mniej "lewitują"), paski HP też lekko
+niżej, a pocisk między nimi leci PRZEZ sprite'y (nie nad/pod), we wszystkich 6 trybach
+(kampania/raid/event/quest/mad/misja).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
