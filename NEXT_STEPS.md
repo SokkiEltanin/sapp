@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Redesign ekwipunku pupila — każdy drop = trwała instancja z własnym id (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §124. User (ze screenshotem Butów): duplikaty gearu czasem
+"łączyły się" i user nie dostawał ani itemu ani monet. Zaproponowałem lżejszą alternatywę,
+user explicit odrzucił i potwierdził pełny redesign: każdy drop dostaje trwałe id
+`itemId:seq` (np. `helm_slomiany:001`), user widzi ile kopii ma ("×N"), rozwija żeby
+zobaczyć float/wartość każdej z osobna, sprzedaje wybraną ILOŚĆ duplikatów naraz, ekwipunek
+wyżej na ekranie, bez emoji w etykiecie slotu. Po drodze znaleziony i naprawiony REALNY bug
+dokładnie matchujący skargę usera: `openCrate()` (skrzynka sardynek za głaskanie) miała
+własną, nieskopiowaną kopię starej logiki "czy to ulepszenie", która przy gorszym dropie
+PO CICHU go odrzucała bez ŻADNEJ kompensaty (inne dwie ścieżki dropu przynajmniej dawały
+monety) — `CrateModal.tsx` mimo to zawsze pisało "🎁 Ekwipunek: {name}". `ownedGear` zmienia
+kształt (flat mapa instancji, nie 1 slot per item), `isGearUpgrade()`/`dupeCoins`/
+`alreadyOwnGear()` USUNIĘTE — nic już nie ocenia automatycznie "lepsze/gorsze", user sam
+decyduje. Migracja stalych zapisów jest idempotentna (bezpieczna na każdym starcie apki).
+`GearPanel.tsx` przepisany pod grupowanie po itemie + stepper ilości do sprzedaży.
+`tsc`/`jest` czyste (980 testów, 2 pliki testowe przepisane pod nowe API). **Priorytet
+testu na urządzeniu — wysoki, patrz pełna lista w ARCHITECTURE §124**: (1) 2+ kopie tego
+samego itemu zostają WIDOCZNE osobno, nie zlewają się; (2) rozwinięcie grupy pokazuje
+realny float każdej kopii; (3) "Sprzedaj kilka…" ze stepperem liczy monety poprawnie i
+sprzedaje najsłabsze; (4) skrzynka sardynek kilka razy pod rząd — KAŻDY drop gearu
+faktycznie się pojawia (dawny bug); (5) stary zapis (przed update) migruje się poprawnie
+przy pierwszym starcie po aktualizacji.
+
 ## ✅ Audyt Gabloty — zdobyta odznaka mogła "wrócić do zablokowanej" (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §123. User: "rzuć okiem na gablotę... czy to wgle dziala i
@@ -87,17 +111,15 @@ samych plikach już to robią. Naprawione + 3 nowe testy regresyjne. `tsc`/`jest
 (981 testów). Do zrobienia (user, niski priorytet): brak — poprawka dotyczy tylko rzadkiej
 kombinacji (przelew własny z tagiem słodycze/przekąski lub kategorią groceries).
 
-## 🆕 Redesign ekwipunku pupila — zakładki, tap-outside, sprzedaż zbiorcza (2026-09-17)
+## ✅ Redesign ekwipunku pupila — zakładki, tap-outside, sprzedaż zbiorcza (2026-09-17)
 
 Pełny opis w ARCHITECTURE.md §116. User: skarga na 4 rzeczy w `GearPanel.tsx` — malutkie
 ikonki slotów wymuszające zamykanie/otwieranie modala dla każdego slotu, brak tap-outside
 (tylko malutki X), goły `sellLink` bez paddingu (ciężko trafić), i brak zbiorczej sprzedaży
-"podobnych itemów z gorszym floatem" (czyli: innych itemów tego samego slotu, nie
-duplikatów TEGO SAMEGO itemu — te są auto-kompensowane monetami przy zdobyciu). Naprawione
-wszystkie 4: pasek zakładek wszystkich 6 slotów, tap na tło zamyka, przycisk Sprzedaj z
-realnym paddingiem+ikoną, "Sprzedaj X niezałożonych" per slot. `tsc`/`jest` czyste. Do
-zrobienia (user, na urządzeniu): pełny flow — przełączanie zakładek, tap-outside, zbiorcza
-sprzedaż z policzoną sumą monet, założony item NIE znika przy zbiorczej sprzedaży.
+"podobnych itemów z gorszym floatem". Naprawione wszystkie 4: pasek zakładek wszystkich 6
+slotów, tap na tło zamyka, przycisk Sprzedaj z realnym paddingiem+ikoną, "Sprzedaj X
+niezałożonych" per slot. **Pasek zakładek/tap-outside ZOSTAJĄ** w §124 (2026-09-18) redesign
+instancji — tamten wpis to kolejny krok na tym samym pliku, nie zamiana tego.
 
 ## ✅ Self-review #224: bug w logu "Historia zmian" dla pojazdu (2026-09-17)
 

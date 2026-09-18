@@ -218,7 +218,7 @@ export default function Pet() {
   // to konkretne miejsce zostało przeoczone przy dodawaniu misji).
   const [cancelMissionConfirm, setCancelMissionConfirm] = useState(false);
   const onCancelMission = () => { haptic.tap(); setCancelMissionConfirm(true); };
-  const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
+  const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
   const recordBoxOpen = useBoxStats(st => st.recordOpen);
@@ -226,11 +226,12 @@ export default function Pet() {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
     const reward = rollBox(DAILY_BOX, lvl.level, ownedCombatItems);
-    let dupeCoins: number | undefined;
     // 2026-09-11: 'color'/'startup'/'freeze' USUNIĘTE z BoxReward (patrz petBoxes.ts) — te
     // gałęzie miały ich obsłużyć, teraz rollBox() nigdy ich nie zwraca.
     if (reward.type === 'coins') addCoins(reward.coins);
-    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
+    // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
+    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
+    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — `daily:true` bo to darmowa
     // Skrzynka dnia (cost 0), odróżniona od płatnej Drewnianej (ten sam BoxId 'sardine'),
@@ -240,7 +241,7 @@ export default function Pet() {
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
     });
     haptic.success();
-    setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });
+    setBoxReveal({ box: DAILY_BOX, reward });
   };
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
@@ -443,14 +444,15 @@ export default function Pet() {
             <Text style={s.lvlXpTxt}>{lvl.inLevel}/{lvl.needed} XP</Text>
           </View>
         </View>
-        <Text style={s.tip}>{petStatusLine(pet)}</Text>
-
         {/* stage — no room backdrop any more; the cat IS the stage. Ekwipunek (6 slotów,
             gear.ts) flankuje kotka 3 lewo/3 prawo (2026-08-20, `GearPanel` bierze kotka jako
             `children` żeby otoczyć go z obu stron — patrz NEXT_STEPS.md "SYSTEM EKWIPUNKU"
             krok 7 i wpis "Gear layout + konsolidacja UI misji"). Stały rozmiar 300px zawsze —
             dawny dynamiczny `minHeight` dla wielkiego kafelka podróży zniknął razem z nim
-            (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu). */}
+            (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu).
+            PRZENIESIONE PRZED `s.tip` (2026-09-18, redesign ekwipunku, user: "eq możemy w
+            górę") — ekwipunek renderuje się teraz bezpośrednio pod nagłówkiem nazwa/lvl,
+            zamiast pod linijką statusu pupila, żeby był pierwszą rzeczą widoczną po headerze. */}
         <View style={s.stage}>
           <GearPanel>
             {/* Kotek W MISJI — JEDEN kotek, nie dwa (2026-08-20, user: "kotek jest podwojony" —
@@ -551,6 +553,7 @@ export default function Pet() {
             )}
           </GearPanel>
         </View>
+        <Text style={s.tip}>{petStatusLine(pet)}</Text>
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. UI misji
@@ -744,7 +747,6 @@ export default function Pet() {
         boxColor={boxReveal?.box.color ?? '#FBBF24'}
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         boxIcon={boxReveal?.box.icon}
-        dupeCoins={boxReveal?.dupeCoins}
         onClose={() => setBoxReveal(null)}
       />
       <PetCustomizeModal

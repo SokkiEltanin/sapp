@@ -54,11 +54,10 @@ const FILLER_ICONS: { icon?: any; emoji?: string }[] = [
 const FILLER_COLORS = [RARITY_META.common.color, RARITY_META.common.color, RARITY_META.common.color,
   RARITY_META.rare.color, RARITY_META.rare.color, RARITY_META.epic.color, RARITY_META.legendary.color, RARITY_META.mythic.color];
 
-function rewardCell(reward: BoxReward, dupeCoins?: number): ReelCell {
-  const isDupe = reward.type === 'gear' && !!dupeCoins;
+function rewardCell(reward: BoxReward): ReelCell {
   if (reward.type === 'gear') {
     const g = gearById(reward.itemId);
-    return { key: 'reward', icon: g?.icon, color: isDupe ? RARITY_META.common.color : RARITY_META[reward.rarity].color };
+    return { key: 'reward', icon: g?.icon, color: RARITY_META[reward.rarity].color };
   }
   if (reward.type === 'combatItem') {
     const def = itemById(reward.itemId);
@@ -67,10 +66,10 @@ function rewardCell(reward: BoxReward, dupeCoins?: number): ReelCell {
   return { key: 'reward', emoji: '🪙', color: CRATE_META[reward.rarity].color };
 }
 
-function buildReel(reward: BoxReward, dupeCoins?: number): ReelCell[] {
+function buildReel(reward: BoxReward): ReelCell[] {
   const cells: ReelCell[] = [];
   for (let i = 0; i < REEL_LENGTH; i++) {
-    if (i === REEL_TARGET_INDEX) { cells.push(rewardCell(reward, dupeCoins)); continue; }
+    if (i === REEL_TARGET_INDEX) { cells.push(rewardCell(reward)); continue; }
     const f = FILLER_ICONS[Math.floor(Math.random() * FILLER_ICONS.length)];
     const color = FILLER_COLORS[Math.floor(Math.random() * FILLER_COLORS.length)];
     cells.push({ key: `f${i}`, icon: f.icon, emoji: f.emoji, color });
@@ -81,15 +80,12 @@ function buildReel(reward: BoxReward, dupeCoins?: number): ReelCell[] {
 // Odsłona nagrody ze skrzynki. Nagroda jest JUŻ wylosowana i przyznana — tu tylko celebracja:
 // "Otwórz" → reel przelatuje i zwalnia na wylosowanym itemie → wybuch + cząstki + karta.
 //
-// `dupeCoins` (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu
-// nic nie dostałem") — gdy wylosowany gear to duplikat (już posiadany w ≥ tej rzadkości),
-// `petStore.grantGear` go NIE przyznaje, tylko kompensuje monetami (patrz komentarz tam).
-// Pokazywanie zwykłej karty "EKWIPUNEK! <nazwa>" w tej sytuacji byłoby kłamstwem — user
-// widziałby że "dostał" item, którego naprawdę nie ma w ekwipunku. Ten prop przełącza kartę
-// na uczciwą wersję: monety zamiast ikony/nazwy itemu, ta sama logika cząstek co przy
-// zwykłej wygranej monet.
-export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, dupeCoins, onClose }: {
-  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any; dupeCoins?: number; onClose: () => void;
+// Dawny prop `dupeCoins` USUNIĘTY (2026-09-18) — od `grantGear`'s przejścia na trwałe
+// instancje (patrz `GearInstance` w gear.ts) KAŻDY wylosowany gear jest zawsze naprawdę
+// przyznany, nigdy po cichu kompensowany/odrzucany, więc karta "EKWIPUNEK! <nazwa>" już
+// zawsze mówi prawdę — nie potrzeba osobnej "uczciwej" wersji na duplikat.
+export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, onClose }: {
+  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any; onClose: () => void;
 }) {
   // Nowa faza `opening` (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
   // powiększyć bo jest malutka i zrobic takie epickie przejście po kliknięciu otworz do
@@ -149,7 +145,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
         Animated.timing(flash, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         Animated.timing(openScale, { toValue: 0, duration: 200, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]).start(() => {
-        setReel(buildReel(reward, dupeCoins));
+        setReel(buildReel(reward));
         reelX.setValue(0);
         flash.setValue(0);
         setPhase('spinning');
@@ -164,9 +160,8 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
           setPhase('revealed');
           haptic.success();
           Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-          const isDupe = reward.type === 'gear' && !!dupeCoins;
           const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
-          const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
+          const em = reward.type === 'coins' ? '🪙' : '✨';
           setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
             sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
             emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
@@ -183,9 +178,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
-  const isDupe = reward?.type === 'gear' && !!dupeCoins;
-  const rewardTitle = isDupe ? 'MASZ JUŻ TEN PRZEDMIOT'
-    : reward?.type === 'gear' ? 'EKWIPUNEK!'
+  const rewardTitle = reward?.type === 'gear' ? 'EKWIPUNEK!'
     : reward?.type === 'combatItem' ? (reward.isUpgrade ? 'PERK ULEPSZONY!' : 'NOWY PERK BOSSA!')
     : 'MONETY';
 
@@ -242,12 +235,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
                 {flies.map(f => <Fly key={f.id} sx={f.sx} sy={f.sy} ex={f.ex} ey={f.ey} emoji={f.emoji} size={f.size} />)}
                 <Animated.View style={[st.card, { borderColor: meta.color, transform: [{ scale: cardScale }] }]}>
                   <Text style={[st.tier, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
-                  {reward?.type === 'gear' && isDupe ? (
-                    <>
-                      <Text style={st.coins}>+{dupeCoins} 🪙</Text>
-                      <Text style={st.rewardName}>{reward.name} (już masz)</Text>
-                    </>
-                  ) : reward?.type === 'gear' ? (
+                  {reward?.type === 'gear' ? (
                     <>
                       {(() => { const g = gearById(reward.itemId); return g
                         ? <Image source={g.icon} style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />

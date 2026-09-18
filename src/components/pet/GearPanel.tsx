@@ -1,12 +1,12 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native';
-import { X, Check, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, LucideIcon } from 'lucide-react-native';
+import { X, Check, ChevronDown, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, Minus, Plus, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePetStore } from '@/store/petStore';
 import {
-  GEAR_SLOTS, GearSlot, RARITY_META, SLOT_META, SLOT_STAT,
-  gearById, gearBySlot, gearSellValue, GEAR_STAT_LABEL, fmtGearStat,
+  GEAR_SLOTS, GearSlot, GearItemDef, GearInstance, RARITY_META, SLOT_META, SLOT_STAT,
+  gearById, gearSellValue, GEAR_STAT_LABEL, fmtGearStat, parseGearInstanceId,
 } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -14,24 +14,31 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
-// Ikony lucide zamiast emoji dla sloty flankujące kotka (2026-08-20, user: "lepsze ikony
-// lucid bez koloru jako by były puste" — puste/niezałożone sloty renderują ikonę wyciszonym
-// kolorem, bez wypełnienia rarity). Emoji z SLOT_META.icon ZOSTAJE dla innych miejsc
-// (pet-shop.tsx, BoxRevealModal.tsx) — to celowe, nie dead code.
 const SLOT_ICON: Record<GearSlot, LucideIcon> = {
   helm: HardHat, zbroja: Shield, buty: Footprints, obroza: Link2, talizman: Gem, kolczyki: Coins,
 };
-// 3 lewo / 3 prawo flankujące kotka (2026-08-20, user: "itemy będą 3 z prawej i 3 z lewej
-// kotka" — zastępuje dawny pojedynczy rząd POD kotkiem, patrz historia niżej przy `flankRow`).
 const LEFT_SLOTS = GEAR_SLOTS.slice(0, 3);
 const RIGHT_SLOTS = GEAR_SLOTS.slice(3);
 
-// 6 slotów ekwipunku FLANKUJĄCYCH kotka, 3 lewo/3 prawo (2026-08-20, user: "itemy będą 3 z
-// prawej i 3 z lewej kotka" — zastępuje dawny pojedynczy rząd emoji POD kotkiem, którego
-// napisy zachodziły na kartę misji niżej). `children` = render kotka (przekazany przez
-// pet.tsx), wstawiany w środkową kolumnę żeby sloty otaczały go z obu stron zamiast żyć
-// jako osobna sekcja pod nim. Staty JESZCZE nic nie robią w walce/ekonomii bezpośrednio TU —
-// to czysto zarządzanie kolekcją (realne wpięcie w combat jest w bosses.ts/gear.ts, krok 8).
+type OwnedMap = Partial<Record<string, GearInstance>>;
+
+// Grupuje FLAT mapę instancji (petStore `ownedGear`, kluczowaną `itemId:seq`, 2026-09-18) po
+// bazowym itemie, dla danego slotu — jedna karta na item w UI, niezależnie od tego ile
+// konkretnych kopii user posiada. Instancje w grupie sortowane wg wartości (najlepsza pierwsza).
+interface GearGroup { item: GearItemDef; instances: { id: string; inst: GearInstance }[] }
+function groupOwnedBySlot(ownedGear: OwnedMap, slot: GearSlot): GearGroup[] {
+  const groups = new Map<string, GearGroup>();
+  for (const [id, inst] of Object.entries(ownedGear)) {
+    if (!inst) continue;
+    const item = gearById(inst.itemId);
+    if (!item || item.slot !== slot) continue;
+    if (!groups.has(inst.itemId)) groups.set(inst.itemId, { item, instances: [] });
+    groups.get(inst.itemId)!.instances.push({ id, inst });
+  }
+  for (const g of groups.values()) g.instances.sort((a, b) => b.inst.value - a.inst.value);
+  return [...groups.values()].sort((a, b) => a.item.unlockLevel - b.item.unlockLevel);
+}
+
 export default function GearPanel({ children }: { children: ReactNode }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -40,16 +47,15 @@ export default function GearPanel({ children }: { children: ReactNode }) {
 
   const slotButton = (slot: GearSlot) => {
     const equippedId = equippedGear[slot];
-    // Grafika KONKRETNEGO założonego itemu (2026-08-20, user: "dodałeś ze ikony te które
-    // dodam wyświetlają sie jako w tych kafelkach u pupila?") — `GearItemDef.icon` istniało
-    // w gear.ts od kroku 1 (require() per plik w assets/ekwipunek/), ale NIC go dotąd
-    // faktycznie nie renderowało (ani stara wersja tego slotu, ani sklep/reveal — wszędzie
-    // leciała generyczna emoji/ikona SLOTU, nie itemu). Puste sloty ZOSTAJĄ na `SLOT_ICON`
-    // (kategoria, nie ma czego pokazać).
-    const equippedItem = equippedId ? gearById(equippedId) : undefined;
-    const owned = equippedId ? ownedGear[equippedId] : undefined;
-    const meta = owned ? RARITY_META[owned.rarity] : null;
-    const ownedCount = gearBySlot(slot).filter(g => ownedGear[g.id]).length;
+    // Instancje modelu (2026-09-18): `equippedId` jest teraz złożonym `itemId:seq`, a
+    // `ownedGear` jest kluczowany TYM SAMYM złożonym id — więc lookup grafiki/rzadkości idzie
+    // przez `parseGearInstanceId` do bazowego itemu, a nie prosto `gearById(equippedId)`.
+    const equippedInst = equippedId ? ownedGear[equippedId] : undefined;
+    const equippedItem = equippedInst ? gearById(equippedInst.itemId) : undefined;
+    const meta = equippedInst ? RARITY_META[equippedInst.rarity] : null;
+    const hasUnequippedInSlot = Object.entries(ownedGear).some(
+      ([id, inst]) => inst && id !== equippedId && gearById(inst.itemId)?.slot === slot,
+    );
     const Icon = SLOT_ICON[slot];
     return (
       <PressableScale key={slot} onPress={() => { haptic.tap(); setOpenSlot(slot); }}>
@@ -59,7 +65,7 @@ export default function GearPanel({ children }: { children: ReactNode }) {
           ) : (
             <Icon size={27} color={c.text.muted} strokeWidth={1.6} />
           )}
-          {ownedCount > 0 && !equippedId && <View style={s.slotDot} />}
+          {hasUnequippedInSlot && <View style={s.slotDot} />}
         </View>
       </PressableScale>
     );
@@ -77,39 +83,32 @@ export default function GearPanel({ children }: { children: ReactNode }) {
   );
 }
 
-// Redesign (2026-09-17, user: "kliknięcie w sloty otwierał sie ekwipunek pełnoprawny...
-// klikanie w te ikonki małe to ból dupy potem zeby trafić w sprzedaz albo doczytać sie co
-// robi item... zeby wyjść z eq chciałem kliknąć poza niego ale nie traf w malutki x... a
-// sprzedawanie podobnych itemow z gorszym floatem to tez masakra") — cztery zmiany w JEDNYM
-// modalu (nie osobny full-screen route — mniej ryzyka w nawigacji, ten sam bottom-sheet):
-// (1) pasek zakładek WSZYSTKICH 6 slotów u góry, przełącza się bez zamykania/ponownego
-// otwierania z malutkich ikonek na kotku (to jest "ekwipunek pełnoprawny" — cały ekwipunek
-// w jednym miejscu, nie pojedynczy slot na raz); (2) tap na tło ZA arkuszem zamyka (obok X,
-// nie tylko X); (3) X i przycisk Sprzedaj powiększone/z paddingiem (dawny `sellLink` był
-// gołym podkreślonym tekstem bez paddingu — realnie ciężko trafić); (4) "Sprzedaj słabsze"
-// — jeden przycisk sprzedaje WSZYSTKIE nie-założone itemy tego slotu za jednym
-// potwierdzeniem, zamiast N razy osobno.
 function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null; onSelectSlot: (s: GearSlot) => void; onClose: () => void }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { ownedGear, equippedGear, equipGear, unequipGear, sellGear } = usePetStore();
-  // Sprzedaż pojedynczego itemu (2026-08-20, user: "co robimy z itemami co sa słabsze ale je
-  // mamy w eq? mozna je sprzedać? jak tak dodaj przycisk sprzedaj z potwierdzeniem") —
-  // potwierdzenie przez ISTNIEJĄCY `ConfirmDialog`, ten sam wzorzec co reszta destrukcyjnych
-  // akcji w apce.
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  // Sprzedaż JEDNEJ konkretnej instancji.
   const [sellTarget, setSellTarget] = useState<{ id: string; name: string; coins: number; wasEquipped: boolean } | null>(null);
-  // Sprzedaż zbiorcza (2026-09-17) — patrz komentarz nad komponentem, punkt (4).
+  // Sprzedaż całego slotu naraz (wszystkie niezałożone instancje, niezależnie od itemu).
   const [bulkSell, setBulkSell] = useState<{ slot: GearSlot; ids: string[]; coins: number } | null>(null);
+  // Sprzedaż N kopii TEGO SAMEGO itemu — wybierana ilość (user: "jak sa dosłownie takie same
+  // moge je sprzedac i wtedy wybieram ile"). Sprzedaje N najsłabszych niezałożonych kopii.
+  const [groupSell, setGroupSell] = useState<{ item: GearItemDef; candidates: { id: string; inst: GearInstance }[]; qty: number } | null>(null);
 
   if (!slot) return null;
-  const items = gearBySlot(slot).filter(g => ownedGear[g.id]);
+  const groups = groupOwnedBySlot(ownedGear, slot);
   const equippedId = equippedGear[slot];
-  const equippedItem = equippedId ? gearById(equippedId) : undefined;
-  const equippedOwned = equippedId ? ownedGear[equippedId] : undefined;
-  const equippedVal = equippedOwned ? equippedOwned.value : 0;
+  const equippedInst = equippedId ? ownedGear[equippedId] : undefined;
+  const equippedItem = equippedInst ? gearById(equippedInst.itemId) : undefined;
+  const equippedVal = equippedInst ? equippedInst.value : 0;
   const stat = SLOT_STAT[slot];
-  const nonEquipped = items.filter(item => item.id !== equippedId);
-  const nonEquippedTotal = nonEquipped.reduce((sum, item) => sum + gearSellValue(item, ownedGear[item.id]!.rarity), 0);
+  const allNonEquipped = groups.flatMap(g => g.instances.filter(i => i.id !== equippedId));
+  const nonEquippedTotal = allNonEquipped.reduce((sum, { id, inst }) => sum + gearSellValue(gearById(inst.itemId)!, inst.rarity), 0);
+
+  const groupSellCoins = groupSell
+    ? groupSell.candidates.slice(0, groupSell.qty).reduce((sum, { inst }) => sum + gearSellValue(groupSell.item, inst.rarity), 0)
+    : 0;
 
   return (
     <>
@@ -125,68 +124,126 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
             {GEAR_SLOTS.map(sl => {
               const TabIcon = SLOT_ICON[sl];
               const active = sl === slot;
-              const hasDot = gearBySlot(sl).some(g => ownedGear[g.id]) && !equippedGear[sl];
+              const slEquippedId = equippedGear[sl];
+              const hasDot = Object.entries(ownedGear).some(
+                ([id, inst]) => inst && id !== slEquippedId && gearById(inst.itemId)?.slot === sl,
+              );
               return (
-                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
+                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
                   <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />
                   {hasDot && <View style={s.tabDot} />}
                 </TouchableOpacity>
               );
             })}
           </View>
-          <Text style={s.slotLabel}>{SLOT_META[slot].icon} {SLOT_META[slot].label}</Text>
+          {/* Bez emoji (2026-09-18, user: "eq możemy w górę i usun z niego emotki") — dawne
+              `SLOT_META[slot].icon` zostaje jako format dla pet-shop.tsx/BoxRevealModal.tsx
+              (celowe, nie dead code), tu tylko sama etykieta słowna. */}
+          <Text style={s.slotLabel}>{SLOT_META[slot].label}</Text>
 
-          {items.length === 0 ? (
+          {groups.length === 0 ? (
             <Text style={s.emptyTxt}>Brak jeszcze itemów do tego slotu — zdobądź w skrzynkach albo sklepie dnia.</Text>
           ) : (
             <>
-            {nonEquipped.length > 0 && (
+            {allNonEquipped.length > 0 && (
               <TouchableOpacity
                 style={s.bulkSellBtn}
-                onPress={() => { haptic.tap(); setBulkSell({ slot, ids: nonEquipped.map(i => i.id), coins: nonEquippedTotal }); }}
+                onPress={() => { haptic.tap(); setBulkSell({ slot, ids: allNonEquipped.map(i => i.id), coins: nonEquippedTotal }); }}
               >
                 <Trash2 size={13} color={c.accent.red ?? '#EF4444'} />
-                <Text style={s.bulkSellTxt}>Sprzedaj {nonEquipped.length} niezałożonych (+{nonEquippedTotal} 🪙)</Text>
+                <Text style={s.bulkSellTxt}>Sprzedaj {allNonEquipped.length} niezałożonych (+{nonEquippedTotal} 🪙)</Text>
               </TouchableOpacity>
             )}
-            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
-              {items.map(item => {
-                const owned = ownedGear[item.id]!;
-                const rarity = owned.rarity;
-                const meta = RARITY_META[rarity];
-                const val = owned.value;
-                const delta = val - equippedVal;
-                const isEquipped = equippedId === item.id;
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+              {groups.map(group => {
+                const isExpanded = expandedItemId === group.item.id;
+                const count = group.instances.length;
+                const groupHasEquipped = group.instances.some(i => i.id === equippedId);
+                const best = group.instances[0].inst;
+                const bestMeta = RARITY_META[best.rarity];
+                const nonEquippedInGroup = group.instances.filter(i => i.id !== equippedId);
                 return (
-                  <View key={item.id} style={[s.itemRow, { borderColor: meta.color + '55' }]}>
-                    <Image source={item.icon} style={[s.itemImg, { borderColor: meta.color + '55' }]} resizeMode="contain" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.itemName}>{item.name}</Text>
-                      <Text style={[s.itemRarity, { color: meta.color }]}>{meta.label}</Text>
-                      <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, val)}{stat === 'flatHp' ? ' HP' : ''}</Text>
-                      {!isEquipped && equippedItem && (
-                        <Text style={[s.deltaTxt, { color: delta > 0 ? '#2AC68F' : delta < 0 ? '#EF4444' : c.text.muted }]}>
-                          {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {delta === 0 ? 'tyle samo' : `${fmtGearStat(stat, Math.abs(delta))} vs założony`}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <TouchableOpacity
-                        onPress={() => { haptic.tap(); isEquipped ? unequipGear(slot) : equipGear(item.id); }}
-                        style={[s.equipBtn, isEquipped && s.equipBtnOn]}
-                      >
-                        {isEquipped && <Check size={13} color={c.bg.primary} />}
-                        <Text style={[s.equipBtnTxt, isEquipped && s.equipBtnTxtOn]}>{isEquipped ? 'Załóż.' : 'Załóż'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => { haptic.tap(); setSellTarget({ id: item.id, name: item.name, coins: gearSellValue(item, rarity), wasEquipped: isEquipped }); }}
-                        style={s.sellBtn}
-                        hitSlop={6}
-                      >
-                        <Trash2 size={12} color={c.text.muted} />
-                        <Text style={s.sellBtnTxt}>+{gearSellValue(item, rarity)} 🪙</Text>
-                      </TouchableOpacity>
-                    </View>
+                  <View key={group.item.id} style={[s.itemGroup, { borderColor: bestMeta.color + '55' }]}>
+                    <TouchableOpacity
+                      style={s.itemGroupHead}
+                      activeOpacity={0.8}
+                      onPress={() => { haptic.tap(); setExpandedItemId(isExpanded ? null : group.item.id); }}
+                    >
+                      <Image source={group.item.icon} style={[s.itemImg, { borderColor: bestMeta.color + '55' }]} resizeMode="contain" />
+                      <View style={{ flex: 1 }}>
+                        <View style={s.itemNameRow}>
+                          <Text style={s.itemName}>{group.item.name}</Text>
+                          {/* Znacznik "masz kilka" (2026-09-18, user: "jak sa takie same te
+                              pierwsze kody to pokazuje ze mam kilka") — złota pigułka ×N,
+                              tylko gdy realnie posiada więcej niż jedną kopię. */}
+                          {count > 1 && (
+                            <View style={s.countBadge}><Text style={s.countBadgeTxt}>×{count}</Text></View>
+                          )}
+                          {groupHasEquipped && (
+                            <View style={s.equippedBadge}><Check size={10} color="#2AC68F" /></View>
+                          )}
+                        </View>
+                        <Text style={[s.itemRarity, { color: bestMeta.color }]}>{bestMeta.label}{count > 1 ? ' (najlepsza)' : ''}</Text>
+                        <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, best.value)}{stat === 'flatHp' ? ' HP' : ''}</Text>
+                      </View>
+                      <ChevronDown size={18} color={c.text.muted} style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
+                    </TouchableOpacity>
+
+                    {isExpanded && (
+                      <View style={s.instanceList}>
+                        {count > 1 && nonEquippedInGroup.length > 0 && (
+                          <TouchableOpacity
+                            style={s.groupSellBtn}
+                            onPress={() => {
+                              haptic.tap();
+                              // Sprzedaje od najsłabszej — kandydatki posortowane wartością rosnąco.
+                              const candidates = [...nonEquippedInGroup].sort((a, b) => a.inst.value - b.inst.value);
+                              setGroupSell({ item: group.item, candidates, qty: 1 });
+                            }}
+                          >
+                            <Trash2 size={12} color={c.accent.red ?? '#EF4444'} />
+                            <Text style={s.groupSellTxt}>Sprzedaj kilka…</Text>
+                          </TouchableOpacity>
+                        )}
+                        {group.instances.map(({ id, inst }, idx) => {
+                          const meta = RARITY_META[inst.rarity];
+                          const delta = inst.value - equippedVal;
+                          const isEquipped = equippedId === id;
+                          const seq = parseGearInstanceId(id)?.seq ?? idx + 1;
+                          return (
+                            <View key={id} style={[s.itemRow, { borderColor: meta.color + '55' }]}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={s.itemInstanceLabel}>Kopia #{seq}</Text>
+                                <Text style={[s.itemRarity, { color: meta.color }]}>{meta.label}</Text>
+                                <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, inst.value)}{stat === 'flatHp' ? ' HP' : ''}</Text>
+                                {!isEquipped && equippedItem && (
+                                  <Text style={[s.deltaTxt, { color: delta > 0 ? '#2AC68F' : delta < 0 ? '#EF4444' : c.text.muted }]}>
+                                    {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {delta === 0 ? 'tyle samo' : `${fmtGearStat(stat, Math.abs(delta))} vs założony`}
+                                  </Text>
+                                )}
+                              </View>
+                              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                                <TouchableOpacity
+                                  onPress={() => { haptic.tap(); isEquipped ? unequipGear(slot) : equipGear(id); }}
+                                  style={[s.equipBtn, isEquipped && s.equipBtnOn]}
+                                >
+                                  {isEquipped && <Check size={13} color={c.bg.primary} />}
+                                  <Text style={[s.equipBtnTxt, isEquipped && s.equipBtnTxtOn]}>{isEquipped ? 'Załóż.' : 'Załóż'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => { haptic.tap(); setSellTarget({ id, name: group.item.name, coins: gearSellValue(group.item, inst.rarity), wasEquipped: isEquipped }); }}
+                                  style={s.sellBtn}
+                                  hitSlop={6}
+                                >
+                                  <Trash2 size={12} color={c.text.muted} />
+                                  <Text style={s.sellBtnTxt}>+{gearSellValue(group.item, inst.rarity)} 🪙</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -228,20 +285,60 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
       }}
       onCancel={() => setBulkSell(null)}
     />
+
+    {/* Wybór ILE sprzedać z duplikatów (2026-09-18, user: "jak sa dosłownie takie same moge
+        je sprzedac i wtedy wybieram ile"). Sprzedaje `qty` NAJSŁABSZYCH niezałożonych kopii
+        (candidates już posortowane wartością rosnąco), założona kopia nigdy nie jest kandydatem. */}
+    <Modal visible={!!groupSell} transparent animationType="fade" onRequestClose={() => setGroupSell(null)}>
+      <Pressable style={s.overlay} onPress={() => setGroupSell(null)}>
+        <Pressable style={s.qtyCard} onPress={() => {}}>
+          <Text style={s.qtyTitle}>Sprzedaj {groupSell?.item.name}</Text>
+          <Text style={s.qtyMsg}>Sprzedane zostaną najsłabsze kopie. Posiadasz {groupSell?.candidates.length ?? 0} niezałożonych.</Text>
+          <View style={s.qtyRow}>
+            <TouchableOpacity
+              style={s.qtyBtn}
+              onPress={() => { haptic.tap(); setGroupSell(g => g ? { ...g, qty: Math.max(1, g.qty - 1) } : g); }}
+            >
+              <Minus size={16} color={c.text.primary} />
+            </TouchableOpacity>
+            <Text style={s.qtyVal}>{groupSell?.qty ?? 1}</Text>
+            <TouchableOpacity
+              style={s.qtyBtn}
+              onPress={() => { haptic.tap(); setGroupSell(g => g ? { ...g, qty: Math.min(g.candidates.length, g.qty + 1) } : g); }}
+            >
+              <Plus size={16} color={c.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={s.qtyCoins}>Otrzymasz: {groupSellCoins} 🪙</Text>
+          <View style={s.qtyActionsRow}>
+            <TouchableOpacity style={s.qtyCancelBtn} onPress={() => setGroupSell(null)} activeOpacity={0.8}>
+              <Text style={s.qtyCancelTxt}>Anuluj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.qtyConfirmBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (groupSell) {
+                  const toSell = groupSell.candidates.slice(0, groupSell.qty);
+                  const earned = toSell.reduce((sum, { id }) => sum + sellGear(id), 0);
+                  haptic.success();
+                  toast.success(`Sprzedano ${toSell.length} × ${groupSell.item.name} — +${earned} 🪙`);
+                }
+                setGroupSell(null);
+              }}
+            >
+              <Text style={s.qtyConfirmTxt}>Sprzedaj</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
     </>
   );
 }
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
-  // Flankujące kolumny (2026-08-20) — `catCol` bierze resztę szerokości (flex:1) i centruje
-  // przekazanego kotka, kolumny slotów po bokach mają STAŁĄ, wąską szerokość (nie flex) żeby
-  // nie ściskać kotka gdy jest mało itemów; ikony bez etykiet (dawny `slotLabel` z nazwą itemu
-  // nie mieścił się obok kotka i zachodził na inne karty — szczegóły itemu są w modalu).
   flankRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: spacing[2] },
-  // Sloty powiększone DRUGI RAZ (2026-09-04, user: "sloty na ekwipunku pupila jeszcze
-  // powiększyć trochę bo teraz itemy nadal sa trochę malo widoczne") — 50→62 (pierwsza
-  // rozbiórka 40→50 była 2026-08-27), ikona/obrazek itemu i kropka "posiadasz" przeskalowane
-  // razem z nim, kolumna odpowiednio szersza żeby sloty nie stykały się krawędziami.
   flankCol: { width: 68, gap: spacing[2], alignItems: 'center' },
   catCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   slot: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
@@ -252,13 +349,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   sheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[2] },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
-  // Powiększony hit-target zamknięcia (2026-09-17, user: "nie traf w malutki x zeby wyjść")
-  // — dawny gołe 20px z hitSlop 10 zostaje 22px + hitSlop 16 + padding, razem ~54×54 efektywnie.
-  // Backdrop (tap poza arkuszem, `overlay` Pressable w renderze) teraz też zamyka — to jest
-  // GŁÓWNY fix, X jest już tylko zapasową drogą wyjścia.
   closeBtn: { padding: spacing[1] },
-  // Pasek zakładek WSZYSTKICH slotów (2026-09-17) — "ekwipunek pełnoprawny": przełączanie
-  // między slotami bez zamykania modala i szukania ponownie malutkiej ikonki na kotku.
   tabRow: { flexDirection: 'row', gap: spacing[1], marginBottom: spacing[2] },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: radius.md, backgroundColor: c.fill.subtle, position: 'relative' },
   tabActive: { backgroundColor: c.accent.blue + '22' },
@@ -266,24 +357,46 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   slotLabel: { fontSize: 13, fontWeight: '800', color: c.text.primary, marginBottom: spacing[2] },
   emptyTxt: { fontSize: 12.5, color: c.text.muted, lineHeight: 18, paddingVertical: spacing[4], textAlign: 'center' },
 
-  // Sprzedaż zbiorcza (2026-09-17, user: "sprzedawanie podobnych itemow z gorszym floatem to
-  // tez masakra") — jeden przycisk nad listą, zamiast osobnego "Sprzedaj" + potwierdzenia per item.
   bulkSellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, borderColor: (c.accent.red ?? '#EF4444') + '55', backgroundColor: (c.accent.red ?? '#EF4444') + '14', paddingVertical: 9, marginBottom: spacing[2] },
   bulkSellTxt: { fontSize: 11.5, fontWeight: '700', color: c.accent.red ?? '#EF4444' },
 
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, backgroundColor: c.bg.card, marginBottom: spacing[2] },
+  // Karta grupy (jeden item, N kopii) — 2026-09-18. Kolapsuje/rozwija instancje.
+  itemGroup: { borderRadius: radius.lg, borderWidth: 1, backgroundColor: c.bg.card, marginBottom: spacing[2], overflow: 'hidden' },
+  itemGroupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[3] },
+  itemNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  countBadge: { backgroundColor: '#FBBF2426', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 1 },
+  countBadgeTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
+  equippedBadge: { backgroundColor: '#2AC68F26', borderRadius: radius.full, padding: 3 },
+  instanceList: { paddingHorizontal: spacing[3], paddingBottom: spacing[3], gap: spacing[2] },
+  itemInstanceLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted },
+
+  groupSellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: radius.md, borderWidth: 1, borderColor: (c.accent.red ?? '#EF4444') + '44', paddingVertical: 7 },
+  groupSellTxt: { fontSize: 10.5, fontWeight: '700', color: c.accent.red ?? '#EF4444' },
+
   itemImg: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, backgroundColor: c.fill.subtle },
   itemName: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   itemRarity: { fontSize: 10.5, fontWeight: '800', marginTop: 1 },
   itemStat: { fontSize: 11, color: c.text.secondary, marginTop: 2 },
   deltaTxt: { fontSize: 10.5, fontWeight: '700', marginTop: 2 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[2], borderRadius: radius.md, borderWidth: 1, backgroundColor: c.bg.secondary },
   equipBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.border.default },
   equipBtnOn: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
   equipBtnTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
   equipBtnTxtOn: { color: c.bg.primary },
-  // Przycisk Sprzedaj (2026-09-17) — dawny `sellLink` to był goły podkreślony `Text` bez
-  // paddingu (user: "ciezko trafic w sprzedaz") — teraz pełnoprawny przycisk z ikoną, tym
-  // samym paddingiem co `equipBtn` obok niego, więc oba mają porównywalny hit-target.
   sellBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.border.default },
   sellBtnTxt: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
+
+  // Modal wyboru ilości (2026-09-18) — prosty stepper +/-, ten sam card-language co ConfirmDialog.
+  qtyCard: { width: '100%', maxWidth: 360, backgroundColor: c.bg.secondary, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], gap: spacing[2] },
+  qtyTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  qtyMsg: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4], marginTop: spacing[1] },
+  qtyBtn: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.card },
+  qtyVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, minWidth: 36, textAlign: 'center' },
+  qtyCoins: { fontSize: 13, fontWeight: '700', color: '#FBBF24', textAlign: 'center', marginTop: spacing[1] },
+  qtyActionsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] },
+  qtyCancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  qtyCancelTxt: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
+  qtyConfirmBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: radius.lg, backgroundColor: '#EF4444' },
+  qtyConfirmTxt: { fontSize: 14, fontWeight: '800', color: '#fff' },
 }));

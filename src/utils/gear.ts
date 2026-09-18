@@ -197,19 +197,31 @@ export function rollGearValue(item: GearItemDef, rarity: GearRarity, rand: () =>
 }
 
 // Posiadana kopia itemu — rzadkość ORAZ konkretny wylosowany wynik (nie tylko rzadkość jak
-// przed 2026-08-31). Jeden slot w `ownedGear` (petStore.ts) = NAJLEPSZA dotąd zdobyta kopia
-// tego itemu, S&F-style — patrz `isGearUpgrade` niżej za regułę "co liczy się jako lepsze".
+// przed 2026-08-31).
 export interface OwnedGear { rarity: GearRarity; value: number }
 
-// Czy `next` jest ulepszeniem względem `cur` (albo `cur` w ogóle nie ma — zawsze ulepszenie)?
-// Rzadkość wygrywa NAJPIERW (wyższy tier zawsze lepszy, niezależnie od rolla) — dopiero PRZY
-// RÓWNEJ rzadkości decyduje wyższa wylosowana wartość (user: "lepszy roll w tej samej
-// rzadkości to realny upgrade" — ARPG-owe podbijanie tej samej rzadkości lepszym rollem, nie
-// tylko zbieranie wyższych tierów).
-export function isGearUpgrade(next: OwnedGear, cur: OwnedGear | undefined): boolean {
-  if (!cur) return true;
-  if (RARITY_MULT[next.rarity] !== RARITY_MULT[cur.rarity]) return RARITY_MULT[next.rarity] > RARITY_MULT[cur.rarity];
-  return next.value > cur.value;
+// Każdy DROP = własna, trwała instancja (2026-09-18, user: "musimy operować inaczej z
+// itemami bo w eq sie nie mieszczą... moze każdy item bedzie miał id swoje np id itemi to
+// 1222 a po dwukropku numer od resetu który raz drapałem czyli np 1222:001") — zastępuje
+// dawny model "jeden slot w ownedGear = NAJLEPSZA dotąd zdobyta kopia, gorsze automatycznie
+// kompensowane monetami albo (w jednej ścieżce dropu — `openCrate()` w petStore.ts —
+// PO CICHU odrzucane bez żadnej kompensaty, prawdziwy bug, patrz komentarz tam). Zamiast
+// oceniać "czy to ulepszenie" przy KAŻDYM dropie (dawne `isGearUpgrade`, USUNIĘTE — nic już
+// go nie woła), user decyduje sam, co zatrzymać/sprzedać, w Ekwipunku. `seq` liczone per
+// `itemId` (1, 2, 3…), niezależnie od rzadkości/wartości — `gearInstanceId`/
+// `parseGearInstanceId` konwertują między parą (itemId, seq) a złożonym stringiem-kluczem,
+// którym teraz jest KAŻDY klucz w `ownedGear` (petStore.ts) i KAŻDA wartość w `equippedGear`.
+export interface GearInstance extends OwnedGear { itemId: string; seq: number }
+
+export function gearInstanceId(itemId: string, seq: number): string {
+  return `${itemId}:${String(seq).padStart(3, '0')}`;
+}
+export function parseGearInstanceId(id: string): { itemId: string; seq: number } | null {
+  const i = id.lastIndexOf(':');
+  if (i < 0) return null;
+  const seq = parseInt(id.slice(i + 1), 10);
+  if (isNaN(seq)) return null;
+  return { itemId: id.slice(0, i), seq };
 }
 
 // Formatowanie statów do UI — WYDZIELONE z GearPanel.tsx (2026-08-22, user: "jak klikam w
