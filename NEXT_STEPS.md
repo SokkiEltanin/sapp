@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Rozbudowa panelu "Statystyki apki" — okresy, trendy, kolejność ekranów, odbicia (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §128. User: brakowało w panelu (Ustawienia → Dane →
+Statystyki apki) sum otwarć dziś/tydzień/miesiąc, porównań do poprzedniego okresu, trendów
+per-ekran i tego "jakie ekrany po sobie"/"czy się jakieś zacinają pomiędzy sobie". Dodane 4
+nowe karty: "Otwarcia" (dziś/tydzień/miesiąc + delta vs poprzedni okres), "Trendy ekranów"
+(które zyskały/straciły otwarcia tydzień do tygodnia), "Najczęstsza kolejność ekranów" (z
+jakiego na jaki najczęściej), "Ekrany na przemian" (pary gdzie user odbija się w obie
+strony — sygnał że coś nie jest wygodnie dostępne z jednego miejsca). Wszystko czyste,
+testowalne funkcje w `usageStatsAnalysis.ts` (+13 testów). `tsc`/`jest` czyste (1000
+testów). Priorytet testu na urządzeniu: niski-średni — otwórz panel, sprawdź że liczby się
+zgadzają i że nowe karty (zwłaszcza kolejność/odbicia) pokazują sensowne pary ekranów.
+
 ## ✅ Audyt logika/optymalizacja, runda 2 — streak tygodniowy + self-transfer #5 + wydajność (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §127. User: "dawaj dalej logika i optymalizacja". Znalezione i

@@ -8617,6 +8617,43 @@ Nawyków i habit-year (szczegóły tego nawyku) pokazują TĘ SAMĄ liczbę dni 
 nie skacze; (3) ekran Zadania — przewiń długą listę, sprawdź że scroll/interakcje są płynne
 (regresja niemożliwa do zaobserwować wprost, tylko brak nowych problemów).
 
+## 128. Rozbudowa panelu "Statystyki apki" — okresy, trendy, kolejność ekranów, odbicia (2026-09-18)
+
+User: *"rozbuduje mi panel statystyk więcej szczegółów bo mam o której porze dnia i nie ma
+pory dnia nie ma otwiarc dzisiaj łącznie, w tym tygodniu i miesiącu łącznie, i Porównań
+otwarc, Porównań ekrnwo, jakie ekrany po sobie, czy się jakieś zacinają pomiędzy sobie
+itp"*. Panel (`app/usage-stats.tsx`, §102) miał już wykres dzienny (14 dni) i "o której
+porze dnia" — user potwierdza że TE zostają, brakowało reszty. Cztery nowe czyste funkcje w
+`src/utils/usageStatsAnalysis.ts` (testowalne bez renderowania ekranu, ten sam wzorzec co
+`bucketByDay`/`bucketByHour` obok):
+
+1. **`periodCounts(events, now)`** — otwarcia dziś/w tym tygodniu/w tym miesiącu ŁĄCZNIE +
+   poprzedni okres każdego (wczoraj/zeszły tydzień/zeszły miesiąc), liczone NIEZALEŻNIE (nie
+   jedna gałąź warunków — dzień może być jednocześnie w "tym tygodniu" i "tym miesiącu").
+   Tydzień = poniedziałek-start, ten sam wzorzec co reszta apki (`getWeekDates`/`weekly.tsx`).
+2. **`screenTrends(events, now)`** — "Porównań ekranów": które ekrany zyskały/straciły
+   otwarcia między tym a zeszłym tygodniem, sortowane po `|delta|` (duży spadek tak samo
+   widoczny jak duży wzrost), nie po samej wartości bieżącej.
+3. **`screenTransitions(events, maxGapMs=30min)`** — "jakie ekrany po sobie": z jakiego
+   ekranu na jaki user NAJCZĘŚCIEJ przechodzi (kolejne wpisy w logu `events`, w oknie 30 min
+   — dłuższa przerwa między otwarciami to NIE przejście w ramach jednej sesji, np. ostatni
+   ekran wczoraj wieczorem → pierwszy dziś rano). Przejście "sam do siebie" wykluczone.
+4. **`bouncePairs(transitions, minEach=3)`** — "czy się jakieś zacinają pomiędzy sobie": pary
+   ekranów gdzie user odbija się w OBIE strony często (A→B I B→A, nie tylko jedna
+   kierunkowa ścieżka) — sygnał że coś nie jest wygodnie dostępne z jednego miejsca.
+
+UI (`app/usage-stats.tsx`): nowa karta "Otwarcia" (3 kafelki dziś/tydzień/miesiąc, każdy z
+deltą vs poprzedni okres — ikona trend-up/trend-down/minus + kolor), "Trendy ekranów" (lista
+z badge'em delty), "Najczęstsza kolejność ekranów" (top 6 par "A → B ×n"), "Ekrany na
+przemian" (bounce pairs, z reassuring empty-state gdy brak wzorca zamiast ukrywania karty).
+Wszystkie 4 nowe funkcje mają testy w `usageStatsAnalysis.test.ts` (13 nowych łącznie).
+
+`tsc`/`jest` czyste (1000 testów).
+**Priorytet testu na urządzeniu**: niski-średni — Ustawienia → Dane → Statystyki apki →
+Zobacz pełny panel; sprawdź że liczby w "Otwarcia" zgadzają się z ranking/wykresem dziennym
+(np. suma słupków dzisiejszego dnia = "dziś" w nowej karcie), i że "Najczęstsza kolejność"/
+"Ekrany na przemian" pokazują sensowne, rozpoznawalne pary ekranów.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
