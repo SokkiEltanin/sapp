@@ -69,6 +69,39 @@ export function shiftMinutes(ev: Pick<CalendarEvent, 'title' | 'startTime' | 'en
   return 0;
 }
 
+export interface ShiftFireTimes { fireStart: Date; fireEnd: Date | null; durationSecs: number }
+
+// Realne momenty startu/końca zmiany jako `Date` na KONKRETNY dzień (`dateBase`,
+// YYYY-MM-DD) — używane przez notificationsService.ts do zaplanowania powiadomień
+// "zaczyna się"/"koniec zmiany" (2026-09-18, agent-audyt znalazł realny bug: nocna zmiana,
+// np. 22:00-06:00, faktycznie KOŃCZY SIĘ NASTĘPNEGO dnia, a `notificationsService.ts` liczyło
+// `fireEnd` na TYM SAMYM dniu co `fireStart` — powiadomienie "koniec zmiany" leciało
+// GODZINY PRZED jej początkiem, z `durationSecs` ujemnym→capowanym do 0, czyli "zarobiłeś
+// 0.00 zł" niezależnie od realnej zmiany). `shiftClockRange`'s zawinięte HH:MM
+// (`minToHHMM` moduluje do 0-23) samo nie niesie informacji "to następny dzień", stąd tu
+// porównanie `end<=start` i przesunięcie DATY (nie tylko godziny) `fireEnd`. `durationSecs`
+// przez `shiftMinutes()` (już poprawnie dolicza +24h dla end<=start), nie przez odjęcie
+// ponownie zawiniętych HH:MM.
+export function shiftFireTimes(
+  ev: Pick<CalendarEvent, 'title' | 'startTime' | 'endTime'>,
+  dateBase: string,
+): ShiftFireTimes | null {
+  if (!ev.startTime) return null;
+  const range = shiftClockRange(ev) ?? { start: ev.startTime, end: ev.endTime ?? ev.startTime };
+  const [sh, sm] = range.start.split(':').map(Number);
+  const fireStart = new Date(`${dateBase}T00:00:00`);
+  fireStart.setHours(sh, sm, 0, 0);
+
+  if (!ev.endTime) return { fireStart, fireEnd: null, durationSecs: 0 };
+
+  const [eh, em] = range.end.split(':').map(Number);
+  const fireEnd = new Date(`${dateBase}T00:00:00`);
+  fireEnd.setHours(eh, em, 0, 0);
+  if (fireEnd <= fireStart) fireEnd.setDate(fireEnd.getDate() + 1);
+
+  return { fireStart, fireEnd, durationSecs: shiftMinutes(ev) * 60 };
+}
+
 export function shiftHours(ev: Pick<CalendarEvent, 'title' | 'startTime' | 'endTime'>): number {
   return shiftMinutes(ev) / 60;
 }
