@@ -1,4 +1,4 @@
-import { titleTimeRange, shiftClockRange, shiftMinutes, shiftHours, isWorkEvent, elapsedShiftHours } from '@/utils/workEvents';
+import { titleTimeRange, shiftClockRange, shiftMinutes, shiftHours, isWorkEvent, elapsedShiftHours, shiftFireTimes } from '@/utils/workEvents';
 
 describe('workEvents — titleTimeRange (parsowanie zakresu godzin z tytułu)', () => {
   test('pełny zakres HH:MM - HH:MM', () => {
@@ -99,5 +99,54 @@ describe('workEvents — elapsedShiftHours (ile z DZISIEJSZEJ zmiany już minę�
   });
   test('brak parsowalnego zakresu godzin (tylko znacznik (Nh)) → licz w całości, nie da się ocenić postępu', () => {
     expect(elapsedShiftHours({ title: '[JD] zmiana (6h)' }, new Date(2026, 0, 1, 0, 0, 0))).toBe(6);
+  });
+});
+
+// 2026-09-18, agent-audyt: notificationsService.ts (scheduleWorkShiftNotifications) liczyło
+// `fireEnd` NA TYM SAMYM dniu co `fireStart` (bez rollover), więc dla zmiany nocnej (koniec
+// przed początkiem w zegarze) powiadomienie "koniec zmiany" leciało GODZINY PRZED jej
+// początkiem, a `durationSecs` (odjęcie minut bez rollover) wychodził ujemny → capowany do 0
+// → "zarobiłeś 0.00 zł" niezależnie od realnej zmiany. Wyniesione do `shiftFireTimes()`,
+// testowane tu wprost (pure logic), bez potrzeby mockowania expo-notifications.
+describe('workEvents — shiftFireTimes (godziny startu/końca zmiany jako Date, dla powiadomień)', () => {
+  // `startTime`/`endTime` tu to GENERYCZNE domyślne godziny kalendarza (jak w prawdziwym
+  // Google Calendar event, patrz komentarz na górze workEvents.ts) — realne godziny mają
+  // pierwszeństwo z tytułu, `shiftFireTimes` wymaga JAKIEGOŚ `startTime` (ten sam strażnik
+  // co oryginalny kod przed wyniesieniem), ale liczy zgodnie z tytułem, nie z nim.
+  test('zmiana dzienna (10:00-18:00 w tytule) — fireEnd tego samego dnia co fireStart, duration poprawny', () => {
+    const r = shiftFireTimes({ title: '[JD] 10:00 - 18:00', startTime: '09:00', endTime: '17:00' }, '2026-09-20')!;
+    expect(r.fireStart.getDate()).toBe(20);
+    expect(r.fireStart.getHours()).toBe(10);
+    expect(r.fireEnd!.getDate()).toBe(r.fireStart.getDate());
+    expect(r.durationSecs).toBe(8 * 3600);
+  });
+
+  test('zmiana NOCNA (22:00-06:00 w tytule) — fireEnd na NASTĘPNY dzień, duration dodatni (nie 0)', () => {
+    const r = shiftFireTimes({ title: '22:00 - 06:00', startTime: '09:00', endTime: '17:00' }, '2026-09-20')!;
+    expect(r.fireStart.getDate()).toBe(20);
+    expect(r.fireStart.getHours()).toBe(22);
+    // Realny bug: fireEnd wychodził tego samego dnia, GODZINY PRZED fireStart.
+    expect(r.fireEnd!.getDate()).toBe(21);
+    expect(r.fireEnd!.getHours()).toBe(6);
+    expect(r.fireEnd!.getTime()).toBeGreaterThan(r.fireStart.getTime());
+    expect(r.durationSecs).toBe(8 * 3600); // 22:00→06:00 = 8h, NIE 0
+  });
+
+  test('brak startTime i brak rozpoznanego zakresu w tytule → null (nic do zaplanowania)', () => {
+    expect(shiftFireTimes({ title: 'Spotkanie' }, '2026-09-20')).toBeNull();
+  });
+
+  test('brak endTime (tylko start) — fireEnd null, fireStart dalej liczony', () => {
+    const r = shiftFireTimes({ title: '', startTime: '09:00' }, '2026-09-20')!;
+    expect(r.fireStart.getHours()).toBe(9);
+    expect(r.fireEnd).toBeNull();
+  });
+
+  test('goły startTime/endTime bez tytułu z zakresem — dalej liczy poprawnie (fallback)', () => {
+    const r = shiftFireTimes({ title: '', startTime: '08:00', endTime: '16:00' }, '2026-09-20')!;
+    expect(r.fireStart.getHours()).toBe(8);
+    expect(r.fireEnd!.getHours()).toBe(16);
+    expect(r.fireEnd!.getDate()).toBe(20);
+    expect(r.durationSecs).toBe(8 * 3600);
   });
 });

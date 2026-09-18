@@ -1701,14 +1701,15 @@ export default function DashboardScreen() {
   }, [budgets, stats.monthExpenses]);
 
   // ── Per-category budget alert (for warning card) ───────────────────────────
+  // BUG FIX (2026-09-18, agent-audyt): przeliczało `monthlySpend` OD ZERA, bez wykluczenia
+  // przelewu własnego (`isSelfTransfer`) — `'transfer'` to prawdziwa, budżetowalna kategoria
+  // (Ustawienia pozwalają jej ustawić limit), więc auto-wykryty przelew własny (kategoria
+  // 'transfer') mógł wywołać fałszywy alarm "przekroczono budżet" dla kategorii Przelew, albo
+  // (po ręcznej zmianie kategorii przez usera) zawyżyć inną. Ta sama liczba jest już
+  // POPRAWNIE liczona w `useExpenses.ts` (`stats.monthCategorySpend`, filtr `isExpense` =
+  // `!isSelfTransfer`) i dostępna na tym samym ekranie — użyj JEJ, nie osobnej kopii.
   const budgetAlertCard = useMemo(() => {
-    const monthKey = today.slice(0, 7);
-    const monthlySpend: Record<string, number> = {};
-    for (const e of expenses) {
-      if (e.type && e.type !== 'expense') continue;
-      if (e.date.slice(0, 7) !== monthKey) continue;
-      monthlySpend[e.category] = (monthlySpend[e.category] ?? 0) + e.amount;
-    }
+    const monthlySpend = stats.monthCategorySpend;
     const alerts = Object.entries(budgets)
       .filter(([, limit]) => limit != null && (limit as number) > 0)
       .map(([cat, limit]) => ({
@@ -1718,7 +1719,7 @@ export default function DashboardScreen() {
       .filter(a => a.pct >= 0.70)
       .sort((a, b) => b.pct - a.pct);
     return alerts[0] ?? null;
-  }, [expenses, budgets, today]);
+  }, [stats.monthCategorySpend, budgets]);
 
   // ── Tag limit bars (e.g. #słodycze) — ALWAYS shown with current % ───────────
   const tagLimits = useMemo(() => {
@@ -1735,7 +1736,10 @@ export default function DashboardScreen() {
         let spend = 0;
         const items: { expenseId: string; idx: number; kind: 'expense' | 'item'; name: string; price: number; date: string }[] = [];
         for (const e of scopedExpenses) {
-          if (e.type === 'income') continue;
+          // isSelfTransfer (2026-09-18, agent-audyt) — brakowało tu, mimo że reszta
+          // agregatorów wydatków w tym pliku/statWidgets.ts go już wyklucza (patrz
+          // budgetAlertCard/weeklySummary fix wyżej z tej samej rundy).
+          if (e.type === 'income' || isSelfTransfer(e)) continue;
           if (!inPeriod(e.date, rule.period)) continue;
           // A RECEIPT is always broken down by its items — only the matching
           // products count, never the whole receipt (a 74 zł Lidl shop is not 74 zł
@@ -1777,7 +1781,7 @@ export default function DashboardScreen() {
       const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
       let spend = 0;
       for (const e of scopedExpenses) {
-        if (e.type === 'income') continue;
+        if (e.type === 'income' || isSelfTransfer(e)) continue;
         if ((e.date ?? '').slice(0, 7) !== key) continue;
         if ((e.receiptItems?.length ?? 0) > 0) {
           e.receiptItems!.forEach(it => { if (countsForConsumption(it) && hasAny(it.tags)) spend += attributedPrice(it, rule.person, payers); });
@@ -1802,7 +1806,12 @@ export default function DashboardScreen() {
   const weeklySummary = useMemo(() => {
     const wd = new Set(getWeekDates(0)); // always the CURRENT week, regardless of UI offset
     let spend = 0;
-    for (const e of expenses) { if (e.type !== 'income' && wd.has((e.date ?? '').slice(0, 10))) spend += e.amount ?? 0; }
+    // BUG FIX (2026-09-18, agent-audyt): brakował `isSelfTransfer` — każdy sąsiedni agregator
+    // wydatków w tym pliku (spentToday, budgetAlertCard po fixie wyżej, statWidgets.ts) już
+    // go wyklucza; ten sumował przelew własny (np. auto-wykryty transfer na Revolut) jako
+    // realny wydatek, więc "Podsumowanie tygodnia" mogło pokazać kwotę znacznie wyższą niż
+    // realne wydatki tygodnia.
+    for (const e of expenses) { if (e.type !== 'income' && !isSelfTransfer(e) && wd.has((e.date ?? '').slice(0, 10))) spend += e.amount ?? 0; }
     const moods = moodEntries.filter(e => wd.has(e.date)).map(e => e.mood);
     const moodAvg = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
     const sleeps = [...wd].map(d => healthDays[d]?.sleepMinutes ?? 0).filter(m => m > 0);

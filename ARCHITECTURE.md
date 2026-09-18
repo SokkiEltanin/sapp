@@ -8466,6 +8466,78 @@ stary+nowy format tego samego itemu naraz), ale jeśli user ma STARY zapis z prz
 zauważy że po aktualizacji jakiś item/rzadkość się "zmieniła" albo zniknęła, to jest to
 miejsce do sprawdzenia jako pierwsze.
 
+## 126. Audyt logika/optymalizacja, runda — nocna zmiana w powiadomieniach + 3 dziury self-transfer (2026-09-18)
+
+User: *"dawaj dalej logika i optymalizacja"* (kontynuacja tej samej otwartej prośby z
+początku sesji). Delegowany agent-audyt na budżety/stałe koszty/wypłatę/powiadomienia
+(obszary jeszcze nieprzetestowane w tej sesji — combat/daty/tagi jedzenia/gablota/
+self-transfer×3/gear już pokryte wcześniej). Znalezione i naprawione 2 realne bugi klasy
+"self-transfer" (kolejna, 4. runda tego samego powtarzającego się typu buga w tym repo) +
+1 realny bug w powiadomieniach pracy:
+
+**1. Powiadomienia o zmianie pracy liczyły nocną zmianę na opak** (`src/services/
+notificationsService.ts`, `scheduleWorkShiftNotifications`) — `fireEnd` liczone na TYM
+SAMYM dniu co `fireStart`, bez rollover na następny dzień dla zmiany kończącej się po
+północy (np. 22:00-06:00). Efekt: powiadomienie "koniec zmiany" leciało GODZINY PRZED jej
+początkiem, a `durationSecs` (odjęcie minut bez rollover) wychodził ujemny → capowany do 0
+→ "zarobiłeś ok. 0.00 zł" niezależnie od realnej zmiany. Ten sam rodzaj rollover już istnieje
+i działa poprawnie w `workEvents.ts` (`titleTimeRange`/`shiftMinutes`), tylko
+`notificationsService.ts` reimplementowało zakres godzin OD ZERA, bez importu. Fix:
+wyniesione do nowej, testowalnej `shiftFireTimes(ev, dateBase)` w `workEvents.ts` (zwraca
+`{fireStart, fireEnd, durationSecs}` jako `Date`/liczba, z poprawnym przesunięciem daty
+`fireEnd` gdy koniec≤początek) — `notificationsService.ts` teraz tylko konsumuje ten wynik,
+zero duplikowanej logiki dat. 5 nowych testów w `workEvents.test.ts` (dzienna/nocna zmiana,
+brak endTime, fallback bez tytułu).
+
+**2. "Podsumowanie tygodnia" (Sunday-evening recap) liczyło przelew własny jako wydatek**
+(`app/(tabs)/index.tsx`, `weeklySummary`) — jedyny agregator wydatków w tym pliku bez
+`isSelfTransfer()`, mimo że KAŻDY sąsiedni (dashboard/spend.ts, useExpenses.ts) go już
+wyklucza. Przykład: realne wydatki tygodnia 300 zł, user przelewa 500 zł na Revolut w
+środku tygodnia (auto-zaksięgowane przez `bankIngest.ts` jako `category:'transfer'`) →
+powiadomienie mówi "Wydatki: 800 zł".
+
+**3. Alert przekroczenia budżetu per-kategoria liczył się od zera, bez self-transfer**
+(`app/(tabs)/index.tsx`, `budgetAlertCard`) — TA SAMA liczba jest już poprawnie liczona w
+`useExpenses.ts` (`stats.monthCategorySpend`, filtr `isExpense = ... && !isSelfTransfer`)
+i dostępna na tym samym ekranie (`stats` już zaimportowane), ale `budgetAlertCard` miała
+własną, nieodfiltrowaną kopię. `'transfer'` to prawdziwa, budżetowalna kategoria (Ustawienia
+pozwalają jej ustawić limit) — ręczna zmiana kategorii przelewu własnego albo limit
+ustawiony wprost na "Przelew" mógł wywołać fałszywy alarm "70%+ budżetu". Fix: `budgetAlertCard`
+teraz czyta `stats.monthCategorySpend` (jedna liczba, jedno źródło prawdy) zamiast
+przeliczać własną kopię.
+
+**4. Tag-limit bary (`#słodycze` itp.) i ich historia (`tagLimits`/`tagHistory`, ten sam
+plik) też nie wykluczały self-transferu** — dopisane, dla zgodności z resztą pliku (wąski
+realny scenariusz: self-transfer musiałby dodatkowo nosić śledzony tag, ale to ten sam
+powtarzający się gap co #2/#3, więc naprawione tą samą okazją).
+
+**Sprawdzone i potwierdzone CZYSTE** (agent-audyt, ręczne prześledzenie konkretnych dat/
+liczb, nie tylko czytanie): `paycheck.ts`'s core arrears/rollover roku (kilka przykładów na
+granicy roku); `accountBalance.ts` (poza `cardBalancePeak`, już potwierdzone w §123);
+`dashboard/spend.ts` (wszystkie funkcje konsekwentnie wykluczają self-transfer);
+`finances.tsx`'s `monthTotals`/`monthPulse` (poprawny cap dni na granicy krótszych
+miesięcy); `refreshPaydayReminder`/`refreshWeeklySummary` w notificationsService.ts.
+
+**Explicite NIE naprawione (niska priorytetowość, brak realnej szkody)**: `computeTagSpend`
+w `tagBudgets.ts` — martwy kod (wołany tylko z własnego testu, realny dashboard reimplementuje
+logikę inline), ma te same dwie dziury (self-transfer + liczy całe paragony zamiast per-item)
+ale nic ich realnie nie woła; `monthIndexFromText` w `paycheck.ts` — teoretyczna, niepotwierdzona
+niejednoznaczność przy notatce wymieniającej DWA miesiące naraz, brak realnego formatu notatki w
+kodzie który by to wywołał; `detectFixedCosts` w `fixedCosts.ts` — nigdy nie "wygasza" starej,
+odwołanej subskrypcji (tylko wyświetlana karta, nie liczone do żadnego budżetu, więc UX-owa
+niedokładność, nie liczbowy bug).
+
+`tsc`/`jest` czyste (988 testów, +5 nowych dla `shiftFireTimes`). Fixy #2-4 (inline w
+`app/(tabs)/index.tsx`) nie mają dedykowanych testów — ten sam wzorzec co
+`topProductsQuantity.test.ts` (komentarz tam: testowalna jest tylko wyeksportowana logika,
+nie logika zamknięta w komponencie ekranu bez renderowania), a bazowy predykat
+`isSelfTransfer` ma już własne testy w `financePredicates.test.ts`.
+
+**Priorytet testu na urządzeniu**: średni — (1) jeśli masz zmianę nocną w kalendarzu/pracy,
+sprawdź że powiadomienie "koniec zmiany" przychodzi PO jej końcu z realną kwotą zarobku, nie
+0 zł; (2) jeśli robisz przelewy własne (Revolut/oszczędności), sprawdź że "Podsumowanie
+tygodnia" i alert budżetu per-kategoria ich NIE liczą jako wydatku.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

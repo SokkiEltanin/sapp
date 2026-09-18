@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Subscription, Task } from '@/types';
 import { PAYDAY_WINDOW_DAYS } from '@/utils/payday';
+import { shiftFireTimes } from '@/utils/workEvents';
 
 // Next clock time for hour:minute — today if it's still ahead and we're not
 // skipping today, otherwise tomorrow. Used so the mood reminder can SKIP today
@@ -647,12 +648,16 @@ export const notificationsService = {
     in7Days.setDate(now.getDate() + 7);
 
     for (const ev of workEvents) {
-      if (!ev.startTime) continue;
       const dateBase = ev.date.slice(0, 10);
-      const [sh, sm] = ev.startTime.split(':').map(Number);
+      // `shiftFireTimes()` (workEvents.ts, 2026-09-18) — była tu inline liczona zamiana
+      // godzin na `Date`, z bugiem: nocna zmiana (np. 22:00-06:00) dostawała `fireEnd` NA
+      // TYM SAMYM dniu co `fireStart` (godziny przed nim), więc powiadomienie "koniec
+      // zmiany" leciało przed jej początkiem z "zarobiłeś 0.00 zł". Wyniesione do
+      // wspólnej, testowalnej funkcji zamiast łatać inline.
+      const times = shiftFireTimes(ev, dateBase);
+      if (!times) continue;
+      const { fireStart, fireEnd, durationSecs } = times;
 
-      const fireStart = new Date(`${dateBase}T00:00:00`);
-      fireStart.setHours(sh, sm, 0, 0);
       if (fireStart > now && fireStart <= in7Days) {
         await Notifications.scheduleNotificationAsync({
           identifier: `work-start-${ev.id}`,
@@ -665,13 +670,9 @@ export const notificationsService = {
         }).catch(() => {});
       }
 
-      if (!ev.endTime) continue;
-      const [eh, em] = ev.endTime.split(':').map(Number);
-      const fireEnd = new Date(`${dateBase}T00:00:00`);
-      fireEnd.setHours(eh, em, 0, 0);
+      if (!fireEnd) continue;
 
       if (fireEnd > now && fireEnd <= in7Days) {
-        const durationSecs = Math.max(0, (eh * 60 + em - sh * 60 - sm) * 60);
         const earned = (perSecond * durationSecs).toFixed(2);
         await Notifications.scheduleNotificationAsync({
           identifier: `work-end-${ev.id}`,

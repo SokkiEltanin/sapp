@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt logika/optymalizacja — nocna zmiana w powiadomieniach + 3 dziury self-transfer (2026-09-18)
+
+Pełny opis w ARCHITECTURE.md §126. User: "dawaj dalej logika i optymalizacja". Fresh audyt
+(budżety/stałe koszty/wypłata/powiadomienia — obszary jeszcze nietknięte w tej sesji) znalazł
+i naprawił: (1) powiadomienie "koniec zmiany" dla nocnej zmiany pracy (np. 22:00-06:00)
+leciało PRZED jej początkiem z "zarobiłeś 0.00 zł" — brak rollover daty, wyniesione do
+testowalnej `shiftFireTimes()` w workEvents.ts; (2) "Podsumowanie tygodnia" liczyło przelew
+własny jako wydatek (jedyny agregator w index.tsx bez `isSelfTransfer`); (3) alert budżetu
+per-kategoria miał własną, nieodfiltrowaną kopię tej samej liczby co `stats.
+monthCategorySpend` (już poprawna) — teraz czyta tamtą; (4) tag-limit bary też dostały
+brakujący filtr, dla zgodności. To już 4. runda tego samego powtarzającego się typu buga
+(self-transfer leak) w tym repo. `tsc`/`jest` czyste (988 testów, +5 nowych). Priorytet
+testu na urządzeniu: średni — sprawdź powiadomienie końca nocnej zmiany (realna kwota, nie
+0 zł po czasie) i że przelewy własne nie liczą się do "Podsumowania tygodnia"/alertu budżetu.
+
 ## ✅ Self-review §124 — kolizja w migracji instancji mogła po cichu nadpisać gear (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §125. Delegowany agent-audyt na redesign z §124 znalazł 1
