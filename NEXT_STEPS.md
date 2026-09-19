@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Wydajność scan.tsx — literka w produkcie re-renderowała cały paragon (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §134. Dokończenie DRUGI RAZ odłożonego fixa (§118, §127) —
+`ProductRow`/`CustomProductRow` re-renderowały WSZYSTKIE ~20-30 wierszy paragonu na każdą
+zmianę w jednym polu (nazwa/cena/waga/ilość/tag/...), bo każdy z ~15+8 callbacków był
+tworzony na nowo przy każdym renderze rodzica. Fix: callbacki przeniesione do `useCallback`
+z pustymi deps + biorą `index` jako argument (stabilna referencja), `React.memo` z własnym
+comparatorem (bo `productTags`/`eaters`/`priceFlag` bywają nową wartością o tej samej
+treści). `tsc`/`jest` czyste (1005 testów, bez zmian w testach — czysto wydajnościowy
+refaktor). Priorytet testu na urządzeniu: średni-wysoki — patrz checklist w §134 (długi
+paragon, edycja pól, pickery kategorii/tagów na różnych wierszach, "kto jadł", zapis).
+
 ## ✅ Fix: ekran Bossy domyślnie wracał na "Kampania" mimo skończonej kampanii (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §133. User: "jak pokonałem wszystkie bossy kampanii to główna

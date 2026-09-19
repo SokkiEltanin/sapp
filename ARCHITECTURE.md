@@ -8819,6 +8819,57 @@ wejdź na ekran Bossy z innej zakładki → powinien od razu otworzyć się na "
 
 ---
 
+## 134. Wydajność `scan.tsx` — literka w jednym produkcie re-renderowała CAŁY paragon (2026-09-19)
+
+Dokończenie DRUGI RAZ odłożonego fixa (§118 pierwsze odłożenie, §127 "explicite NIE
+zrobione" drugie) — potwierdzony, wysoki-impact bug wydajnościowy: `ProductRow`/
+`CustomProductRow` (ekran skanowania paragonu) re-renderowały się WSZYSTKIE (~20-30 wierszy)
+na każdą zmianę w polu JEDNEGO produktu — nazwa, cena, waga, ilość, tag, wykluczenie z
+podziału, wybór "kto jadł". Przy dużych paragonach (Biedronka/Lidl z 20+ pozycjami) to realny,
+odczuwalny lag przy wpisywaniu w dowolnym polu.
+
+**Przyczyna**: `ProductRow` był zwykłą funkcją (bez `React.memo`), a KAŻDY z ~15 callback
+propsów (`onToggle`, `onCategoryPress`, `onPriceChange`, `onNameChange`, `onTagsChange`, ...)
+był tworzony jako `() => handler(i)` NA NOWO przy każdym renderze rodzica (czyli po KAŻDEJ
+zmianie stanu — w tym stanu ZUPEŁNIE INNEGO wiersza). Nawet z gołym `React.memo` to by nic nie
+dało — nowa referencja funkcji na propsie = memo zawsze widzi "coś się zmieniło", więc re-
+renderuje. Ten sam wzorzec (i ten sam bug) w `CustomProductRow`.
+
+**Fix, dwuczęściowy** (dokładnie jak przewidziano w §127 — "stabilne, indeksowane referencje +
+customowy comparator"):
+1. **Wszystkie ~15+8 callbacków przeniesione do rodzica jako `useCallback` z PUSTYMI deps**,
+   biorące `index`/`idx` jako PIERWSZY argument (np. `onPriceChange(i, v)` zamiast domykania
+   `i` w closure na miejscu wywołania). Bezpieczne z pustymi deps, bo każdy już używał
+   funkcyjnego `setState(prev => ...)` — żaden nie domykał się na zewnętrznym stanie poza
+   nullowaniem innych pickerów (co jest bezwarunkowe, nie potrzebuje aktualnej wartości).
+   W JSX (`groups.map`/`displayItems.map`/`customProducts.map`) callbacki przekazywane teraz
+   WPROST (`onToggle={toggleProduct}`, nie `onToggle={() => toggleProduct(i)}`) — ta sama
+   referencja funkcji na każdy render rodzica.
+2. **`ProductRow`/`CustomProductRow` owinięte `React.memo` z WŁASNYM comparatorem**
+   (`productRowPropsEqual`/`customProductRowPropsEqual`), nie domyślnym shallow-compare —
+   trzy propsy (`productTags`, `eaters`, `priceFlag`) bywają NOWĄ wartością o TEJ SAMEJ treści
+   nawet dla niezmienionego wiersza (auto-detekcja tagów z nazwy i `priceAnomaly()` liczą się
+   na nowo z surowych danych przy każdym renderze rodzica, nie są zapamiętane w stanie), więc
+   `sameStrings`/`samePriceFlag` porównują WARTOŚĆ dla tych trzech, reszta to już stabilne
+   prymitywy/referencje po (1) — `===` wystarcza.
+
+Efekt: edycja jednego pola re-renderuje TYLKO ten jeden wiersz (plus max. 1-2 inne, jeśli
+zmiana zamyka/otwiera picker gdzie indziej) — nie całą listę.
+
+`tsc`/`jest` czyste (1005 testów, bez zmian w testach — czysto wydajnościowy refaktor, brak
+siatki testów dla ekranów RN jak flagowano w §127, więc weryfikacja na urządzeniu jest tu
+WYŻSZYM priorytetem niż zwykle). **Priorytet testu na urządzeniu — średni-wysoki**: (1)
+zeskanuj/wklej długi paragon (20+ pozycji), edytuj nazwę/cenę/wagę/ilość w JEDNYM wierszu —
+powinno być płynne, bez lagu; (2) sprawdź że otwieranie kategorii/tagów na jednym wierszu
+poprawnie ZAMYKA picker na innym (współdzielony `catPickerFor`/`tagPickerFor` — regresja
+możliwa, jeśli `useCallback` coś przeoczył); (3) "kto jadł" (2+ płatników), merge-sugestia
+("To samo co...?"), wykluczenie "nie moje", ręcznie dodane produkty (`CustomProductRow`) —
+wszystkie ścieżki edycji przetestowane logicznie, ale bez testów RN wymagają realnego kliku;
+(4) zapis paragonu na końcu — upewnić się że `saveSelected` wciąż widzi wszystkie edycje
+(nie powinno się zmienić, `editedX` stany nietknięte, tylko sposób przekazania do wierszy).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
