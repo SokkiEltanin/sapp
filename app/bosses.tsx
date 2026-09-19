@@ -93,7 +93,15 @@ export default function Bosses() {
   // wymagało przewinięcia całej (do 22-pozycyjnej) listy kampanii. Teraz jeden segmented
   // control pokazuje TYLKO wybraną sekcję na raz; raid/wydarzenie (osobne tory) i ściany
   // medali zostają poza przełącznikiem, zawsze widoczne.
-  const [bossView, setBossView] = useState<'campaign' | 'mad'>('campaign');
+  // Domyślna zakładka zależy od postępu (2026-09-19, user: "jak pokonałem wszystkie bossy
+  // kampanii to główna zakładka musi być wtedy madbossy") — z kampanią w 100% skończoną
+  // (`current` niżej == null) domyślny widok "Kampania" pokazywał tylko martwy ekran
+  // "Wszyscy bossowie pokonani!" (linia `s.done` niżej), a jedyny realny cel (MAD) wymagał
+  // ręcznego przełączenia przy każdym wejściu na ekran. `null` = brak ręcznego wyboru w tej
+  // sesji ekranu → domyślna zakładka liczona z postępu; po ręcznym kliknięciu przełącznika
+  // override trzyma wybór usera (nie wraca siłą do MAD np. gdy user ogląda ściany medali w
+  // zakładce Kampania mimo skończonej kampanii).
+  const [bossViewOverride, setBossViewOverride] = useState<'campaign' | 'mad' | null>(null);
 
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
   // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
@@ -140,6 +148,9 @@ export default function Bosses() {
   // jaki wyważono hp/atak tego bossa), tylko przestał być bramką — stąd WALCZ! niżej jest
   // teraz bezwarunkowe, gdy tylko `current` istnieje.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
+  // Patrz komentarz przy `bossViewOverride` wyżej — bez ręcznego override domyślnie "mad"
+  // gdy kampania skończona (`!current`), inaczej "campaign".
+  const bossView = bossViewOverride ?? (current ? 'campaign' : 'mad');
   // Pokonani bossowie zwijani w liście (2026-08-20, user: "bossy te pokonane sa zwinięte w
   // liscie") — kampania rośnie do 22 bossów, im dalej user zajdzie, tym dłuższa lista
   // pełnowymiarowych, identycznych "Pokonany ✓" wierszy przed aktualnym/zablokowanymi. Bossy
@@ -332,12 +343,12 @@ export default function Bosses() {
 
         {/* Przełącznik Kampania/MAD — patrz komentarz przy `bossView` wyżej. */}
         <View style={s.modeToggle}>
-          <PressableScale onPress={() => { haptic.tap(); setBossView('campaign'); }} style={{ flex: 1 }}>
+          <PressableScale onPress={() => { haptic.tap(); setBossViewOverride('campaign'); }} style={{ flex: 1 }}>
             <View style={[s.modeBtn, bossView === 'campaign' && s.modeBtnActive]}>
               <Text style={[s.modeBtnTxt, bossView === 'campaign' && s.modeBtnTxtActive]}>Kampania</Text>
             </View>
           </PressableScale>
-          <PressableScale onPress={() => { haptic.tap(); setBossView('mad'); }} style={{ flex: 1 }}>
+          <PressableScale onPress={() => { haptic.tap(); setBossViewOverride('mad'); }} style={{ flex: 1 }}>
             <View style={[s.modeBtn, bossView === 'mad' && s.modeBtnActive]}>
               <Text style={[s.modeBtnTxt, bossView === 'mad' && s.modeBtnTxtActive]}>MAD bossy</Text>
             </View>

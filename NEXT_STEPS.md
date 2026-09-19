@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: ekran Bossy domyślnie wracał na "Kampania" mimo skończonej kampanii (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §133. User: "jak pokonałem wszystkie bossy kampanii to główna
+zakładka musi być wtedy madbossy". Przełącznik Kampania/MAD (`app/bosses.tsx`) miał zakodowany
+domyślny widok "Kampania", który resetował się przy każdym wejściu na ekran (ekran się
+odmontowuje między wizytami) — z kampanią skończoną to zawsze pokazywało martwy ekran
+"Wszyscy bossowie pokonani!" zamiast realnego celu (MAD). Teraz domyślna zakładka podąża za
+postępem (mad gdy kampania 100% skończona), ręczne przełączenie trzyma wybór do wyjścia z
+ekranu. `tsc`/`jest` czyste (1005 testów, bez zmian w testach). Priorytet testu: niski.
+
 ## ✅ Fix: 26 miejsc bez poprawnej odmiany przez liczbę w całej apce (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §131 (kafel pupila, pierwszy fix) i §132 (wynik agent-audytu —
