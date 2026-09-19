@@ -4,6 +4,8 @@
 // react-native-health-connect, so everything is loaded lazily and degrades
 // gracefully (the Zdrowie screen keeps working with manual entry without it).
 
+import { plPlural } from '@/utils/plural';
+
 let HC: any = null;
 function mod(): any {
   if (HC) return HC;
@@ -218,8 +220,10 @@ export interface SleepProbe {
 // user sees is identical wherever they trigger it from, and only needs updating in one place.
 export function sleepProbeVerdict(p: SleepProbe): { lines: string[]; verdict: string } {
   const lines = [
-    `Sesje snu (SleepSession): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.sessions} sesji (7 dni)${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
-    `Z fazami: ${p.sessionsWithStages}/${p.sessions} sesji · ${p.stageRecords} rekordów faz${p.stageTypesSeen.length ? `\ntypy faz: ${p.stageTypesSeen.join(', ')} (1=czuwanie,2=sen,3=poza łóżkiem,4=lekki,5=głęboki,6=REM)` : ''}`,
+    `Sesje snu (SleepSession): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.sessions} ${plPlural(p.sessions, 'sesja', 'sesje', 'sesji')} (7 dni)${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+    // "X/Y sesji" — ułamkowe "z Y sesji" bierze dopełniacz l.mn. zawsze, jak "zadań" w
+    // monthlyReports.ts — NIE `plPlural` na mianowniku ułamka.
+    `Z fazami: ${p.sessionsWithStages}/${p.sessions} sesji · ${p.stageRecords} ${plPlural(p.stageRecords, 'rekord', 'rekordy', 'rekordów')} faz${p.stageTypesSeen.length ? `\ntypy faz: ${p.stageTypesSeen.join(', ')} (1=czuwanie,2=sen,3=poza łóżkiem,4=lekki,5=głęboki,6=REM)` : ''}`,
   ];
   let verdict: string;
   if (!p.permission) verdict = 'Brak dostępu — w Health Connect włącz dla Sappa „Sen", potem Synchronizuj.';

@@ -1,4 +1,5 @@
 import { MOOD_COLORS } from '@/types';
+import { plPlural } from '@/utils/plural';
 
 // Czyste formatery/mapery dashboardu — wyniesione z app/(tabs)/index.tsx (krok 1 utwardzania).
 // Bez zależności od store'ów/RN → testowalne w node.
@@ -51,7 +52,9 @@ export function fmtStat(v: number, unit: string): string {
   if (unit === '/5')   return v.toFixed(1);
   if (unit === 'szt.') return `${g(v)} szt.`;
   if (unit === '×')    return `×${g(v)}`;
-  if (unit === 'dni')  return `${Math.round(v)} dni`;
+  // "1 dni" → "1 dzień" (2026-09-19, agent-audyt) — "dni" jest poprawne dla few(2-4) I
+  // many(5+), tylko l.poj. się różni ("dzień"), więc `plPlural` tu tylko łata przypadek 1.
+  if (unit === 'dni')  return `${Math.round(v)} ${plPlural(Math.round(v), 'dzień', 'dni', 'dni')}`;
   if (unit.startsWith('/')) return `${Math.round(v)} ${unit}`; // e.g. habits "/ 5"
   return g(v);
 }

@@ -17,6 +17,7 @@ import { computeBoxStats, BoxTypeStats } from '@/utils/boxStatsAnalysis';
 import { boxById, DAILY_BOX, DAILY_BOX_ICON, BoxId } from '@/utils/petBoxes';
 import { RARITY_META, GearRarity } from '@/utils/gear';
 import { CRATE_META, CrateTier } from '@/utils/crates';
+import { plPlural } from '@/utils/plural';
 
 function boxLabel(boxId: BoxId, daily: boolean): string {
   return daily ? 'Skrzynka dnia' : boxById(boxId).name;
@@ -115,7 +116,7 @@ function BoxCard({ g, s, c }: { g: BoxTypeStats; s: ReturnType<typeof makeStyles
         {icon ? <Image source={icon} style={s.boxIcon} contentFit="contain" /> : null}
         <View style={{ flex: 1 }}>
           <Text style={s.cardTitle}>{boxLabel(g.boxId, g.daily)}{g.daily ? ' · darmowa' : ''}</Text>
-          <Text style={s.cardSub}>{g.opens} otwarć{!g.daily ? ` · ${g.totalCost} monet wydanych` : ''}</Text>
+          <Text style={s.cardSub}>{g.opens} {plPlural(g.opens, 'otwarcie', 'otwarcia', 'otwarć')}{!g.daily ? ` · ${g.totalCost} monet wydanych` : ''}</Text>
         </View>
         {!g.daily && (
           <View style={s.netPill}>

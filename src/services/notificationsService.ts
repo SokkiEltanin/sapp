@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Subscription, Task } from '@/types';
 import { PAYDAY_WINDOW_DAYS } from '@/utils/payday';
 import { shiftFireTimes } from '@/utils/workEvents';
+import { plPlural } from '@/utils/plural';
 
 // Next clock time for hour:minute — today if it's still ahead and we're not
 // skipping today, otherwise tomorrow. Used so the mood reminder can SKIP today
@@ -82,7 +83,10 @@ function buildDigestMessage(titles: string[]): { title: string; body: string } {
   const emoji = topCat === 'uni' ? '📚' : topCat === 'work' ? '💼' : topCat === 'home' ? '🏠' : topCat === 'health' ? '💪' : '📋';
 
   return {
-    title: `${n} zadań jutro ${emoji}`,
+    // Odmiana przez liczbę (2026-09-19, agent-audyt) — było na sztywno "zadań" (dopełniacz
+    // l.mn.) niezależnie od n, mimo że ta gałąź obsługuje n=3/4 (błędne "3 zadań") tak samo
+    // jak n>=5 (poprawne "5 zadań").
+    title: `${n} ${plPlural(n, 'zadanie', 'zadania', 'zadań')} jutro ${emoji}`,
     body:  `Między innymi: "${topTitle}" i ${n - 1} ${n - 1 === 1 ? 'inne' : n - 1 <= 4 ? 'inne' : 'innych'}.`,
   };
 }
@@ -344,10 +348,13 @@ export const notificationsService = {
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },
   ): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
+    // Odmiana przez liczbę (2026-09-19, agent-audyt) — było na sztywno dopełniacz l.mn.
+    // niezależnie od liczby (np. "3 zadań" zamiast "3 zadania"), a te liczniki są zwykłymi
+    // dziennymi licznikami, rutynowo 1-4.
     const parts: string[] = [];
-    if (context?.taskCount) parts.push(`${context.taskCount} zadań`);
-    if (context?.eventCount) parts.push(`${context.eventCount} wydarzeń`);
-    if (context?.habitCount) parts.push(`${context.habitCount} nawyków`);
+    if (context?.taskCount) parts.push(`${context.taskCount} ${plPlural(context.taskCount, 'zadanie', 'zadania', 'zadań')}`);
+    if (context?.eventCount) parts.push(`${context.eventCount} ${plPlural(context.eventCount, 'wydarzenie', 'wydarzenia', 'wydarzeń')}`);
+    if (context?.habitCount) parts.push(`${context.habitCount} ${plPlural(context.habitCount, 'nawyk', 'nawyki', 'nawyków')}`);
     const body = parts.length > 0
       ? `Na dziś: ${parts.join(', ')}. Do dzieła!`
       : 'Zaplanuj swój dzień i sprawdź zadania.';

@@ -20,6 +20,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 const MONTHS_BACK = 6;
 
@@ -591,7 +592,7 @@ export default function StatsScreen() {
               <View style={styles.velocityRow}>
                 <View style={styles.velocityStat}>
                   <Text style={styles.velocityVal}>{foodStats.dailyRate.toFixed(1)} <Text style={styles.velocityUnit}>zł/dzień</Text></Text>
-                  <Text style={styles.velocityLabel}>średnio ({foodStats.daysElapsed} dni)</Text>
+                  <Text style={styles.velocityLabel}>średnio ({foodStats.daysElapsed} {plPlural(foodStats.daysElapsed, 'dzień', 'dni', 'dni')})</Text>
                 </View>
                 {foodStats.projection != null && (
                   <>
@@ -736,7 +737,7 @@ export default function StatsScreen() {
                 <View style={styles.insightItem}>
                   <View style={[styles.insightDot, { backgroundColor: colors.accent.red }]} />
                   <Text style={styles.insightText}>
-                    <Text style={{ color: colors.accent.red, fontWeight: '700' }}>{insights.overBudgetCount} {insights.overBudgetCount === 1 ? 'kategoria' : 'kategorie'}</Text> przekroczyły budżet
+                    <Text style={{ color: colors.accent.red, fontWeight: '700' }}>{insights.overBudgetCount} {plPlural(insights.overBudgetCount, 'kategoria', 'kategorie', 'kategorii')}</Text> przekroczyły budżet
                   </Text>
                 </View>
               )}

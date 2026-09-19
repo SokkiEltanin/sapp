@@ -14,6 +14,7 @@ import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
+import { plPlural } from '@/utils/plural';
 
 const G = {
   card:       '#0C2218',
@@ -281,7 +282,7 @@ export default function FocusScreen() {
           <Text style={s.emptyTitle}>WSZYSTKO ZROBIONE</Text>
           <Text style={s.emptySub}>
             {skipSet.size > 0
-              ? `Pominięto ${skipSet.size} zadań`
+              ? `Pominięto ${skipSet.size} ${plPlural(skipSet.size, 'zadanie', 'zadania', 'zadań')}`
               : 'Brak aktywnych zadań na dziś'}
           </Text>
           <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.backBtn}>

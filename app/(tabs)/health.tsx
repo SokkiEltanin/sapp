@@ -26,6 +26,7 @@ import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealt
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography, fonts } from '@/theme';
+import { plPlural } from '@/utils/plural';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
 
@@ -1281,8 +1282,8 @@ export default function HealthScreen() {
                 haptic.tap();
                 const p = await probeHydration(7);
                 const lines = [
-                  `Nawodnienie (Hydration): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.records} rekordów${p.records ? ` (${(p.totalMl / 1000).toFixed(2)} l)` : ''}${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
-                  `Nutrition: ${p.nutriPermission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.nutriRecords} rekordów${p.nutriSources.length ? `\nźródło: ${p.nutriSources.join(', ')}` : ''}`,
+                  `Nawodnienie (Hydration): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.records} ${plPlural(p.records, 'rekord', 'rekordy', 'rekordów')}${p.records ? ` (${(p.totalMl / 1000).toFixed(2)} l)` : ''}${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+                  `Nutrition: ${p.nutriPermission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.nutriRecords} ${plPlural(p.nutriRecords, 'rekord', 'rekordy', 'rekordów')}${p.nutriSources.length ? `\nźródło: ${p.nutriSources.join(', ')}` : ''}`,
                 ];
                 if (p.nutriRecords > 0 && p.nutriKeys.length) lines.push(`Pola Nutrition: ${p.nutriKeys.join(', ')}`);
                 let verdict: string;

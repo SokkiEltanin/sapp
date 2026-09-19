@@ -26,6 +26,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -459,7 +460,7 @@ export default function WeeklyScreen() {
                 <View style={styles.statDivider} />
                 <View style={styles.statBox}>
                   <Text style={[styles.statBig, { color: colors.text.secondary }]}>{loggedDays.length}/7</Text>
-                  <Text style={styles.statSub}>dni {totalEntries > loggedDays.length ? `(${totalEntries} wpisów)` : 'z wpisem'}</Text>
+                  <Text style={styles.statSub}>dni {totalEntries > loggedDays.length ? `(${totalEntries} ${plPlural(totalEntries, 'wpis', 'wpisy', 'wpisów')})` : 'z wpisem'}</Text>
                 </View>
               </View>
 

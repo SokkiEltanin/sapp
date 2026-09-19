@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodEntry, Task, CalendarEvent } from '@/types';
 import { Expense } from '@/types';
 import { isSelfTransfer } from '@/utils/statWidgets';
+import { plPlural } from '@/utils/plural';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,8 +167,11 @@ export function generateMonthlyReport(input: {
   const bal = totalIncome - totalSpend;
   let highlight: string;
   if (avgM?.mood && avgM.mood >= 4) {
-    highlight = `Dobry miesiąc — śr. nastrój ${avgM.mood.toFixed(1)}/5 przez ${loggedDays} dni.`;
+    highlight = `Dobry miesiąc — śr. nastrój ${avgM.mood.toFixed(1)}/5 przez ${loggedDays} ${plPlural(loggedDays, 'dzień', 'dni', 'dni')}.`;
   } else if (done > 0 && taskRate >= 0.8) {
+    // "X/Y zadań" — ułamkowe wyrażenie "z Y zadań" bierze dopełniacz l.mn. ZAWSZE
+    // (niezależnie od few/many), jak "3 z 5 zadań" — inaczej niż proste liczebnikowe
+    // "5 zadań" (patrz plPlural gdzie indziej w tym pliku). NIE zmieniać na plPlural.
     highlight = `Produktywny miesiąc — ${done}/${monthTasks.length} zadań (${Math.round(taskRate * 100)}%). Brawo!`;
   } else if (bal > 0) {
     highlight = `Finanse na plusie: +${bal.toFixed(0)} zł. Dochód ${totalIncome.toFixed(0)} zł, wydatki ${totalSpend.toFixed(0)} zł.`;
@@ -176,7 +180,7 @@ export function generateMonthlyReport(input: {
   } else if (loggedDays === 0) {
     highlight = `Brak wpisów nastroju w ${month}. Warto śledzić regularnie.`;
   } else {
-    highlight = `${month}: ${loggedDays} dni z wpisem nastroju, ${totalSpend.toFixed(0)} zł wydatków.`;
+    highlight = `${month}: ${loggedDays} ${plPlural(loggedDays, 'dzień', 'dni', 'dni')} z wpisem nastroju, ${totalSpend.toFixed(0)} zł wydatków.`;
   }
 
   return {
@@ -287,13 +291,13 @@ export function generateYearlyReport(input: {
   // ── Highlight
   let highlight: string;
   if (avgM?.mood && avgM.mood >= 4) {
-    highlight = `${year}: świetny rok — śr. nastrój ${avgM.mood.toFixed(1)}/5 przez ${loggedDays} dni.`;
+    highlight = `${year}: świetny rok — śr. nastrój ${avgM.mood.toFixed(1)}/5 przez ${loggedDays} ${plPlural(loggedDays, 'dzień', 'dni', 'dni')}.`;
   } else if (taskRate >= 0.75 && done > 10) {
     highlight = `${year}: ${done} zadań ukończonych (${Math.round(taskRate * 100)}%). Mega produktywny rok!`;
   } else if (bal > 0) {
     highlight = `${year}: finanse na plusie +${bal.toFixed(0)} zł. Śr. wydatki ${avgMonthlySpend.toFixed(0)} zł/mies.`;
   } else {
-    highlight = `${year}: ${loggedDays} dni z wpisem nastroju, ${totalSpend.toFixed(0)} zł łącznych wydatków.`;
+    highlight = `${year}: ${loggedDays} ${plPlural(loggedDays, 'dzień', 'dni', 'dni')} z wpisem nastroju, ${totalSpend.toFixed(0)} zł łącznych wydatków.`;
   }
 
   return {

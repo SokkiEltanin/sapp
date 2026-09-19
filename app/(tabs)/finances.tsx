@@ -34,6 +34,7 @@ import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
+import { plPlural } from '@/utils/plural';
 
 const F = {
   card:       '#0E0707',        // near-black, slight red undertone
@@ -468,7 +469,9 @@ export default function FinancesScreen() {
                   <View style={st.monthCard}>
                     <View style={st.monthHead}>
                       <Text style={st.monthTitle}>TEN MIESIĄC</Text>
-                      <Text style={st.monthDayTag}>{p.day}/{p.daysInMonth} dnia · zostało {p.daysLeft}</Text>
+                      {/* "dnia" → "dni" (2026-09-19, agent-audyt) — `daysInMonth` jest ZAWSZE
+                          28-31, więc to l.mn. ("X z 30 dni"), nigdy l.poj. dopełniacza. */}
+                      <Text style={st.monthDayTag}>{p.day}/{p.daysInMonth} dni · zostało {p.daysLeft}</Text>
                     </View>
 
                     <View style={st.flowRow}>
@@ -508,7 +511,7 @@ export default function FinancesScreen() {
                           <Wallet size={14} color={p.perDayLeft > 0 ? '#2AC68F' : '#E43434'} />
                           <Text style={st.pulseLineTxt}>
                             {p.perDayLeft > 0
-                              ? <>Możesz jeszcze <Text style={{ color: '#2AC68F', fontWeight: '800' }}>~{p.perDayLeft.toFixed(0)} zł/dzień</Text> przez {p.daysLeft} dni</>
+                              ? <>Możesz jeszcze <Text style={{ color: '#2AC68F', fontWeight: '800' }}>~{p.perDayLeft.toFixed(0)} zł/dzień</Text> przez {p.daysLeft} {plPlural(p.daysLeft, 'dzień', 'dni', 'dni')}</>
                               : <Text style={{ color: '#E43434', fontWeight: '800' }}>Przekroczono tegomiesięczne przychody</Text>}
                           </Text>
                         </View>

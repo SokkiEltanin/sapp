@@ -8742,6 +8742,54 @@ w toku, wynik w kolejnym wpisie po zakończeniu.
 **Priorytet testu na urządzeniu**: niski — dashboard, kafel pupila z 1/2/5+ nagrodami do
 odebrania, sprawdź poprawną odmianę.
 
+## 132. Wynik agent-audytu §131 — 26 miejsc bez poprawnej odmiany przez liczbę, naprawione (2026-09-19)
+
+Kontynuacja §131 (user: "sprawdzaj tam i wszędzie takie rzeczy logiczne"). Agent-audyt
+przeszukał `app/`+`src/` pod kątem `{count} rzeczownik` z rzeczownikiem który powinien się
+odmieniać (1/2-4/5+), znalazł 29 kandydatów. Po weryfikacji: 26 realnych bugów naprawionych
+`plPlural()`, 3 świadomie NIE ruszone (były już poprawne — patrz niżej).
+
+**Dwie klasy buga**, oba dają złą liczbę mnogą:
+1. **Rzeczownik na sztywno** — najczęstsza: `${n} rekordów`/`${n} produktów`/`${n} zadań`
+   niezależnie od `n`, poprawne tylko dla 5+/0.
+2. **Dwuwariantowy ternary zamiast trójwariantowego** — user/wcześniejszy kod zauważył
+   problem l.poj./l.mn., ale polski ma TRZY formy (1 / 2-4 / 5+), nie dwie: `n===1 ?
+   'nawyk' : 'nawyki'` jest błędne dla n≥5 (powinno być "nawyków"); `n===1 ? 'odznaka' :
+   'odznak'` jest błędne dla n=2-4 (powinno być "odznaki") — zależnie który wariant ktoś
+   scalił, błąd wychodzi w innym kierunku.
+
+**Naprawione (26 miejsc, pełna lista w PR)**: `notificationsService.ts` (tytuł/treść
+powiadomień — realny push, wysoki priorytet), `dashboard/format.ts`'s `fmtStat()` (dzielona
+funkcja, szeroki zasięg), dashboard (`index.tsx`: seria logowań/monety, nawyk(i) wieczorem,
+odznaki, pozycje tagu), `habit-year.tsx` (najdłuższa seria), `finances.tsx` (dzień
+miesiąca — "dnia"→"dni", bo `daysInMonth` to ZAWSZE 28-31, nigdy l.poj.), `weekly.tsx`
+(wpisy), `ExpenseItem.tsx`/`products.tsx`/`manual.tsx`/`audit.tsx`/`stats.tsx` (produkty/
+pozycje/wpisy/kategorie), `items.tsx`/`subscriptions.tsx` (dni do terminu/interwał),
+`box-stats.tsx` (otwarcia), `GearPanel.tsx` (itemy przy zbiorczej sprzedaży),
+`monthlyReports.ts` (dni zalogowane — 2 miejsca miesięczne + 2 roczne), `focus.tsx`
+(kroki podzadań — zobacz "NIE ruszone" niżej, pominięte celowo w jednym miejscu),
+`bossProgressReport.ts` (rundy walki — **+ naprawiony test, który asercją zamrażał złą
+odmianę "2 rund"**), `MonthWrappedCard.tsx` (dni kroków, rekordy miesiąca),
+`settings.tsx`/`BackupSection.tsx` (dni backfillu Samsung Health, rekordy kopii zapasowej),
+`health.tsx`/`healthConnectService.ts` (diagnostyka Health Connect — najniższy priorytet,
+za przyciskiem debug).
+
+**Świadomie NIE ruszone — 3 przypadki, gdzie audyt/pierwsza wersja fixa BYŁYBY błędem**:
+konstrukcja ułamkowa "X/Y rzeczownik" (np. "3/5 zadań", "2/7 sesji") bierze dopełniacz l.mn.
+ZAWSZE, niezależnie od Y — to nie jest bezpośrednie liczebnik+rzeczownik (few/many), tylko
+"X z Y" (jak po przyimku "z"), a dopełniacz l.mn. ma JEDNĄ formę dla wszystkich liczb ≥2.
+Podmiana na `plPlural(Y,...)` w `monthlyReports.ts`'s "${done}/${monthTasks.length} zadań"
+i `healthConnectService.ts`'s "${sessionsWithStages}/${sessions} sesji" BYŁABY nową,
+subtelniejszą wersją tego samego buga (wypisano to jako komentarz w kodzie, żeby nikt tego
+nie "naprawił" ponownie w złą stronę). `focus.tsx`'s "{done}/{total} kroków" to ta sama
+konstrukcja ułamkowa — zostawione bez zmian z tego samego powodu.
+
+`tsc`/`jest` czyste (1005 testów — jeden istniejący test w `monthlyReports.test.ts`
+zaktualizowany, bo asercja sprawdzała STARĄ, błędną odmianę "1 dni" zamiast "1 dzień").
+**Priorytet testu na urządzeniu**: niski-średni — rozproszone po całej apce, żaden pojedynczy
+ekran nie jest krytyczny, ale warto rzucić okiem na dashboard (kafel pupila/nawyki wieczorem/
+gablota) i powiadomienia push (jeśli akurat trafi się 3-4 zadania jutro).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -28,6 +28,7 @@ import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
+import { plPlural } from '@/utils/plural';
 
 type Product = { name: string; key: string; count: number; category: string; tags: string[] };
 
@@ -245,7 +246,7 @@ export default function ProductsScreen() {
         <PressableBack onPress={() => router.back()} color={c.text.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Produkty</Text>
-          <Text style={s.subtitle}>{products.length} produktów · tagi, waga, scalanie duplikatów</Text>
+          <Text style={s.subtitle}>{products.length} {plPlural(products.length, 'produkt', 'produkty', 'produktów')} · tagi, waga, scalanie duplikatów</Text>
         </View>
       </View>
 

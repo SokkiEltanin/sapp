@@ -113,7 +113,9 @@ describe('bossProgressReport', () => {
         }],
       };
       const report = buildBossProgressReport(s);
-      expect(report).toContain('WYGRANA (2 rund)');
+      // 2026-09-19, agent-audyt: było "2 rund" (błędna odmiana — 2 to "few", powinno być
+      // "rundy", nie dopełniacz l.mn. "rund" zarezerwowany dla 0/5+).
+      expect(report).toContain('WYGRANA (2 rundy)');
       expect(report).toContain('boss HP: 382→321→263');
       expect(report).toContain('kotek HP: 120→108→108');
       expect(report).toContain('Twój dmg/rundę: 61,58');
