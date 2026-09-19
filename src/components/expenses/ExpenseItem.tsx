@@ -12,6 +12,7 @@ import { estimateItemKcal } from '@/utils/calories';
 import { isMine } from '@/store/statsScope';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 // Warm amber marks a transaction someone ELSE paid (payer ≠ "Ja"): it shows in the
 // list but does NOT count toward your spend/balance, so it needs an at-a-glance tell.
@@ -66,7 +67,7 @@ export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Prop
   // No time in the list — every entry defaults to noon, so "12:00" was just noise.
   // Subtitle = the meaningful parts (products / tags / category / cash).
   const subParts: string[] = [];
-  if (isReceipt) subParts.push(`${expense.receiptItems!.length} produktów`);
+  if (isReceipt) subParts.push(`${expense.receiptItems!.length} ${plPlural(expense.receiptItems!.length, 'produkt', 'produkty', 'produktów')}`);
   if (!isIncome) {
     if ((expense.tags?.length ?? 0) > 0) subParts.push(expense.tags!.slice(0, 2).join(', '));
     if (!isReceipt) subParts.push(meta.label);

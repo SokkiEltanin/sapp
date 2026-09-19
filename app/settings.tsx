@@ -174,12 +174,12 @@ export default function SettingsScreen() {
   const doBackfill = () => {
     const r = backfillRange();
     Alert.alert('Zaległe dane z Samsung Health',
-      `${backfillDone ? 'Już wgrane raz. Wgrać ponownie? ' : ''}Wypełni ${r.days} dni (${r.from} → ${r.to}) — tylko PUSTE dni, nie nadpisze ręcznych ani nowszych.`,
+      `${backfillDone ? 'Już wgrane raz. Wgrać ponownie? ' : ''}Wypełni ${r.days} ${plPlural(r.days, 'dzień', 'dni', 'dni')} (${r.from} → ${r.to}) — tylko PUSTE dni, nie nadpisze ręcznych ani nowszych.`,
       [
         { text: 'Anuluj', style: 'cancel' },
         { text: 'Wgraj', onPress: async () => {
           haptic.tap(); setBackfillBusy(true);
-          try { const res = await runSamsungBackfill(); setBackfillDone(true); Alert.alert('Gotowe', `Uzupełniono ${res.filled} dni. Kroki/sen/waga/kalorie ze starych dni są teraz w wykresach i trendzie wagi.`); }
+          try { const res = await runSamsungBackfill(); setBackfillDone(true); Alert.alert('Gotowe', `Uzupełniono ${res.filled} ${plPlural(res.filled, 'dzień', 'dni', 'dni')}. Kroki/sen/waga/kalorie ze starych dni są teraz w wykresach i trendzie wagi.`); }
           catch { Alert.alert('Błąd', 'Nie udało się wgrać danych.'); }
           finally { setBackfillBusy(false); }
         } },
@@ -2093,7 +2093,7 @@ export default function SettingsScreen() {
         },
         {
           id: 'diag-backfill', title: `Wgraj zaległe dane z Samsung Health${backfillDone ? ' ✓' : ''}`,
-          subtitle: `Historyczne kroki/sen/waga/kalorie (${backfillRange().days} dni) do wykresów — jednorazowo, wypełnia luki`,
+          subtitle: `Historyczne kroki/sen/waga/kalorie (${backfillRange().days} ${plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki`,
           keywords: ['samsung health', 'zaległe dane', 'backfill', 'historia', 'uzupełnij'],
           control: { kind: 'custom', render: () => (
             <PressableScale onPress={doBackfill} disabled={backfillBusy} style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
@@ -2102,7 +2102,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Wgraj zaległe dane z Samsung Health{backfillDone ? ' ✓' : ''}</Text>
-                <Text style={styles.rowSub}>Historyczne kroki/sen/waga/kalorie ({backfillRange().days} dni) do wykresów — jednorazowo, wypełnia luki</Text>
+                <Text style={styles.rowSub}>Historyczne kroki/sen/waga/kalorie ({backfillRange().days} {plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki</Text>
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>

@@ -3,14 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: "nagród do odbioru" nie odmieniało się przez liczbę + audyt w toku (2026-09-19)
+## ✅ Fix: 26 miejsc bez poprawnej odmiany przez liczbę w całej apce (2026-09-19)
 
-Pełny opis w ARCHITECTURE.md §131. `PetTile.tsx` (kafel pupila na dashboardzie) miał na
-sztywno "{n} nagród do odbioru" niezależnie od n — naprawione przez `plPlural` (już istniał,
-używany w TopPill.tsx, ale nie tutaj). Dodany pierwszy test dla `plPlural` samego w sobie.
-Delegowany agent-audyt na TĘ SAMĄ klasę buga (hardcoded polska liczba mnoga / dwuwarian-
-towy ternary zamiast 3-wariantowej odmiany) w całej apce — **DO ZROBIENIA**: sprawdzić wynik
-audytu w kolejnej sesji i naprawić znalezione miejsca. `tsc`/`jest` czyste (1005 testów).
+Pełny opis w ARCHITECTURE.md §131 (kafel pupila, pierwszy fix) i §132 (wynik agent-audytu —
+26 kolejnych naprawionych). User: "nagrody u pupila nie odmieniają się przez liczbę...
+sprawdzaj tam i wszędzie". Naprawione `plPlural()`: powiadomienia push, dashboard (seria
+logowań/monety, nawyki wieczorem, gablota odznak), habit-year, finanse, tydzień, paragony/
+produkty/audyt finansów, przedmioty domowe/subskrypcje (dni do terminu), statystyki skrzynek,
+ekwipunek pupila, roczne/miesięczne podsumowania, karta Wrapped miesiąca, backfill Samsung
+Health, kopia zapasowa, diagnostyka Health Connect. Po drodze naprawiony test, który
+asercją zamrażał złą odmianę ("2 rund" zamiast "2 rundy"). Świadomie NIE ruszone: konstrukcje
+ułamkowe "X/Y rzeczownik" (np. "3/5 zadań") — te ZAWSZE biorą dopełniacz l.mn., podmiana na
+`plPlural` byłaby NOWYM bugiem, nie fixem (szczegóły w §132). `tsc`/`jest` czyste (1005
+testów). Priorytet testu na urządzeniu: niski-średni, rozproszone po całej apce.
 
 ## ✅ Fix: nieopisany pasek "% celu snu" na karcie Sen w Zdrowie (2026-09-18)
 

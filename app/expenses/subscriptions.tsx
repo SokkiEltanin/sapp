@@ -22,6 +22,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -476,7 +477,7 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
   const cycle = CYCLES.find((c) => c.value === sub.billingCycle);
   const days  = daysUntil(sub.nextBillingDate);
   const color = urgencyColor(days);
-  const nextLabel = days < 0 ? 'zaległa' : days === 0 ? 'dziś!' : `za ${days} dni`;
+  const nextLabel = days < 0 ? 'zaległa' : days === 0 ? 'dziś!' : `za ${days} ${plPlural(days, 'dzień', 'dni', 'dni')}`;
   const durLabel = sub.durationMonths && sub.durationMonths > 0
     ? `${sub.durationMonths} mies.`
     : null;
@@ -496,7 +497,7 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
         {sub.reminderDaysBefore > 0 && sub.active && (
           <View style={s.itemBell}>
             <Bell size={9} color={colors.accent.amber} />
-            <Text style={s.itemBellText}>Przypomnienie {sub.reminderDaysBefore} dni przed</Text>
+            <Text style={s.itemBellText}>Przypomnienie {sub.reminderDaysBefore} {plPlural(sub.reminderDaysBefore, 'dzień', 'dni', 'dni')} przed</Text>
           </View>
         )}
       </View>

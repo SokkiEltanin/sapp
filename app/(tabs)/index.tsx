@@ -43,6 +43,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS, weekdaySpendPattern } from '@/utils/dashboard/spend';
 import { plTasks, tagLimitMsg, metricTagLabel, fmtChartPt, fmtStat, fmtWave, unitChip, periodCaption } from '@/utils/dashboard/format';
+import { plPlural } from '@/utils/plural';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
@@ -833,7 +834,7 @@ export default function DashboardScreen() {
     for (const it of maintItems) {
       const d = dueInDays(it);
       if (d > 7) continue;
-      out.push({ key: `i-${it.id}`, label: it.name, sub: d < 0 ? `${-d} dni po terminie` : d === 0 ? 'dziś' : `za ${d} dni`, overdue: d < 0, route: '/items' });
+      out.push({ key: `i-${it.id}`, label: it.name, sub: d < 0 ? `${-d} ${plPlural(-d, 'dzień', 'dni', 'dni')} po terminie` : d === 0 ? 'dziś' : `za ${d} ${plPlural(d, 'dzień', 'dni', 'dni')}`, overdue: d < 0, route: '/items' });
     }
     return out.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1)).slice(0, 5);
   }, [vehicles, maintItems]);
@@ -1588,7 +1589,7 @@ export default function DashboardScreen() {
     const g = registerLogin();
     if (g) {
       haptic.success();
-      const msg = `Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} monet`;
+      const msg = `Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} ${plPlural(g.coins, 'moneta', 'monety', 'monet')}`;
       toast.success(msg);
       // Też w TopPill (2026-09-13, user: "niech moze tam sie pokazuja te powiadomienia...
       // seria logowan") — toast znika po ~2.6s i łatwo go przegapić, pill jest bardziej
@@ -1860,7 +1861,7 @@ export default function DashboardScreen() {
     }
     if (hour >= 17 && habits.length > 0) {
       const undone = habits.length - habitsDoneIds.length;
-      if (undone > 0) return { pre: 'Wieczór — zostało ', bold: `${undone} ${undone === 1 ? 'nawyk' : 'nawyki'}`, post: ' do odhaczenia.' };
+      if (undone > 0) return { pre: 'Wieczór — zostało ', bold: `${undone} ${plPlural(undone, 'nawyk', 'nawyki', 'nawyków')}`, post: ' do odhaczenia.' };
     }
     if (hour >= 18 && !todayEntry) {
       return { pre: 'Jak ', bold: 'minął Ci dzień', post: '? Zapisz nastrój.' };
@@ -2953,7 +2954,7 @@ export default function DashboardScreen() {
                     <View style={{ width: `${Math.round(pct * 100)}%`, height: '100%', backgroundColor: '#FFC83D', borderRadius: 5 }} />
                   </View>
                   <Text style={[s.factText, { marginTop: spacing[2] }]}>
-                    {left > 0 ? `Jeszcze ${left} ${left === 1 ? 'odznaka' : 'odznak'} do zdobycia · stuknij` : 'Wszystkie zdobyte! 👑 stuknij'}
+                    {left > 0 ? `Jeszcze ${left} ${plPlural(left, 'odznaka', 'odznaki', 'odznak')} do zdobycia · stuknij` : 'Wszystkie zdobyte! 👑 stuknij'}
                   </Text>
                 </TouchableOpacity>
               );
@@ -2972,8 +2973,7 @@ export default function DashboardScreen() {
                   <Flame size={14} color={accentColor} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.habitsNudgeTitle}>
-                      {notDone.length === 1 ? 'Jeszcze 1 nawyk dziś'
-                        : `Jeszcze ${notDone.length} nawyki dziś`}
+                      {`Jeszcze ${notDone.length} ${plPlural(notDone.length, 'nawyk', 'nawyki', 'nawyków')} dziś`}
                       {maxStreak >= 2 ? ` · ${maxStreak}d seria!` : ''}
                     </Text>
                     <Text style={s.habitsNudgeSub} numberOfLines={1}>
@@ -4023,7 +4023,7 @@ export default function DashboardScreen() {
             {tagModal && (
               <>
                 <Text style={s.tagModalTitle}>{tagModal.label}</Text>
-                <Text style={s.tagModalSub}>{Math.round(tagModal.spend)}/{Math.round(tagModal.limit)} zł · {tagModal.items.length} pozycji · {tagModal.period === 'week' ? 'tydzień' : 'miesiąc'}</Text>
+                <Text style={s.tagModalSub}>{Math.round(tagModal.spend)}/{Math.round(tagModal.limit)} zł · {tagModal.items.length} {plPlural(tagModal.items.length, 'pozycja', 'pozycje', 'pozycji')} · {tagModal.period === 'week' ? 'tydzień' : 'miesiąc'}</Text>
                 {tagModal.period === 'month' && tagHistory.length > 0 && (() => {
                   const limit = tagModal.limit;
                   const max = Math.max(limit, ...tagHistory.map(m => m.spend), 1);
@@ -4152,7 +4152,7 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle}>{meta.label} · {foodSel.name}</Text>
                     <TouchableOpacity onPress={() => setFoodCat(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
-                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycji'} · stuknij, by otworzyć paragon; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
+                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {plPlural(items.length, 'pozycja', 'pozycje', 'pozycji')} · stuknij, by otworzyć paragon; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
                   <ScrollView style={{ maxHeight: 300, marginTop: spacing[2] }} showsVerticalScrollIndicator={false}>
                     {items.map(([name, amt]) => {
                       const srcs = (foodSel.subSrc[foodCat!]?.[name] ?? []).slice().sort((a, b) => b.date.localeCompare(a.date));

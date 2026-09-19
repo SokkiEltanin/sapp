@@ -20,6 +20,7 @@ import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
+import { plPlural } from '@/utils/plural';
 
 const COLORS = ['#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24', '#F472B6', '#FB923C', '#E43434'];
 const INTERVAL_PRESETS = [30, 60, 90, 120, 180, 365];
@@ -103,7 +104,7 @@ export default function ItemsScreen() {
     toast.info('Usunięto');
   };
 
-  const dueLabel = (d: number) => d < 0 ? `${-d} dni po terminie` : d === 0 ? 'dziś!' : d === 1 ? 'jutro' : `za ${d} dni`;
+  const dueLabel = (d: number) => d < 0 ? `${-d} ${plPlural(-d, 'dzień', 'dni', 'dni')} po terminie` : d === 0 ? 'dziś!' : d === 1 ? 'jutro' : `za ${d} dni`;
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
@@ -150,7 +151,7 @@ export default function ItemsScreen() {
                   <View style={[s.dot, { backgroundColor: it.color }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.name} numberOfLines={1}>{it.name}</Text>
-                    <Text style={s.meta}>co {it.intervalDays} dni · ostatnio {new Date(it.lastChangedDate).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })}</Text>
+                    <Text style={s.meta}>co {it.intervalDays} {plPlural(it.intervalDays, 'dzień', 'dni', 'dni')} · ostatnio {new Date(it.lastChangedDate).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })}</Text>
                     <Text style={[s.due, { color: tone }]}>{dueLabel(d)}</Text>
                   </View>
                   <TouchableOpacity onPress={() => markChanged(it)} style={[s.markBtn, { borderColor: it.color + '60' }]} activeOpacity={0.75}>

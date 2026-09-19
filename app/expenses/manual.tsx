@@ -32,6 +32,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 interface Item {
   id: string;
@@ -687,7 +688,7 @@ export default function ManualReceiptScreen() {
         .then(() => confirmSync(expense.id))
         .catch(() => {}); // stays pending; retried on next foreground
       haptic.success();
-      toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
+      toast.success(`Zapisano ${receiptItems.length} ${plPlural(receiptItems.length, 'pozycję', 'pozycje', 'pozycji')} · ${totalAmount.toFixed(2)} zł`);
       markScanStep('nav');
       clearScanSave();
       requestAnimationFrame(() => goBackOrHome());   // yield a frame → no black screen mid-commit
@@ -726,7 +727,7 @@ export default function ManualReceiptScreen() {
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Ręczny paragon</Text>
           {validCount > 0 && (
-            <Text style={styles.subtitle}>{validCount} produktów · {total.toFixed(2)} zł</Text>
+            <Text style={styles.subtitle}>{validCount} {plPlural(validCount, 'produkt', 'produkty', 'produktów')} · {total.toFixed(2)} zł</Text>
           )}
         </View>
         <View style={{ width: 36 }} />

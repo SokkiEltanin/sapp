@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight, Moon, Scale } from 'lucide-react-native';
 import { MonthCard, MonthPace } from '@/utils/monthCards';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
+import { plPlural } from '@/utils/plural';
 
 // A Spotify-Wrapped-style COLLECTIBLE card for one month. The gradient + emoji
 // stickers are deliberate decoration; the stats are real (sweets, steps, spend,
@@ -117,7 +118,7 @@ export default function MonthWrappedCard({
             <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '1F' }]}>
               <Text style={[st.rarityTxt, { color: card.accent }]}>{card.tierLabel}</Text>
               {recordsN >= 1 && (
-                <Text style={[st.rarityCount, { color: card.accent }]}>· {recordsN} {recordsN === 1 ? 'rekord' : 'rekordy'}</Text>
+                <Text style={[st.rarityCount, { color: card.accent }]}>· {recordsN} {plPlural(recordsN, 'rekord', 'rekordy', 'rekordów')}</Text>
               )}
             </View>
             <Text style={st.month}>{card.monthName}</Text>
@@ -131,7 +132,7 @@ export default function MonthWrappedCard({
             <View style={st.heroIcon}><Footprints size={16} color="#fff" /></View>
             <View>
               <Text style={st.heroVal}>{fmtSteps(card.steps)}</Text>
-              <Text style={st.heroKey}>kroków{card.stepsDays > 0 ? ` · ${card.stepsDays} dni` : ''}</Text>
+              <Text style={st.heroKey}>kroków{card.stepsDays > 0 ? ` · ${card.stepsDays} ${plPlural(card.stepsDays, 'dzień', 'dni', 'dni')}` : ''}</Text>
             </View>
           </View>
           {card.earned > 0 && (

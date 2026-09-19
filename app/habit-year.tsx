@@ -14,6 +14,7 @@ import { useCounters, matchesAvoid, matchedEatDays, resolveAvoidKeyword, type Co
 import { useFoodStore } from '@/store/foodStore';
 import { expensesService } from '@/services/expensesService';
 import { spacing, radius, fonts } from '@/theme';
+import { plPlural } from '@/utils/plural';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 
@@ -225,7 +226,7 @@ export default function HabitYear() {
           <Flame size={26} color={doneColor} fill={stats.current > 0 ? doneColor : 'transparent'} />
           <View style={{ flex: 1 }}>
             <Text style={s.heroNum}>{stats.current} <Text style={s.heroUnit}>{stats.current === 1 ? 'dzień' : 'dni'}{isCounter ? ' czysto' : ''} z rzędu</Text></Text>
-            <Text style={s.heroSub}>najdłuższa: {stats.longest} dni · {view === 'month' ? 'ostatnie 5 tyg.' : 'rok'}</Text>
+            <Text style={s.heroSub}>najdłuższa: {stats.longest} {plPlural(stats.longest, 'dzień', 'dni', 'dni')} · {view === 'month' ? 'ostatnie 5 tyg.' : 'rok'}</Text>
           </View>
         </View>
 

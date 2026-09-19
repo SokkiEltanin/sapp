@@ -14,6 +14,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
+import { plPlural } from '@/utils/plural';
 
 const SLOT_ICON: Record<GearSlot, LucideIcon> = {
   helm: HardHat, zbroja: Shield, buty: Footprints, obroza: Link2, talizman: Gem, kolczyki: Coins,
@@ -284,7 +285,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
     <ConfirmDialog
       visible={!!bulkSell}
       title="Sprzedać niezałożone?"
-      message={bulkSell ? `${bulkSell.ids.length} itemów (${SLOT_META[bulkSell.slot].label}) — otrzymasz łącznie ${bulkSell.coins} monet. Założony item zostaje. Tej operacji nie można cofnąć.` : ''}
+      message={bulkSell ? `${bulkSell.ids.length} ${plPlural(bulkSell.ids.length, 'item', 'itemy', 'itemów')} (${SLOT_META[bulkSell.slot].label}) — otrzymasz łącznie ${bulkSell.coins} monet. Założony item zostaje. Tej operacji nie można cofnąć.` : ''}
       confirmLabel="Sprzedaj wszystkie"
       cancelLabel="Anuluj"
       destructive
@@ -292,7 +293,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
         if (bulkSell) {
           const earned = bulkSell.ids.reduce((sum, id) => sum + sellGear(id), 0);
           haptic.success();
-          toast.success(`Sprzedano ${bulkSell.ids.length} itemów — +${earned} 🪙`);
+          toast.success(`Sprzedano ${bulkSell.ids.length} ${plPlural(bulkSell.ids.length, 'item', 'itemy', 'itemów')} — +${earned} 🪙`);
         }
         setBulkSell(null);
       }}

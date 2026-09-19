@@ -9,6 +9,7 @@ import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
+import { plPlural } from '@/utils/plural';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
@@ -76,7 +77,7 @@ export default function FinanceAuditScreen() {
           </View>
           <Text style={s.summaryHint}>
             „Suma wydatków" na ekranie Finanse = {data.expTotal.toFixed(2)} zł
-            ({data.thisMonth.filter(isExp).length} wpisów)
+            ({data.thisMonth.filter(isExp).length} {plPlural(data.thisMonth.filter(isExp).length, 'wpis', 'wpisy', 'wpisów')})
           </Text>
         </View>
 
@@ -85,7 +86,7 @@ export default function FinanceAuditScreen() {
           <View style={s.warnCard}>
             <View style={s.warnHeader}>
               <AlertTriangle size={15} color="#FBBF24" />
-              <Text style={s.warnTitle}>{data.noType.length} wpisów bez typu</Text>
+              <Text style={s.warnTitle}>{data.noType.length} {plPlural(data.noType.length, 'wpis', 'wpisy', 'wpisów')} bez typu</Text>
             </View>
             <Text style={s.warnDesc}>
               Te wpisy nie mają ustawionego pola „typ", więc domyślnie liczą się jako WYDATEK.

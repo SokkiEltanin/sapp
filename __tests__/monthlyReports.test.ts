@@ -66,7 +66,8 @@ describe('generateMonthlyReport — priorytet wiadomości highlight (izolowane g
 
   test('F: są wpisy nastroju (ale <4 średnio) i nic innego się nie wyróżnia → ogólne podsumowanie', () => {
     const r = generateMonthlyReport({ ...base(), moodEntries: [mood({ mood: 2 })] });
-    expect(r.highlight).toMatch(/dni z wpisem nastroju/);
+    // 2026-09-19, agent-audyt: 1 zalogowany dzień → poprawna odmiana "1 dzień", nie "1 dni".
+    expect(r.highlight).toMatch(/dzień z wpisem nastroju/);
   });
 });
 

@@ -10,6 +10,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, exportExpensesToCsv, BackupMeta } from '@/services/backupService';
+import { plPlural } from '@/utils/plural';
 
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
@@ -223,7 +224,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
       <ConfirmDialog
         visible={!!confirmRestore}
         title="Przywrócić kopię?"
-        message={confirmRestore ? `Z dnia ${fmtWhen(confirmRestore.createdAt)}.\n\nObecne dane zostaną zastąpione danymi z tej kopii (${restoreTotal} rekordów + ustawienia). Tego nie można cofnąć.` : undefined}
+        message={confirmRestore ? `Z dnia ${fmtWhen(confirmRestore.createdAt)}.\n\nObecne dane zostaną zastąpione danymi z tej kopii (${restoreTotal} ${plPlural(restoreTotal, 'rekord', 'rekordy', 'rekordów')} + ustawienia). Tego nie można cofnąć.` : undefined}
         confirmLabel="Przywróć"
         onCancel={() => setConfirmRestore(null)}
         onConfirm={() => { const b = confirmRestore; setConfirmRestore(null); if (b) doRestore(b); }}

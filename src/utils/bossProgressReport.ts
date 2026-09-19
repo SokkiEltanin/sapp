@@ -5,6 +5,7 @@ import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK, 
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { levelFromXp, catMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
 import { gearCombatBonuses, gearFlatHp, GearSlot, OwnedGear } from '@/utils/gear';
+import { plPlural } from '@/utils/plural';
 
 export interface ProgressReportInput {
   xp: number;
@@ -111,7 +112,7 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
     // fixu nie mają `rounds` (opcjonalne pole), dostają starą, samą linię z nagrodą.
     if (e.rounds && e.rounds.length > 0 && e.bossMaxHp != null && e.catMaxHpAtFight != null) {
       const outcome = e.won ? 'WYGRANA' : e.catFainted ? 'PRZEGRANA (kotek zemdlał)' : 'PRZEGRANA (limit rund)';
-      lines.push(`${head} · ${outcome} (${e.rounds.length} rund) · +${e.coins} monet, +${e.xp} XP`);
+      lines.push(`${head} · ${outcome} (${e.rounds.length} ${plPlural(e.rounds.length, 'runda', 'rundy', 'rund')}) · +${e.coins} monet, +${e.xp} XP`);
       lines.push(`      boss HP: ${e.bossMaxHp}→${e.rounds.map(r => r.bhp).join('→')}`);
       lines.push(`      kotek HP: ${e.catMaxHpAtFight}→${e.rounds.map(r => r.chp).join('→')}`);
       lines.push(`      Twój dmg/rundę: ${e.rounds.map(r => r.p).join(',')}`);
