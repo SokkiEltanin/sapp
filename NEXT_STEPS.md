@@ -3,6 +3,15 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: "nagród do odbioru" nie odmieniało się przez liczbę + audyt w toku (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §131. `PetTile.tsx` (kafel pupila na dashboardzie) miał na
+sztywno "{n} nagród do odbioru" niezależnie od n — naprawione przez `plPlural` (już istniał,
+używany w TopPill.tsx, ale nie tutaj). Dodany pierwszy test dla `plPlural` samego w sobie.
+Delegowany agent-audyt na TĘ SAMĄ klasę buga (hardcoded polska liczba mnoga / dwuwarian-
+towy ternary zamiast 3-wariantowej odmiany) w całej apce — **DO ZROBIENIA**: sprawdzić wynik
+audytu w kolejnej sesji i naprawić znalezione miejsca. `tsc`/`jest` czyste (1005 testów).
+
 ## ✅ Fix: nieopisany pasek "% celu snu" na karcie Sen w Zdrowie (2026-09-18)
 
 Pełny opis w ARCHITECTURE.md §130. User: "zdrowie mało czytelne" → doprecyzowane: chodzi o
