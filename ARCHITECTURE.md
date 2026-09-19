@@ -8722,6 +8722,26 @@ floating nad każdą zakładką) — NIE ruszane, bo user explicit powiedział �
 **Priorytet testu na urządzeniu**: niski — Zdrowie → karta Sen → sprawdź że pod kolorowym
 paskiem pojawia się teraz podpis z %/godzinami.
 
+## 131. Fix: "nagród do odbioru" nie odmieniało się przez liczbę + audyt tej samej klasy buga (2026-09-19)
+
+User: *"jak na dashboardzie pokazuje się że mam do odebrania nagrody u pupila to nie odmienia
+sieę przez liczbę chyba posrpawdzaj tam i wszędzie takie rzeczy logiczne"*. `PetTile.tsx`
+(kafel pupila na dashboardzie, `nodes['pet']` w `index.tsx`) miał na sztywno `{claimable}
+nagród do odbioru` — zawsze dopełniacz l.mn. ("1 nagród", "2 nagród"), niezależnie od
+liczby, zamiast "1 nagroda"/"2 nagrody"/"5 nagród". Fix: użyty istniejący, ale wcześniej
+NIEUŻYTY tutaj `plPlural(n, one, few, many)` z `src/utils/plural.ts` (poprawna polska
+odmiana: 1→one, 2-4→few poza 12-14, 0/5-21/12-14→many — ten sam helper już poprawnie użyty
+w `TopPill.tsx`). Dodany pierwszy test dla samego `plPlural` (nigdy wcześniej nietestowany
+mimo istniejących zastosowań) — `__tests__/plural.test.ts`, 5 przypadków w tym pułapkę
+112-114 (kończą się na 12-14, ale to "many" nie "few").
+
+Delegowany agent-audyt na TĘ SAMĄ klasę buga w całej apce (user: "sprawdzaj tam i wszędzie") —
+w toku, wynik w kolejnym wpisie po zakończeniu.
+
+`tsc`/`jest` czyste (1005 testów, +5 nowych).
+**Priorytet testu na urządzeniu**: niski — dashboard, kafel pupila z 1/2/5+ nagrodami do
+odebrania, sprawdź poprawną odmianę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

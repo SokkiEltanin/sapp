@@ -5,6 +5,7 @@ import { PetState } from '@/utils/petState';
 import { usePetStore } from '@/store/petStore';
 import { paletteById } from '@/utils/catPalettes';
 import { useColors } from '@/theme/useColors';
+import { plPlural } from '@/utils/plural';
 
 // Dashboard companion tile: a mini cat + its name + level.
 // Taps through to the full pet page.
@@ -44,8 +45,11 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
           <View style={[st.lvl, { backgroundColor: '#A78BFA22' }]}><Text style={st.lvlTxt}>lvl {level}</Text></View>
         </View>
         <Text style={[st.status, { color: pet.color }]}>{pet.label}</Text>
+        {/* Odmiana przez liczbę (2026-09-19, user: "nie odmienia się przez liczbę") — było
+            zawsze "nagród" (dopełniacz l.mn.), niezależnie od liczby: "1 nagród", "2 nagród"
+            zamiast "1 nagroda"/"2 nagrody". */}
         {claimable > 0 && (
-          <View style={st.claim}><Gift size={11} color="#0B0E1A" /><Text style={st.claimTxt}>{claimable} nagród do odbioru</Text></View>
+          <View style={st.claim}><Gift size={11} color="#0B0E1A" /><Text style={st.claimTxt}>{claimable} {plPlural(claimable, 'nagroda', 'nagrody', 'nagród')} do odbioru</Text></View>
         )}
       </View>
     </>
