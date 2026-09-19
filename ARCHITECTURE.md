@@ -8792,6 +8792,33 @@ gablota) i powiadomienia push (jeśli akurat trafi się 3-4 zadania jutro).
 
 ---
 
+## 133. Fix: ekran Bossy domyślnie wracał na "Kampania" mimo skończonej kampanii (2026-09-19)
+
+User: "jak pokonałem wszystkie bossy kampanii to główna zakładka musi być wtedy madbossy".
+Przełącznik Kampania/MAD na ekranie `app/bosses.tsx` (§ z 2026-08-21, `bossView` state) miał
+`useState('campaign')` na stałe — z kampanią w 100% skończoną (`current` == null, wszyscy 22
+bossowie pokonani) zakładka "Kampania" pokazywała tylko martwy ekran "Wszyscy bossowie
+pokonani! Kolejni wkrótce." (linia `s.done`), a jedyny realny cel na tym etapie (MAD bossy)
+wymagał ręcznego przełączenia PRZY KAŻDYM wejściu na ekran, bo ekran się odmontowuje między
+wizytami (nie jest jednym z 6 zakładek w `(tabs)/_layout.tsx`, tylko osobny stack screen pod
+`router.push`) — `useState` initial value resetuje się do `'campaign'` na nowo za każdym
+razem.
+
+**Fix**: `bossViewOverride` (`'campaign' | 'mad' | null`, domyślnie `null`) + wyprowadzone
+`const bossView = bossViewOverride ?? (current ? 'campaign' : 'mad')`. Bez ręcznego kliknięcia
+przełącznika w danej sesji ekranu, domyślna zakładka podąża za postępem: "Kampania" dopóki
+jest niepokonany boss (`current` istnieje), "MAD bossy" gdy kampania skończona. Kliknięcie
+przełącznika ustawia `bossViewOverride` na wybraną wartość i to trzyma się do opuszczenia
+ekranu — user może np. świadomie wrócić na "Kampania" (ściany medali, przegląd pokonanych),
+bez wciąż naprowadzania go z powrotem na "MAD" po każdej interakcji.
+
+`tsc`/`jest` czyste (1005 testów — bez zmian w testach, czysto UI-default). **Priorytet testu
+na urządzeniu**: niski — pokonaj (albo symuluj przez dev tools) wszystkich 22 bossów kampanii,
+wejdź na ekran Bossy z innej zakładki → powinien od razu otworzyć się na "MAD bossy", nie
+"Kampania"; ręczne przełączenie na "Kampania" powinno trzymać wybór do wyjścia z ekranu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
