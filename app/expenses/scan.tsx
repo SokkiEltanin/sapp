@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -114,7 +114,7 @@ export default function ScanReceiptModal() {
   // mam opcji oddania go na stałe, żebym mógł sobie dodac tag na inne kategorie" — it was
   // already persisted for future receipts via `saveTagMemory` on save, but `tagFreq` only ever
   // loaded once at mount, so it stayed invisible to other products until next time).
-  const onNewCustomTag = (tag: string) => setTagFreq(prev => ({ ...prev, [tag]: (prev[tag] ?? 0) + 1 }));
+  const onNewCustomTag = useCallback((tag: string) => setTagFreq(prev => ({ ...prev, [tag]: (prev[tag] ?? 0) + 1 })), []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useEffect(() => { loadPriceMemory().then(setPriceMemory).catch(() => {}); }, []);
@@ -207,10 +207,92 @@ export default function ScanReceiptModal() {
     setCatPickerFor(null);
   };
 
-  const removeCustomProduct = (idx: number) => {
+  const removeCustomProduct = useCallback((idx: number) => {
     setCustomProducts(prev => prev.filter((_, i) => i !== idx));
-    if (customCatPickerFor === idx) setCustomCatPickerFor(null);
-  };
+    setCustomCatPickerFor(prev => prev === idx ? null : prev);
+  }, []);
+
+  // ── Stabilne, indeksowane callbacki dla ProductRow/CustomProductRow (2026-09-19,
+  // patrz NEXT_STEPS.md/ARCHITECTURE §127 "explicite NIE zrobione") — user zgłaszał (i audyt
+  // potwierdził) że jedna literka w polu JEDNEGO produktu re-renderowała WSZYSTKIE ~20-30
+  // wierszy paragonu. Przyczyna: każdy callback prop był inline `() => handler(i)` tworzonym
+  // NA NOWO przy KAŻDYM renderze rodzica (dowolna zmiana stanu, w tym stanu innego wiersza) —
+  // nawet z `React.memo` na wierszu, nowa referencja funkcji = memo zawsze widzi "props się
+  // zmieniły". Fix: handlery biorą `index` jako PIERWSZY argument i są `useCallback` z PUSTYMI
+  // deps (bezpieczne, bo wszystkie już używały funkcyjnego `setState(prev => ...)` — nie
+  // zamykają się na żaden zewnętrzny stan) — ta sama referencja funkcji na każdy render
+  // rodzica, przekazywana WPROST (bez `() =>` na miejscu wywołania w JSX niżej), więc
+  // `React.memo` na wierszu (patrz `productRowPropsEqual`/`customProductRowPropsEqual` przy
+  // definicjach komponentów) faktycznie łapie "nic się nie zmieniło dla TEGO wiersza".
+  const onCategoryPress = useCallback((i: number) => {
+    setCatPickerFor(prev => prev === i ? null : i);
+    setTagPickerFor(null);
+    setCustomCatPickerFor(null);
+  }, []);
+  const onPriceChange = useCallback((i: number, v: string) => {
+    setEditedPrices(prev => ({ ...prev, [i]: v }));
+  }, []);
+  const onNameChange = useCallback((i: number, v: string) => {
+    setEditedNames(prev => ({ ...prev, [i]: v }));
+  }, []);
+  const onMerge = useCallback((i: number, name: string) => {
+    setEditedNames(prev => ({ ...prev, [i]: name }));
+    setDismissedSug(prev => new Set(prev).add(i));
+  }, []);
+  const onDismissMerge = useCallback((i: number) => {
+    setDismissedSug(prev => new Set(prev).add(i));
+  }, []);
+  const onTagsChange = useCallback((i: number, tags: string[]) => {
+    setEditedTags(prev => ({ ...prev, [i]: tags }));
+  }, []);
+  const onTagPickerPress = useCallback((i: number) => {
+    setTagPickerFor(prev => prev === i ? null : i);
+    setCatPickerFor(null);
+    setCustomCatPickerFor(null);
+    setCustomTagPickerFor(null);
+  }, []);
+  const onToggleExcluded = useCallback((i: number) => {
+    setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }));
+  }, []);
+  const onQuantityChange = useCallback((i: number, v: string) => {
+    setEditedQty(prev => ({ ...prev, [i]: v }));
+  }, []);
+  const onWeightChange = useCallback((i: number, v: string) => {
+    setEditedWeight(prev => ({ ...prev, [i]: v }));
+  }, []);
+  const onEatersChange = useCallback((i: number, eaters: string[]) => {
+    setEditedEaters(prev => ({ ...prev, [i]: eaters }));
+  }, []);
+
+  // Custom (ręcznie dodane) produkty — ten sam wzorzec, `idx` jako pierwszy argument.
+  const onCustomNameChange = useCallback((idx: number, v: string) => {
+    setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, name: v } : p));
+  }, []);
+  const onCustomPriceChange = useCallback((idx: number, v: string) => {
+    setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, price: v } : p));
+  }, []);
+  const onCustomQuantityChange = useCallback((idx: number, v: string) => {
+    setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, quantity: v } : p));
+  }, []);
+  const onCustomCategoryChange = useCallback((idx: number, c: ExpenseCategory) => {
+    setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, category: c } : p));
+    setCustomCatPickerFor(null);
+  }, []);
+  const onCustomCategoryPress = useCallback((idx: number) => {
+    setCustomCatPickerFor(prev => prev === idx ? null : idx);
+    setCatPickerFor(null);
+    setTagPickerFor(null);
+    setCustomTagPickerFor(null);
+  }, []);
+  const onCustomTagPickerPress = useCallback((idx: number) => {
+    setCustomTagPickerFor(prev => prev === idx ? null : idx);
+    setCustomCatPickerFor(null);
+    setCatPickerFor(null);
+    setTagPickerFor(null);
+  }, []);
+  const onCustomTagsChange = useCallback((idx: number, tags: string[]) => {
+    setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, tags } : p));
+  }, []);
 
   const processText = () => {
     const text = pastedText.trim();
@@ -264,13 +346,13 @@ export default function ScanReceiptModal() {
 
   // ── Selection ────────────────────────────────────────────────────────────────
 
-  const toggleProduct = (i: number) => {
+  const toggleProduct = useCallback((i: number) => {
     setSelected(prev => {
       const next = new Set(prev);
       next.has(i) ? next.delete(i) : next.add(i);
       return next;
     });
-  };
+  }, []);
 
   const toggleAll = () => {
     if (!receipt) return;
@@ -282,10 +364,10 @@ export default function ScanReceiptModal() {
 
   // ── Category editing ─────────────────────────────────────────────────────────
 
-  const changeCategory = (i: number, cat: ExpenseCategory) => {
+  const changeCategory = useCallback((i: number, cat: ExpenseCategory) => {
     setEditedCats(prev => ({ ...prev, [i]: cat }));
     setCatPickerFor(null);
-  };
+  }, []);
 
   // ── Sorted/grouped products ───────────────────────────────────────────────────
 
@@ -718,37 +800,38 @@ export default function ScanReceiptModal() {
                     {items.map(({ p, i }) => (
                       <ProductRow
                         key={i}
+                        index={i}
                         product={p}
                         category={getCategory(i)}
                         selected={selected.has(i)}
-                        onToggle={() => toggleProduct(i)}
+                        onToggle={toggleProduct}
                         catPickerOpen={catPickerFor === i}
-                        onCategoryPress={() => { setCatPickerFor(catPickerFor === i ? null : i); setTagPickerFor(null); setCustomCatPickerFor(null); }}
-                        onCategoryChange={c => changeCategory(i, c)}
+                        onCategoryPress={onCategoryPress}
+                        onCategoryChange={changeCategory}
                         priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
-                        onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                        onPriceChange={onPriceChange}
                         priceFlag={priceFlagFor(i)}
                         productName={getProductName(i)}
-                        onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
+                        onNameChange={onNameChange}
                         mergeSuggestion={getMergeSuggestion(i)}
-                        onMerge={name => { setEditedNames(prev => ({ ...prev, [i]: name })); setDismissedSug(prev => new Set(prev).add(i)); }}
-                        onDismissMerge={() => setDismissedSug(prev => new Set(prev).add(i))}
+                        onMerge={onMerge}
+                        onDismissMerge={onDismissMerge}
                         productTags={getProductTags(i)}
-                        onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
+                        onTagsChange={onTagsChange}
                         tagPickerOpen={tagPickerFor === i}
-                        onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
+                        onTagPickerPress={onTagPickerPress}
                         tagFreq={tagFreq}
                         onNewCustomTag={onNewCustomTag}
                         excluded={!!editedExcluded[i]}
-                        onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
+                        onToggleExcluded={onToggleExcluded}
                         weighable={isWeighable(i)}
                         weight={getWeightG(i)}
                         quantity={getQuantity(i)}
-                        onQuantityChange={v => setEditedQty(prev => ({ ...prev, [i]: v }))}
-                        onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
+                        onQuantityChange={onQuantityChange}
+                        onWeightChange={onWeightChange}
                         payers={payers}
                         eaters={editedEaters[i]}
-                        onEatersChange={e => setEditedEaters(prev => ({ ...prev, [i]: e }))}
+                        onEatersChange={onEatersChange}
                       />
                     ))}
                   </View>
@@ -758,37 +841,38 @@ export default function ScanReceiptModal() {
               displayItems.map(({ p, i }) => (
                 <ProductRow
                   key={i}
+                  index={i}
                   product={p}
                   category={getCategory(i)}
                   selected={selected.has(i)}
-                  onToggle={() => toggleProduct(i)}
+                  onToggle={toggleProduct}
                   catPickerOpen={catPickerFor === i}
-                  onCategoryPress={() => { setCatPickerFor(catPickerFor === i ? null : i); setTagPickerFor(null); setCustomCatPickerFor(null); }}
-                  onCategoryChange={c => changeCategory(i, c)}
+                  onCategoryPress={onCategoryPress}
+                  onCategoryChange={changeCategory}
                   priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
-                  onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                  onPriceChange={onPriceChange}
                   priceFlag={priceFlagFor(i)}
                   productName={getProductName(i)}
-                  onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
+                  onNameChange={onNameChange}
                   mergeSuggestion={getMergeSuggestion(i)}
-                  onMerge={name => { setEditedNames(prev => ({ ...prev, [i]: name })); setDismissedSug(prev => new Set(prev).add(i)); }}
-                  onDismissMerge={() => setDismissedSug(prev => new Set(prev).add(i))}
+                  onMerge={onMerge}
+                  onDismissMerge={onDismissMerge}
                   productTags={getProductTags(i)}
-                  onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
+                  onTagsChange={onTagsChange}
                   tagPickerOpen={tagPickerFor === i}
-                  onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
+                  onTagPickerPress={onTagPickerPress}
                   tagFreq={tagFreq}
                   onNewCustomTag={onNewCustomTag}
                   excluded={!!editedExcluded[i]}
-                  onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
+                  onToggleExcluded={onToggleExcluded}
                   weighable={isWeighable(i)}
                   weight={getWeightG(i)}
                   quantity={getQuantity(i)}
-                  onQuantityChange={v => setEditedQty(prev => ({ ...prev, [i]: v }))}
-                  onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
+                  onQuantityChange={onQuantityChange}
+                  onWeightChange={onWeightChange}
                   payers={payers}
                   eaters={editedEaters[i]}
-                  onEatersChange={e => setEditedEaters(prev => ({ ...prev, [i]: e }))}
+                  onEatersChange={onEatersChange}
                 />
               ))
             )}
@@ -802,20 +886,18 @@ export default function ScanReceiptModal() {
             {customProducts.map((cp, idx) => (
               <CustomProductRow
                 key={`custom-${idx}`}
+                index={idx}
                 product={cp}
-                onRemove={() => removeCustomProduct(idx)}
-                onNameChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, name: v } : p))}
-                onPriceChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, price: v } : p))}
-                onQuantityChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, quantity: v } : p))}
-                onCategoryChange={c => {
-                  setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, category: c } : p));
-                  setCustomCatPickerFor(null);
-                }}
+                onRemove={removeCustomProduct}
+                onNameChange={onCustomNameChange}
+                onPriceChange={onCustomPriceChange}
+                onQuantityChange={onCustomQuantityChange}
+                onCategoryChange={onCustomCategoryChange}
                 catPickerOpen={customCatPickerFor === idx}
-                onCategoryPress={() => { setCustomCatPickerFor(customCatPickerFor === idx ? null : idx); setCatPickerFor(null); setTagPickerFor(null); setCustomTagPickerFor(null); }}
+                onCategoryPress={onCustomCategoryPress}
                 tagPickerOpen={customTagPickerFor === idx}
-                onTagPickerPress={() => { setCustomTagPickerFor(customTagPickerFor === idx ? null : idx); setCustomCatPickerFor(null); setCatPickerFor(null); setTagPickerFor(null); }}
-                onTagsChange={tags => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, tags } : p))}
+                onTagPickerPress={onCustomTagPickerPress}
+                onTagsChange={onCustomTagsChange}
                 tagFreq={tagFreq}
                 onNewCustomTag={onNewCustomTag}
               />
@@ -1016,8 +1098,103 @@ function TagPicker({ activeTags, onToggle, freq = {}, onNewCustomTag }: {
 
 // ─── ProductRow ───────────────────────────────────────────────────────────────
 
-function ProductRow({
-  product, category, selected, onToggle,
+// Rzeczownikowa równość dla propsów typu string[] (2026-09-19, patrz komentarz przy
+// `productRowPropsEqual` niżej) — `productTags`/`eaters` bywają NOWĄ tablicą o tej samej
+// treści przy każdym renderze rodzica (np. auto-detekcja tagów z nazwy), więc porównanie
+// `===` w komparatorze `memo` zawsze widziałoby "zmiana" mimo identycznej zawartości.
+function sameStrings(a?: string[], b?: string[]): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let idx = 0; idx < a.length; idx++) if (a[idx] !== b[idx]) return false;
+  return true;
+}
+function samePriceFlag(a?: PriceFlag, b?: PriceFlag): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.kind === b.kind && a.typical === b.typical;
+}
+
+// Custom comparator dla `React.memo` (2026-09-19, ARCHITECTURE §127 "explicite NIE zrobione",
+// §133 poprzedni fix w tej samej sesji) — user zgłosił (audyt potwierdził) że jedna literka w
+// polu JEDNEGO produktu re-renderowała WSZYSTKIE ~20-30 wierszy paragonu. Sam `React.memo` z
+// domyślnym shallow-compare by TU NIE WYSTARCZYŁ nawet po ustabilizowaniu callbacków (patrz
+// `onCategoryPress` i siostrzane w komponencie rodzica) — `productTags`/`eaters` bywają
+// świeżą tablicą o tej samej treści (auto-detekcja tagów z nazwy nie jest zapamiętana w
+// stanie, liczy się na nowo z `getFoodTags` przy każdym renderze rodzica), a `priceFlag` to
+// świeży obiekt z `priceAnomaly()` — stąd `sameStrings`/`samePriceFlag` porównują WARTOŚĆ, nie
+// referencję, dla tych trzech propsów; reszta to już stabilne prymitywy/referencje.
+function productRowPropsEqual(prev: Readonly<ProductRowProps>, next: Readonly<ProductRowProps>): boolean {
+  return prev.index === next.index
+    && prev.product === next.product
+    && prev.category === next.category
+    && prev.selected === next.selected
+    && prev.onToggle === next.onToggle
+    && prev.catPickerOpen === next.catPickerOpen
+    && prev.onCategoryPress === next.onCategoryPress
+    && prev.onCategoryChange === next.onCategoryChange
+    && prev.priceValue === next.priceValue
+    && prev.onPriceChange === next.onPriceChange
+    && samePriceFlag(prev.priceFlag, next.priceFlag)
+    && prev.productName === next.productName
+    && prev.onNameChange === next.onNameChange
+    && prev.mergeSuggestion === next.mergeSuggestion
+    && prev.onMerge === next.onMerge
+    && prev.onDismissMerge === next.onDismissMerge
+    && sameStrings(prev.productTags, next.productTags)
+    && prev.onTagsChange === next.onTagsChange
+    && prev.tagPickerOpen === next.tagPickerOpen
+    && prev.onTagPickerPress === next.onTagPickerPress
+    && prev.tagFreq === next.tagFreq
+    && prev.onNewCustomTag === next.onNewCustomTag
+    && prev.excluded === next.excluded
+    && prev.onToggleExcluded === next.onToggleExcluded
+    && prev.weighable === next.weighable
+    && prev.weight === next.weight
+    && prev.onWeightChange === next.onWeightChange
+    && prev.quantity === next.quantity
+    && prev.onQuantityChange === next.onQuantityChange
+    && prev.payers === next.payers
+    && sameStrings(prev.eaters, next.eaters)
+    && prev.onEatersChange === next.onEatersChange;
+}
+
+type ProductRowProps = {
+  index: number;
+  product: ReceiptProduct;
+  category: ExpenseCategory;
+  selected: boolean;
+  onToggle: (i: number) => void;
+  catPickerOpen: boolean;
+  onCategoryPress: (i: number) => void;
+  onCategoryChange: (i: number, cat: ExpenseCategory) => void;
+  priceValue: string;
+  onPriceChange: (i: number, v: string) => void;
+  priceFlag?: PriceFlag;
+  productName: string;
+  onNameChange: (i: number, v: string) => void;
+  mergeSuggestion?: string | null;
+  onMerge?: (i: number, name: string) => void;
+  onDismissMerge?: (i: number) => void;
+  productTags: string[];
+  onTagsChange: (i: number, tags: string[]) => void;
+  tagPickerOpen: boolean;
+  onTagPickerPress: (i: number) => void;
+  tagFreq?: Record<string, number>;
+  onNewCustomTag?: (tag: string) => void;
+  excluded?: boolean;
+  onToggleExcluded?: (i: number) => void;
+  weighable?: boolean;
+  weight?: string;
+  onWeightChange?: (i: number, v: string) => void;
+  quantity?: string;
+  onQuantityChange?: (i: number, v: string) => void;
+  payers?: string[];
+  eaters?: string[];
+  onEatersChange?: (i: number, eaters: string[]) => void;
+};
+
+const ProductRow = memo(function ProductRow({
+  index, product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, priceFlag, productName, onNameChange,
   mergeSuggestion, onMerge, onDismissMerge,
@@ -1025,39 +1202,7 @@ function ProductRow({
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
   quantity, onQuantityChange,
   payers, eaters, onEatersChange,
-}: {
-  product: ReceiptProduct;
-  category: ExpenseCategory;
-  selected: boolean;
-  onToggle: () => void;
-  catPickerOpen: boolean;
-  onCategoryPress: () => void;
-  onCategoryChange: (cat: ExpenseCategory) => void;
-  priceValue: string;
-  onPriceChange: (v: string) => void;
-  priceFlag?: PriceFlag;
-  productName: string;
-  onNameChange: (v: string) => void;
-  mergeSuggestion?: string | null;
-  onMerge?: (name: string) => void;
-  onDismissMerge?: () => void;
-  productTags: string[];
-  onTagsChange: (tags: string[]) => void;
-  tagPickerOpen: boolean;
-  onTagPickerPress: () => void;
-  tagFreq?: Record<string, number>;
-  onNewCustomTag?: (tag: string) => void;
-  excluded?: boolean;
-  onToggleExcluded?: () => void;
-  weighable?: boolean;
-  weight?: string;
-  onWeightChange?: (v: string) => void;
-  quantity?: string;
-  onQuantityChange?: (v: string) => void;
-  payers?: string[];
-  eaters?: string[];
-  onEatersChange?: (eaters: string[]) => void;
-}) {
+}: ProductRowProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const meta    = getCategoryMeta(category);
@@ -1072,7 +1217,7 @@ function ProductRow({
         !selected && styles.productRowInactive,
         product.suspect && !selected && styles.productRowSuspect,
       ]}>
-        <PressableScale onPress={onToggle} style={[styles.checkbox, selected && styles.checkboxDone]}>
+        <PressableScale onPress={() => onToggle(index)} style={[styles.checkbox, selected && styles.checkboxDone]}>
           {selected && <Check size={12} color={colors.bg.primary} />}
         </PressableScale>
 
@@ -1097,7 +1242,7 @@ function ProductRow({
           )}
           <TextInput
             value={productName}
-            onChangeText={onNameChange}
+            onChangeText={v => onNameChange(index, v)}
             style={styles.productNameInput}
             placeholder={product.name}
             placeholderTextColor={colors.text.muted}
@@ -1106,10 +1251,10 @@ function ProductRow({
             <View style={styles.mergeSugRow}>
               <LucideIcons.GitMerge size={11} color="#46B0DE" />
               <Text style={styles.mergeSugText} numberOfLines={1}>To samo co „{mergeSuggestion}"?</Text>
-              <PressableScale onPress={() => onMerge?.(mergeSuggestion)} style={styles.mergeSugBtn}>
+              <PressableScale onPress={() => onMerge?.(index, mergeSuggestion)} style={styles.mergeSugBtn}>
                 <Text style={styles.mergeSugBtnText}>Scal</Text>
               </PressableScale>
-              <PressableScale onPress={() => onDismissMerge?.()} style={styles.mergeSugX}>
+              <PressableScale onPress={() => onDismissMerge?.(index)} style={styles.mergeSugX}>
                 <LucideIcons.X size={13} color={colors.text.muted} />
               </PressableScale>
             </View>
@@ -1123,7 +1268,7 @@ function ProductRow({
             </View>
           )}
           <View style={styles.productMeta}>
-            <PressableScale onPress={onCategoryPress}>
+            <PressableScale onPress={() => onCategoryPress(index)}>
               <View style={[
                 styles.catChip,
                 catPickerOpen && { borderColor: meta.color, backgroundColor: meta.color + '20' },
@@ -1133,7 +1278,7 @@ function ProductRow({
                 </Text>
               </View>
             </PressableScale>
-            <PressableScale onPress={onTagPickerPress}>
+            <PressableScale onPress={() => onTagPickerPress(index)}>
               <View style={[styles.tagEditBtn, tagPickerOpen && styles.tagEditBtnActive]}>
                 <Tag size={9} color={tagPickerOpen ? colors.accent.blue : colors.text.muted} />
                 <Text style={[styles.tagEditBtnText, tagPickerOpen && { color: colors.accent.blue }]}>
@@ -1142,7 +1287,7 @@ function ProductRow({
               </View>
             </PressableScale>
             {!isDeposit && onToggleExcluded && (
-              <PressableScale onPress={onToggleExcluded}>
+              <PressableScale onPress={() => onToggleExcluded(index)}>
                 <View style={[styles.exclBtn, excluded && styles.exclBtnActive]}>
                   <LucideIcons.UserMinus size={9} color={excluded ? '#FBBF24' : colors.text.muted} />
                   <Text style={[styles.exclBtnText, excluded && { color: '#FBBF24' }]}>
@@ -1155,7 +1300,7 @@ function ProductRow({
               <View style={styles.weighChip}>
                 <TextInput
                   value={quantity}
-                  onChangeText={onQuantityChange}
+                  onChangeText={v => onQuantityChange(index, v)}
                   keyboardType="decimal-pad"
                   placeholder={String(product.quantity)}
                   placeholderTextColor={colors.text.muted}
@@ -1170,7 +1315,7 @@ function ProductRow({
                 <LucideIcons.Scale size={9} color="#60A5FA" />
                 <TextInput
                   value={weight}
-                  onChangeText={onWeightChange}
+                  onChangeText={v => onWeightChange?.(index, v)}
                   keyboardType="decimal-pad"
                   placeholder="250"
                   placeholderTextColor={colors.text.muted}
@@ -1204,7 +1349,7 @@ function ProductRow({
                 return (
                   <PressableScale key={p} onPress={() => {
                     const cur = eaters ?? [];
-                    onEatersChange(on ? cur.filter(x => x !== p) : [...cur, p]);
+                    onEatersChange(index, on ? cur.filter(x => x !== p) : [...cur, p]);
                   }}>
                     <View style={[styles.eaterChip, on && styles.eaterChipOn]}>
                       <Text style={[styles.eaterChipText, on && styles.eaterChipTextOn]}>{p}</Text>
@@ -1227,7 +1372,7 @@ function ProductRow({
           <View style={styles.priceInputWrap}>
             <TextInput
               value={priceValue}
-              onChangeText={onPriceChange}
+              onChangeText={v => onPriceChange(index, v)}
               style={styles.priceInput}
               keyboardType="decimal-pad"
               selectTextOnFocus
@@ -1238,7 +1383,7 @@ function ProductRow({
       </View>
 
       {catPickerOpen && (
-        <CategoryPicker current={category} onSelect={onCategoryChange} />
+        <CategoryPicker current={category} onSelect={c => onCategoryChange(index, c)} />
       )}
       {tagPickerOpen && (
         <TagPicker
@@ -1249,34 +1394,59 @@ function ProductRow({
             const next = productTags.includes(tag)
               ? productTags.filter(t => t !== tag)
               : [...productTags, tag];
-            onTagsChange(next);
+            onTagsChange(index, next);
           }}
         />
       )}
     </View>
   );
-}
+}, productRowPropsEqual);
 
 // ─── CustomProductRow ─────────────────────────────────────────────────────────
 
-function CustomProductRow({
-  product, onRemove, onNameChange, onPriceChange, onQuantityChange, onCategoryChange,
-  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange, tagFreq, onNewCustomTag,
-}: {
+// Prostszy komparator niż `productRowPropsEqual` — `product` tu jest referencyjnie stabilny
+// dla wierszy, których użytkownik NIE dotyka (patrz `.map((p,i)=> i===idx ? {...p,...} : p)`
+// w rodzicu: nietrafione indeksy zwracają TĘ SAMĄ referencję `p`), więc czysty shallow-compare
+// wystarcza — bez potrzeby `sameStrings` jak w `ProductRow` (tam propsy jak `productTags`
+// bywały świeżą tablicą o tej samej treści nawet dla niezmienionego wiersza).
+function customProductRowPropsEqual(prev: Readonly<CustomProductRowProps>, next: Readonly<CustomProductRowProps>): boolean {
+  return prev.index === next.index
+    && prev.product === next.product
+    && prev.onRemove === next.onRemove
+    && prev.onNameChange === next.onNameChange
+    && prev.onPriceChange === next.onPriceChange
+    && prev.onQuantityChange === next.onQuantityChange
+    && prev.onCategoryChange === next.onCategoryChange
+    && prev.catPickerOpen === next.catPickerOpen
+    && prev.onCategoryPress === next.onCategoryPress
+    && prev.tagPickerOpen === next.tagPickerOpen
+    && prev.onTagPickerPress === next.onTagPickerPress
+    && prev.onTagsChange === next.onTagsChange
+    && prev.tagFreq === next.tagFreq
+    && prev.onNewCustomTag === next.onNewCustomTag;
+}
+
+type CustomProductRowProps = {
+  index: number;
   product: { name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] };
-  onRemove: () => void;
-  onNameChange: (name: string) => void;
-  onPriceChange: (price: string) => void;
-  onQuantityChange: (qty: string) => void;
-  onCategoryChange: (cat: ExpenseCategory) => void;
+  onRemove: (idx: number) => void;
+  onNameChange: (idx: number, name: string) => void;
+  onPriceChange: (idx: number, price: string) => void;
+  onQuantityChange: (idx: number, qty: string) => void;
+  onCategoryChange: (idx: number, cat: ExpenseCategory) => void;
   catPickerOpen: boolean;
-  onCategoryPress: () => void;
+  onCategoryPress: (idx: number) => void;
   tagPickerOpen: boolean;
-  onTagPickerPress: () => void;
-  onTagsChange: (tags: string[]) => void;
+  onTagPickerPress: (idx: number) => void;
+  onTagsChange: (idx: number, tags: string[]) => void;
   tagFreq?: Record<string, number>;
   onNewCustomTag?: (tag: string) => void;
-}) {
+};
+
+const CustomProductRow = memo(function CustomProductRow({
+  index, product, onRemove, onNameChange, onPriceChange, onQuantityChange, onCategoryChange,
+  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange, tagFreq, onNewCustomTag,
+}: CustomProductRowProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const meta     = getCategoryMeta(product.category);
@@ -1286,7 +1456,7 @@ function CustomProductRow({
     <View style={styles.productWrap}>
       <View style={[styles.productRow, styles.customRow]}>
         {/* Delete */}
-        <PressableScale onPress={onRemove} style={styles.deleteCustomBtn}>
+        <PressableScale onPress={() => onRemove(index)} style={styles.deleteCustomBtn}>
           <Trash2 size={13} color={colors.accent.red} />
         </PressableScale>
 
@@ -1299,19 +1469,19 @@ function CustomProductRow({
         <View style={styles.productInfo}>
           <TextInput
             value={product.name}
-            onChangeText={onNameChange}
+            onChangeText={v => onNameChange(index, v)}
             style={[styles.productNameInput, { color: colors.text.primary }]}
             placeholder="Nazwa produktu..."
             placeholderTextColor={colors.text.muted}
             autoFocus={product.name === ''}
           />
           <View style={styles.productMeta}>
-            <PressableScale onPress={onCategoryPress}>
+            <PressableScale onPress={() => onCategoryPress(index)}>
               <View style={[styles.catChip, { borderColor: meta.color + '60', backgroundColor: meta.color + '14' }]}>
                 <Text style={[styles.catChipText, { color: meta.color }]}>{meta.label}</Text>
               </View>
             </PressableScale>
-            <PressableScale onPress={onTagPickerPress}>
+            <PressableScale onPress={() => onTagPickerPress(index)}>
               <View style={[styles.tagEditBtn, tagPickerOpen && styles.tagEditBtnActive]}>
                 <Tag size={9} color={tagPickerOpen ? colors.accent.blue : colors.text.muted} />
                 <Text style={[styles.tagEditBtnText, tagPickerOpen && { color: colors.accent.blue }]}>
@@ -1336,7 +1506,7 @@ function CustomProductRow({
           <View style={styles.priceInputWrap}>
             <TextInput
               value={product.price}
-              onChangeText={onPriceChange}
+              onChangeText={v => onPriceChange(index, v)}
               style={styles.priceInput}
               keyboardType="decimal-pad"
               selectTextOnFocus
@@ -1346,7 +1516,7 @@ function CustomProductRow({
           <View style={styles.qtyRow}>
             <TextInput
               value={product.quantity}
-              onChangeText={onQuantityChange}
+              onChangeText={v => onQuantityChange(index, v)}
               style={styles.qtyInput}
               keyboardType="decimal-pad"
               selectTextOnFocus
@@ -1359,7 +1529,7 @@ function CustomProductRow({
       </View>
 
       {catPickerOpen && (
-        <CategoryPicker current={product.category} onSelect={onCategoryChange} />
+        <CategoryPicker current={product.category} onSelect={c => onCategoryChange(index, c)} />
       )}
       {tagPickerOpen && (
         <TagPicker
@@ -1370,13 +1540,13 @@ function CustomProductRow({
             const next = product.tags.includes(tag)
               ? product.tags.filter(t => t !== tag)
               : [...product.tags, tag];
-            onTagsChange(next);
+            onTagsChange(index, next);
           }}
         />
       )}
     </View>
   );
-}
+}, customProductRowPropsEqual);
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
