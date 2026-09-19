@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Redesign check-inu humoru — siatka nastrój×energia, notatka opcjonalna (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §135. User: "nie wiadomo co zaznaczam... nie zawsze da się
+szybko kliknąć... dawaj pomysły". Trzy zmiany: (1) notatka dnia opcjonalna (był to głowny
+powód "za wolno" — 4 wymuszone kroki → 2); (2) dwa osobne rzędy nastrój/energia zamienione
+na jedną siatkę 2D 5×5 (`MoodEnergyGrid.tsx`, NOWY plik) — tap lub przeciągnięcie ustawia oba
+naraz; (3) `sortMoodTags` dostał dwa nowe sygnały (pora dnia/dzień tygodnia, recency-ważona
+częstość) ponad istniejące dopasowanie mood/energy. **PRIORYTET TESTU NA URZĄDZENIU —
+WYSOKI**: to gest RN (react-native-gesture-handler) zagnieżdżony w zwykłym ScrollView, bez
+możliwości przetestowania bez fizycznego urządzenia — sprawdź czy siatka łapie dotknięcia
+płynnie i czy scroll modala nadal działa POZA siatką. Jeśli nie — fix jest udokumentowany w
+kodzie (`MoodEnergyGrid.tsx`, komentarz przy `pan`): zamienić import `ScrollView` w
+`MoodCheckInModal.tsx` z 'react-native' na 'react-native-gesture-handler'. Świadomie NIE
+zrobione: sygnał sen/kroki z innych ekranów (wymaga najpierw współdzielonego selektora
+"dzisiejszy sen", którego dziś nie ma — patrz §135). `tsc`/`jest` czyste (1008 testów).
+
 ## ✅ Wydajność scan.tsx — literka w produkcie re-renderowała cały paragon (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §134. Dokończenie DRUGI RAZ odłożonego fixa (§118, §127) —

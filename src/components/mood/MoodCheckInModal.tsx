@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { X, Check, Plus } from 'lucide-react-native';
 
-import MoodPicker from './MoodPicker';
+import MoodEnergyGrid from './MoodEnergyGrid';
 import InputField from '@/components/ui/InputField';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import Chip from '@/components/ui/Chip';
@@ -65,10 +65,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     return map;
   }, [allEntries]);
 
-  // Sortowanie po DWÓCH niezależnych osiach (nastrój + energia), nie tylko nastroju —
-  // patrz `sortMoodTags`/komentarz w moodTags.ts (user: "te tagi ulepszyć na bazie tego
-  // też ile mam energii lub połączenia że jestem szczęśliwy ale nie wyspany").
-  const sortedPresetTags = useMemo(() => sortMoodTags(mood, energy, tagFrequency), [mood, energy, tagFrequency]);
+  // Sortowanie po TRZECH sygnałach (mood/energy trafność, pora dnia/dzień tygodnia,
+  // recency-ważona częstość) — patrz `sortMoodTags`/nagłówek w moodTags.ts. Bierze `allEntries`
+  // (nie `tagFrequency` — ten zostaje TYLKO do liczby na chipie, osobny cel, patrz komentarz
+  // w moodTags.ts przy `recencyWeight`).
+  const sortedPresetTags = useMemo(() => sortMoodTags(mood, energy, allEntries), [mood, energy, allEntries]);
 
   useEffect(() => {
     if (visible) {
@@ -115,10 +116,6 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const handleSave = async () => {
     if (!mood || !energy) {
       Alert.alert('Uzupełnij', 'Wybierz nastrój i poziom energii');
-      return;
-    }
-    if (!note.trim()) {
-      Alert.alert('Uzupełnij', 'Wpisz notatkę dnia — to pomaga budować statystyki słów kluczowych');
       return;
     }
     setSaving(true);
@@ -182,8 +179,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-              <MoodPicker value={mood} onChange={setMood} label="Nastrój" />
-              <MoodPicker value={energy} onChange={setEnergy} label="Energia" mode="energy" />
+              <MoodEnergyGrid mood={mood} energy={energy} onChange={(m, e) => { setMood(m); setEnergy(e); }} />
 
               {/* Tags — custom-add plus pinned on the LEFT, tags scroll to the right */}
               <View style={styles.section}>
@@ -232,11 +228,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               </View>
 
               <InputField
-                label="Notatka dnia"
+                label="Notatka dnia (opcjonalnie)"
                 value={note}
                 onChangeText={setNote}
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)}
-                placeholder="Co słychać? Opisz dzień — dobra lub zła, każda notatka buduje Twoje statystyki."
+                placeholder="Co słychać? Opcjonalnie — ale każda notatka buduje Twoje statystyki słów kluczowych."
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -254,7 +250,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               icon={<Check size={18} color={c.bg.primary} />}
               size="lg"
               fullWidth
-              disabled={saving || !mood || !energy || !note.trim()}
+              disabled={saving || !mood || !energy}
             />
           </View>
         </Animated.View>
