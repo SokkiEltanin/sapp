@@ -38,7 +38,12 @@ describe('bossProgressReport', () => {
     expect(report).toMatch(/kampania · Kanapowy Leniwiec · Lv2 · \+8 monet, \+60 XP/);
   });
 
-  test('log jest cięty do logLimit i sortowany od najnowszego', () => {
+  // 2026-09-19, user: "zrob potem pełna historie eksportu pupila... z dnia na dzień wbiłem z
+  // 51 lvl na 270" — stary `logLimit` UCINAŁ starsze wpisy z raportu całkowicie (niewidoczne,
+  // nie tylko skrócone). Teraz nic nie znika: `detailLimit` kontroluje tylko ile NAJNOWSZYCH
+  // wpisów dostaje pełny przebieg runda-po-rundzie, reszta trafia do zwięzłej sekcji "STARSZE
+  // WALKI" (bez rund/HP, ale wciąż widoczna — level/nagroda/wynik).
+  test('detailLimit ogranicza SZCZEGÓŁY (najnowsze), ale starsze wpisy zostają widoczne w skrócie', () => {
     const s: ProgressReportInput = {
       ...base,
       bossLog: [
@@ -47,9 +52,10 @@ describe('bossProgressReport', () => {
       ],
     };
     const report = buildBossProgressReport(s, 1);
-    expect(report).toContain('LOG WALK (ostatnie 1 z 2)');
+    expect(report).toContain('LOG WALK — pełna historia (2 łącznie, szczegóły ostatnich 1)');
     expect(report).toContain('· B ·');
-    expect(report).not.toContain('· A ·');
+    expect(report).toContain('STARSZE WALKI, skrót (1)');
+    expect(report).toMatch(/STARSZE WALKI[\s\S]*· A ·/); // "A" jest w sekcji skrótu, nie w szczegółach
   });
 
   test('posiadany item bojowy pokazuje poziom i status założenia', () => {

@@ -29,7 +29,17 @@ const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
   campaign: 'kampania', raid: 'raid', event: 'wydarzenie', quest: 'quest', mad: 'MAD', mission: 'misja',
 };
 
-export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): string {
+// 2026-09-19, user: "zrob potem pełna historie eksportu pupila bo pozniej te bossy stają sie
+// tak wiele XP i coinow... wbiłem z 51 lvl na 270" — dotąd `logLimit` (domyślnie 30) po prostu
+// UCINAŁ starsze wpisy z raportu, więc przy dużym `bossLog` (setki walk po takim skoku
+// poziomów) większość historii była NIEWIDOCZNA w eksporcie, nie tylko skrócona. Teraz nic nie
+// znika: najnowsze `detailLimit` wpisów dostają pełny przebieg runda-po-rundzie (jak dotąd,
+// potrzebne do oceny "jak trudna była TA konkretna walka"), a WSZYSTKIE starsze trafiają do
+// osobnej, zwięzłej sekcji (jedna linia: kiedy/rodzaj/nazwa/poziom/wynik/nagroda) — to
+// wystarcza żeby odtworzyć krzywą XP/monet w czasie (dokładnie to czego user chce do analizy
+// tego skoku), bez rozdymania eksportu do nieczytelnego/nieudostępnialnego rozmiaru pełnym
+// przebiegiem KAŻDEJ z potencjalnie setek walk.
+export function buildBossProgressReport(s: ProgressReportInput, detailLimit = 30): string {
   const lvl = levelFromXp(s.xp);
   const equippedGear = s.equippedGear ?? {};
   const ownedGear = s.ownedGear ?? {};
@@ -101,10 +111,13 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   }
   lines.push('');
 
-  const log = [...s.bossLog].sort((a, b) => b.at.localeCompare(a.at)).slice(0, logLimit);
-  lines.push(`LOG WALK (ostatnie ${log.length} z ${s.bossLog.length}):`);
-  if (log.length === 0) lines.push('  (brak zapisanych walk)');
-  for (const e of log) {
+  const sortedLog = [...s.bossLog].sort((a, b) => b.at.localeCompare(a.at));
+  const detailed = sortedLog.slice(0, detailLimit);
+  const rest = sortedLog.slice(detailLimit);
+
+  lines.push(`LOG WALK — pełna historia (${sortedLog.length} łącznie, szczegóły ostatnich ${detailed.length}):`);
+  if (sortedLog.length === 0) lines.push('  (brak zapisanych walk)');
+  for (const e of detailed) {
     const when = new Date(e.at).toLocaleString('pl-PL');
     const head = `  ${when} · ${KIND_LABEL[e.kind]} · ${e.name} · Lv${e.level}`;
     // Przebieg walki runda po rundzie (2026-08-17, user: "nie zapisujesz... dokładnie walk z
@@ -119,6 +132,19 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
       lines.push(`      kontratak/rundę: ${e.rounds.map(r => r.c).join(',')}`);
     } else {
       lines.push(`${head} · +${e.coins} monet, +${e.xp} XP`);
+    }
+  }
+
+  // Reszta historii — TYLKO skrót (bez rund/HP), żeby "pełna historia" nie znaczyło
+  // "pełny przebieg KAŻDEJ z setek walk" (nieczytelne, ryzyko olbrzymiego eksportu) — patrz
+  // komentarz przy `detailLimit` wyżej. Wystarcza do odtworzenia krzywej XP/monet w czasie.
+  if (rest.length > 0) {
+    lines.push('');
+    lines.push(`STARSZE WALKI, skrót (${rest.length}):`);
+    for (const e of rest) {
+      const when = new Date(e.at).toLocaleString('pl-PL');
+      const outcome = e.won === undefined ? '' : e.won ? ' · WYGRANA' : e.catFainted ? ' · PRZEGRANA (zemdlał)' : ' · PRZEGRANA (limit rund)';
+      lines.push(`  ${when} · ${KIND_LABEL[e.kind]} · ${e.name} · Lv${e.level}${outcome} · +${e.coins} monet, +${e.xp} XP`);
     }
   }
 

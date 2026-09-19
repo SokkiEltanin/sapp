@@ -8945,6 +8945,43 @@ komórce.
 
 ---
 
+## 136. Fix: eksport postępu pupila tracił starsze walki zamiast je skracać (2026-09-19)
+
+User: *"zrob potem pełna historie eksportu pupila bo pozniej te bossy stają sie tak wiele XP i
+coinow w pizdu z dnia na dzień wbiłem z 51 lvl na 270 xddd pojebane ja eksportuje i jeszcze
+bardziej to ulepszyć"* — czyli: (1) chce PEŁNEJ historii w eksporcie "Udostępnij raport
+postępu pupila" (Ustawienia → Pupil/Diagnostyka, `buildBossProgressReport`), bo zauważył
+podejrzanie stromy skok (51→270 poziom w jeden dzień) i chce mi wysłać realne dane do dalszego
+balansowania nagród bossów; (2) to zadanie "na potem" (nie pilna gameplay-owa zmiana).
+
+**Realny bug**: `buildBossProgressReport`'s `logLimit` (domyślnie 30) nie SKRACAŁ raportu —
+UCINAŁ go. Wpisy starsze niż 30. najnowszych znikały z eksportu CAŁKOWICIE, niewidoczne w
+ogóle, nie tylko bez szczegółów. Przy skoku 51→270 poziomów w jeden dzień (setki walk,
+zwłaszcza MAD bossy — 10× hp kampanii, patrz `madBosses.ts`) to oznaczało że >90% realnej
+historii nigdy nie trafiało do eksportu — dokładnie odwrotność tego czego user potrzebuje do
+analizy tego skoku.
+
+**Fix** (`bossProgressReport.ts`): `logLimit` → `detailLimit` — kontroluje TERAZ tylko ile
+NAJNOWSZYCH walk dostaje pełny przebieg runda-po-rundzie (HP bossa/kotka w czasie, dmg/rundę —
+jak dotąd, potrzebne do oceny trudności KONKRETNEJ walki). Wszystkie STARSZE wpisy trafiają do
+nowej sekcji "STARSZE WALKI, skrót" — jedna linia każda (kiedy/rodzaj/nazwa/poziom/wynik/
+nagroda, bez rund/HP) — nic już nie znika, tylko szczegółowość spada ze zamierzchłością. To
+wystarcza żeby odtworzyć krzywą XP/monet w czasie (cel usera), bez rozdymania eksportu do
+nieudostępnialnego rozmiaru pełnym przebiegiem KAŻDEJ z potencjalnie setek walk. Domyślny
+`detailLimit` zostaje 30 — nie było potrzeby go zmieniać, problem był w UCINANIU, nie w samej
+liczbie.
+
+`tsc`/`jest` czyste (1008 testów — jeden istniejący test zaktualizowany pod nowe zachowanie,
+z komentarzem wyjaśniającym że stare `logLimit` gubiło dane, nowe `detailLimit` tylko obniża
+szczegółowość). Priorytet testu na urządzeniu: niski (czysto narzędzie diagnostyczne, nie
+gameplay) — user: idź do Ustawienia → Pupil → "Udostępnij raport postępu pupila" i wyślij mi
+pełny eksport, żebym mógł faktycznie zobaczyć krzywą 51→270 i zaproponować konkretny fix
+balansu (bez realnych liczb nie da się ocenić czy to bug w `madRewardMultFor`/`MAD_HP_MULT`
+czy coś innego — ta sama zasada co przy każdej wcześniejszej kalibracji bossów w tej sesji:
+throwaway-symulacja na realnych danych, nie zgadywanie).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

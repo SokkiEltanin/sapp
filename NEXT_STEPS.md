@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: eksport postępu pupila tracił starsze walki + 🆕 CZEKAM na dane usera (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §136. User: "pełna historie eksportu pupila... z dnia na dzień
+wbiłem z 51 lvl na 270 xddd pojebane". Bug: `buildBossProgressReport`'s `logLimit` (30) nie
+skracał raportu, UCINAŁ go — wpisy starsze niż 30 najnowszych znikały CAŁKOWICIE. Naprawione:
+`detailLimit` teraz kontroluje tylko szczegółowość (pełny przebieg walki vs. jednolinijkowy
+skrót), nic już nie znika z eksportu. `tsc`/`jest` czyste (1008 testów).
+
+**DO ZROBIENIA (czeka na usera, nie na mnie)**: user ma pójść do Ustawienia → Pupil →
+"Udostępnij raport postępu pupila" i wysłać mi PEŁNY eksport (teraz faktycznie pełny) — chce
+zbadać czy skok 51→270 poziomów w jeden dzień to bug w balansie nagród MAD bossów
+(`madRewardMultFor`/`MAD_HP_MULT` w `madBosses.ts`) czy coś innego. Bez realnych liczb nie da
+się tego ocenić — ta sama zasada co przy każdej wcześniejszej kalibracji bossów w tej sesji
+(throwaway-symulacja na realnych danych, nigdy zgadywanie).
+
 ## 🆕 Redesign check-inu humoru — siatka nastrój×energia, notatka opcjonalna (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §135. User: "nie wiadomo co zaznaczam... nie zawsze da się
