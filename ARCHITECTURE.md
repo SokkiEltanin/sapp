@@ -8870,6 +8870,81 @@ wszystkie ścieżki edycji przetestowane logicznie, ale bez testów RN wymagają
 
 ---
 
+## 135. Redesign check-inu humoru — siatka nastrój×energia, notatka opcjonalna, logiczniejsze tagi (2026-09-19)
+
+User (ze screenem "Jak się czujesz?"): *"nie wiadomo co zaznaczam za bardzo nie zawsze da sie
+szybko kliknąć potem jeszcze tag i potem opisywać dawaj pomysly"*. Po burzy mózgów (patrz
+transkrypt) user doprecyzował przez `AskUserQuestion`: notatka opcjonalnie OK, statyczne
+podpisy pod każdą buźką "słabe" (niska priorytet) — chce **zbicia liczby kroków** (połączyć
+nastrój+energię w jedną siatkę 2D) i **logicznego polecania tagów** (pora dnia/dzień tygodnia
++ dane z innych ekranów + ostatnio używane, NA WIERZCHU istniejącej logiki mood/energy).
+
+**1. Notatka dnia opcjonalna** (`MoodCheckInModal.tsx`) — `handleSave` blokował zapis Alertem
+bez tekstu notatki; usunięte, `AnimatedButton`'s `disabled` już nie sprawdza `!note.trim()`.
+Placeholder/label doprecyzowane ("Notatka dnia (opcjonalnie)"). To była realnie największa
+przyczyna "nie da się szybko kliknąć" — 4 wymuszone kroki (nastrój+energia+tag+notatka)
+zmniejszone do 2 (nastrój+energia), reszta zostaje ale nie blokuje.
+
+**2. Nowy `MoodEnergyGrid.tsx`, zamiast dwóch osobnych `MoodPicker` (usunięty, był orphaned po
+podmianie — nigdzie indziej nie używany, sprawdzone grepem).** Siatka 5×5 (oś X = nastrój,
+lewo→prawo gorzej→lepiej; oś Y = energia, dół→góra mniej→więcej — układ jak "circumplex model
+of affect" z psychologii, nie wymyślony od zera) — jedno tapnięcie LUB przeciągnięcie ustawia
+OBA wymiary naraz, `Gesture.Pan().minDistance(0)` (żeby zwykły tap i drag obsłużyć jednym
+gestem, bez osobnego Tap+Pan). Zamiast statycznych podpisów pod KAŻDĄ z 25 komórek (user:
+"słabe", świadomie pominięte — więcej szumu, nie mniej) jest jeden ŻYWY odczyt pod siatką
+("{emoji} {etykieta} · {emoji} {etykieta}"), aktualizujący się na bieżąco podczas
+przeciągania — mocniej odpowiada na "nie wiadomo co zaznaczam" niż 25 małych napisów naraz.
+Tło siatki to subtelny diagonalny `LinearGradient` (już zależność apki) jako wizualna
+podpowiedź kierunku, bez dodatkowych podpisów osi. Wskaźnik-kropka animowany klasycznym
+`Animated` (react-native, nie reanimated) w PIKSELACH, spójnie ze starym `MoodPicker.tsx`.
+Worklet `.onUpdate` liczy col/row z `evt.x`/`evt.y`, `lastKey` (reanimated `useSharedValue`)
+pilnuje żeby `runOnJS`/haptyka odpaliły się TYLKO przy faktycznej zmianie komórki, nie na
+każdą klatkę ruchu palca.
+
+**RYZYKO DO SPRAWDZENIA NA URZĄDZENIU (zaflagowane w kodzie)**: siatka siedzi w zwykłym
+`ScrollView` (react-native) w `MoodCheckInModal.tsx`, nie gesture-handler. `minDistance(0)`
+powinno dać jej priorytet nad scrollem rodzica dla dotknięć zaczynających się NA siatce
+(wzorzec "samodzielnej kontrolki", jak suwak) — jeśli w praktyce gubi dotknięcia albo blokuje
+scroll modala, prosty fix to zamiana importu `ScrollView` w `MoodCheckInModal.tsx` z
+'react-native' na 'react-native-gesture-handler' (drop-in, ten sam props API).
+
+**3. `sortMoodTags` (moodTags.ts) — DWA nowe sygnały ponad istniejące mood/energy-relevance**:
+(a) `contextAffinity` — pora dnia (±2h) / dzień tygodnia, jako UDZIAŁ wystąpień tagu w tym
+kontekście spośród WSZYSTKICH jego wystąpień (nie surowa liczba, żeby popularny tag nie
+wygrywał tylko dlatego że ma więcej wpisów w ogóle); (b) `recencyWeight` — częstość z
+half-life 14 dni (`Math.pow(0.5, dni/14)`), więc świeżo używany tag bije taki sam użyty pół
+roku temu. Finalny wzór: `tagRelevance×10 + contextAffinity×2 + recencyWeight` — mnożniki tak
+dobrane, że wybrany TERAZ nastrój/energia zawsze dominuje (różnica o 1 punkt relevance = 10,
+więcej niż realny zakres pozostałych dwóch razem), kontekst/recency to tie-break przy remisie
+trafności, nie nadpisanie jej. Bez wybranego mood/energy `tagRelevance` daje 0 dla każdego
+tagu, więc formuła naturalnie redukuje się do samego kontekstu+recency — bez osobnej gałęzi.
+Sygnatura `sortMoodTags` zmieniona z `(mood, energy, tagFrequency: Map)` na `(mood, energy,
+entries: MoodEntry[], now?)` — call site (`MoodCheckInModal.tsx`) przekazuje teraz
+`allEntries` zamiast `tagFrequency`; `tagFrequency` (Map) ZOSTAJE w modalu, ale już TYLKO do
+liczby na chipie (`count={tagFrequency.get(tag)}`) — osobny cel (surowa suma "ile razy w
+ogóle" ma pozostać surowa, nie recency-ważona).
+
+**Świadomie NIE zrobione**: sygnał z innych ekranów apki (sen/kroki/wydatki) — user wybrał tę
+opcję w `AskUserQuestion`, ale `MoodEntry` nie przechowuje żadnego z tych sygnałów, a jedyne
+źródło (np. sen) żyje w statefulnym, async pipeline'ie synchronizacji Health Connect w
+`health.tsx` (nie ma go jako prostego selektora) — doprowadzenie go tu oznaczałoby albo
+duplikację całego syncu, albo czytanie na twardo jego prywatnego klucza AsyncStorage z
+zewnątrz, obu nie da się zweryfikować bez fizycznego urządzenia z realnymi danymi Health
+Connect. Odłożone świadomie — wymaga najpierw wydzielenia współdzielonego selektora
+"dzisiejszy sen/kroki", osobne zadanie.
+
+`tsc`/`jest` czyste (1008 testów, +3 nowe w `moodTags.test.ts` — testy przepisane pod nową
+sygnaturę `sortMoodTags`, z jawnym `now` żeby recency-decay nie zależał od realnego czasu
+odpalenia testu). **Priorytet testu na urządzeniu — wysoki, bez siatki testów dla gestów RN**:
+(1) dotknij/przeciągnij po siatce — sprawdź płynność, brak "gubienia" dotknięć, i że scroll
+modala wciąż działa POZA siatką (patrz ryzyko wyżej); (2) zapisz check-in BEZ notatki —
+powinno przejść; (3) sortowanie tagów po ustawieniu nastroju/energii wciąż stawia trafne wyżej
+(regresja niemożliwa do zaobserwowania wprost, tylko czy kolejność "czuje się" sensownie);
+(4) edycja istniejącego wpisu (`existingEntry`) — kropka na siatce startuje w poprawnej
+komórce.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
