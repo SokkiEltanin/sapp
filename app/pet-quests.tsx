@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useShallow } from 'zustand/react/shallow';
 import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Zap as XpIcon } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -44,11 +45,20 @@ function relDayLabel(date: string): string {
 export default function PetQuests() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // useShallow (2026-09-20, audyt logika/optymalizacja) — goły `usePetStore()` subskrybował
+  // CAŁY store pupila (walka/gear/streaki...), więc ekran re-renderował się na każdą zmianę w
+  // petStore, nie tylko związaną z questami — ten sam wzorzec/fix co `pet.tsx`/`GearPanel.tsx`.
   const {
     coins, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly,
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markBikeDone,
     markTrainingDay, equippedGear, ownedGear,
-  } = usePetStore();
+  } = usePetStore(useShallow((s) => ({
+    coins: s.coins, claimDaily: s.claimDaily, claimDailyFor: s.claimDailyFor, claimQuest: s.claimQuest,
+    claimMonthly: s.claimMonthly, claimWeekly: s.claimWeekly,
+    markPushupsDone: s.markPushupsDone, markSquatsDone: s.markSquatsDone, markSitupsDone: s.markSitupsDone,
+    markPlankDone: s.markPlankDone, markStretchDone: s.markStretchDone, markBikeDone: s.markBikeDone,
+    markTrainingDay: s.markTrainingDay, equippedGear: s.equippedGear, ownedGear: s.ownedGear,
+  })));
   const { questCtx, quests, missed, synced } = usePetQuests();
   // "Kolczyki" (gear) mnożą monety ze WSZYSTKICH źródeł, w tym questów — ten sam wzorzec co
   // boss-fight.tsx (`gearCoinsMult`), żeby zainwestowany gear liczył się też tutaj.

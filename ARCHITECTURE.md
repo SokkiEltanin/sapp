@@ -9015,6 +9015,84 @@ OD RAZU, nie dopiero po zamknięciu/otwarciu.
 
 ---
 
+## 138. Audyt logika/optymalizacja — kalendarz/questy/subskrypcje, 4 znaleziska (2026-09-20)
+
+User: "co teraz? dalej testy logiki o optymalizacja?" — kolejna runda tego samego typu co
+poprzednie w tej sesji (§126/§127 itd.), tym razem na świeżych obszarach: kalendarz, questy
+pupila, pomodoro/focus, subskrypcje, jedzenie. Delegowany agent-audyt (bez edycji kodu, tylko
+rozpoznanie z konkretnym repro na każde znalezisko) znalazł 4 potwierdzone bugi, wszystkie
+zweryfikowane osobiście przed fixem (throwaway-repro w Node dla obu miejsc z datami).
+
+**1+2. TA SAMA klasa buga w DWÓCH miejscach — `setMonth`/`setFullYear` na dzień
+nieistniejący w docelowym miesiącu PRZEWIJA (day overflow), nie przycina.**
+- `useTasks.ts`'s `nextDeadline()` — zadanie cykliczne "monthly" z deadline'em 31. dnia
+  miesiąca po ukończeniu skakało DWA miesiące dalej na 3. dnia (luty całkowicie pomijany;
+  zweryfikowane w Node: `new Date('2026-01-31').setMonth(+1)` → 2026-03-03), seria trwale
+  dryfowała od tego momentu.
+- `subscriptions.tsx`'s `advanceNextBillingDate`/`isDurationExpired` — TEN SAM bug w cichym
+  auto-rollu zaległej `nextBillingDate` (bez pytania usera) i w liczeniu końca subskrypcji z
+  `durationMonths`. Subskrypcja z dniem 29-31 traciła po cichu jeden cykl płatności z
+  prognozy przy każdym auto-rollu.
+
+Fix: `date-fns`'s `addMonths`/`addQuarters`/`addYears` (już zależność apki) zamiast ręcznej
+arytmetyki — poprawnie PRZYCINAJĄ do ostatniego dnia miesiąca (Jan 31 + 1mies. = Feb 28, nie
+Mar 3; zweryfikowane w Node przed użyciem). `nextDeadline` wydzielone z `useTasks.ts` do
+`utils/date.ts` (dla testowalności — `useTasks.ts` transitively importuje
+`notificationsService.ts`→`expo-notifications`, node-environment jest.config nie potrafi tego
+sparsować, ten sam problem co `useHabits.ts` z §127). `advanceNextBillingDate`/
+`isDurationExpired` przeniesione z `subscriptions.tsx` do `utils/recurringBills.ts` z tego
+samego powodu (screeny pod `app/` nigdy nie są importowane bezpośrednio w testach —
+sprawdzone grepem po całym `__tests__/`). `nextBillingDate` (INNA funkcja w tym samym pliku,
+używana do sugerowania NOWEGO rachunku) sprawdzona i POTWIERDZONA bezpieczna — jej
+`dayOfMonth` jest już przycięty do 1-28 wcześniej w pipeline, więc `setMonth` tam nigdy nie
+przewija (każdy miesiąc ma ≥28 dni).
+
+**3. `googleCalendarService.ts`'s `mapEvent` — sync z Google Calendar gubił wielodniowe
+eventy poza pierwszym dniem.** `CalendarEvent.endDate` (pole na którym opiera się
+`eventCoversDay`/`isMultiDay`, types/index.ts) nigdy nie było ustawiane przy mapowaniu eventu
+z Google — `mapEvent` czytał tylko datę startu. Wielodniowy event utworzony WPROST w Google
+Calendar (nie w tej apce — np. urlop/wyjazd zaimportowany z synchronizacji) pokazywał się w
+kalendarzu TYLKO w dniu startu. Fix: `mapEvent` liczy teraz `endDate` z `e.end.date`/
+`e.end.dateTime` — Google's `end.date` dla eventów całodniowych jest EXCLUSIVE (1-dniowy
+event ma end=start+1, 3-dniowy 20→23 ma end=24), nasze `endDate` jest INCLUSIVE, więc trzeba
+odjąć 1 dzień (dokładnie odwrotność tego co `createEvent`/`updateEvent` w tym samym pliku już
+poprawnie ROBIĄ +1 dzień przy zapisie w drugą stronę). Dla eventów z godziną (nie całodniowych)
+`end.dateTime` jest już precyzyjnym momentem, bez odejmowania. Wydzielone do nowego
+`utils/googleCalendarMap.ts` (dla testowalności — `googleCalendarService.ts` importuje
+`@react-native-google-signin/google-signin`, natywny ESM moduł którego jest.config
+(`testEnvironment: 'node'`, brak whitelisty w `transformIgnorePatterns`) nie potrafi
+sparsować — zweryfikowane bezpośrednio: import wywalał się `SyntaxError: Unexpected token
+'export'` zanim to wydzielono).
+
+**4. Wydajność — `usePetQuests.ts`/`pet-quests.tsx`, gołe `usePetStore()`/`useExpensesStore()`
+bez selektora, ten sam wzorzec co już naprawiony w `pet.tsx`/`GearPanel.tsx` (audyt wydajności
+runda 2/4).** Impact wyższy niż zwykły ekran: `usePetQuests()` zasila TEŻ ping-badge na
+`PupilNavbar`, widoczny na WSZYSTKICH 4 ekranach Pupila (nie tylko `pet-quests.tsx`) — każda
+niepowiązana zmiana w `petStore`/`expensesStore` (tick energii, walka, gear gdzie indziej)
+re-renderowała badge na każdym z 4 ekranów. Fix: `usePetStore(useShallow(s => ({...})))` +
+`useExpensesStore(s => s.expenses)`, dokładnie wzorzec z `pet.tsx`.
+
+**Sprawdzone przez agenta — czyste, bez zmian**: Pomodoro (hardcoded 5/15 min break —
+odrzucone jako false-positive, store nie ma settera do zmiany tych pól, brak realnej ścieżki
+do rozjazdu); Questy pupila (`quests.ts`/`usePetQuests.ts` — claim-race niemożliwy, zustand
+synchroniczny; niższa nagroda za zaległe questy to udokumentowany design, nie bug); Jedzenie/
+kalorie (liczenie przez lokalne `Date`, bez parsowania stringów — brak TZ-bugów; dwa systemy
+liczenia kalorii celowo rozdzielone).
+
+`tsc`/`jest` czyste (1026 testów, +18 nowych: 4 w `date.test.ts` dla `nextDeadline`, 8 w
+nowym `recurringBills.test.ts` — w tym 2 z `jest.useFakeTimers()` na granicy przyciętej vs.
+przewiniętej daty, żeby test faktycznie ROZSTRZYGAŁ które zachowanie działa, nie tylko
+sprawdzał typ zwrotu — i 6 w nowym `googleCalendarMap.test.ts`). **Priorytet testu na
+urządzeniu**: średni — (1) dodaj zadanie cykliczne "co miesiąc" z deadline'em 29-31, ukończ
+je, sprawdź że nowy deadline TRZYMA się końca miesiąca zamiast dryfować; (2) subskrypcja z
+dniem rozliczenia 29-31 i przynajmniej jednym zaległym cyklem — sprawdź `nextBillingDate` po
+auto-rollu; (3) jeśli masz podłączony Google Calendar — zaimportuj/sprawdź wielodniowy event
+utworzony wprost w Google (nie w tej apce), powinien teraz pokazywać się na WSZYSTKICH swoich
+dniach w kalendarzu/DayTimeline, nie tylko pierwszym; (4) ping-badge Pupila (4 ekrany) —
+regresja niemożliwa do zaobserwowania wprost, tylko brak nowych problemów.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

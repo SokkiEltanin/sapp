@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useProfileStore } from '@/store/profileStore';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
@@ -19,16 +20,28 @@ const todayISO = () => ymdOf(new Date());
 // ten sam wzorzec co `usePetHealthSync` (patrz komentarz tam o "lekko podwaja odczyt przy
 // przełączaniu zakładek, ale to nic w porównaniu z ryzykiem rozjazdu dwóch kopii").
 export function usePetQuests() {
+  // useShallow (2026-09-20, audyt logika/optymalizacja) — goły `usePetStore()` subskrybował
+  // CAŁY store pupila (współdzielony z walką/gearem/streakami), więc ten hook re-renderował
+  // się na KAŻDĄ zmianę w petStore, nawet niezwiązaną z questami. Impact wyższy niż zwykle:
+  // ten hook zasila TEŻ `PupilNavbar`'s ping-badge, widoczny na WSZYSTKICH 4 ekranach Pupila
+  // (nie tylko pet-quests.tsx) — ten sam wzorzec/fix co `pet.tsx`/`GearPanel.tsx` (audyt
+  // wydajności, runda 2/4). `useExpensesStore()` niżej dostał ten sam fix z tego samego
+  // powodu (komentarz przy analogicznym miejscu w pet.tsx).
   const {
     xp, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, affection, affectionDay,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay, trainingDays,
-  } = usePetStore();
+  } = usePetStore(useShallow((s) => ({
+    xp: s.xp, claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
+    weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims, affection: s.affection, affectionDay: s.affectionDay,
+    pushupsDay: s.pushupsDay, squatsDay: s.squatsDay, situpsDay: s.situpsDay, plankDay: s.plankDay,
+    stretchDay: s.stretchDay, bikeDay: s.bikeDay, trainingDays: s.trainingDays,
+  })));
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const lvl = levelFromXp(xp);
   const { health, waterGoal, waterToday, recentDays, cardsCollected, synced } = usePetHealthSync();
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
-  const { expenses } = useExpensesStore();
+  const expenses = useExpensesStore((s) => s.expenses);
 
   const affToday = affectionDay === todayISO() ? affection : 0;
 

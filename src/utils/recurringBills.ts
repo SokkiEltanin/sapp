@@ -1,5 +1,6 @@
+import { addMonths, addQuarters, addYears } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Expense, Subscription } from '@/types';
+import { Expense, Subscription, BillingCycle } from '@/types';
 
 // Recognisable recurring-bill types — matched against an expense's note + tags.
 // Order = display priority. Exported (2026-08-31) so the Finanse filter (finances.tsx)
@@ -84,6 +85,43 @@ export function nextBillingDate(dayOfMonth: number, now = new Date()): string {
   const d = new Date(now.getFullYear(), now.getMonth(), dayOfMonth);
   if (d.getTime() <= now.getTime()) d.setMonth(d.getMonth() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// (Bezpieczne wobec day-overflow — `dayOfMonth` przychodzi zawsze przycięte do 1-28, patrz
+// wyżej `Math.min(28, ...)`, więc `setMonth` powyżej nigdy nie przewija miesiąca, bo każdy
+// ma co najmniej 28 dni. Inaczej niż `advanceNextBillingDate`/`isDurationExpired` niżej —
+// te operują na DOWOLNYM dniu zapisanym przez usera, więc day-overflow był realny.)
+
+const ymdLocal = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// 2026-09-20, audyt logika/optymalizacja — wydzielone z app/expenses/subscriptions.tsx dla
+// testowalności. Zwykły `setMonth`/`setFullYear` na dzień nieistniejący w docelowym miesiącu
+// PRZEWIJA (day overflow) zamiast przyciąć: subskrypcja z `nextBillingDate` 31. dnia miesiąca
+// po jednym cichym auto-rollu (patrz subscriptions.tsx's useEffect, bez pytania usera)
+// lądowała na 3. dnia DWA miesiące dalej — luty (cały cykl płatności) po cichu znikał z
+// prognozy, i seria trwale dryfowała od tego momentu na "3. dnia" zamiast 31/ostatniego dnia
+// miesiąca. `date-fns`'s `addMonths`/`addQuarters`/`addYears` poprawnie przycinają do
+// ostatniego dnia docelowego miesiąca (Jan 31 + 1mies. = Feb 28, nie Mar 3) — ten sam fix co
+// `nextDeadline` w utils/date.ts (ta sama klasa buga, druga lokalizacja).
+export function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
+  const start = new Date(`${current}T00:00:00`);
+  let d = start;
+  switch (cycle) {
+    case 'weekly':    d = new Date(start); d.setDate(d.getDate() + 7); break;
+    case 'monthly':   d = addMonths(start, 1); break;
+    case 'quarterly': d = addQuarters(start, 1); break;
+    case 'yearly':    d = addYears(start, 1); break;
+  }
+  return ymdLocal(d);
+}
+
+// Ten sam bug/fix co `advanceNextBillingDate` wyżej — `durationMonths` dodawane do
+// `startDate` (dowolny dzień usera) mogło tak samo przewinąć miesiąc.
+export function isDurationExpired(sub: Pick<Subscription, 'durationMonths' | 'startDate'>): boolean {
+  if (!sub.durationMonths || sub.durationMonths === 0 || !sub.startDate) return false;
+  const end = addMonths(new Date(`${sub.startDate}T00:00:00`), sub.durationMonths);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return end <= today;
 }
 
 // "Don't suggest this bill" is remembered per tag so the prompt doesn't nag forever.

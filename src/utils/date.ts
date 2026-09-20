@@ -1,5 +1,6 @@
-import { format, isToday, isYesterday, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, isToday, isYesterday, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { TaskRecurring } from '@/types';
 
 export const formatDate = (iso: string): string => {
   const d = parseISO(iso);
@@ -45,3 +46,19 @@ export const monthRange = (iso: string): { from: string; to: string } => {
     to: endOfMonth(d).toISOString(),
   };
 };
+
+// Wydzielone z useTasks.ts (2026-09-20, audyt logika/optymalizacja) — dla testowalności
+// (useTasks.ts transitively importuje notificationsService.ts → expo-notifications, którego
+// node-environment nie potrafi sparsować, ten sam problem co useHabits.ts udokumentowany
+// przy weeklyTargetStreak w habits.ts). Zwykły `setMonth` na dzień nieistniejący w kolejnym
+// miesiącu PRZEWIJA (day overflow) zamiast przyciąć — zadanie cykliczne "monthly" z
+// deadline'em 31. dnia miesiąca skakało na 3. dnia DWA miesiące dalej (luty całkowicie
+// pomijany), a seria trwale dryfowała od tego momentu. `date-fns`'s `addMonths` poprawnie
+// przycina do ostatniego dnia docelowego miesiąca (Jan 31 + 1mies. = Feb 28, nie Mar 3).
+export function nextDeadline(iso: string, recurring: TaskRecurring): string {
+  let d = new Date(iso);
+  if (recurring === 'daily')   d.setDate(d.getDate() + 1);
+  if (recurring === 'weekly')  d.setDate(d.getDate() + 7);
+  if (recurring === 'monthly') d = addMonths(d, 1);
+  return d.toISOString();
+}

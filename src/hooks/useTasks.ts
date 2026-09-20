@@ -4,9 +4,10 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { usePetStore } from '@/store/petStore';
-import { Task, TaskRecurring, Subtask } from '@/types';
+import { Task, Subtask } from '@/types';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
+import { nextDeadline } from '@/utils/date';
 
 const SAVE_FAIL = 'Nie zapisano — sprawdź połączenie';
 
@@ -24,14 +25,6 @@ function taskXp(difficulty?: number): number {
   return 6 + (difficulty ?? 1) * 3;
 }
 const MILESTONE_XP = 4;
-
-function nextDeadline(iso: string, recurring: TaskRecurring): string {
-  const d = new Date(iso);
-  if (recurring === 'daily')   d.setDate(d.getDate() + 1);
-  if (recurring === 'weekly')  d.setDate(d.getDate() + 7);
-  if (recurring === 'monthly') d.setMonth(d.getMonth() + 1);
-  return d.toISOString();
-}
 
 export function useTasks() {
   const { tasks, isLoading, setTasks, addTask, updateTask, deleteTask, setLoading } =
