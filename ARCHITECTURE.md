@@ -8982,6 +8982,39 @@ throwaway-symulacja na realnych danych, nie zgadywanie).
 
 ---
 
+## 137. Fix: kamień milowy w tasku nie skreślał się na żywo, tylko po wyjściu/wejściu (2026-09-19)
+
+User (ze screenem modala "Umyć brodzik prysznicowy"): *"jak klikam milestony w taskach to
+dziala tylko nie zaznacza sie na żywo muszę wyjść i wejść z taska zeby sie skreslilo z
+listy"*.
+
+**Przyczyna**: `TaskDetailModal` w `app/(tabs)/tasks.tsx` renderuje kamienie milowe wprost z
+propa `task.subtasks`. Rodzic (`TasksScreen`) trzymał ten task w `detailTask` —
+zwykły `useState<Task | null>`, ustawiany RAZ w `handleEditPress` (`setDetailTask(task)`) w
+chwili otwarcia modala. `onToggleSubtask` (kliknięcie checkboxa) poprawnie aktualizował listę
+`tasks` w `calendarStore.ts` (nowa referencja, `updateTask` mapuje niemutowalnie — sprawdzone),
+ale `detailTask` był ZAMROŻONĄ kopią z chwili otwarcia i nic go nie synchronizowało z żywym
+stanem — modal renderował dalej starą wersję (checkbox bez ✓, tekst bez przekreślenia) dopóki
+nie zamknięto i otworzono go ponownie (co na nowo wołało `handleEditPress` ze świeżym taskiem).
+
+**Fix**: `detailTask` (obiekt) → `detailTaskId` (samo id) + `useMemo` wyliczający właściwy
+task z aktualnej listy `tasks` (`tasks.find(t => t.id === detailTaskId)`). Modal automatycznie
+widzi zmianę zaraz po `onToggleSubtask`, bo `detailTask` przelicza się z KAŻDĄ zmianą `tasks`,
+nie tylko przy otwarciu. Sprawdzone czy ten sam wzorzec (checklist z live-toggle wewnątrz
+modala karmionego zamrożonym snapshotem) występuje gdzie indziej — `habits.tsx`/`mood.tsx`'s
+`editingHabit`/`editingEntry`/`confirmDelete*` to zwykłe formularze edycji (kopiują pola do
+własnego stanu formularza, submit/close, nic zewnętrznego nie mutuje obiektu W TRAKCIE gdy
+formularz jest otwarty) i `habit-year.tsx`'s `habit` to statyczny widok statystyk (ładowany
+raz, bez interaktywnego checklisty) — żaden nie ma tego samego kształtu buga, izolowany
+przypadek.
+
+`tsc`/`jest` czyste (1008 testów, bez zmian w testach — czysto UI-sync, nie ma dla tego
+sensownego testu bez renderowania komponentu). Priorytet testu na urządzeniu: niski — otwórz
+task z kamieniami milowymi, zaznacz jeden bez zamykania modala — powinien przekreślić się
+OD RAZU, nie dopiero po zamknięciu/otwarciu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

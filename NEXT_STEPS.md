@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: kamień milowy w tasku nie skreślał się na żywo (2026-09-19)
+
+Pełny opis w ARCHITECTURE.md §137. User: "jak klikam milestony w taskach... nie zaznacza sie
+na żywo muszę wyjść i wejść z taska". `TaskDetailModal`'s task pochodził z zamrożonego
+`useState` snapshotu ustawianego raz przy otwarciu — `onToggleSubtask` poprawnie update'ował
+store, ale modal tego nie widział. Naprawione: state trzyma tylko id, obiekt liczy się
+`useMemo` z żywej listy `tasks`. Sprawdzone że ten sam wzorzec nie występuje w innych modalach
+(habits.tsx/mood.tsx/habit-year.tsx — żaden nie ma live-toggle checklisty w zamrożonym
+snapshocie). `tsc`/`jest` czyste (1008 testów). Priorytet testu: niski.
+
 ## ✅ Fix: eksport postępu pupila tracił starsze walki + 🆕 CZEKAM na dane usera (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §136. User: "pełna historie eksportu pupila... z dnia na dzień
