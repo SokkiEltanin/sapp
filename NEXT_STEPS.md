@@ -14,8 +14,26 @@ tych stanach. Naprawione: `arr[calmTick % arr.length]` + `key` po id — rotacja
 wszystkich kandydatów co ~8s, z płynną animacją przy każdej zmianie. `tsc`/`jest` czyste (1030
 testów). Priorytet testu na urządzeniu: średni — dodaj 2+ zaległe zadania, sprawdź rotację.
 
-**W toku**: scena walki pupila (`boss-fight.tsx`) — user zgłosił niedopasowane skale cieni do
-sprite'ów, chce łatwiej dostosowywać pozycje/skalę. Research zaczęty osobno.
+## ✅ Edytor układu walki — niezależna skala/pozycja cienia + fix STARYCH domyślnych (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §145. Przyczyna "cienie nie pasują skali": `GroundShadow` w
+realnej walce liczył width/height jako JEDEN wspólny ułamek (0.62/0.18) rozmiaru portretu dla
+kotka i bossa — działa dla bossa (PNG przycięte do sylwetki), nie dla kotka (SVG z dużym
+pustym marginesem, stąd `CAT_PORTRAIT_SIZE` jest sztucznie ~35% większe od `PORTRAIT_SIZE`
+bossa). Edytor (`battle-layout-lab.tsx`) dostał niezależną skalę X/Y + offsetY cienia PER
+SPRITE (domyślnie = dzisiejszy ułamek, więc start Edytora nic nie zmienia wizualnie) — user
+dostroi kotka osobno od bossa dotykiem/Stepperami, wyeksportuje, ja podepnę do
+`boss-fight.tsx` (Edytor świadomie NIE czyta się live z ekranu walki).
+
+**Przy tym naprawiony bug**: `BATTLE_LAYOUT_DEFAULT` (175/130, offsety=0) nie było
+zaktualizowane po eksporcie z 2026-09-18 (realne stałe w `boss-fight.tsx` to już 205/150 +
+offsety 45/45/10/10) — Edytor otwierał się z INNYM layoutem niż realna walka, mimo komentarza
+w kodzie obiecującego "1:1 podgląd". Przywrócone do zgodności + bezpieczny `merge` dla starych
+zapisanych draftów bez nowych pól cienia.
+
+`tsc`/`jest` czyste (1030 testów, bez zmiany — dev-tylko poligon bez testów).
+**Priorytet testu na urządzeniu — wysoki**: (1) otwórz Edytor, sprawdź że wygląda jak realna
+walka; (2) sekcja "Cień" — dostosuj kotka osobno od bossa; (3) eksport zawiera nowe pola.
 
 ## ✅ Pierwszy etap "inteligentnych powiadomień" — nawyki żywe, fix persystencji godzin (2026-09-20)
 
