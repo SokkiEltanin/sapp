@@ -17,6 +17,7 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { todayISO, ymd } from '@/utils/date';
+import { advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -64,25 +65,6 @@ function urgencyColor(days: number): string {
   if (days <= 3) return colors.accent.amber;
   if (days <= 7) return colors.accent.blue;
   return colors.accent.green;
-}
-
-function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
-  const d = new Date(current + 'T00:00:00');
-  switch (cycle) {
-    case 'weekly':    d.setDate(d.getDate() + 7); break;
-    case 'monthly':   d.setMonth(d.getMonth() + 1); break;
-    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
-    case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
-  }
-  return ymd(d);
-}
-
-function isDurationExpired(sub: Subscription): boolean {
-  if (!sub.durationMonths || sub.durationMonths === 0 || !sub.startDate) return false;
-  const end = new Date(sub.startDate + 'T00:00:00');
-  end.setMonth(end.getMonth() + sub.durationMonths);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  return end <= today;
 }
 
 // ─── Add/Edit Form ────────────────────────────────────────────────────────────

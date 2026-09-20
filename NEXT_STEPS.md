@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt logika/optymalizacja — kalendarz/questy/subskrypcje, 4 znaleziska (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §138. Kolejna runda audytu (jak §126/§127), świeże obszary:
+kalendarz, questy pupila, pomodoro, subskrypcje, jedzenie. Naprawione: (1+2) `setMonth` bez
+przycięcia w DWÓCH miejscach — `nextDeadline` (zadania cykliczne) i `advanceNextBillingDate`/
+`isDurationExpired` (subskrypcje) gubiły/dryfowały przy dniu 29-31, fix przez `date-fns`'s
+`addMonths`/`addQuarters`/`addYears`; (3) `mapEvent` w sync Google Calendar nigdy nie
+ustawiało `endDate` — wielodniowe eventy z Google widoczne tylko w dniu startu; (4) wydajność
+`usePetQuests.ts`/`pet-quests.tsx` — gołe store bez selektora (wpływa na ping-badge widoczny
+na 4 ekranach Pupila naraz). Sprawdzone i czyste: Pomodoro, questy (claim-race/nagroda za
+zaległe), jedzenie/kalorie. `tsc`/`jest` czyste (1026 testów, +18 nowych). Priorytet testu na
+urządzeniu: średni — patrz checklist w §138 (zadanie cykliczne 29-31, subskrypcja z dniem
+29-31, import wielodniowego eventu z Google jeśli podłączony).
+
 ## ✅ Fix: kamień milowy w tasku nie skreślał się na żywo (2026-09-19)
 
 Pełny opis w ARCHITECTURE.md §137. User: "jak klikam milestony w taskach... nie zaznacza sie
