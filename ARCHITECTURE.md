@@ -9259,6 +9259,59 @@ zweryfikowany w §140).
 
 ---
 
+## 142. Pierwszy etap "inteligentnych powiadomień" — przypomnienie o nawykach żywe, fix persystencji godzin (2026-09-20)
+
+User: "zrob inteligentne powiadomienia" (część większego wieloetapowego żądania — bugi
+techniczne §141 zrobione jako pierwsze, to drugi etap; trzeci etap, kategoryzacja produktów w
+finansach, w toku osobno). Research `notificationsService.ts` (778 linii, ~38 metod)
+pokazał, że 3 z 4 typów przypomnień w Ustawieniach (`refreshMoodReminder`/`refreshPetReminder`/
+`refreshBossReminder`) już SĄ "inteligentne" — one-off DATE trigger re-armowany na żywym
+stanie (zalogowany nastrój / gotowa skrzynka / bijalny boss), a treść i skip-today są
+przeliczane na nowo przy każdym otwarciu apki. **Przypomnienie o nawykach było jedynym
+wyjątkiem** — ślepy `DAILY` alarm zaplanowany RAZ przy zapisie Ustawień, bez żadnego związku z
+realnym stanem: trąbił "Nie odhaczyłeś dziś nawyków" nawet gdy user WŁAŚNIE wszystkie odhaczył
+(albo nie ma żadnego nawyku wcale).
+
+**Fix — `scheduleDailyHabitReminder`/nowe `refreshDailyHabitReminder`** (mirror
+`refreshMoodReminder`): DAILY → one-off DATE (`nextFireDate(hour, minute, allDoneToday)`),
+`allDoneToday` przeskakuje na jutro miast nagabywać dzisiaj, treść dostaje realną liczbę
+nieodhaczonych (`remaining`, przez `plPlural`). `refreshDailyHabitReminder` czyta
+`notif_habits_hour/min` z AsyncStorage i re-planuje — wołane z nowego `useEffect` w
+`useHabits()` na każdą zmianę `habits.length`/`todayDone.length` (ten hook jest zamontowany i
+na ekranie Nawyków, i na kafelku dashboardu, więc łapie stan przy każdym otwarciu apki/
+odhaczeniu, tak jak `refreshMoodReminder` w `moodStore.ts`).
+
+**Znaleziony przy tym drugi bug (ta sama okazja, ten sam plik ustawień)**: `app/settings.tsx`
+ZAPISYWAŁO godziny wszystkich 4 przypomnień (nastrój wieczorny/poranny, lista zadań, nawyki) do
+AsyncStorage przy "Zapisz przypomnienia", ale NIGDY nie WCZYTYWAŁO ich z powrotem przy
+otwarciu ekranu — pola zawsze wracały do sztywnych domyślnych (20:00/8:00/8:00/21:00), mimo że
+powiadomienie realnie leciało o zapisanej wcześniej godzinie (rozjazd UI ↔ realny stan, user
+widziałby "8:00" a przypomnienie i tak przyjdzie o godzinie ustawionej wcześniej). Przy tym też
+`scheduleMorningMoodReminder` nigdy nie zapisywało swojej godziny WCALE (żadne miejsce w ogóle
+tego nie robiło) — dodane `notif_morning_hour`/`notif_morning_min` w `settings.tsx` obok
+`notif_morning_enabled`. Habit reminder teraz samo-persystuje `notif_habits_hour/min`
+(multiSet w `scheduleDailyHabitReminder`, jak mood). Wszystkie 4 godziny wczytywane na mount
+Ustawień jednym `multiGet`.
+
+`tsc`/`jest` czyste (1030 testów, bez zmiany — logika `notificationsService.ts` importuje
+`expo-notifications`, więc nie da się jej testować bez wydzielenia do osobnego pliku jak
+`googleCalendarMap.ts` w §138; ten plik nigdy nie miał testów, więc nie jest to regresja, ale
+kandydat na przyszłe wydzielenie `nextFireDate`/treści do testowalnego modułu).
+
+**Priorytet testu na urządzeniu — wysoki** (nowe zachowanie, nie tylko fix persystencji):
+(1) włącz przypomnienie o nawykach w Ustawieniach, ustaw bliską godzinę, poczekaj — powinno
+przyjść z treścią "Zostało Ci N nawyków..."; (2) odhacz WSZYSTKIE nawyki na dziś PRZED tą
+godziną — przypomnienie nie powinno przyjść dzisiaj; (3) zamknij i otwórz Ustawienia — godziny
+wszystkich 4 przypomnień powinny pokazywać wcześniej zapisane wartości, nie domyślne.
+
+**Kolejny etap (nie zaczęty)**: kategoryzacja produktów w Finanse/Produkty — hierarchia
+tag→podkategoria→wariant (user: "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz 500g)"),
+lepsze sortowanie/edycja po dacie zakupu, klik na produkt → który paragon i gdzie na nim.
+Wymaga researchu `app/products.tsx`/modelu danych produktów przed projektowaniem — patrz
+NEXT_STEPS.md.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

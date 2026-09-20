@@ -654,6 +654,25 @@ export default function SettingsScreen() {
       if (m.notif_todo_enabled === 'true') setBriefingEnabled(true);
       if (m.notif_habits_enabled === 'true') setHabitNotifEnabled(true);
     }).catch(() => {});
+    // Godziny wszystkich 4 przypomnień (2026-09-20, "inteligentne powiadomienia") — były
+    // ZAPISYWANE przy "Zapisz przypomnienia" (evening/todo self w tym pliku, mood/habits w
+    // notificationsService), ale NIGDY nie wczytywane z powrotem tutaj — pola zawsze
+    // wracały do sztywnych domyślnych (20:00/8:00/8:00/21:00) po zamknięciu i otwarciu
+    // Ustawień, mimo że powiadomienia realnie leciały o zapisanej godzinie.
+    AsyncStorage.multiGet([
+      'notif_mood_hour', 'notif_mood_min', 'notif_morning_hour', 'notif_morning_min',
+      'notif_todo_hour', 'notif_todo_min', 'notif_habits_hour', 'notif_habits_min',
+    ]).then(pairs => {
+      const m = Object.fromEntries(pairs);
+      if (m.notif_mood_hour != null) setEveningHour(m.notif_mood_hour);
+      if (m.notif_mood_min != null) setEveningMin(m.notif_mood_min);
+      if (m.notif_morning_hour != null) setMorningHour(m.notif_morning_hour);
+      if (m.notif_morning_min != null) setMorningMin(m.notif_morning_min);
+      if (m.notif_todo_hour != null) setBriefingHour(m.notif_todo_hour);
+      if (m.notif_todo_min != null) setBriefingMin(m.notif_todo_min);
+      if (m.notif_habits_hour != null) setHabitHour(m.notif_habits_hour);
+      if (m.notif_habits_min != null) setHabitMin(m.notif_habits_min);
+    }).catch(() => {});
     AsyncStorage.multiGet(SIMPLE_NOTIF_TYPES.map(t => t.flag)).then(pairs => {
       const next: Record<string, boolean> = {};
       for (const [k, v] of pairs) next[k] = v !== 'false'; // default ON — patrz komentarz w notificationTypes.ts
@@ -775,6 +794,8 @@ export default function SettingsScreen() {
       }
       if (morningEnabled) {
         await AsyncStorage.setItem('notif_morning_enabled', 'true');
+        await AsyncStorage.setItem('notif_morning_hour', String(mh));
+        await AsyncStorage.setItem('notif_morning_min', String(mm));
         await notificationsService.scheduleMorningMoodReminder(mh, mm);
       } else {
         await AsyncStorage.setItem('notif_morning_enabled', 'false');

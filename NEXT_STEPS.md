@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Pierwszy etap "inteligentnych powiadomień" — nawyki żywe, fix persystencji godzin (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §142. Drugi etap wieloczęściowego żądania usera (po §141
+"techniczne bugi"; trzeci etap — kategoryzacja produktów — w toku, patrz niżej). Przypomnienie
+o nawykach było jedynym z 4 typów przypomnień, które NIE było "inteligentne" — ślepy `DAILY`
+alarm zaplanowany raz, ignorujący realny stan (trąbił "nie odhaczyłeś" nawet po odhaczeniu
+wszystkiego). Przerobione na one-off DATE trigger re-armowany z `useHabits()` na każdą zmianę
+stanu (mirror `refreshMoodReminder`/`refreshPetReminder`/`refreshBossReminder`) — skip-today
+gdy wszystko zaliczone, treść z realną liczbą zostałych nawyków. Przy tej samej okazji
+naprawiony osobny bug: godziny wszystkich 4 przypomnień w Ustawieniach zapisywały się, ale
+NIGDY nie wczytywały z powrotem (pola zawsze resetowały się do domyślnych po zamknięciu
+ekranu) — `notif_morning_hour/min` w ogóle nigdy nie było zapisywane. `tsc`/`jest` czyste (1030
+testów, bez zmiany — plik notificationsService.ts nigdy nie miał testów, importuje
+expo-notifications). **Priorytet testu na urządzeniu: wysoki** (nowe zachowanie) — patrz §142.
+
+**Kolejny etap w toku (nie zaczęty)**: kategoryzacja produktów w Finanse/Produkty —
+hierarchia tag→podkategoria→wariant, lepsze sortowanie po dacie zakupu, klik na produkt →
+który paragon. Wymaga researchu modelu danych produktów/paragonów przed projektowaniem.
+
 ## ✅ Konsolidacja duplikatów setMonth-overflow + dokończenie sweepu selektorów (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §141. User: "ogarnij wszystko te techniczne bugi". Repo-wide
