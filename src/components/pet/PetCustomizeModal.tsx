@@ -6,6 +6,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import StartupPreview from '@/components/pet/StartupPreview';
+import { useShallow } from 'zustand/react/shallow';
 import { usePetStore } from '@/store/petStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { STARTUPS, startupById, ANIM_LABEL, Startup } from '@/utils/petStartups';
@@ -60,11 +61,21 @@ export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
 }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // useShallow (2026-09-20, audyt logika/optymalizacja) — komponent jest ZAWSZE zamontowany
+  // na /pet (Modal's `visible` prop tylko chowa go wizualnie, nie odmontowuje), więc goły
+  // `usePetStore()` re-renderował go na każdą zmianę w petStore nawet gdy zamknięty — ten sam
+  // wzorzec co już naprawiony `GearPanel.tsx`/`pet.tsx`.
   const {
     name, coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
     setName, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, setOnboarded,
     equippedStartup, buyStartup,
-  } = usePetStore();
+  } = usePetStore(useShallow((s) => ({
+    name: s.name, coins: s.coins, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
+    catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor, catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
+    setName: s.setName, buyColor: s.buyColor, buyStripes: s.buyStripes, buyEyeColor: s.buyEyeColor,
+    buyNoseColor: s.buyNoseColor, buyWhiskers: s.buyWhiskers, buyLegStripes: s.buyLegStripes,
+    setOnboarded: s.setOnboarded, equippedStartup: s.equippedStartup, buyStartup: s.buyStartup,
+  })));
 
   const [draft, setDraft] = useState(name);
   const [pvColor, setPvColor] = useState<string | null>(null);

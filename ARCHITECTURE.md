@@ -9201,6 +9201,64 @@ niemożliwa do zaobserwowania wprost na ekranie Bossy/Licznikach.
 
 ---
 
+## 141. Konsolidacja duplikatów `setMonth`-overflow + dokończenie sweepu selektorów (2026-09-20)
+
+User: "ogarnij wszystko te techniczne bugi" — nawiązanie do własnej propozycji (§1 "wspólny
+`addMonthsClamped`, ten sam bug wyszedł 3 razy" i §2 "sweep selektorów store'ów"). Zamiast
+pisać nową funkcję "addMonthsClamped" (niepotrzebne — `date-fns`'s `addMonths`/`addQuarters`/
+`addYears` już to robi poprawnie, używane od §138), zrobiony REPO-WIDE grep za wzorcem
+`setMonth(...getMonth() + ...)` — wynik: bug był zduplikowany w **3 KOLEJNYCH** plikach,
+których żadna z poprzednich 3 rund (§138/§140) nie dotknęła:
+
+**1. `src/utils/dashboard/subs.ts`** — LITERALNA kopia `advanceNextBillingDate`/
+`isDurationExpired` (te same nazwy funkcji!) z tego co już naprawiono w `recurringBills.ts`,
+używana przez dashboard (`app/(tabs)/index.tsx`) do liczenia zaległych/wygasłych subskrypcji.
+Miał nawet WŁASNY test (`dashboardSubs.test.ts`) który PINOWAŁ buggy zachowanie jako
+"zachowanie JS Date" wprost w komentarzu — dokładnie ten wzorzec z tej sesji, gdzie stary test
+zamraża zły wynik jako "prawidłowy".
+
+**2. `src/utils/subscriptionAuto.ts`'s `advanceBillingDate`** — TRZECI niezależny wariant tej
+samej funkcji, używany w `src/services/bankCommit.ts` do AUTOMATYCZNEGO (bez interakcji usera)
+dopasowywania płatności bankowych do subskrypcji i cichego przesuwania `nextBillingDate` —
+najpoważniejszy z trzech, bo drift byłby całkowicie niewidoczny (żadnego ekranu, żadnego
+kliknięcia, po prostu cichy błąd w tle przy każdej synchronizacji banku).
+
+**3. `src/utils/maintenanceCalendar.ts`** — WŁASNA, ręczna kopia "dodaj miesiące" (nie
+duplikat nazwy funkcji, ale duplikat BUGA) do generowania wydarzeń kalendarza "wymiana oleju"/
+"serwis pojazdu" — osobny kod-path od `vehicleMatch.ts` (ten dawał chip "za ~X mies." na
+ekranie Pojazdów, ten tu generuje właściwe wydarzenie w Kalendarzu), więc §140 go nie objęło.
+
+**Fix**: `dashboard/subs.ts` i jego test USUNIĘTE CAŁKOWICIE (dashboard woła teraz wprost
+`advanceNextBillingDate`/`isDurationExpired` z `recurringBills.ts` — JEDNO źródło prawdy
+zamiast trzech). `subscriptionAuto.ts`'s `advanceBillingDate` USUNIĘTA (wołający kod,
+`bankCommit.ts`/`index.tsx`, woła teraz też wprost `recurringBills.ts`). `maintenanceCalendar.ts`
+przepisany na `date-fns`'s `addMonths` (lokalna nazwa `addMonthsIso` żeby nie kolidować z
+importem). Nowe testy: `maintenanceCalendar.test.ts` (4 testy, w tym wymiana oleju 31.08+6mies.
+→ 28.02 nie 3.03).
+
+**Dokończony sweep selektorów store'ów** (§140 "runda 3" zaczęła, to ją kończy dla
+uzasadnionych przypadków): `PetCustomizeModal.tsx` (ZAWSZE zamontowany na `/pet` — Modal's
+`visible` chowa go wizualnie, nie odmontowuje — miał CAŁKOWICIE goły `usePetStore()`, teraz
+`useShallow`), `bosses.tsx`/`boss-fight.tsx` (resztki gołego `useExpensesStore()`, `boss-
+fight.tsx` to ekran walki — hot path). ŚWIADOMIE NIE dotknięte pozostałe 12 miejsc z gołym
+`useExpensesStore()` (`vehicles.tsx`, `month-cards.tsx`, `weekly.tsx`, `search.tsx`,
+`achievements.tsx`, `settings.tsx`, `expenses/[id].tsx`, `expenses/stats.tsx`,
+`expenses/audit.tsx`, `work/history.tsx`, `(tabs)/stats.tsx`, `(tabs)/finances.tsx`) — to albo
+ekrany analizy wydatków które i tak potrzebują szerokiego dostępu do `expenses` (selektor by
+nic nie dał), albo rzadko odwiedzane ekrany ze stosu nawigacji (nie stale zamontowane, nie hot
+path) — fix tam byłby czystym boilerplate'em bez realnej korzyści, dokładnie to czego CLAUDE.md
+każe unikać ("nie dodawaj ponad to czego wymaga zadanie").
+
+`tsc`/`jest` czyste (1030 testów — sam count bez zmian netto: -4 z usuniętego
+`dashboardSubs.test.ts`, +4 z nowego `maintenanceCalendar.test.ts`). **Priorytet testu na
+urządzeniu**: średni — (1) subskrypcja z dniem rozliczenia 29-31, wpłać "płatność bankową" (albo
+poczekaj na realną synchronizację) która ją dopasuje, sprawdź że `nextBillingDate` po
+automatycznym przesunięciu jest poprawny, nie przewinięty; (2) pojazd z datą oleju 29-31 dnia
+miesiąca — sprawdź wydarzenie w Kalendarzu, nie tylko chip na ekranie Pojazdów (już
+zweryfikowany w §140).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

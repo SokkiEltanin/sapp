@@ -6,7 +6,8 @@ import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
 import { useSubscriptionsStore } from '@/store/subscriptionsStore';
 import { subscriptionsService } from '@/services/subscriptionsService';
-import { matchSubscriptionForPayment, advanceBillingDate, isConfidentSubMatch, queueSubConfirm } from '@/utils/subscriptionAuto';
+import { matchSubscriptionForPayment, isConfidentSubMatch, queueSubConfirm } from '@/utils/subscriptionAuto';
+import { advanceNextBillingDate } from '@/utils/recurringBills';
 import { rememberPaycheckSender } from '@/utils/paycheckSenders';
 
 // A bank payment that settles a subscription: if it's a CONFIDENT match (same
@@ -21,7 +22,7 @@ async function maybeAutoPaySubscription(p: PendingBankTx): Promise<void> {
     const sub = matchSubscriptionForPayment({ store: p.store, amount: p.amount, dateISO: p.dateISO }, subs);
     if (!sub) return;
     if (isConfidentSubMatch({ store: p.store, amount: p.amount, dateISO: p.dateISO, currency: p.currency }, sub)) {
-      const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
+      const next = advanceNextBillingDate(sub.nextBillingDate, sub.billingCycle);
       if (next === sub.nextBillingDate) return;
       useSubscriptionsStore.getState().updateSubscription(sub.id, { nextBillingDate: next });
       await subscriptionsService.update(sub.id, { nextBillingDate: next });

@@ -44,7 +44,6 @@ import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS, weekdaySpendPattern } from '@/utils/dashboard/spend';
 import { plTasks, tagLimitMsg, metricTagLabel, fmtChartPt, fmtStat, fmtWave, unitChip, periodCaption } from '@/utils/dashboard/format';
 import { plPlural } from '@/utils/plural';
-import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
 import { humorLine } from '@/utils/dashboard/humor';
@@ -106,8 +105,8 @@ import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
-import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
-import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
+import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill, advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
+import { loadSubConfirms, removeSubConfirm, PendingSubConfirm } from '@/utils/subscriptionAuto';
 import { fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, FvBucket } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFloor, EarnedMap } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
@@ -648,7 +647,7 @@ export default function DashboardScreen() {
     removeSubConfirm(c.id).catch(() => {});
     const sub = subscriptions.find(s => s.id === c.subId);
     if (!sub) return;
-    const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
+    const next = advanceNextBillingDate(sub.nextBillingDate, sub.billingCycle);
     if (next !== sub.nextBillingDate) { try { await updateSub(sub.id, { nextBillingDate: next }); } catch {} }
     toast.success(`Oznaczono „${c.subName}" jako opłaconą`);
   }, [subscriptions, updateSub]);
