@@ -49,22 +49,49 @@ import { Boss, BOSSES } from '@/utils/bosses';
 // walki co kampania) bez ryzyka powtórki "MAD niewygrywalny od lvl~90" z pierwszej wersji.
 export const MAD_UNLOCK_LEVEL = 15;
 
-// PRZEBUDOWANE NAGRODY (2026-08-22) — user po zobaczeniu logu walk: "mad bossy mają być
-// nagrody z nich kontynuacja jak po ostatnim busie kampanii". Stary `MAD_REWARD_MULT` (×3 na
-// WŁASNĄ, oryginalną nagrodę bazowego bossa) dawał absurdalnie mało dla wczesnych bossów
-// kampanii — np. MAD Cukrowy Potwór (boss #2, coins:12/xp:100 bazowo) dawał tylko 36 monet/
-// 300 XP, mimo że PO przebudowie na stałe hp×10 + counterMult×3 wyżej jest teraz trudniejszy
-// niż nawet finałowy boss kampanii. Zapytany wprost (AskUserQuestion) o dokładny kształt
-// wzrostu — dosłowna kontynuacja krzywej kampanii (~1.48× na krok, ekstrapolowana z 22
-// istniejących wartości `coins`) dałaby przy MAD order 22 ~88 MILIONÓW monet za jedną walkę,
-// user wybrał zamiast tego "start od końca kampanii, łagodny wzrost": KAŻDY MAD boss startuje
-// od nagrody OSTATNIEGO bossa kampanii (`BOSSES` posortowane po `order`, ostatni = Iluzja
-// Kontroli, floor niezależny od tego jak mało dawał WŁASNY bazowy boss), rosnąc liniowo +15%
-// tej bazy za każdy krok WŁASNEGO order MAD-a (order1 = dokładnie finał kampanii, order22 =
-// ~4.15× tego — wyraźnie więcej niż finał, ale bez wykładniczej eksplozji).
-const MAD_REWARD_GROWTH_PER_ORDER = 0.15;
-function madRewardMultFor(order: number): number {
-  return 1 + Math.max(0, order - 1) * MAD_REWARD_GROWTH_PER_ORDER;
+// PRZEBUDOWANE DRUGI RAZ (2026-09-20) — user po realnym eksporcie postępu pupila: "ilość XP i
+// coinów za bossy jest popierdolone... z dnia na dzień wbiłem z 51 lvl na 270". Poprzedni
+// model (floor = 100% nagrody finału OD order1, +15%/order dalej) okazał się, po realnym
+// zagraniu, dokładnie tym samym problemem co user sam zgłosił: MAD order1 (Kanapowy Leniwiec,
+// odblokowany na Lv15, NAJŁATWIEJSZY MAD boss) dawał 1:1 TYLE SAMO co legalne pokonanie
+// fabularnego finału kampanii (Iluzja Kontroli, unlockLevel 116) — potwierdzone w logu walk
+// (oba +24244 monet/+225000 XP). 5-9 walk MAD w jeden dzień dawało miliony XP, więcej niż
+// reszta konta razem wzięta.
+//
+// Nowy kształt (user, AskUserQuestion): order1 = WŁASNA nagroda bossa z kampanii (mała,
+// adekwatna do Lv15), rosnąc do nagrody finału na ostatnim orderze (22 = Iluzja Kontroli =
+// jednocześnie sam finał, więc na końcu nie ma żadnego skoku — "własna" i "finałowa" nagroda
+// to dosłownie ta sama liczba). Samo "own→finał" interpolowane WPROST okazało się jednak
+// płacić ŚMIESZNIE MAŁO na dole skali (order1: 8 monet za pokonanie 5400-HP bossa z 3×
+// kontratakiem — mniej niż pojedynczy quest, 42-125 monet) — MAD ma stałe 10× hp
+// (`MAD_HP_MULT`)/3× kontratak (`MAD_COUNTER_MULT`) NIEZALEŻNIE od order, więc nawet
+// najlżejszy MAD jest realnie trudniejszy niż jego kampanijny odpowiednik i potrzebuje
+// nagrody WYRAŹNIE ponad "gołą" własną wartość, nie dokładnie tyle samo.
+//
+// Fix: dolna kotwica dostaje malejący mnożnik trudności — `BOOST_AT_ORDER_1` (na starcie) do
+// `BOOST_AT_FINALE` (=1, na ostatnim orderze, gdzie "własna" nagroda to i tak finał) — więc
+// wczesne MAD-y są WYRAŹNIE lepiej płatne niż ich "gołe" kampanijne odzwierciedlenie, a późne
+// orderowo zbiegają gładko do finału bez dodatkowego mnożnika (bo tam mnożnik by już nic nie
+// zmieniał — sama wartość jest już blisko finału). Bez capu ta podbita kotwica dla
+// orderów ~15-21 PRZEKRACZAŁABY finał (np. order19: 6800×3,7 ≈ 25 000 > finał 22 000),
+// co w interpolacji dawałoby NIE-MONOTONICZNĄ krzywą (nagroda rosłaby POWYŻEJ finału w
+// środku skali, po czym SPADAŁABY z powrotem do finału na order22 — czyli późniejszy,
+// trudniejszy MAD dawałby MNIEJ niż wcześniejszy, dokładnie odwrotność zamierzonego efektu).
+// `REWARD_ANCHOR_CAP_OF_FINALE` przycina kotwicę do 60% finału, co sprawdzone przeliczeniem
+// całych 22 kroków w Node DAJE ŚCIŚLE MONOTONICZNY wzrost order1→order22 bez tego problemu.
+const REWARD_BOOST_AT_ORDER_1 = 20;
+const REWARD_ANCHOR_CAP_OF_FINALE = 0.6;
+
+function madRewardFor(boss: Boss, finale: Boss): { coins: number; xp: number } {
+  const t = (boss.order - 1) / (finale.order - 1); // 0 (order1) .. 1 (order finale)
+  const boost = REWARD_BOOST_AT_ORDER_1 - (REWARD_BOOST_AT_ORDER_1 - 1) * t;
+  const anchor = (own: number, finaleVal: number) => Math.min(own * boost, finaleVal * REWARD_ANCHOR_CAP_OF_FINALE);
+  const lowCoins = anchor(boss.coins, finale.coins);
+  const lowXp = anchor(boss.xp, finale.xp);
+  return {
+    coins: Math.round(lowCoins + (finale.coins - lowCoins) * t),
+    xp: Math.round(lowXp + (finale.xp - lowXp) * t),
+  };
 }
 
 // PODBITE ×1.15 (2026-08-18, user: "mad wtedy niech będą 2x trudniejsze od podstaw albo
@@ -117,15 +144,15 @@ export function madCandidate(defeatedBosses: string[], defeatedMadBosses: string
 // boss (art+nazwa+weakness wystarczą).
 export function madBossFor(boss: Boss): Boss {
   const finale = BOSSES[BOSSES.length - 1];
-  const mult = madRewardMultFor(boss.order);
+  const reward = madRewardFor(boss, finale);
   return {
     ...boss,
     id: madBossId(boss.id),
     name: `${boss.name} (Oszalały)`,
     hp: boss.hp * MAD_HP_MULT,
     counterMult: MAD_COUNTER_MULT,
-    coins: Math.round(finale.coins * mult),
-    xp: Math.round(finale.xp * mult),
+    coins: reward.coins,
+    xp: reward.xp,
     unlockLevel: MAD_UNLOCK_LEVEL,
     guard: undefined,
     regenPct: undefined,

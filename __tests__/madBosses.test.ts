@@ -58,38 +58,49 @@ describe('madBosses — balans (STAŁE hp = kampania × MAD_HP_MULT, 2026-08-21)
   });
 });
 
-// PRZEBUDOWANE NAGRODY (2026-08-22) — user: "mad bossy mają być nagrody z nich kontynuacja
-// jak po ostatnim busie kampanii". Stary MAD_REWARD_MULT (×3 na WŁASNĄ nagrodę bazowego
-// bossa) dawał absurdalnie mało dla wczesnych bossów kampanii mimo że ich MAD wersja jest
-// teraz dużo trudniejsza niż finał kampanii. Nowy model: KAŻDY MAD boss startuje od nagrody
-// OSTATNIEGO bossa kampanii (floor), rosnąc łagodnie (+15%/order MAD-a) — user wybrał to
-// zamiast dosłownej kontynuacji krzywej kampanii (~1.48×/krok), która przy order22 dałaby
-// ~88 mln monet za jedną walkę.
-describe('madBosses — nagrody (start od finału kampanii, łagodny wzrost, 2026-08-22)', () => {
+// PRZEBUDOWANE DRUGI RAZ (2026-09-20) — user po realnym eksporcie postępu pupila: "ilość XP i
+// coinów za bossy jest popierdolone... z dnia na dzień wbiłem z 51 lvl na 270". Poprzedni
+// model (floor = 100% finału OD order1) potwierdzony w logu jako przyczyna: MAD order1 dawał
+// 1:1 tyle co pokonanie finału kampanii. Nowy model: order1 = własna nagroda bossa × mnożnik
+// trudności (maleje z orderem), order22 (=finał) = dokładnie nagroda finału, bez skoku.
+describe('madBosses — nagrody (interpolacja własna→finał z malejącym mnożnikiem trudności, 2026-09-20)', () => {
   const sloth = BOSSES.find(b => b.id === 'sloth')!; // order 1 — najsłabszy bazowy boss
   const finale = BOSSES[BOSSES.length - 1]; // Iluzja Kontroli, order 22
 
-  test('MAD order 1 (Kanapowy Leniwiec) daje DOKŁADNIE tyle co finał kampanii, nie własną małą nagrodę', () => {
+  test('MAD order 1 (Kanapowy Leniwiec) daje WYRAŹNIE mniej niż finał kampanii, ale wyraźnie więcej niż własna nagroda', () => {
     const mad = madBossFor(sloth);
+    expect(mad.coins).toBeLessThan(finale.coins);
+    expect(mad.xp).toBeLessThan(finale.xp);
+    // mnożnik trudności (REWARD_BOOST_AT_ORDER_1=20) — MAD ma stałe 10× hp/3× kontratak
+    // niezależnie od poziomu trudności bazowego bossa, więc nawet order1 potrzebuje wyraźnie
+    // więcej niż goła własna nagroda (8 monet/60 XP), inaczej opłaca się mniej niż quest.
+    expect(mad.coins).toBeGreaterThan(sloth.coins * 15);
+    expect(mad.xp).toBeGreaterThan(sloth.xp * 15);
+  });
+
+  test('MAD ostatniego bossa kampanii (order22 = sam finał) daje DOKŁADNIE tyle co finał — bez skoku na granicy', () => {
+    const wizard = BOSSES.find(b => b.id === 'wizard')!; // order 22 = Iluzja Kontroli = finale
+    const mad = madBossFor(wizard);
     expect(mad.coins).toBe(finale.coins);
     expect(mad.xp).toBe(finale.xp);
-    expect(mad.coins).toBeGreaterThan(sloth.coins * 3); // dużo więcej niż stary ×3 na własnej, małej nagrodzie
   });
 
-  test('nagroda rośnie z WŁASNYM order MAD-a, nie tylko z bazowego bossa', () => {
-    const wizard = BOSSES.find(b => b.id === 'wizard')!; // order 22
-    const madSloth = madBossFor(sloth);
-    const madWizard = madBossFor(wizard);
-    expect(madWizard.coins).toBeGreaterThan(madSloth.coins);
-    expect(madWizard.coins).toBeGreaterThan(finale.coins); // ostatni MAD > sam finał kampanii
-  });
-
-  test('wzrost jest ŁAGODNY (liniowy), nie eksplozja wykładnicza jak reszta kampanii', () => {
-    const wizard = BOSSES.find(b => b.id === 'wizard')!;
-    const mad = madBossFor(wizard);
-    // order22 = finale × (1 + 21×0.15) = finale × 4.15 — daleko od milionów
-    expect(mad.coins).toBeLessThan(finale.coins * 5);
-    expect(mad.coins).toBeGreaterThan(finale.coins * 4);
+  test('nagroda rośnie ściśle MONOTONICZNIE z order MAD-a, przez WSZYSTKIE 22 kroki — bez dołka w środku', () => {
+    // To jest WŁAŚNIE właściwość, którą złamała pierwsza, naiwna wersja fixu (malejący
+    // mnożnik × własna nagroda mógł PRZEKROCZYĆ finał w środku skali dla orderów ~15-21,
+    // co w interpolacji dawało krzywą która rosła POWYŻEJ finału, a potem SPADAŁA z powrotem
+    // do finału na order22 — późniejszy, trudniejszy MAD dawałby wtedy MNIEJ niż wcześniejszy).
+    // Sprawdzone throwaway-symulacją w Node na wszystkich 22 orderach przed wyborem capu
+    // (REWARD_ANCHOR_CAP_OF_FINALE) — ten test pilnuje że nikt tego capu nie usunie bez
+    // ponownej weryfikacji.
+    let prevCoins = -Infinity, prevXp = -Infinity;
+    for (const b of BOSSES) {
+      const mad = madBossFor(b);
+      expect(mad.coins).toBeGreaterThanOrEqual(prevCoins);
+      expect(mad.xp).toBeGreaterThanOrEqual(prevXp);
+      prevCoins = mad.coins;
+      prevXp = mad.xp;
+    }
   });
 
   test('unlockLevel to FLAT MAD_UNLOCK_LEVEL, nie oryginalny unlockLevel bossa', () => {

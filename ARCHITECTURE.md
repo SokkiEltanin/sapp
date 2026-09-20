@@ -9093,6 +9093,56 @@ regresja niemożliwa do zaobserwowania wprost, tylko brak nowych problemów.
 
 ---
 
+## 139. Przebudowa nagród MAD bossów — drugi raz, na podstawie realnego eksportu (2026-09-20)
+
+Kontynuacja §136/NEXT_STEPS.md "czekam na dane usera". User przysłał pełny (na tyle ile
+stara wersja apki eksportowała) raport postępu pupila po skoku 51→270 poziomów w jeden
+dzień. Analiza logu walk potwierdziła dokładnie to podejrzenie: MAD order1 (Kanapowy
+Leniwiec, unlockLevel 15, najłatwiejszy MAD boss) dawał **1:1 tyle samo** co legalne
+pokonanie fabularnego finału kampanii (Iluzja Kontroli, unlockLevel 116) — `+24244 monet,
++225000 XP` widoczne w logu identycznie dla obu. Pięć walk MAD w jeden dzień dało ~1,46 mln
+XP, kolejne cztery następnego dnia ~1,78 mln XP — **łącznie ~82% CAŁEGO XP na koncie usera z
+zaledwie 9 walk**. Przyczyna: model z §~64 (2026-08-22, `MAD_REWARD_GROWTH_PER_ORDER`) miał
+floor = 100% nagrody finału JUŻ OD order1, rosnący +15%/order dalej — user sam wtedy o to
+poprosił ("nagrody z nich kontynuacja jak po ostatnim busie kampanii"), ale po realnym
+zagraniu okazało się że to za dużo.
+
+**Nowy kształt, zaproponowany i wybrany przez usera (`AskUserQuestion`)**: order1 = własna
+nagroda bossa z kampanii (mała, adekwatna do Lv15), order22 (Iluzja Kontroli = sam finał) =
+nagroda finału, bez skoku na granicy. Pierwsza, naiwna implementacja czystej interpolacji
+własna→finał okazała się jednak płacić śmiesznie mało na dole skali (order1: 8 monet za
+pokonanie 5400-HP bossa z 3× kontratakiem, MNIEJ niż pojedynczy quest ~42-125 monet) — MAD ma
+STAŁE 10× hp (`MAD_HP_MULT`)/3× kontratak (`MAD_COUNTER_MULT`) NIEZALEŻNIE od order, więc
+nawet najlżejszy MAD jest realnie trudniejszy niż swój kampanijny odpowiednik.
+
+**Finalny wzór** (`madRewardFor` w `madBosses.ts`): dolna kotwica dostaje mnożnik trudności
+malejący liniowo `REWARD_BOOST_AT_ORDER_1=20` (order1) → `1` (order finale, gdzie mnożnik by
+już nic nie zmieniał — wartość jest tam i tak sama finałem). Bez dodatkowego zabezpieczenia
+ten podbity mnożnik dla orderów ~15-21 PRZEKRACZAŁBY finał (np. order19: 6800×~3.7≈25000 >
+finał 22000), co w interpolacji dawałoby NIE-MONOTONICZNĄ krzywą — nagroda rosłaby POWYŻEJ
+finału w środku skali, po czym SPADAŁABY z powrotem do finału na order22 (późniejszy,
+trudniejszy MAD dawałby MNIEJ niż wcześniejszy — dokładnie odwrotność zamierzonego efektu).
+Znalezione throwaway-symulacją w Node (przeliczenie wszystkich 22 kroków dla czterech
+kandydackich wartości capu 0.5-0.8× finału) PRZED wdrożeniem, nie po fakcie —
+`REWARD_ANCHOR_CAP_OF_FINALE=0.6` (środek sprawdzonego, monotonicznego zakresu) przycina
+dolną kotwicę tak, żeby nigdy nie przekroczyła 60% finału, co eliminuje problem przy
+zachowaniu tego samego kształtu na obu końcach skali.
+
+Przykładowe wartości po fixie (coins/xp): order1 (Kanapowy Leniwiec) 160/1200 (było
+24244/225000 — spadek ~150×), order5 (Złodziej Czasu) 4787/48824 (było 38790/360000), order10
+(Hydra Odwodnienia) 10784/109980, order22 (Iluzja Kontroli, finał) bez zmian.
+
+`tsc`/`jest` czyste (1026 testów — 3 stare testy w `madBosses.test.ts` zastąpione nowymi:
+order1 wyraźnie mniej niż finał ale wyraźnie więcej niż własna nagroda, order22 dokładnie
+finał bez skoku, i test monotoniczności na WSZYSTKICH 22 orderach naraz — ten ostatni
+bezpośrednio pilnuje właściwości, którą złamała pierwsza, nieprzetestowana wersja fixu,
+żeby nikt nie usunął `REWARD_ANCHOR_CAP_OF_FINALE` bez ponownej weryfikacji). **Priorytet
+testu na urządzeniu**: średni — user ma świadomie zaobserwować że wczesne MAD bossy dają
+teraz WYRAŹNIE mniej niż wcześniej (to zamierzone, nie regresja) i że progresja od order1 do
+order22 czuje się płynna, bez dziwnych skoków w żadną stronę.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Przebudowa nagród MAD bossów — na podstawie realnego eksportu usera (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §139. User przysłał realny eksport po skoku 51→270 poziomów w
+dzień — potwierdzone: MAD order1 dawał 1:1 tyle co finał kampanii, 9 walk MAD = ~82% CAŁEGO
+XP na koncie. Nowy wzór: order1 = własna nagroda bossa × malejący mnożnik trudności (20→1),
+order22 (=finał) = nagroda finału bez skoku. Pierwsza wersja fixu (czysta interpolacja
+własna→finał) była sprawdzona throwaway-symulacją w Node PRZED wdrożeniem i okazała się
+niemonotoniczna (nagroda w środku skali przekraczała finał, potem spadała z powrotem) —
+naprawione capem `REWARD_ANCHOR_CAP_OF_FINALE=0.6`, zweryfikowanym na wszystkich 22 orderach.
+`tsc`/`jest` czyste (1026 testów, w tym test monotoniczności na całej skali). Priorytet testu
+na urządzeniu: średni — wczesne MAD bossy dają teraz WYRAŹNIE mniej niż wcześniej, to
+zamierzone.
+
 ## ✅ Audyt logika/optymalizacja — kalendarz/questy/subskrypcje, 4 znaleziska (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §138. Kolejna runda audytu (jak §126/§127), świeże obszary:
