@@ -9143,6 +9143,64 @@ order22 czuje się płynna, bez dziwnych skoków w żadną stronę.
 
 ---
 
+## 140. Audyt logika/optymalizacja, runda 3 — pojazdy/raid/wydajność, 3 znaleziska (2026-09-20)
+
+User: "dawaj dalej". Trzecia runda audytu w tej sesji, świeże obszary: raid tygodniowy,
+wydarzenia sezonowe/Nemesis, ekonomia sklepu/gearu, pojazdy, liczniki. Agent-audyt (bez
+edycji kodu) znalazł 3 potwierdzone znaleziska, wszystkie zweryfikowane osobiście (repro w
+Node dla obu buga z datami) przed fixem.
+
+**1. `vehicleMatch.ts`'s `maintenanceDueMonths` — TA SAMA klasa buga co §138, przeoczona przy
+tamtej rundzie w nowym pliku.** Gołe `setMonth` bez przycięcia — serwis z datą 31. dnia
+miesiąca + interwał 6 mies. liczył termin jako 3 dni PO końcu docelowego miesiąca (31.08+6mies.
+→ 3.03 zamiast 28.02), więc przypomnienie (`app/vehicles.tsx`) pojawiało się PÓŹNIEJ niż
+powinno. Fix: `date-fns`'s `addMonths` (ten sam wzorzec z §138). Test z `jest.useFakeTimers()`
+na granicy przyciętej vs. przewiniętej daty (ten sam wzorzec co w `recurringBills.test.ts`).
+
+**2. Raid tygodniowy — desync paska HP/% przy level-upie W TRAKCIE tygodnia (kosmetyczny, nie
+blokuje ukończenia).** `raidMaxHp` (mianownik paska w `bosses.tsx`/`boss-fight.tsx`) liczył
+się NA ŻYWO z aktualnego poziomu (`raidHpFor(level, weekKey)`) przy KAŻDYM renderze, podczas
+gdy `raidHp` (licznik, realny postęp) bankuje się RAZ na tydzień (`raidEnsure`, no-op jeśli
+`raidWeek===weekKey`). Level-up w środku tygodnia podbijał mianownik bez podbicia licznika —
+pasek/% "cofał się" mimo że nic realnie się nie zmieniło (warunek zwycięstwa liczy się od
+`raidHp===0`, niezależny od tego pola — czysto wizualny bug). Zweryfikowane w Node: gracz na
+Lv5 zadający 50% obrażeń realnej puli → po levelupie do Lv10 (bez żadnej nowej walki) pasek
+pokazuje 33.3%.
+
+Fix: nowe pole `raidMaxHp` w `petStore.ts`, bankowane RAZEM z `raidHp` w `raidEnsure`
+(`raidWeek !== weekKey`), migracja `onRehydrateStorage` dla starego stanu (trwający tydzień
+raidu dostaje jednorazowo wartość policzoną z aktualnego poziomu w chwili migracji — zachowuje
+ciągłość, dalsze level-upy tego tygodnia już nie dryfują). `bosses.tsx`/`boss-fight.tsx`
+czytają teraz zbankowane pole do WYŚWIETLANIA (`raidWeek===weekKey ? raidMaxHpBanked : ...`),
+z fallbackiem na żywe liczenie tylko zanim tydzień w ogóle się zbankował — `boss-fight.tsx`
+osobno trzyma `liveRaidMaxHp` do zasiania `raidEnsure` (musi być aktualne przy PIERWSZYM
+zbankowaniu tygodnia). Nowy `__tests__/raidEnsure.test.ts` (wzorzec z `grantGear.test.ts` —
+bezpośrednie wywołania akcji store'a) pilnuje że drugie wywołanie `raidEnsure` w TYM SAMYM
+tygodniu jest no-opem dla `raidMaxHp`, nawet z inną "żywą" wartością.
+
+**3. Wydajność — `app/bosses.tsx` wołało `usePetStore()` CAŁKOWICIE bez selektora (nie tylko
+bez pól — bez `useShallow` w ogóle).** Re-renderowało ekran Bossy na każdą zmianę w petStore
+(~50+ pól: potki, dayClaims, customizacja kotka z innych ekranów...), nie tylko 20 pól
+faktycznie użytych. Ten sam anty-wzorzec już naprawiony w `pet.tsx`/`boss-fight.tsx`/
+`pet-shop.tsx`/`usePetQuests.ts` — `bosses.tsx` (siostrzany ekran do `boss-fight.tsx`) został
+przeoczony przy tamtych rundach. Fix: `useShallow` z 20 nazwanymi polami (ten sam wzorzec).
+Przy okazji naprawione: `app/counters.tsx`/`app/counters/[id].tsx` miały gołe
+`useExpensesStore()` mimo używania TYLKO pola `expenses` — selektor pojedynczego pola.
+
+**Sprawdzone przez agenta — czyste, bez zmian**: wydarzenia sezonowe/Nemesis (okna dat nie
+nakładają się, brak `setMonth`-overflow — tylko `setDate`/`setHours`), ekonomia gear/sklepu
+(ceny kupna/sprzedaży konsekwentne wszędzie, przebalansowane wcześniej), liczniki (logika
+streaków/resetów konsystentna na granicach dni), reszta raidu (`weekKeyOf`/`raidAttack`/
+`raidClaim` bez błędów).
+
+`tsc`/`jest` czyste (1030 testów, +4 nowe: 1 w `vehicleMatch.test.ts`, 3 w nowym
+`raidEnsure.test.ts`). **Priorytet testu na urządzeniu**: niski-średni — (1) serwis pojazdu z
+datą 29-31 dnia miesiąca, sprawdź termin po interwale; (2) rozegraj kawałek raidu, zdobądź
+kilka poziomów, sprawdź że pasek/% raidu nie "cofa się"; (3) regresja wydajności
+niemożliwa do zaobserwowania wprost na ekranie Bossy/Licznikach.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

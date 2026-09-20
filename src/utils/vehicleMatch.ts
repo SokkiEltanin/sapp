@@ -1,3 +1,4 @@
+import { addMonths } from 'date-fns';
 import { Expense, Vehicle, VehicleMaintenance } from '@/types';
 import { monthISO } from '@/utils/date';
 
@@ -64,9 +65,16 @@ export function summarizeVehicle(v: Vehicle, expenses: Expense[], mainId?: strin
 
 // Months until a maintenance entry is next due (negative = overdue). Null when
 // no interval is set.
+// 2026-09-20, audyt logika/optymalizacja (runda 3) — gołe `setMonth` na dzień
+// nieistniejący w docelowym miesiącu PRZEWIJA (day overflow), nie przycina — dokładnie ten
+// sam bug co `nextDeadline`/`advanceNextBillingDate` naprawione w §138, tylko przeoczony w
+// tym pliku przy tamtej rundzie. Serwis z datą 31. dnia miesiąca + interwał 6 mies. liczył
+// się jako 3 dni PO końcu docelowego miesiąca (np. 31.08+6mies. → 3.03 zamiast 28.02) —
+// przypomnienie pojawiało się PÓŹNIEJ niż powinno. `date-fns`'s `addMonths` poprawnie
+// przycina do ostatniego dnia docelowego miesiąca.
 export function maintenanceDueMonths(m: VehicleMaintenance): number | null {
   if (!m.intervalMonths) return null;
-  const due = new Date(m.date); due.setMonth(due.getMonth() + m.intervalMonths);
+  const due = addMonths(new Date(m.date), m.intervalMonths);
   return (due.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44);
 }
 
