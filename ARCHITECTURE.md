@@ -9403,7 +9403,56 @@ odtworzyć).
 
 **Osobno w toku**: przegląd scen walki pupila (`boss-fight.tsx`) — user zgłosił, że cienie nie
 pasują do skali sprite'ów; ma to być dopracowane tak, żeby dało się łatwiej dostosować pozycje
-i skalę.
+i skalę. Kontynuacja w §145.
+
+---
+
+## 145. Edytor układu walki — niezależna skala/pozycja cienia + naprawa STARYCH domyślnych (2026-09-20)
+
+User: "co z pupilem/pillem [chodziło o walkę]... żebym mógł dostosować lepiej te pozycje w
+końcu i skale (teraz nadal Cienie nie pasują skale itp)".
+
+**Przyczyna "cienie nie pasują skali"**: `GroundShadow` w realnej walce (`boss-fight.tsx`)
+liczy swój `width`/`height` jako JEDEN, wspólny, STAŁY ułamek rozmiaru portretu (0.62/0.18),
+identyczny dla kotka i bossa. Działa dobrze dla bossa — `BossArt` to PNG przycięte ciasno do
+sylwetki, ułamek pudełka ≈ ułamek faktycznej sylwetki. Kotek (`CatArt`) to SVG z viewBox
+2000×2000 z DUŻYM pustym marginesem wokół (stąd `CAT_PORTRAIT_SIZE` jest ~35% większe niż
+`PORTRAIT_SIZE` bossa, żeby oba portrety wizualnie wyszły podobnej wielkości — patrz komentarz
+w `boss-fight.tsx`) — więc ten sam ułamek 0.62 liczony od SZTUCZNIE powiększonego pudełka daje
+cień SZERSZY niż realna sylwetka kotka. Jeden wspólny ułamek nie mógł tego pogodzić.
+
+**Fix — Edytor układu walki (`battle-layout-lab.tsx`/`battleLayoutDraftStore.ts`) dostał
+niezależną skalę cienia PER SPRITE**: `catShadowScaleX/Y`, `bossShadowScaleX/Y` (zamiast
+sztywnego `* 0.62`/`* 0.18` w JSX) + `catShadowOffsetY`/`bossShadowOffsetY` (cień może się
+przesunąć niezależnie od sprite'a — np. gdy "łapki" na sylwetce nie są dokładnie na dole
+pudełka). Domyślne wartości = dzisiejszy ułamek (0.62/0.18/0) dla OBU, więc otwarcie Edytora
+na starcie renderuje się identycznie jak dziś — user dostroi kotka osobno wizualnie (dotyk +
+Steppery z krokiem 0.02), wyeksportuje, wklei mi w rozmowie, ja podepnę nowe stałe do
+`boss-fight.tsx` (`GroundShadow` tam nadal ma STAŁE liczby, jak `PORTRAIT_SIZE`/offsety —
+Edytor świadomie NIE czyta się live z ekranu walki, to tylko poligon, patrz komentarz w
+`battle-layout-lab.tsx`).
+
+**Przy tym naprawiony bug w samym Edytorze**: `BATTLE_LAYOUT_DEFAULT` w
+`battleLayoutDraftStore.ts` (katSize=175/bossSize=130, offsety=0) NIE zostało zaktualizowane
+po poprzednim eksporcie z 2026-09-18 (który podbił realne stałe w `boss-fight.tsx` do
+205/150 + offsetY 45/45/10/10) — plik miał wprost w komentarzu "musi zgadzać się 1:1 z
+realnymi stałymi", ale się nie zgadzał. Efekt: otwarcie Edytora pokazywało INNY layout niż
+realna walka — najpierw trzeba by zgadnąć, że to nie jest "1:1 podgląd" jak obiecuje własny
+komentarz w kodzie. Domyślne wartości przywrócone do zgodności z `boss-fight.tsx`.
+
+**Migracja starego zapisu**: dodane pola cienia wymagały niestandardowego `merge` w
+`persist()` — domyślny (shallow) merge zostawiałby zagnieżdżone `draft` bez nowych pól jako
+`undefined` u kogoś z już zapisanym draftem (NaN w SVG). `merge` teraz dogrywa
+`BATTLE_LAYOUT_DEFAULT` do zagnieżdżonego `draft`, nie tylko do stanu top-level.
+
+`tsc`/`jest` czyste (1030 testów — bez zmiany, `battle-layout-lab.tsx`/`battleLayoutDraftStore.ts`
+to dev-tylko poligon bez testów, jak dotąd).
+
+**Priorytet testu na urządzeniu — wysoki (nowa funkcja + fix defaultów)**: (1) otwórz Edytor —
+layout powinien wyglądać IDENTYCZNIE jak w realnej walce (rozmiar/pozycja portretów), nie jak
+przed fixem; (2) w nowej sekcji "Cień" dostosuj szerokość/wysokość/pozycję Y cienia kotka
+osobno od bossa, sprawdź że sylwetka+cień zaczynają wizualnie się zgadzać; (3) eksport JSON
+zawiera nowe pola `catShadowScaleX/Y`, `bossShadowScaleX/Y`, `*ShadowOffsetY`.
 
 ---
 

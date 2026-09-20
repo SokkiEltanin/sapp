@@ -21,18 +21,33 @@ export interface BattleLayoutDraft {
   bossOffsetX: number; bossOffsetY: number;
   catHpOffsetX: number; catHpOffsetY: number;
   bossHpOffsetX: number; bossHpOffsetY: number;
+  // Cień (2026-09-20, user: "cienie nie pasują skali") — dotąd `GroundShadow` liczył swój
+  // width/height jako STAŁY ułamek (0.62/0.18) rozmiaru portretu, ten sam dla kotka i bossa.
+  // To działa dobrze dla bossa (PNG przycięty ciasno do sylwetki), ale kotek to SVG z dużym
+  // pustym marginesem wokół (patrz komentarz przy CAT_PORTRAIT_SIZE w boss-fight.tsx) — jego
+  // realna sylwetka jest węższa niż 62% pudełka, więc cień wychodzi za szeroki. Niezależne
+  // skale X/Y + offsetY per sprite, żeby user mógł dostroić wizualnie, nie zgadywać ułamkiem.
+  catShadowScaleX: number; catShadowScaleY: number; catShadowOffsetY: number;
+  bossShadowScaleX: number; bossShadowScaleY: number; bossShadowOffsetY: number;
 }
 
-// Musi zgadzać się 1:1 z realnymi stałymi w app/boss-fight.tsx (PORTRAIT_SIZE=130,
-// CAT_PORTRAIT_SIZE=175, bg domyślne = GORSKILAS) — offsety=0 bo dziś nic takiego nie istnieje.
+// Musi zgadzać się 1:1 z realnymi stałymi w app/boss-fight.tsx (PORTRAIT_SIZE=150,
+// CAT_PORTRAIT_SIZE=205, oba offsetY sprite'ów=45, oba offsetY pasków HP=10, bg domyślne =
+// GORSKILAS, cienie=0.62/0.18/0 — dzisiejszy STAŁY ułamek z boss-fight.tsx, patrz wyżej) —
+// żeby otwarcie Edytora renderowało DOKŁADNIE to co widać w realnej walce, zero wizualnej
+// różnicy, dopóki user czegoś nie ruszy. (2026-09-20 — poprzednia wersja tej stałej NIE
+// została zaktualizowana po ostatnim eksporcie z 2026-09-18, więc Edytor otwierał się z
+// INNYM layoutem niż realna arena — sam sobie zaprzeczał jako "podgląd 1:1".)
 export const BATTLE_LAYOUT_DEFAULT: BattleLayoutDraft = {
   bg: 'gorskislas',
-  catSize: 175,
-  bossSize: 130,
-  catOffsetX: 0, catOffsetY: 0,
-  bossOffsetX: 0, bossOffsetY: 0,
-  catHpOffsetX: 0, catHpOffsetY: 0,
-  bossHpOffsetX: 0, bossHpOffsetY: 0,
+  catSize: 205,
+  bossSize: 150,
+  catOffsetX: 0, catOffsetY: 45,
+  bossOffsetX: 0, bossOffsetY: 45,
+  catHpOffsetX: 0, catHpOffsetY: 10,
+  bossHpOffsetX: 0, bossHpOffsetY: 10,
+  catShadowScaleX: 0.62, catShadowScaleY: 0.18, catShadowOffsetY: 0,
+  bossShadowScaleX: 0.62, bossShadowScaleY: 0.18, bossShadowOffsetY: 0,
 };
 
 interface BattleLayoutDraftState {
@@ -51,6 +66,15 @@ export const useBattleLayoutDraft = create<BattleLayoutDraftState>()(
     {
       name: 'battle-layout-draft-v1',
       storage: throttledPersistStorage(),
+      // Domyślny (shallow) merge zostawiałby stary, zapisany `draft` BEZ nowych pól cienia
+      // jako `undefined` (merguje tylko klucze top-level stanu, nie zagnieżdżone pola
+      // `draft`) — dopisanie defaultów tutaj sprawia, że stary zapis dostaje sensowne
+      // wartości startowe dla pól, których jeszcze nie miał, zamiast NaN w SVG.
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<BattleLayoutDraftState> | undefined),
+        draft: { ...BATTLE_LAYOUT_DEFAULT, ...(persisted as { draft?: Partial<BattleLayoutDraft> } | undefined)?.draft },
+      }),
     },
   ),
 );

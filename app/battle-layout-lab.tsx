@@ -53,7 +53,15 @@ const BG_LABELS: Record<ArenaBgKey, string> = {
 const BG_KEYS = Object.keys(BG_SOURCES) as ArenaBgKey[];
 
 const SIZE_MIN = 60, SIZE_MAX = 260, OFFSET_MAX = 160;
+const SHADOW_SCALE_MIN = 0.1, SHADOW_SCALE_MAX = 1.2, SHADOW_OFFSET_MAX = 60;
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+// Skala cienia w krokach 0.02 — Stepper poniżej ma domyślny `step=5` (px, dla pozycji),
+// za gruby dla ułamka (0.62 → 0.64), więc te sterowniki dostają własny, mały krok.
+const SHADOW_SCALE_STEP = 0.02;
+// `Stepper` formatuje wartość jako plain `{value}` — dla ułamków z `SHADOW_SCALE_STEP` to
+// dawałoby np. "0.6200000000000001" (binarna niedokładność float). Zaokrąglamy do 2 miejsc
+// PRZED wyświetleniem/zapisem, żeby export JSON i UI zawsze pokazywały czyste liczby.
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
 // Wrapper przeciągalny dotykiem — POZYCJA jest kontrolowana przez rodzica (`x`/`y` w px,
 // dodane jako translateX/Y NA WIERZCHU normalnego flex-layoutu, nie zamiast niego), więc
@@ -165,7 +173,13 @@ export default function BattleLayoutLab() {
                 <Draggable x={draft.catOffsetX} y={draft.catOffsetY} onDrag={(x, y) => setPatch({ catOffsetX: Math.round(x), catOffsetY: Math.round(y) })}>
                   <View style={[s.spriteBox, { width: draft.catSize, height: draft.catSize }]}>
                     <RadialGlow size={draft.catSize * 1.5} color={palette.coat} opacity={0.22} />
-                    <GroundShadow width={draft.catSize * 0.62} height={draft.catSize * 0.18} opacity={0.5} />
+                    {/* Wrapper = pełny footprint spriteBoxa (jak sam `GroundShadow`, `bottom:0`
+                        wewnątrz nadal trafia w to samo miejsce), TYLKO żeby dało się przesunąć
+                        `translateY` — bez tego wrappera cień skolapsowałby się do 0×0 i jego
+                        "dół" wypadłby w środku spriteBoxa, nie na jego faktycznym dole. */}
+                    <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateY: draft.catShadowOffsetY }] }]}>
+                      <GroundShadow width={draft.catSize * draft.catShadowScaleX} height={draft.catSize * draft.catShadowScaleY} opacity={0.5} />
+                    </View>
                     <CatArt size={draft.catSize} expression="content" animate={false} palette={palette} stripes={catStripes}
                       eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </View>
@@ -185,7 +199,9 @@ export default function BattleLayoutLab() {
                 <Draggable x={draft.bossOffsetX} y={draft.bossOffsetY} onDrag={(x, y) => setPatch({ bossOffsetX: Math.round(x), bossOffsetY: Math.round(y) })}>
                   <View style={[s.spriteBox, { width: draft.bossSize, height: draft.bossSize }]}>
                     <RadialGlow size={draft.bossSize * 1.6} color="#F87171" opacity={0.25} />
-                    <GroundShadow width={draft.bossSize * 0.62} height={draft.bossSize * 0.18} opacity={0.5} />
+                    <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateY: draft.bossShadowOffsetY }] }]}>
+                      <GroundShadow width={draft.bossSize * draft.bossShadowScaleX} height={draft.bossSize * draft.bossShadowScaleY} opacity={0.5} />
+                    </View>
                     <BossArt id={boss.id} emoji={boss.emoji} size={draft.bossSize} />
                   </View>
                 </Draggable>
@@ -243,6 +259,21 @@ export default function BattleLayoutLab() {
           <Stepper label="Pasek HP Pupila Y" value={draft.catHpOffsetY} onChange={(v) => setPatch({ catHpOffsetY: v })} min={-OFFSET_MAX} max={OFFSET_MAX} />
           <Stepper label="Pasek HP Bossa X" value={draft.bossHpOffsetX} onChange={(v) => setPatch({ bossHpOffsetX: v })} min={-OFFSET_MAX} max={OFFSET_MAX} />
           <Stepper label="Pasek HP Bossa Y" value={draft.bossHpOffsetY} onChange={(v) => setPatch({ bossHpOffsetY: v })} min={-OFFSET_MAX} max={OFFSET_MAX} />
+        </View>
+
+        {/* ── Cień (2026-09-20, "cienie nie pasują skali") ──────────────────────────────
+            Dotąd JEDEN wspólny ułamek (0.62/0.18) rozmiaru portretu dla obu sprite'ów —
+            działa dla bossa (PNG przycięty do sylwetki), nie dla kotka (SVG z pustym
+            marginesem, patrz komentarz w battleLayoutDraftStore.ts). Niezależna skala X/Y +
+            offsetY per sprite, żeby dostroić wizualnie na oko, nie zgadywać ułamkiem. */}
+        <Text style={s.sectionLabel}>Cień — szerokość / wysokość / pozycja</Text>
+        <View style={s.card}>
+          <Stepper label="Pupil — szerokość" value={round2(draft.catShadowScaleX)} onChange={(v) => setPatch({ catShadowScaleX: round2(v) })} step={SHADOW_SCALE_STEP} min={SHADOW_SCALE_MIN} max={SHADOW_SCALE_MAX} />
+          <Stepper label="Pupil — wysokość" value={round2(draft.catShadowScaleY)} onChange={(v) => setPatch({ catShadowScaleY: round2(v) })} step={SHADOW_SCALE_STEP} min={SHADOW_SCALE_MIN} max={SHADOW_SCALE_MAX} />
+          <Stepper label="Pupil — pozycja Y" value={draft.catShadowOffsetY} onChange={(v) => setPatch({ catShadowOffsetY: v })} min={-SHADOW_OFFSET_MAX} max={SHADOW_OFFSET_MAX} />
+          <Stepper label="Boss — szerokość" value={round2(draft.bossShadowScaleX)} onChange={(v) => setPatch({ bossShadowScaleX: round2(v) })} step={SHADOW_SCALE_STEP} min={SHADOW_SCALE_MIN} max={SHADOW_SCALE_MAX} />
+          <Stepper label="Boss — wysokość" value={round2(draft.bossShadowScaleY)} onChange={(v) => setPatch({ bossShadowScaleY: round2(v) })} step={SHADOW_SCALE_STEP} min={SHADOW_SCALE_MIN} max={SHADOW_SCALE_MAX} />
+          <Stepper label="Boss — pozycja Y" value={draft.bossShadowOffsetY} onChange={(v) => setPatch({ bossShadowOffsetY: v })} min={-SHADOW_OFFSET_MAX} max={SHADOW_OFFSET_MAX} />
         </View>
 
         {/* ── Eksport ────────────────────────────────────────────────────────────────── */}
