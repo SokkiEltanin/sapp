@@ -133,7 +133,7 @@ export default function BossFight() {
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems, equippedGear, ownedGear, activePotion,
-    raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
+    raidWeek, raidHp, raidMaxHp: raidMaxHpBanked, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
     menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
     dayClaims, claimQuestFight, markTrainingDay,
@@ -146,7 +146,7 @@ export default function BossFight() {
     catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, damageCat: s.damageCat, resetCatHp: s.resetCatHp,
     spendEnergy: s.spendEnergy, ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
     equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion, raidWeek: s.raidWeek,
-    raidHp: s.raidHp, raidWon: s.raidWon, raidEnsure: s.raidEnsure, raidAttack: s.raidAttack,
+    raidHp: s.raidHp, raidMaxHp: s.raidMaxHp, raidWon: s.raidWon, raidEnsure: s.raidEnsure, raidAttack: s.raidAttack,
     raidClaim: s.raidClaim, eventWon: s.eventWon, spendEventEnergy: s.spendEventEnergy, eventClaim: s.eventClaim,
     menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure, menaceAttack: s.menaceAttack,
     menaceClaim: s.menaceClaim, dayClaims: s.dayClaims, claimQuestFight: s.claimQuestFight,
@@ -204,10 +204,15 @@ export default function BossFight() {
   // ── raid: zawsze istnieje (deterministyczny wybór z tygodnia) ──
   const weekKey = weekKeyOf();
   const raid = raidForWeek(weekKey);
-  const raidMaxHp = raidHpFor(level, weekKey);
+  // `liveRaidMaxHp` TYLKO do zasiania `raidEnsure` na start tygodnia (musi być aktualne, żeby
+  // pierwsze zbankowanie tygodnia złapało prawdziwy poziom gracza) — do WYŚWIETLANIA i jako
+  // `maxHp` celu walki niżej używamy zamrożonego `raidMaxHpBanked` (patrz komentarz przy
+  // `raidMaxHp` w petStore.ts), żeby level-up W TRAKCIE tygodnia raidu nie cofał paska/%.
+  const liveRaidMaxHp = raidHpFor(level, weekKey);
+  const raidMaxHp = raidWeek === weekKey ? raidMaxHpBanked : liveRaidMaxHp;
   const raidRemaining = raidWeek === weekKey ? raidHp : raidMaxHp;
   const raidDone = raidWon.includes(weekKey);
-  useEffect(() => { if (kind === 'raid') raidEnsure(weekKey, raidMaxHp); }, [kind, weekKey, raidMaxHp]);
+  useEffect(() => { if (kind === 'raid') raidEnsure(weekKey, liveRaidMaxHp); }, [kind, weekKey, liveRaidMaxHp]);
 
   // ── wydarzenie: może nie istnieć teraz (brak sezonu/nemesis) ──
   const now = new Date();

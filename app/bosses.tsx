@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -60,11 +61,24 @@ function nextLocalMidnightIso(): string {
 export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // useShallow (2026-09-20, audyt logika/optymalizacja runda 3) — goły `usePetStore()` bez
+  // selektora subskrybował CAŁY store pupila (~50+ pól: gear, potki, dayClaims, customizacja
+  // kotka...), re-renderując ten ekran na każdą zmianę gdziekolwiek, nie tylko te 20 pól
+  // faktycznie użytych. Ten sam wzorzec już naprawiony w `pet.tsx`/`boss-fight.tsx`/
+  // `pet-shop.tsx`/`usePetQuests.ts` — `bosses.tsx` (siostrzany ekran do `boss-fight.tsx`)
+  // został przeoczony przy tamtych audytach.
   const {
     xp, energy, energyRegenAt, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
+    raidWeek, raidHp, raidMaxHp: raidMaxHpBanked, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
     menaceId, menaceHp, menaceEnsure, equippedGear, ownedGear,
-  } = usePetStore();
+  } = usePetStore(useShallow((s) => ({
+    xp: s.xp, energy: s.energy, energyRegenAt: s.energyRegenAt, eventEnergy: s.eventEnergy,
+    ownedItems: s.ownedItems, defeatedBosses: s.defeatedBosses, syncEnergyRegen: s.syncEnergyRegen,
+    syncEventEnergy: s.syncEventEnergy, raidWeek: s.raidWeek, raidHp: s.raidHp, raidMaxHp: s.raidMaxHp,
+    raidWon: s.raidWon, raidEnsure: s.raidEnsure, eventWon: s.eventWon, defeatedMadBosses: s.defeatedMadBosses,
+    atkStatBonus: s.atkStatBonus, menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure,
+    equippedGear: s.equippedGear, ownedGear: s.ownedGear,
+  })));
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
@@ -172,7 +186,11 @@ export default function Bosses() {
   // ── raid tygodniowy ──
   const weekKey = weekKeyOf();
   const raid = raidForWeek(weekKey);
-  const raidMaxHp = raidHpFor(level, weekKey);
+  // Zamrożone na start tygodnia (`raidMaxHpBanked`, patrz komentarz przy `raidMaxHp` w
+  // petStore.ts) zamiast liczonego na żywo z aktualnego poziomu — level-up W TRAKCIE tygodnia
+  // raidu nie ma już cofać paska/%. Fallback na żywe liczenie TYLKO zanim `raidEnsure` w ogóle
+  // zbankowało ten tydzień (ten sam wzorzec co `raidRemaining` niżej).
+  const raidMaxHp = raidWeek === weekKey ? raidMaxHpBanked : raidHpFor(level, weekKey);
   const raidRemaining = raidWeek === weekKey ? raidHp : raidMaxHp;
   const raidDone = raidWon.includes(weekKey);
   const raidUnlocked = level >= 3;

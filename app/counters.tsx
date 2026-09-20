@@ -37,7 +37,10 @@ export default function Counters() {
   const s = useMemo(() => makeS(c), [c]);
   const { counters, add, update, remove, resetSince } = useCounters();
   const { events, gcalEvents } = useCalendarStore();
-  const { expenses } = useExpensesStore();
+  // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja runda 3) — goły
+  // `useExpensesStore()` subskrybował cały store (filters/isLoading/error/pendingSync...),
+  // choć tu używane jest tylko `expenses`, ten sam wzorzec co już naprawiony gdzie indziej.
+  const expenses = useExpensesStore((st) => st.expenses);
   const meals = useFoodStore(st => st.meals);
   const foodProducts = useFoodStore(st => st.products);
 

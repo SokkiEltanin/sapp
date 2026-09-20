@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt logika/optymalizacja, runda 3 — pojazdy/raid/wydajność (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §140. Trzecia runda audytu, świeże obszary (raid/wydarzenia
+sezonowe/gear-shop/pojazdy/liczniki). 3 znaleziska: (1) `maintenanceDueMonths` w
+`vehicleMatch.ts` — ta sama klasa `setMonth`-overflow co §138, przeoczona w nowym pliku,
+naprawiona `addMonths`; (2) raid tygodniowy — pasek/% "cofał się" po level-upie w trakcie
+tygodnia (mianownik liczony na żywo, licznik zbankowany raz) — naprawione nowym polem
+`raidMaxHp` w petStore, bankowanym razem z `raidHp`; (3) `bosses.tsx` miało CAŁKOWICIE goły
+`usePetStore()` (bez `useShallow` w ogóle) — przeoczone przy wcześniejszych audytach
+wydajności, plus `counters.tsx`/`counters/[id].tsx` dostały selektor `expenses`. Sprawdzone i
+czyste: wydarzenia sezonowe, ekonomia gear/sklepu, liczniki, reszta raidu. `tsc`/`jest` czyste
+(1030 testów, +4 nowe). Priorytet testu na urządzeniu: niski-średni.
+
 ## ✅ Przebudowa nagród MAD bossów — na podstawie realnego eksportu usera (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §139. User przysłał realny eksport po skoku 51→270 poziomów w

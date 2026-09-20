@@ -133,6 +133,21 @@ describe('vehicleMatch — maintenanceDueMonths (Date.now() wewnętrznie, bez ws
     expect(result).toBeLessThan(-0.8);
     expect(result).toBeGreaterThan(-1.2);
   });
+
+  // 2026-09-20, audyt logika/optymalizacja (runda 3) — `setMonth` na dzień nieistniejący w
+  // docelowym miesiącu PRZEWIJA (day overflow), nie przycina: serwis z datą 31.01 + 1 mies.
+  // interwału ma PRZYCIĘTY termin 28.02, ale PRZEWINIĘTY (bug) termin 3.03 — "dziś" ustawiony
+  // fake timerem na 1.03 leży MIĘDZY tymi dwiema datami, więc znak wyniku (przeterminowane
+  // vs jeszcze nie) jednoznacznie rozstrzyga które zachowanie faktycznie działa.
+  test('31.01 + 1 mies. interwału, "dziś" = 1.03 → przeterminowane (przycięty termin 28.02), NIE jeszcze aktualne (przewinięty 3.03)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-01T12:00:00'));
+    try {
+      const result = maintenanceDueMonths(m({ date: '2026-01-31', intervalMonths: 1 }));
+      expect(result).toBeLessThan(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('vehicleMatch — maintenancePresets', () => {

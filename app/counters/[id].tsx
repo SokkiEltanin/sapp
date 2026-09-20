@@ -43,7 +43,9 @@ export default function CounterDetail() {
   const s = useMemo(() => makeS(c), [c]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { counters } = useCounters();
-  const { expenses } = useExpensesStore();
+  // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja runda 3) — goły
+  // `useExpensesStore()` subskrybował cały store, choć tu używane jest tylko `expenses`.
+  const expenses = useExpensesStore(st => st.expenses);
   const meals = useFoodStore(st => st.meals);
   const foodProducts = useFoodStore(st => st.products);
   const { tasks, create: createTask, toggle: toggleTask, remove: removeTask } = useTasks();

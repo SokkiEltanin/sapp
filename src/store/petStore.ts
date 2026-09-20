@@ -7,7 +7,7 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
-import { RAID_ENERGY_COST } from '@/utils/raid';
+import { RAID_ENERGY_COST, raidHpFor } from '@/utils/raid';
 import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, parseGearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 import { PotionKind, ActivePotion, POTIONS, potionFlatHp, potionXpMult } from '@/utils/potions';
@@ -283,6 +283,14 @@ interface PetState {
   // USUNIĘTE — patrz `eventEnergy` niżej, teraz wspólne dla raid+event.
   raidWeek: string | null;      // klucz tygodnia, dla którego raidHp jest aktualne
   raidHp: number;               // pozostałe HP raidu tego tygodnia
+  // ZAMROŻONE przy `raidEnsure` na start tygodnia (2026-09-20, audyt logika/optymalizacja
+  // runda 3) — `raidHpFor(level, weekKey)` rośnie z AKTUALNYM poziomem gracza, więc bez tego
+  // pola ekrany (bosses.tsx/boss-fight.tsx) liczyły mianownik paska/% NA ŻYWO przy każdym
+  // renderze: level-up W TRAKCIE tygodnia raidu podbijał mianownik bez podbicia licznika, więc
+  // pasek/procent "cofał się" mimo że realny postęp (raidHp) się nie zmienił — czysto
+  // kosmetyczny bug (warunek zwycięstwa liczy się od raidHp===0, niezależnie od tego pola), ale
+  // mylący. `raidMaxHp` trzyma wartość z CHWILI zbankowania tygodnia, nie przelicza się więcej.
+  raidMaxHp: number;
   raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
   // ── wydarzenia (sezonowe święta / nemesis miesiąca) ──
   // Wspólna czerwona pula dla WYDARZEŃ i RAIDU (2026-08-22, patrz komentarz przy raidWeek
@@ -447,6 +455,7 @@ export const usePetStore = create<PetState>()(
       energyRegenAt: null,
       raidWeek: null,
       raidHp: 0,
+      raidMaxHp: 0,
       raidWon: [],
       eventEnergy: 0,
       eventEnergyDate: null,
@@ -789,7 +798,7 @@ export const usePetStore = create<PetState>()(
         return { missionStartedAt: null, missionEndsAt: null, missionProfile: null };
       }),
       healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
-      raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),
+      raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp, raidMaxHp: hp })),
       raidAttack: (damage) => {
         const s = get();
         // ZAWSZE bankuje realny postęp, wygrana LUB przegrana (2026-08-25, user: "kotek
@@ -1023,7 +1032,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, activePotion: null, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidMaxHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, activePotion: null, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -1044,7 +1053,7 @@ export const usePetStore = create<PetState>()(
         missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt, missionProfile: s.missionProfile,
         bossHp: s.bossHp, bossLog: s.bossLog,
         resetGeneration: s.resetGeneration, lastResetAt: s.lastResetAt,
-        raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
+        raidWeek: s.raidWeek, raidHp: s.raidHp, raidMaxHp: s.raidMaxHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventWon: s.eventWon,
         menaceId: s.menaceId, menaceHp: s.menaceHp,
@@ -1062,6 +1071,16 @@ export const usePetStore = create<PetState>()(
         state.lastLoginDay = state.lastLoginDay ?? null;
         state.loginBonusDay = state.loginBonusDay ?? null;
         state.bossLog = state.bossLog ?? [];   // stary stan sprzed 2026-08-14 nie miał logu walk
+        // Migracja raidMaxHp (2026-09-20, audyt logika/optymalizacja runda 3) — stary stan
+        // sprzed dodania tego pola go nie ma. Trwający tydzień raidu (raidWeek ustawiony)
+        // dostaje ZAMROŻONĄ wartość policzoną z AKTUALNEGO poziomu w chwili migracji — dokładnie
+        // to co user widziałby na ekranie TERAZ w starym, "na żywo" liczonym modelu, więc
+        // ciągłość paska/% zostaje zachowana; dalsze level-upy tego tygodnia już nie dryfują.
+        if (state.raidWeek && !state.raidMaxHp) {
+          state.raidMaxHp = raidHpFor(levelFromXp(state.xp ?? 0).level, state.raidWeek);
+        } else {
+          state.raidMaxHp = state.raidMaxHp ?? 0;
+        }
         // Stary stan sprzed 2026-08-18 nie miał wyboru profilu misji — jeśli akurat trwała
         // aktywna misja (missionEndsAt ustawione), traktuj ją jako 'balanced' (stare wartości
         // nagrody, dokładnie to co wtedy dostałaby), inaczej null (brak aktywnej misji).
