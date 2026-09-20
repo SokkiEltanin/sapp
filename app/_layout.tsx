@@ -1,7 +1,7 @@
 // Import FIRST — its module-eval time is the `JS_START` reference for the cold-start perf
 // log (perfLog.ts) that Diagnostyka reads back. Must stay the very first import so it evals
 // as close to real app launch as this JS bundle can observe.
-import '@/utils/perfLog';
+import { startColdStartLagSampling } from '@/utils/perfLog';
 import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -179,6 +179,12 @@ function AutoMoodPopup() {
 }
 
 export default function RootLayout() {
+  // Rejestr obciążenia wątku JS na starcie (2026-09-20, user: "zrób rejestr żebyś miał realne
+  // dane" — patrz komentarz przy `startColdStartLagSampling` w perfLog.ts). Pierwszy efekt w
+  // komponencie — najwcześniej jak się da bez samo-startowania na poziomie modułu (to
+  // zapętliłoby prawdziwe timery w testach Jest, patrz komentarz tam).
+  useEffect(() => { startColdStartLagSampling(); }, []);
+
   // Still used by the two "wait for auth" effects further down (autobackup, restore-
   // prompt) and the StatusBar color — no longer gates the Stack itself, see `whenAuthReady()`
   // in firebase.ts.

@@ -2151,7 +2151,7 @@ export default function SettingsScreen() {
           } },
         },
         {
-          id: 'diag-perf-log', title: 'Wydajność startu apki', subtitle: 'Czas do pierwszej klatki i pełnego załadowania dashboardu — ostatnie starty',
+          id: 'diag-perf-log', title: 'Wydajność startu apki', subtitle: 'Czas do pierwszej klatki, dashboardu i lag wątku JS (czy da się kliknąć) — ostatnie starty',
           icon: LucideIcons.Gauge, accentColor: '#46B0DE',
           keywords: ['wydajność', 'lag', 'laguje', 'szybkość', 'start', 'optymalizacja', 'dashboard'],
           control: { kind: 'link', onPress: async () => {
@@ -2165,13 +2165,23 @@ export default function SettingsScreen() {
               return;
             }
             const last = log[log.length - 1];
-            const avg = (key: 'msToFirstFrame' | 'msToReady') => Math.round(log.reduce((s, e) => s + e[key], 0) / log.length);
-            const lines = log.slice().reverse().map(e =>
-              `${new Date(e.at).toLocaleString('pl-PL')}: 1. klatka ${e.msToFirstFrame}ms, gotowy ${e.msToReady}ms`);
+            const avg = (key: 'msToFirstFrame' | 'msToReady' | 'maxLagMs' | 'totalLagMs') =>
+              Math.round(log.reduce((s, e) => s + (e[key] ?? 0), 0) / log.length);
+            // Lag wątku JS (2026-09-20, user: "zawsze te animacje lagują... nie mogę kliknąć,
+            // zrób rejestr") — `maxLagMs`/`totalLagMs`/`lagSamples`, patrz komentarz przy
+            // `startColdStartLagSampling` w perfLog.ts. `?? 0` na starych wpisach zapisanych
+            // PRZED tą funkcją (nie miały tych pól wcale).
+            const fmtEntry = (e: typeof last) =>
+              `${new Date(e.at).toLocaleString('pl-PL')}: 1. klatka ${e.msToFirstFrame}ms, gotowy ${e.msToReady}ms, lag JS max ${e.maxLagMs ?? 0}ms / suma ${e.totalLagMs ?? 0}ms (${e.lagSamples ?? 0} próbek)`;
+            const lines = log.slice().reverse().map(fmtEntry);
             Alert.alert(
-              `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms`,
-              `1. klatka / w pełni gotowy (ze wszystkimi widgetami). Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms.\n\nHistoria (najnowsze u góry):\n${lines.join('\n')}`,
-              [{ text: 'Wyczyść historię', onPress: () => clearPerfLog() }, { text: 'OK' }],
+              `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms, lag max ${last.maxLagMs ?? 0}ms`,
+              `1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria (najnowsze u góry):\n${lines.join('\n')}`,
+              [
+                { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność startu apki (Sapp)\n\n${lines.join('\n')}` }).catch(() => {}); } },
+                { text: 'Wyczyść historię', onPress: () => clearPerfLog() },
+                { text: 'OK' },
+              ],
             );
           } },
         },

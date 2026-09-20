@@ -9456,6 +9456,68 @@ zawiera nowe pola `catShadowScaleX/Y`, `bossShadowScaleX/Y`, `*ShadowOffsetY`.
 
 ---
 
+## 146. Rejestr lagu wątku JS na starcie + mapa efektów `_layout.tsx` (2026-09-20)
+
+User: "zawsze te startupy animacje lagują bardzo, nigdy nie widziałem płynnej animacji... jak
+wchodzę do apki i próbuję kliknąć to jest impossible bo jest lag. Jak chcesz zrób rejestr
+żebyś miał realne dane. Potem optymalizacja i logika lub mapa tego co mamy żebyś lepiej
+rozumiał." — trzy rzeczy: (1) instrumentacja PRZED optymalizacją (ta sama dyscyplina co
+`perfLog.ts` z 2026-08-25), (2) sama optymalizacja później, na podstawie realnych danych, (3)
+mapa tego repo dla mnie. Ten wpis robi (1) i (3); (2) czeka na dane z realnego urządzenia.
+
+**Diagnoza na czytaniu kodu (przed danymi)**: `AnimatedSplash.tsx` (sam ekran startowy) jest
+już "lag-proof by design" — WSZYSTKIE jego animacje idą przez `useNativeDriver: true`
+(transformy/opacity), nigdy nie dotykają wątku JS. Ale user nie skarży się na TĘ animację
+samą w sobie, tylko na wrażenie ogólnego zawieszenia + niedziałające dotyki od razu po
+wejściu — a to wskazuje na `app/_layout.tsx`, gdzie `RootLayout` montuje **kilkanaście
+równoległych `useEffect`ów** naraz, część od razu, część przez `setTimeout` (rozłożone w
+czasie, ale i tak wszystkie na tym samym wątku JS co obsługa dotyku w RN):
+
+| Efekt | Kiedy | Co robi |
+|---|---|---|
+| `startColdStartLagSampling()` | natychmiast | NOWY — próbkowanie lagu, patrz niżej |
+| crash-check (native+JS) | natychmiast (async IIFE) | `FileSystem.getInfoAsync`/AsyncStorage read + ew. `Alert` z 1400ms delay |
+| dangling-scan-check | natychmiast (async IIFE) | AsyncStorage read + ew. `Alert` z 1800ms delay |
+| `ensureAndroidChannel()` | natychmiast | natywne API powiadomień |
+| `whenAuthReady()` | natychmiast | AsyncStorage read (persisted sesja) + ew. sieć (anon sign-in) |
+| notification response listener + `getLastNotificationResponseAsync()` | natychmiast | rejestracja listenera + async read |
+| `appSettings.loadAll()` / `migrateBalanceModel()` / `migratePaydayDefaultOff()` / `loadNonFood()` / `loadOwnName()` | natychmiast (5 osobnych efektów) | po AsyncStorage read każdy |
+| autobackup | +8000ms (po `authReady`) | throttlowany, nie powinien kolidować |
+| health autosync | +2000ms | Health Connect read (może być kosztowne) |
+| bank notification drain + auto-commit | +1500ms | AsyncStorage + ew. Firestore |
+| flush pending expense writes | +2500ms | ew. Firestore |
+| level-up detect, usage-stats record | natychmiast | proste, tanie |
+
+Efekty z `setTimeout` (1500-8000ms) są rozłożone w czasie ŚWIADOMIE, ale **wszystkie
+natychmiastowe efekty (crash-check, dangling-scan, auth, 5× migracja/loader, notification
+listener) odpalają się w jednym burście przy pierwszym render-cycle** — każdy to co najmniej
+jedno round-tripowe wywołanie AsyncStorage (bridge call), a kilkanaście naraz to realny
+kandydat na "wątek JS zajęty tuż po starcie", czyli okno w którym dotyk może się nie
+zarejestrować. Nie naprawiane w tym PR — to hipoteza do zweryfikowania danymi, nie fix.
+
+**Fix — nowy rejestr w `perfLog.ts`**: `startColdStartLagSampling()` (wołane raz z pierwszego
+`useEffect` w `RootLayout`, NIE na poziomie modułu — to zapętliłoby prawdziwe `setTimeout`y w
+Jest, patrz komentarz w kodzie) próbkuje wątek JS co 50ms przez 8s od `JS_START`: `setTimeout`
+zaplanowany na 50ms, który faktycznie odpala się później, mówi o ile wątek JS był zajęty czymś
+innym w tym czasie — to ten sam wątek, który obsługuje dotyk w RN, więc lag tutaj = "nie mogę
+kliknąć". `PerfEntry` dostał `maxLagMs`/`totalLagMs`/`lagSamples`, zapisywane przy
+`recordDashboardReady()` jak dotychczasowe `msToFirstFrame`/`msToReady`. Ustawienia →
+Diagnostyka → "Wydajność startu apki" pokazuje teraz też te liczby + nowy przycisk
+"Udostępnij" (dotąd tylko `Alert`, nieczytelny do skopiowania) — user używa apki normalnie
+kilka dni, potem eksportuje i wkleja mi w rozmowie, TA SAMA metoda co eksport postępu pupila/
+pamięci cen.
+
+`tsc`/`jest` czyste (1031 testów, +1 nowy — pola lagu domyślnie zerowe gdy sampler nigdy nie
+odpalony, sampler sam NIE jest testowany bezpośrednio z opisanego wyżej powodu).
+
+**Priorytet testu na urządzeniu — wysoki, ale to zbieranie danych, nie fix**: użyj apki
+normalnie kilka dni (kilka cold startów), potem Ustawienia → Diagnostyka → Wydajność startu
+apki → Udostępnij, wyślij mi wynik. `maxLagMs`/`totalLagMs` wysokie = potwierdzona hipoteza
+wyżej (burst efektów na starcie) → następny krok to faktyczna optymalizacja (rozłożenie w
+czasie/`InteractionManager`/przeniesienie części do `requestIdleCallback`-podobnego wzorca).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

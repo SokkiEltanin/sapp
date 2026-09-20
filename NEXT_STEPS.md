@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rejestr lagu wątku JS na starcie — czeka na REALNE dane z urządzenia (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §146. User: "zawsze te startupy animacje lagują... nie mogę
+kliknąć, zrób rejestr żebyś miał realne dane". `AnimatedSplash.tsx` sam jest już w 100%
+native-driver (nie może być przyczyną), więc podejrzenie pada na ~15 równoległych
+`useEffect`ów w `_layout.tsx` odpalających się w jednym burście na starcie (crash-check,
+auth, 5× migracja/loader, notification listener) — każdy to AsyncStorage round-trip, razem
+realny kandydat na zajęty wątek JS = niedziałające dotyki. Dodany `startColdStartLagSampling()`
+w `perfLog.ts` (próbkuje wątek JS co 50ms/8s od startu), nowe pola w Ustawienia → Diagnostyka →
+Wydajność startu apki + przycisk "Udostępnij".
+
+**NIE jest to fix — to zbieranie danych.** Priorytet: użyj apki normalnie kilka dni, potem
+wyślij eksport z Diagnostyki. Wysoki `maxLagMs`/`totalLagMs` potwierdzi hipotezę burst-efektów
+→ dalej faktyczna optymalizacja (rozłożenie w czasie). `tsc`/`jest` czyste (1031 testów, +1).
+
+**Osobno w kolejce (ten sam wątek żądania usera)**: kategoryzacja produktów Finanse/Produkty
+(patrz §143, propozycja czeka na potwierdzenie), dostrojenie cieni w Edytorze walki (§145,
+czeka na eksport od usera).
+
 ## ✅ TopPill — rotacja przez wszystkie zaległe/dzisiejsze zadania, nie jedno (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §144. User: "co z pillem? Animacja przejściami lepszymi

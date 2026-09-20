@@ -19,6 +19,49 @@ export interface PerfEntry {
   at: string;            // ISO timestamp
   msToFirstFrame: number; // JS start → dashboard component's first committed render
   msToReady: number;      // JS start → `deferredReady` (ALL sections, incl. non-essential, are in)
+  maxLagMs: number;      // najdłuższa JEDNA zwłoka wątku JS zaobserwowana do tego momentu (ms)
+  totalLagMs: number;    // suma wszystkich zwłok — "jak długo łącznie wątek JS był zajęty/zablokowany"
+  lagSamples: number;    // ile próbek zdążyło odpalić się do tego momentu (sanity-check — mniej niż
+                          // oczekiwane z `LAG_WINDOW_MS`/`LAG_SAMPLE_MS` = same przez to, że wątek był
+                          // zbyt zajęty, żeby je nawet odpalić na czas)
+}
+
+// ─── Cold-start JS-thread lag sampling ─────────────────────────────────────────
+// User (2026-09-20): "zawsze te startupy animacje lagują... jak wchodzę i próbuję kliknąć to
+// jest impossible, zrob rejestr żebyś miał realne dane". `msToFirstFrame`/`msToReady` powyżej
+// mówią JAK DŁUGO trwa start, ale nie CZY wątek JS jest w tym czasie zablokowany — a to
+// dokładnie ta sama przyczyna co "nie mogę kliknąć" (dotyk w RN jest obsługiwany na TYM SAMYM
+// wątku JS co reszta logiki). Metoda: `setTimeout` zaplanowany na `LAG_SAMPLE_MS` który
+// faktycznie odpala się później = coś innego zajmowało wątek JS w tym czasie — mierzymy o ile
+// później, zamiast zgadywać które z ~10 równoległych `useEffect`ów w `_layout.tsx` jest winne.
+const LAG_SAMPLE_MS = 50;
+const LAG_WINDOW_MS = 8000; // przestań próbkować tyle po JS_START — z zapasem po najdłuższym dotąd starcie
+
+let maxLagMs = 0;
+let totalLagMs = 0;
+let lagSamples = 0;
+let lagSamplingStarted = false;
+
+function scheduleLagSample() {
+  const scheduledAt = Date.now();
+  setTimeout(() => {
+    const actual = Date.now() - scheduledAt;
+    const lag = Math.max(0, actual - LAG_SAMPLE_MS);
+    maxLagMs = Math.max(maxLagMs, lag);
+    totalLagMs += lag;
+    lagSamples++;
+    if (Date.now() - JS_START < LAG_WINDOW_MS) scheduleLagSample();
+  }, LAG_SAMPLE_MS);
+}
+
+// Wołane RAZ z `app/_layout.tsx` (efekt, NIE na poziomie modułu) — samo-startujące się przy
+// imporcie zapętliłoby prawdziwe `setTimeout`y na 8s przy KAŻDYM imporcie tego modułu, także
+// przez `perfLog.test.ts` w Jest, wisząc/przeciekając w testach. Idempotentne — bezpieczne przy
+// Fast Refresh, który mógłby wywołać ten efekt ponownie.
+export function startColdStartLagSampling() {
+  if (lagSamplingStarted) return;
+  lagSamplingStarted = true;
+  scheduleLagSample();
 }
 
 // One-shot PER JS SESSION (cold start / reload) — the dashboard remounts every time you
@@ -46,6 +89,7 @@ export async function recordDashboardReady(): Promise<void> {
     at: new Date().toISOString(),
     msToFirstFrame: Math.max(0, firstFrameAt - JS_START),
     msToReady: Math.max(0, now - JS_START),
+    maxLagMs, totalLagMs, lagSamples,
   };
   try {
     const raw = await AsyncStorage.getItem(KEY);
