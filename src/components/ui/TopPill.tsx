@@ -245,24 +245,31 @@ export default function TopPill() {
       };
     }
 
-    // 4 — Overdue tasks (status pending + deadline < today)
+    // 4 — Overdue tasks (status pending + deadline < today). Rotuje przez WSZYSTKIE
+    // zaległe (jak pula LUŹNA niżej, ten sam `calmTick`), nie tylko najstarsze — user
+    // z 3 zaległymi widziałby wiecznie TO SAMO jedno zadanie, resztę tylko po wejściu w
+    // Zadania (2026-09-20, "lepszymi odmianami zadań"). Sortowanie po deadline ustala
+    // KOLEJNOŚĆ rotacji (najpilniejsze pierwsze), nie wybór — a `key` po `id` zamiast po
+    // samej liczbie sprawia, że zmiana w puli faktycznie odpala animację przejścia (przy
+    // stałym `key` pill nigdy się nie animował, mimo że treść pod spodem się zmieniała).
     const overdue = calTasks.filter(t =>
       t.status === 'pending' &&
       t.deadline &&
       t.deadline.split('T')[0] < today
-    );
+    ).sort((a, b) => a.deadline!.localeCompare(b.deadline!));
     if (overdue.length > 0) {
-      const first = overdue.sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
+      const shown = overdue[calmTick % overdue.length];
       return {
         badge: `${overdue.length} ${plPlural(overdue.length, 'ZALEGŁE', 'ZALEGŁE', 'ZALEGŁYCH')}`,
         color:  colors.tabs.finances,  // #E63535 red
-        text:   up(first.title),
+        text:   up(shown.title),
         route:  '/(tabs)/tasks',
-        key:    `overdue-${overdue.length}`,
+        key:    `overdue-${shown.id}`,
       };
     }
 
-    // 4b — Tasks due / scheduled TODAY (deadline today OR scheduledDate today).
+    // 4b — Tasks due / scheduled TODAY (deadline today OR scheduledDate today). Rotuje
+    // przez wszystkie, ta sama motywacja co "4" wyżej.
     // These fall between "overdue (<today)" and "near deadline (>today)", so
     // without this the pill would vanish on a day full of today-tasks.
     const todayTasks = calTasks.filter(t =>
@@ -270,13 +277,13 @@ export default function TopPill() {
       ((t.deadline && t.deadline.split('T')[0] === today) || t.scheduledDate === today)
     );
     if (todayTasks.length > 0) {
-      const first = todayTasks[0];
+      const shown = todayTasks[calmTick % todayTasks.length];
       return {
         badge: todayTasks.length > 1 ? `${todayTasks.length} DZIŚ` : 'DZIŚ',
         color:  timeAccent,
-        text:   up(first.title),
+        text:   up(shown.title),
         route:  '/(tabs)/tasks',
-        key:    `today-${todayTasks.length}`,
+        key:    `today-${shown.id}`,
       };
     }
 
@@ -292,13 +299,15 @@ export default function TopPill() {
       .filter(a => a.pct >= 0.85)
       .sort((a, b) => b.pct - a.pct);
     if (budgetAlerts.length > 0) {
-      const first = budgetAlerts[0];
+      // Rotuje przez wszystkie kategorie blisko limitu, nie tylko najgorszą — ta sama
+      // logika co "4"/"4b" wyżej.
+      const shown = budgetAlerts[calmTick % budgetAlerts.length];
       return {
-        badge: `${Math.round(first.spend)} PLN`,
+        badge: `${Math.round(shown.spend)} PLN`,
         color:  colors.tabs.finances,  // #E43434 red
-        text:  `ZBLIŻASZ SIĘ DO LIMITU #${first.cat}`,
+        text:  `ZBLIŻASZ SIĘ DO LIMITU #${shown.cat}`,
         route: '/(tabs)/finances',
-        key:   `budget-${first.cat}`,
+        key:   `budget-${shown.cat}`,
       };
     }
 
@@ -313,7 +322,8 @@ export default function TopPill() {
       })
       .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
     if (gcalToday.length > 0) {
-      const ev = gcalToday[0];
+      // Rotuje przez wszystkie dzisiejsze wydarzenia, nie tylko najbliższe — jak wyżej.
+      const ev = gcalToday[calmTick % gcalToday.length];
       const [h, m] = ev.startTime!.split(':').map(Number);
       const diffM = h * 60 + m - nowMins;
       const timeLabel = diffM <= 0 ? 'TERAZ' : diffM < 60 ? `ZA ${diffM} MIN` : ev.startTime!;
