@@ -9304,11 +9304,67 @@ przyjść z treścią "Zostało Ci N nawyków..."; (2) odhacz WSZYSTKIE nawyki n
 godziną — przypomnienie nie powinno przyjść dzisiaj; (3) zamknij i otwórz Ustawienia — godziny
 wszystkich 4 przypomnień powinny pokazywać wcześniej zapisane wartości, nie domyślne.
 
-**Kolejny etap (nie zaczęty)**: kategoryzacja produktów w Finanse/Produkty — hierarchia
-tag→podkategoria→wariant (user: "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz 500g)"),
-lepsze sortowanie/edycja po dacie zakupu, klik na produkt → który paragon i gdzie na nim.
-Wymaga researchu `app/products.tsx`/modelu danych produktów przed projektowaniem — patrz
-NEXT_STEPS.md.
+**Kolejny etap**: kategoryzacja produktów w Finanse/Produkty. Research `app/products.tsx` +
+`productMemory.ts` (poniżej, §143) pokazał, że większość tego co user opisał JUŻ istnieje
+(historia zakupów z linkiem do paragonu, tagi, scalanie duplikatów) — brakuje głównie
+hierarchii tag→podtag i widoku grupowanego. Konkretna propozycja w §143.
+
+---
+
+## 143. Audyt reszty powiadomień + research kategoryzacji produktów (2026-09-20)
+
+User: "Ogólnie wszystkie powiadomienia możesz poulepszać bo teraz trochę lipią" — zielone
+światło na kontynuację §142 dla RESZTY typów powiadomień, nie tylko zbiorczego przypomnienia o
+nawykach.
+
+**Przegląd całego `notificationsService.ts` (~38 metod)**: `refreshMaintenanceReminder`/
+`refreshPaydayReminder`/`refreshBudgetReminder`/`refreshWeeklySummary`/`refreshMonthCardReminder`
+już SĄ stanowe (one-off DATE, re-armowane na żywym stanie, cancel gdy nic nie wymaga uwagi) —
+nic do zrobienia. `scheduleSubscriptionReminder`/`scheduleRenewalHeadsUp`/`scheduleEventReminder`/
+`scheduleWorkShiftNotifications`/`scheduleSnoozeReminder`/`scheduleMissionReady` są z natury
+jednorazowe, powiązane z konkretnym zdarzeniem (data płatności/wydarzenia/koniec zmiany) —
+też nic do poprawy, "dumbness" nie miało tu gdzie się ukryć.
+
+**Znaleziska, które NAPRAWIONO**:
+1. **`scheduleHabitReminder`/`cancelHabitReminder`** (przypomnienie PER-NAWYK, `Habit.
+   reminderTime` — osobne od zbiorczego z §142) — TA SAMA dziura co zbiorcze przed §142: ślepy
+   `DAILY`, trąbił o konkretnym nawyku nawet po jego zaznaczeniu. Przerobiony identycznie
+   (DATE + `nextFireDate(hour, minute, doneToday)`). Nowy `useEffect` w `useHabits()` re-armuje
+   PER NAWYK z ustawioną godziną na każdą zmianę `habits`/`todayDone`.
+2. **`scheduleDailyTaskBriefing`/`cancelDailyTaskBriefing` — MARTWY KOD, usunięty całkowicie.**
+   Zero wywołań w całym repo (sprawdzone grepem) — zastąpiony dawno przez `scheduleDailyTodoList`
+   (grupowanie dziś/jutro/bezterminowe), ale stara wersja nigdy nie została odpięta.
+
+**Research kategoryzacji produktów (Finanse/Produkty, kolejny etap żądania usera)** —
+`app/products.tsx` (484 linii) + `src/utils/productMemory.ts` (630 linii) okazały się dużo
+bogatsze niż user zakładał pisząc "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz 500g)":
+
+- **"Po kliknięciu pokazywalo jaki paragon" — JUŻ ISTNIEJE.** `purchaseHistory` w
+  `products.tsx` (linia ~186) pod edycją produktu: lista dat/cen/sklepów, tap → prosto do
+  `/expenses/[id]` (dodane 2026-09-17, user: "muszę mieć tam odnośnik gdzie w finansach jest
+  ten produkt i kiedy do paragonu").
+- **"Gdzie na paragonie" (pozycja/miejsce w tekście)** — NIE istnieje i nie jest łatwe do
+  dodania: scanner (`expenses/scan.tsx`) parsuje TEKST paragonu, nie zapisuje współrzędnych/
+  pozycji OCR (bounding box) — wymagałoby przebudowy pipeline'u skanowania, żeby zapisywać
+  POZYCJĘ każdej pozycji, nie tylko jej treść. Poza zasięgiem tego etapu.
+- **Warianty rozmiaru osobno ("Pudliszki 250g" ≠ "Heinz 500g")** — JUŻ DZIAŁA:
+  `normalizeProductName`/`canonicalProductName` świadomie ZACHOWUJĄ rozmiar w nazwie (komentarz
+  w kodzie: "Sizes are KEPT — user wants different sizes counted separately in top-stats"),
+  więc każdy wariant to już osobny wpis w `products` z własną historią/tagami/wagą.
+- **Realnie BRAKUJE**: (1) hierarchii tag→podtag — tagi w `productMemory.ts`/`products.tsx` są
+  PŁASKIE (`ITEM_TAGS`, jedna lista, wielokrotny wybór, bez rodzic/dziecko); (2) grupowania W
+  UI — lista w `products.tsx` jest jedną płaską listą sortowaną po liczbie zakupów + filtr
+  tekstowy, bez sekcji/nagłówków per kategoria — nie da się "wejść w sosy" i zobaczyć tylko
+  ketchupy.
+
+**Propozycja (do potwierdzenia z userem przed implementacją — zmiana modelu danych + UI,
+nie mechaniczny fix)**: dwupoziomowy tag — top-level ("sosy") + subtag ("ketchupy"), zapisywany
+w `tagMemory`/`ReceiptItem.tags` jako dodatkowy, osobny poziom (nie zamiast płaskich tagów —
+obok), plus widok `products.tsx` grupowany po top-level tagu (zwijane sekcje) gdy user nie
+szuka tekstem. Nie zaczęte — czeka na potwierdzenie kierunku.
+
+`tsc`/`jest` czyste (1030 testów, bez zmiany netto — usunięty martwy kod nie miał testów, nowa
+logika w `notificationsService.ts` jak zawsze nietestowalna bez wydzielenia).
 
 ---
 
