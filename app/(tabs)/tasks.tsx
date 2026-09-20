@@ -569,9 +569,17 @@ export default function TasksScreen() {
   const [sortOpen, setSortOpen] = useState(false);
   const tasksSortTrigger = useUiActions(s => s.tasksSortTrigger);
   useEffect(() => { if (tasksSortTrigger > 0) setSortOpen(true); }, [tasksSortTrigger]);
-  const [detailTask, setDetailTask]     = useState<Task | null>(null);
+  // `detailTaskId` (nie cały obiekt) — user: "jak klikam milestony w taskach to działa
+  // tylko nie zaznacza się na żywo muszę wyjść i wejść z taska żeby się skreśliło z listy".
+  // Stary `detailTask` trzymał ZAMROŻONĄ kopię tasku z chwili otwarcia modala; `toggleSubtask`
+  // poprawnie aktualizował `tasks` w store (nowa referencja, `calendarStore.ts`'s
+  // `updateTask` — sprawdzone), ale modal i tak renderował starą kopię, bo nic go nie łączyło
+  // z żywym stanem. Teraz trzymamy tylko id, a właściwy obiekt liczymy `useMemo` z aktualnej
+  // listy `tasks` — modal automatycznie widzi zmianę od razu po `onToggleSubtask`.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [doneCollapsed, setDoneCollapsed] = useState(true);
+  const detailTask = useMemo(() => tasks.find(t => t.id === detailTaskId) ?? null, [tasks, detailTaskId]);
 
   const today  = todayStr();
   const active = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
@@ -582,7 +590,7 @@ export default function TasksScreen() {
   // haptics + the reward toast now live in the hook so every path is consistent
   const handleCompletePress = useCallback((task: Task) => { toggle(task.id); }, [toggle]);
 
-  const handleEditPress     = useCallback((task: Task) => { setDetailTask(task); setDetailVisible(true); }, []);
+  const handleEditPress     = useCallback((task: Task) => { setDetailTaskId(task.id); setDetailVisible(true); }, []);
   const handleEditDirect    = useCallback((task: Task) => { haptic.tap(); router.navigate(`/tasks/${task.id}?edit=1` as any); }, []);
   const handleDelete        = useCallback((id: string) => { remove(id); toast.info('Usunięto'); }, [remove]);
   const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.navigate('/pomodoro' as any); }, [startPomodoro]);
