@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ TopPill — rotacja przez wszystkie zaległe/dzisiejsze zadania, nie jedno (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §144. User: "co z pillem? Animacja przejściami lepszymi
+odmianami zadań?". 4 z 7 pilnych stanów pilla (zaległe/dziś-zadania/budżet/gcal-wydarzenia)
+zawsze wybierały TEN SAM element z listy kandydatów (najstarszy/najbliższy), ignorując
+istniejący `calmTick` — user z wieloma zaległymi widział wiecznie jedno zadanie, a `key`
+oparty o `.length` zamiast o id sprawiał, że animacja przejścia (§91) nigdy się nie odpalała w
+tych stanach. Naprawione: `arr[calmTick % arr.length]` + `key` po id — rotacja przez
+wszystkich kandydatów co ~8s, z płynną animacją przy każdej zmianie. `tsc`/`jest` czyste (1030
+testów). Priorytet testu na urządzeniu: średni — dodaj 2+ zaległe zadania, sprawdź rotację.
+
+**W toku**: scena walki pupila (`boss-fight.tsx`) — user zgłosił niedopasowane skale cieni do
+sprite'ów, chce łatwiej dostosowywać pozycje/skalę. Research zaczęty osobno.
+
 ## ✅ Pierwszy etap "inteligentnych powiadomień" — nawyki żywe, fix persystencji godzin (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §142. Drugi etap wieloczęściowego żądania usera (po §141

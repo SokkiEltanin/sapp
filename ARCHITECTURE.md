@@ -9368,6 +9368,45 @@ logika w `notificationsService.ts` jak zawsze nietestowalna bez wydzielenia).
 
 ---
 
+## 144. TopPill — rotacja przez WSZYSTKIE zaległe/dzisiejsze zadania, nie tylko jedno (2026-09-20)
+
+User: "co z pillem? Animacja przejściami lepszymi odmianami zadań itp?" — po §91 (fix
+"bouncy ball" animacji przejścia) i luźnej puli z rotacją (2026-08-23, komentarz przy
+`calmTick` w `TopPill.tsx`), sam mechanizm PRZEJŚCIA (`Animated.timing`, płynne bez odbicia)
+był już dobry — problem był gdzie indziej: **4 z 7 "pilnych" stanów (1-7) NIGDY go nie
+używały**, bo zawsze wybierały TEN SAM element z listy kandydatów niezależnie od `calmTick`:
+
+- **Zaległe zadania** (tier 4) — zawsze `overdue.sort(...)[0]` (najstarsze), `key` liczony z
+  `overdue.length`, nie z id zadania. User z 3 zaległymi widział WIECZNIE jedno, resztę tylko
+  po wejściu w Zadania — i nawet ta jedna pozycja nigdy się nie animowała (key nie zmieniał się
+  między tickami mimo że `calmTick` tykał).
+- **Zadania na dziś** (tier 4b) — analogicznie, zawsze `todayTasks[0]`.
+- **Alerty budżetowe** (tier 5) — zawsze najgorsza kategoria, reszta bliskich limitu niewidoczna.
+- **Wydarzenia z Kalendarza Google na dziś** (tier 6) — zawsze najbliższe wydarzenie.
+
+Fix: wszystkie cztery teraz wybierają `arr[calmTick % arr.length]` (ten sam `calmTick` co pula
+luźna niżej, więc jeden, spójny rytm rotacji ~8s w całym pillu) — sortowanie/priorytet
+zostaje (najpilniejsze wciąż pierwsze w kolejności rotacji), ale gdy jest więcej niż jeden
+kandydat, user zobaczy WSZYSTKIE po kolei, nie jeden zamrożony. `key` dla zaległych/dzisiejszych
+zadań przepisany z `${arr.length}` na `${item.id}`, żeby zmiana w puli faktycznie odpalała
+animację przejścia (przy stałym key pill nigdy się nie animował, mimo że treść pod spodem się
+zmieniała między renderami) — to naprawia też "animacja" część zgłoszenia: dotąd przejście było
+widoczne głównie w luźnej puli (mission/boss/mood/all-clear), teraz też w pilnych stanach.
+
+`tsc`/`jest` czyste (1030 testów, bez zmiany — `TopPill.tsx` nigdy nie miało testów, logika
+mocno wpleciona w komponent/animacje).
+
+**Priorytet testu na urządzeniu — średni**: dodaj 2-3 zaległe zadania (deadline w przeszłości),
+sprawdź że pill pokazuje je PO KOLEI co ~8s (nie zawsze to samo), z płynnym przejściem między
+każdym. To samo dla 2+ zadań na dziś i 2+ kategorii blisko limitu budżetu (jeśli łatwo
+odtworzyć).
+
+**Osobno w toku**: przegląd scen walki pupila (`boss-fight.tsx`) — user zgłosił, że cienie nie
+pasują do skali sprite'ów; ma to być dopracowane tak, żeby dało się łatwiej dostosować pozycje
+i skalę.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
