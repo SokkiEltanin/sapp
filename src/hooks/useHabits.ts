@@ -281,6 +281,17 @@ export function useHabits() {
 
   const todayDone = useMemo(() => habitsDoneOn(habits, completions, today), [habits, completions, today]);
 
+  // "Inteligentne powiadomienia" (2026-09-20) — przypomnienie o nawykach było ślepym DAILY
+  // alarmem: trąbiło "nie odhaczyłeś nawyków" nawet gdy user WŁAŚNIE wszystkie odhaczył, bo
+  // nikt nie sprawdzał żywego stanu. `useHabits()` jest zamontowany zarówno na ekranie
+  // Nawyków jak i na kafelku dashboardu, więc ten efekt łapie realny stan przy każdym
+  // otwarciu apki/zmianie — jak refreshMoodReminder w moodStore.
+  useEffect(() => {
+    if (isLoading) return;
+    const remaining = Math.max(0, habits.length - todayDone.length);
+    notificationsService.refreshDailyHabitReminder(remaining === 0, remaining).catch(() => {});
+  }, [isLoading, habits.length, todayDone.length]);
+
   return {
     habits, todayDone, completions, isLoading,
     toggle, increment, decrement,

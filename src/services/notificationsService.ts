@@ -376,25 +376,47 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
   },
 
-  async scheduleDailyHabitReminder(hour = 21, minute = 0): Promise<string> {
+  // Nie DAILY (na sztywno o godzinie, bez względu na stan) — jak scheduleDailyMoodReminder,
+  // one-off DATE trigger, żeby móc być stanowe: `allDoneToday` (2026-09-20, "inteligentne
+  // powiadomienia" — dotąd trąbiło "nie odhaczyłeś nawyków" nawet gdy user WŁAŚNIE je
+  // odhaczył, bo DAILY nie wie nic o realnym stanie) przeskakuje na jutro miast nagabywać
+  // dzisiaj; `remaining` (liczba nieodhaczonych) trafia do treści.
+  async scheduleDailyHabitReminder(hour = 21, minute = 0, allDoneToday = false, remaining = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
-    if (await AsyncStorage.getItem('notif_habits_enabled') === 'false') return '';
+    await AsyncStorage.multiSet([
+      ['notif_habits_enabled', 'true'],
+      ['notif_habits_hour', String(hour)],
+      ['notif_habits_min', String(minute)],
+    ]).catch(() => {});
+    const body = remaining > 0
+      ? `Zostało Ci ${remaining} ${plPlural(remaining, 'nawyk', 'nawyki', 'nawyków')} do zrobienia dziś.`
+      : 'Masz nawyki do zrobienia na dziś.';
     return Notifications.scheduleNotificationAsync({
       identifier: 'daily-habits',
       content: {
         title: 'Nie odhaczyłeś dziś nawyków',
-        body: 'Masz nawyki do zrobienia na dziś.',
+        body,
         data: { screen: 'habits' },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour, minute,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(hour, minute, allDoneToday) },
     });
   },
 
   async cancelDailyHabitReminder(): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
+  },
+
+  // Re-arm na żywy stan (app foreground, po odhaczeniu, po zmianie listy nawyków) — jak
+  // refreshMoodReminder/refreshPetReminder/refreshBossReminder. Wołane z useHabits() na
+  // każdą zmianę habits/todayDone, więc treść i skip-today zawsze zgadzają się z realnym
+  // stanem, a nie z tym co było prawdą w chwili zapisu Ustawień.
+  async refreshDailyHabitReminder(allDoneToday: boolean, remaining: number): Promise<void> {
+    try {
+      if (await AsyncStorage.getItem('notif_habits_enabled') === 'false') return;
+      const h = parseInt((await AsyncStorage.getItem('notif_habits_hour')) ?? '21') || 21;
+      const m = parseInt((await AsyncStorage.getItem('notif_habits_min')) ?? '0') || 0;
+      await this.scheduleDailyHabitReminder(h, m, allDoneToday, remaining);
+    } catch {}
   },
 
   // ─── Daily todo list ──────────────────────────────────────────────────────────
