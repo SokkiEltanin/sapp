@@ -343,39 +343,6 @@ export const notificationsService = {
     } catch {}
   },
 
-  async scheduleDailyTaskBriefing(
-    hour = 8, minute = 0,
-    context?: { taskCount?: number; eventCount?: number; habitCount?: number },
-  ): Promise<string> {
-    await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
-    // Odmiana przez liczbę (2026-09-19, agent-audyt) — było na sztywno dopełniacz l.mn.
-    // niezależnie od liczby (np. "3 zadań" zamiast "3 zadania"), a te liczniki są zwykłymi
-    // dziennymi licznikami, rutynowo 1-4.
-    const parts: string[] = [];
-    if (context?.taskCount) parts.push(`${context.taskCount} ${plPlural(context.taskCount, 'zadanie', 'zadania', 'zadań')}`);
-    if (context?.eventCount) parts.push(`${context.eventCount} ${plPlural(context.eventCount, 'wydarzenie', 'wydarzenia', 'wydarzeń')}`);
-    if (context?.habitCount) parts.push(`${context.habitCount} ${plPlural(context.habitCount, 'nawyk', 'nawyki', 'nawyków')}`);
-    const body = parts.length > 0
-      ? `Na dziś: ${parts.join(', ')}. Do dzieła!`
-      : 'Zaplanuj swój dzień i sprawdź zadania.';
-    return Notifications.scheduleNotificationAsync({
-      identifier: 'daily-briefing',
-      content: {
-        title: 'Dzień dobry — plan dnia',
-        body,
-        data: { screen: 'tasks' },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour, minute,
-      },
-    });
-  },
-
-  async cancelDailyTaskBriefing(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
-  },
-
   // Nie DAILY (na sztywno o godzinie, bez względu na stan) — jak scheduleDailyMoodReminder,
   // one-off DATE trigger, żeby móc być stanowe: `allDoneToday` (2026-09-20, "inteligentne
   // powiadomienia" — dotąd trąbiło "nie odhaczyłeś nawyków" nawet gdy user WŁAŚNIE je
@@ -759,7 +726,12 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync('mission-ready').catch(() => {});
   },
 
-  async scheduleHabitReminder(habitId: string, title: string, hour: number, minute: number): Promise<void> {
+  // Nie DAILY (2026-09-20, "inteligentne powiadomienia" cd. — ta sama dziura co
+  // scheduleDailyHabitReminder wyżej, tylko dla przypomnienia PER-NAWYK: trąbiło o
+  // konkretnym nawyku o jego godzinie nawet gdy user go WŁAŚNIE zaznaczył). `doneToday`
+  // przeskakuje na jutro, jak wszędzie indziej w tym pliku. Re-armowane z useHabits() na
+  // każdą zmianę habits/todayDone, dla każdego nawyku z ustawionym `reminderTime`.
+  async scheduleHabitReminder(habitId: string, title: string, hour: number, minute: number, doneToday = false): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(`habit-${habitId}`).catch(() => {});
     await Notifications.scheduleNotificationAsync({
       identifier: `habit-${habitId}`,
@@ -768,10 +740,7 @@ export const notificationsService = {
         body: `"${title}" — zaznacz postęp na dziś!`,
         data: { screen: 'habits' },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour, minute,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(hour, minute, doneToday) },
     }).catch(() => {});
   },
 

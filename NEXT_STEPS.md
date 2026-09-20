@@ -18,9 +18,28 @@ ekranu) — `notif_morning_hour/min` w ogóle nigdy nie było zapisywane. `tsc`/
 testów, bez zmiany — plik notificationsService.ts nigdy nie miał testów, importuje
 expo-notifications). **Priorytet testu na urządzeniu: wysoki** (nowe zachowanie) — patrz §142.
 
-**Kolejny etap w toku (nie zaczęty)**: kategoryzacja produktów w Finanse/Produkty —
-hierarchia tag→podkategoria→wariant, lepsze sortowanie po dacie zakupu, klik na produkt →
-który paragon. Wymaga researchu modelu danych produktów/paragonów przed projektowaniem.
+## ✅ Audyt reszty powiadomień + research kategoryzacji produktów (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §143. User: "wszystkie powiadomienia możesz poulepszać, teraz
+trochę lipią" — kontynuacja §142 na resztę typów. Reszta `refresh*` (serwis/wypłata/budżet/
+podsumowanie tygodnia/karta miesiąca) już stanowa, nic do zmiany. Naprawione: (1) przypomnienie
+PER-NAWYK (`Habit.reminderTime`) miało TĘ SAMĄ dziurę co zbiorcze z §142 — ślepy `DAILY`,
+przerobione identycznie (DATE + `doneToday`, re-arm z `useHabits()`); (2)
+`scheduleDailyTaskBriefing`/`cancelDailyTaskBriefing` — martwy kod, zero wywołań w repo,
+zastąpiony dawno przez `scheduleDailyTodoList` ale nigdy nieodpięty — usunięty.
+
+**Research trzeciego etapu (kategoryzacja produktów)**: `app/products.tsx`/`productMemory.ts`
+już mają WIĘCEJ niż user zakładał — historia zakupów z linkiem do konkretnego paragonu (klik
+→ `/expenses/[id]`), warianty rozmiaru osobno w statystykach, scalanie duplikatów. Realnie
+brakuje: (1) hierarchii tag→podtag (dziś płaskie tagi, jedna lista); (2) grupowanego widoku w
+UI (dziś jedna płaska lista sortowana po liczbie zakupów). "Gdzie na paragonie" (pozycja OCR)
+NIE jest wykonalne bez przebudowy skanera — poza zasięgiem. **Konkretna propozycja czeka na
+potwierdzenie usera przed implementacją** (zmiana modelu danych, nie mechaniczny fix) — patrz
+§143 dla szczegółów.
+
+`tsc`/`jest` czyste (1030 testów). Priorytet testu na urządzeniu: średni (przypomnienie
+per-nawyk — ustaw godzinę na konkretnym nawyku, zaznacz go przed tą godziną, sprawdź że nie
+przypomni dzisiaj).
 
 ## ✅ Konsolidacja duplikatów setMonth-overflow + dokończenie sweepu selektorów (2026-09-20)
 

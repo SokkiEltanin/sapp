@@ -9,10 +9,10 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useFoodStore } from '@/store/foodStore';
 import { notificationsService } from '@/services/notificationsService';
 
-function applyReminder(habit: Habit) {
+function applyReminder(habit: Habit, doneToday = false) {
   if (habit.reminderTime) {
     const [h, m] = habit.reminderTime.split(':').map(Number);
-    notificationsService.scheduleHabitReminder(habit.id, habit.title, h, m).catch(() => {});
+    notificationsService.scheduleHabitReminder(habit.id, habit.title, h, m, doneToday).catch(() => {});
   } else {
     notificationsService.cancelHabitReminder(habit.id).catch(() => {});
   }
@@ -291,6 +291,17 @@ export function useHabits() {
     const remaining = Math.max(0, habits.length - todayDone.length);
     notificationsService.refreshDailyHabitReminder(remaining === 0, remaining).catch(() => {});
   }, [isLoading, habits.length, todayDone.length]);
+
+  // Ta sama dziura, per-nawyk: przypomnienie o KONKRETNYM nawyku (`reminderTime`) było
+  // dotąd ustawiane RAZ przy add/update (`applyReminder` w add/update niżej) i nigdy
+  // nie sprawdzało, czy ten nawyk został już dziś zaliczony — trąbiło mimo odhaczenia.
+  // Re-arm na każdą zmianę stanu, dla każdego nawyku z ustawioną godziną.
+  useEffect(() => {
+    if (isLoading) return;
+    for (const h of habits) {
+      if (h.reminderTime) applyReminder(h, todayDone.includes(h.id));
+    }
+  }, [isLoading, habits, todayDone]);
 
   return {
     habits, todayDone, completions, isLoading,
