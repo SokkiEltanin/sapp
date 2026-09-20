@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { markDashboardFirstFrame, recordDashboardReady, getPerfLog, clearPerfLog } from '@/utils/perfLog';
 
+// `startColdStartLagSampling` deliberately NOT imported/called anywhere in this file — it
+// schedules real `setTimeout`s for up to 8s (patrz komentarz w perfLog.ts), które by wisiały
+// w tle każdego testu w tym pliku. Testy niżej sprawdzają tylko że pola lagu ISTNIEJĄ i
+// domyślnie wynoszą 0 (sampler nigdy nie odpalony), nie samo próbkowanie.
+
 // 2026-08-25 (perf pass): "poor man's" cold-start profiler — no remote on-device profiler
 // here, so this logs real msToFirstFrame/msToReady numbers on the user's own phone, readable
 // via Ustawienia → Diagnostyka. `recordDashboardReady` is a plain, always-appends function —
@@ -23,6 +28,14 @@ describe('perfLog — cold-start timing log', () => {
     expect(log[0].msToFirstFrame).toBeGreaterThanOrEqual(0);
     expect(log[0].msToReady).toBeGreaterThanOrEqual(0);
     expect(typeof log[0].at).toBe('string');
+  });
+
+  test('pola lagu wątku JS domyślnie zerowe, gdy sampler nigdy nie odpalony', async () => {
+    await recordDashboardReady();
+    const [entry] = await getPerfLog();
+    expect(entry.maxLagMs).toBe(0);
+    expect(entry.totalLagMs).toBe(0);
+    expect(entry.lagSamples).toBe(0);
   });
 
   test('kolejne wywołania dopisują kolejne wpisy (one-shot pilnowany PRZEZ WOŁAJĄCEGO, nie tutaj)', async () => {
