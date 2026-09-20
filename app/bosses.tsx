@@ -79,7 +79,10 @@ export default function Bosses() {
     atkStatBonus: s.atkStatBonus, menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure,
     equippedGear: s.equippedGear, ownedGear: s.ownedGear,
   })));
-  const { expenses } = useExpensesStore();
+  // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja) — goły
+  // `useExpensesStore()` subskrybował cały store (filters/isLoading/pendingSync...) na
+  // ekranie, który już wcześniej w tej sesji dostał ten sam fix dla usePetStore.
+  const expenses = useExpensesStore((st) => st.expenses);
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
 

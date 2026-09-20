@@ -155,7 +155,10 @@ export default function BossFight() {
     catColor: s.catColor, catStripes: s.catStripes, catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor,
     catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
   })));
-  const { expenses } = useExpensesStore();
+  // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja) — goły
+  // `useExpensesStore()` na EKRANIE WALKI (hot path, częste re-rendery podczas animacji rund)
+  // subskrybował cały store wydatków, choć tu używane jest tylko `expenses`.
+  const expenses = useExpensesStore((st) => st.expenses);
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
 

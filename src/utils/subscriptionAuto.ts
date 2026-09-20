@@ -1,20 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Subscription, BillingCycle } from '@/types';
+import { Subscription } from '@/types';
 import { ymd } from '@/utils/date';
+
+// `advanceBillingDate` USUNIĘTE STĄD (2026-09-20, audyt logika/optymalizacja — konsolidacja
+// duplikatów) — był to TRZECI niezależny kopiowany wariant tej samej funkcji (obok
+// `subscriptions.tsx`'s `advanceNextBillingDate`, już przeniesionej do `recurringBills.ts`, i
+// `dashboard/subs.ts`'s identycznej kopii, też skonsolidowanej), ze SAMYM SAMYM buggiem
+// (gołe `setMonth` bez przycięcia, patrz §138/140 w ARCHITECTURE.md) — i to w kodzie który
+// odpala się AUTOMATYCZNIE, bez interakcji usera (dopasowanie płatności bankowej do
+// subskrypcji, `bankCommit.ts`), więc drift byłby całkowicie niewidoczny. Wołający kod woła
+// teraz wprost `advanceNextBillingDate` z `utils/recurringBills.ts` — jedno źródło prawdy.
 
 // When a bank payment matches a due subscription, we advance its billing date
 // automatically — so the app understands it's paid and stops asking "zapłaciłeś?".
-
-export function advanceBillingDate(current: string, cycle: BillingCycle): string {
-  const d = new Date(current + 'T00:00:00');
-  switch (cycle) {
-    case 'weekly':    d.setDate(d.getDate() + 7); break;
-    case 'monthly':   d.setMonth(d.getMonth() + 1); break;
-    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
-    case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
-  }
-  return ymd(d);
-}
 
 function norm(s: string): string {
   return (s || '').toLowerCase().replace(/[^a-z0-9ąćęłńóśżź]+/g, '');

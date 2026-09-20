@@ -1,3 +1,4 @@
+import { addMonths } from 'date-fns';
 import { Vehicle, MaintenanceItem, CalendarEvent } from '@/types';
 
 // Derive read-only "service due" calendar events from vehicles + maintenance
@@ -7,10 +8,14 @@ import { Vehicle, MaintenanceItem, CalendarEvent } from '@/types';
 
 const COLOR = '#FBBF24';
 
-function addMonths(iso: string, months: number): string {
-  const d = new Date(iso.slice(0, 10) + 'T00:00:00');
-  d.setMonth(d.getMonth() + months);
-  return fmt(d);
+// 2026-09-20, audyt logika/optymalizacja (konsolidacja duplikatów) — ta funkcja miała
+// WŁASNĄ, ręczną kopię `setMonth` bez przycięcia (ten sam bug co §138/140, TRZECI niezależny
+// plik z logiką terminów pojazdów obok `vehicleMatch.ts`/`recurringBills.ts`) — serwis/wymiana
+// oleju z datą 29-31 dnia miesiąca dawała wydarzenie w kalendarzu kilka dni PO właściwym
+// terminie. Teraz `date-fns`'s `addMonths` (poprawnie przycina), zaimportowane wprost —
+// lokalna nazwa `addMonthsIso` żeby nie kolidować z importem.
+function addMonthsIso(iso: string, months: number): string {
+  return fmt(addMonths(new Date(iso.slice(0, 10) + 'T00:00:00'), months));
 }
 function addDays(iso: string, days: number): string {
   const d = new Date(iso.slice(0, 10) + 'T00:00:00');
@@ -27,9 +32,9 @@ export function maintenanceDueEvents(vehicles: Vehicle[], items: MaintenanceItem
     out.push({ id, title, date, allDay: true, priority: 'normal', color: COLOR, createdAt: '' });
 
   for (const v of vehicles) {
-    if (v.oilChangeDate && v.oilIntervalMonths) mk(`maint:v:${v.id}:oil`, `Wymiana oleju — ${v.name}`, addMonths(v.oilChangeDate, v.oilIntervalMonths));
+    if (v.oilChangeDate && v.oilIntervalMonths) mk(`maint:v:${v.id}:oil`, `Wymiana oleju — ${v.name}`, addMonthsIso(v.oilChangeDate, v.oilIntervalMonths));
     for (const m of v.maintenance ?? []) {
-      if (m.intervalMonths && m.date) mk(`maint:v:${v.id}:${m.id}`, `${m.label} — ${v.name}`, addMonths(m.date, m.intervalMonths));
+      if (m.intervalMonths && m.date) mk(`maint:v:${v.id}:${m.id}`, `${m.label} — ${v.name}`, addMonthsIso(m.date, m.intervalMonths));
     }
   }
   for (const it of items) {

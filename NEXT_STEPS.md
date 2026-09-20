@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Konsolidacja duplikatów setMonth-overflow + dokończenie sweepu selektorów (2026-09-20)
+
+Pełny opis w ARCHITECTURE.md §141. User: "ogarnij wszystko te techniczne bugi". Repo-wide
+grep za wzorcem `setMonth(...getMonth()+...)` znalazł bug ZDUPLIKOWANY w 3 kolejnych plikach
+(`dashboard/subs.ts` — literalna kopia funkcji z recurringBills.ts, z własnym testem
+pinującym buggy zachowanie; `subscriptionAuto.ts`'s `advanceBillingDate` — używana w
+AUTOMATYCZNYM dopasowywaniu płatności bankowych, bankCommit.ts — najpoważniejszy przypadek,
+cichy drift bez żadnej interakcji usera; `maintenanceCalendar.ts` — osobna kopia dla wydarzeń
+kalendarza "wymiana oleju"). Skonsolidowane do JEDNEGO źródła (`recurringBills.ts`) zamiast
+3 niezależnych kopii, `maintenanceCalendar.ts` przepisany na `date-fns`. Dokończony sweep
+selektorów store'ów: `PetCustomizeModal.tsx` (zawsze zamontowany na /pet, miał całkowicie
+goły `usePetStore()`), reszta `useExpensesStore()` w `bosses.tsx`/`boss-fight.tsx`. Świadomie
+NIE dotknięte pozostałe 12 miejsc — albo ekrany analizy wydatków potrzebujące szerokiego
+dostępu, albo rzadko odwiedzane ekrany ze stosu, selektor by nic nie dał. `tsc`/`jest` czyste
+(1030 testów). Priorytet testu na urządzeniu: średni.
+
 ## ✅ Audyt logika/optymalizacja, runda 3 — pojazdy/raid/wydajność (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §140. Trzecia runda audytu, świeże obszary (raid/wydarzenia
