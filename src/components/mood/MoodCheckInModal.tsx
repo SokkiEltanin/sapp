@@ -48,7 +48,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const scrollRef = useRef<ScrollView>(null);
   const tagsScrollRef = useRef<ScrollView>(null);
 
-  const { addEntry, updateEntry, entries: allEntries } = useMoodStore();
+  const { addPending, updateEntry, markPending, confirmSync, entries: allEntries } = useMoodStore();
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
 
   // You can log mood several times a day. Show which check-in of the day this is.
@@ -113,34 +113,36 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     setTimeout(() => tagsScrollRef.current?.scrollTo({ x: 0, animated: true }), 60);
   };
 
-  const handleSave = async () => {
+  // Local-first (2026-09-21, user: zapis zawieszony na "Zapisuję..." na słabym połączeniu,
+  // §149 — potem: "może zapisywać offline i wysłać jak będzie wifi") — TEN SAM wzorzec co
+  // `expenses/manual.tsx`'s `addPending()`+fire-and-forget `addWithId()`: zapisz lokalnie
+  // (natychmiastowe, synchroniczne, przetrwa restart dzięki `pendingSync`), zamknij modal od
+  // razu, a zapis do Firestore leci w tle — jeśli się nie uda (offline), `pendingSync` zostaje
+  // ustawione i `flushPendingMoodWrites()` (w `_layout.tsx`) spróbuje ponownie na kolejnym
+  // foregroundzie, bez udziału usera. UI już nigdy nie czeka na sieć, więc nie może zawisnąć.
+  const handleSave = () => {
     if (!mood || !energy) {
       Alert.alert('Uzupełnij', 'Wybierz nastrój i poziom energii');
       return;
     }
+    if (saving) return; // double-tap guard
     setSaving(true);
-    try {
-      if (existingEntry) {
-        const updates = { mood, energy, note: note.trim() || undefined, tags };
-        await moodService.update(existingEntry.id, updates);
-        updateEntry(existingEntry.id, updates);
-      } else {
-        const entry = await moodService.add({
-          date: todayISO(),
-          mood, energy,
-          note: note.trim() || undefined,
-          tags,
-        });
-        addEntry(entry);
-      }
-      haptic.success();
-      onClose();
-    } catch (e: any) {
-      haptic.error();
-      Alert.alert('Błąd', e.message);
-    } finally {
-      setSaving(false);
+    if (existingEntry) {
+      const updates = { mood, energy, note: note.trim() || undefined, tags, updatedAt: new Date().toISOString() };
+      updateEntry(existingEntry.id, updates);
+      markPending(existingEntry.id);
+      const fullEntry: MoodEntry = { ...existingEntry, ...updates };
+      moodService.addWithId(existingEntry.id, fullEntry).then(() => confirmSync(existingEntry.id)).catch(() => {});
+    } else {
+      const id = moodService.newId();
+      const now = new Date().toISOString();
+      const entry: MoodEntry = { id, date: todayISO(), mood, energy, note: note.trim() || undefined, tags, createdAt: now, updatedAt: now };
+      addPending(entry);
+      moodService.addWithId(id, entry).then(() => confirmSync(id)).catch(() => {});
     }
+    haptic.success();
+    setSaving(false);
+    onClose();
   };
 
   // Custom (non-preset) tags are pinned to the FRONT (right after the + button) so a

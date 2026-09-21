@@ -3,25 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## ✅ Zapis humoru wisiał wiecznie na "Zapisuję..." — timeout na zapis Firestore (2026-09-21)
+## ✅ Humor local-first — zapis offline + auto-sync po powrocie sieci (2026-09-21)
 
-Pełny opis w ARCHITECTURE.md §149. User przysłał screenshot: przycisk zapisu check-inu
-zamrożony, nic się nie dzieje. Przyczyna: Firestore bez offline persistence NIE rzuca błędu
-na słabym połączeniu, tylko wiesza się bezterminowo — `handleSave`'s try/catch/finally nigdy
-się nie odpalał, bo Promise nigdy się nie rozstrzygał. Nowy `withTimeout()` w `firebase.ts`
-(10s, potem czytelny błąd) zastosowany w `moodService.ts`. Notatka/tagi nie giną — modal
-zamyka się tylko przy sukcesie. `tsc`/`jest` czyste (1033 testy, bez zmiany).
+Pełny opis w ARCHITECTURE.md §149 (fix nr 1: timeout, bezpiecznik) i §150 (fix nr 2: PRAWDZIWY
+local-first, to o co userowi chodziło: "może zapisywać offline i wysłać jak będzie wifi").
+Okazało się, że apka JUŻ MIAŁA ten dokładny wzorzec dla wydatków/paragonów
+(`expensesStore.ts`'s `pendingSync`/`expenseSync.ts`'s `flushPendingExpenseWrites`/
+`expensesService.newId()`+`addWithId()`) — `expenses/manual.tsx` zapisuje natychmiast lokalnie,
+nawiguje dalej OD RAZU, Firestore leci w tle fire-and-forget. Humor tego nie miał. Przeniesiony
+ten sam wzorzec 1:1: `moodStore.ts` dostał `pendingSync`/`addPending`/`markPending`/
+`confirmSync` + merge-aware `setEntries`, `moodService.ts`'s blokujące `add`/`update` zastąpione
+`newId()`+`addWithId()` (upsert), nowy `moodSync.ts` (`flushPendingMoodWrites`, wpięty w
+`_layout.tsx` obok flusha wydatków), `MoodCheckInModal.tsx`'s `handleSave` i dashboardowy
+`handleQuickMood` już nie `async`/`await` — zapis lokalny + zamknięcie modala natychmiastowe,
+sieć w tle. `tsc`/`jest` czyste (1033 testy, bez zmiany netto — `moodStore.ts` nietestowalne
+bezpośrednio, importuje `notificationsService`→`expo-notifications`).
 
-**🆕 Systemowy zakres, NIE zrobiony teraz**: TEN SAM brak timeoutu jest we WSZYSTKICH
-serwisach piszących do Firestore — `expensesService.ts` (najważniejszy!), `calendarService.ts`,
-`debtsService.ts`, `maintenanceService.ts`, `subscriptionsService.ts`, `templatesService.ts`,
-`vehiclesService.ts`, `workService.ts`, `backupService.ts`. `withTimeout()` gotowy do
-ponownego użycia — kandydat na dedykowany PR (sweep), jeśli to samo zawieszenie wystąpi gdzie
-indziej albo user zdecyduje się ochronić resztę zapisów prewencyjnie.
+**🆕 Systemowy zakres, NIE zrobiony teraz**: `expensesService.ts` już MA ten wzorzec (był
+źródłem, nie brakiem) — reszta serwisów piszących do Firestore NADAL nie ma ani local-first
+ani nawet samego `withTimeout()` z §149: `calendarService.ts`, `debtsService.ts`,
+`maintenanceService.ts`, `subscriptionsService.ts`, `templatesService.ts`, `vehiclesService.ts`,
+`workService.ts`, `backupService.ts`. Kandydat na dedykowany PR (sweep), jeśli to samo
+zawieszenie wystąpi gdzie indziej albo user zdecyduje się ochronić resztę zapisów prewencyjnie.
 
-**Priorytet testu na urządzeniu — wysoki**: zapisz check-in humoru normalnie (powinno
-działać), potem spróbuj z wyłączonym internetem — po ~10s Alert z błędem zamiast wiecznego
-"Zapisuję...".
+**Priorytet testu na urządzeniu — wysoki**: (1) zapisz humor normalnie — bez zauważalnej
+zmiany; (2) tryb samolotowy → zapisz humor → modal zamyka się NATYCHMIAST, wpis widoczny; (3)
+wyłącz tryb samolotowy, wróć z tła apki — wpis synchronizuje się sam, bez żadnej akcji.
 
 ## 🆕 Rejestr lagu wątku JS na starcie — czeka na REALNE dane z urządzenia (2026-09-20)
 

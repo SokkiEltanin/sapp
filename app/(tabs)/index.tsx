@@ -318,7 +318,8 @@ export default function DashboardScreen() {
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const moodEntries = useMoodStore(s => s.entries);
   const setMood = useMoodStore(s => s.setEntries);
-  const addEntry = useMoodStore(s => s.addEntry);
+  const addMoodPending = useMoodStore(s => s.addPending);
+  const confirmMoodSync = useMoodStore(s => s.confirmSync);
   const events = useCalendarStore(s => s.events);
   const gcalEvents = useCalendarStore(s => s.gcalEvents);
   const calTasks = useCalendarStore(s => s.tasks);
@@ -744,18 +745,18 @@ export default function DashboardScreen() {
   }, [allEvents, workSettings, workEarnings.perSecond]);
 
   // ── Quick mood handler ────────────────────────────────────────────────────
-  const handleQuickMood = useCallback(async (level: MoodLevel) => {
+  // Local-first (2026-09-21, §149/§150 — ten sam wzorzec co MoodCheckInModal.tsx): zapisz
+  // lokalnie od razu, Firestore leci w tle fire-and-forget, retry przez flushPendingMoodWrites.
+  const handleQuickMood = useCallback((level: MoodLevel) => {
     haptic.tap();
-    try {
-      const entry = await moodService.add({ date: todayStr(), mood: level, energy: 3, tags: [] });
-      addEntry(entry);
-      const n = moodEntries.filter(e => e.date === todayStr()).length + 1; // +1 = the one just added
-      toast.success(n > 1 ? `Zapisano nastrój · ${n}. raz dziś` : 'Zapisano nastrój');
-    } catch {
-      haptic.error();
-      toast.error('Nie zapisano nastroju — spróbuj ponownie');
-    }
-  }, [addEntry, moodEntries]);
+    const id = moodService.newId();
+    const now = new Date().toISOString();
+    const entry: MoodEntry = { id, date: todayStr(), mood: level, energy: 3, tags: [], createdAt: now, updatedAt: now };
+    addMoodPending(entry);
+    moodService.addWithId(id, entry).then(() => confirmMoodSync(id)).catch(() => {});
+    const n = moodEntries.filter(e => e.date === todayStr()).length + 1; // +1 = the one just added
+    toast.success(n > 1 ? `Zapisano nastrój · ${n}. raz dziś` : 'Zapisano nastrój');
+  }, [addMoodPending, confirmMoodSync, moodEntries]);
 
   // ── Pomodoro history ──────────────────────────────────────────────────────
   const loadPomSessions = useCallback(async () => {

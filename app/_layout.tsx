@@ -29,6 +29,7 @@ import { autoSyncHealth } from '@/services/healthAutoSync';
 import { drainBankNotifications } from '@/services/bankNotificationDrain';
 import { flushThrottledStorage } from '@/utils/throttledStorage';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
+import { flushPendingMoodWrites } from '@/services/moodSync';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import { migratePaydayDefaultOff } from '@/utils/payday';
@@ -382,6 +383,17 @@ export default function RootLayout() {
     const t = setTimeout(() => { flushPendingExpenseWrites().catch(() => {}); }, 2500);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') flushPendingExpenseWrites().catch(() => {});
+    });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, []);
+
+  // TEN SAM wzorzec dla check-inów humoru (2026-09-21, user: "moze zapisywac offline i
+  // wyslac jak bedzie wifi" — §149/§150) — `MoodCheckInModal`/quick-mood na dashboardzie
+  // zapisują lokalnie od razu i flagują `pendingSync`, ten efekt dogrywa je do chmury.
+  useEffect(() => {
+    const t = setTimeout(() => { flushPendingMoodWrites().catch(() => {}); }, 2500);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') flushPendingMoodWrites().catch(() => {});
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, []);

@@ -9630,6 +9630,56 @@ do ponownej próby.
 
 ---
 
+## 150. Humor local-first — zapis offline + auto-sync po powrocie sieci (2026-09-21)
+
+User, po §149 (timeout zamiast wiecznego zawieszenia): "może zapisywać offline i wysłać jak
+będzie wifi" — timeout to bezpiecznik, nie to o co naprawdę chodziło. Okazało się, że apka JUŻ
+MA dokładnie ten wzorzec, tylko dla wydatków/paragonów, nie dla humoru: `expensesStore.ts`'s
+`pendingSync`/`addPending`/`confirmSync` + `expenseSync.ts`'s `flushPendingExpenseWrites()` +
+`expensesService.newId()`/`addWithId()` — `expenses/manual.tsx` zapisuje NATYCHMIAST lokalnie
+(`addPending`, synchroniczne, przetrwa restart), nawiguje dalej OD RAZU, a Firestore leci w
+tle fire-and-forget (`.then(confirmSync).catch(() => {})`) — user NIGDY nie czeka na sieć
+(komentarz w kodzie: naprawione już raz jako "receipt-save black screen" na słabym sygnale).
+`moodService.add()`/`.update()` tego nie miały — stąd zawieszenie z §149.
+
+**Przeniesiony ten sam wzorzec 1:1 na humor**:
+- `moodStore.ts` — dodane `pendingSync: string[]`, `addPending`/`markPending`/`confirmSync`,
+  `setEntries` merge-aware (zachowuje niezsynchronizowane wpisy przy odświeżeniu z chmury) —
+  identyczny kształt co `expensesStore.ts`.
+- `moodService.ts` — `add()`/`update()` (blokujące, `await`) USUNIĘTE, zastąpione
+  `newId()` (synchroniczne, offline, mintuje id bez sieci) + `addWithId()` (upsert przez
+  `setDoc`, bezpieczny zarówno dla nowego wpisu jak i edycji istniejącego — ten sam trik co
+  `expensesService`, jedna funkcja zamiast osobnych add/update). `getAll`/`getByDate`/`remove`
+  bez zmian.
+- `moodSync.ts` (NOWY plik) — `flushPendingMoodWrites()`, kopia `flushPendingExpenseWrites()`.
+  Wpięty w `_layout.tsx` (cold start + każdy foreground), obok istniejącego flusha wydatków.
+- `MoodCheckInModal.tsx`'s `handleSave` — już NIE `async`/`await`. Zapisz lokalnie
+  (`addPending`/`updateEntry`+`markPending`) → `haptic.success()` → `onClose()`, WSZYSTKO
+  natychmiast, synchronicznie. Firestore-write leci fire-and-forget PO zamknięciu modala.
+  `saving`/"Zapisuję..." zostaje jako guard przeciw double-tapowi, ale realnie migocze przez
+  ułamek klatki (nic już nie czeka na sieć) — w praktyce user nigdy go nie zobaczy.
+- `app/(tabs)/index.tsx`'s `handleQuickMood` (szybki wybór nastroju na dashboardzie) —
+  ten sam local-first, ten sam powód (był drugim, mniejszym `moodService.add()` z tą samą
+  luką).
+
+Efekt: zapis humoru offline działa jak zapis paragonu offline od dawna — user widzi wynik od
+razu, dane nie giną (persisted lokalnie + `pendingSync` przetrwa restart), a chmura dogania w
+tle bez żadnej interakcji, gdy sieć wróci. `withTimeout` z §149 zostaje w `addWithId` — chroni
+teraz kolejkę retry (`flushPendingMoodWrites`), nie UI (które już nigdy nie czeka).
+
+`tsc`/`jest` czyste (1033 testy, bez zmiany netto — `moodStore.ts` importuje
+`notificationsService`→`expo-notifications`, więc jak zawsze nietestowalne bezpośrednio w
+Jest; zweryfikowane probe-testem że import faktycznie się wywala, jak przy `googleCalendarMap.ts`
+w §138).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) zapisz humor przy dobrym połączeniu —
+powinno działać jak dotąd, bez zauważalnej zmiany; (2) włącz tryb samolotowy, zapisz humor —
+modal powinien zamknąć się NATYCHMIAST (nie czekać), wpis widoczny na liście; (3) wyłącz tryb
+samolotowy, poczekaj na kolejny foreground apki (albo wróć z tła) — wpis powinien
+zsynchronizować się w tle bez żadnej dodatkowej akcji.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
