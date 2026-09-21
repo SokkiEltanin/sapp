@@ -3,6 +3,41 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 POMYSŁ (zapisany, nie zaczęty): plan zajęć [PUR] z importu PDF (2026-09-21)
+
+User (student UR) chce widget/przypomnienia dla planu zajęć — sala, X minut przed. Ustalony
+kierunek: prefiks `[PUR]` (jak `[JD]` dla pracy), konfigurowalny w Ustawieniach identycznie
+jak `workPrefix`; źródło wydarzeń = Google Kalendarz (cykliczność + wyjątki — dni rektorskie,
+sesja — obsługuje NATYWNIE Kalendarz, apka tylko czyta co zwraca, ZERO parsera/logiki
+wyjątków po stronie apki). Dodatkowy pomysł usera: zamiast ręcznie ustawiać cykl w Kalendarzu,
+wysłać mi (w rozmowie, nie jako funkcja w apce) PDF z planem + PDF z wolnymi tygodniami — ja
+czytam PDF-y i generuję gotowy plik `.ics` z całym semestrem (poprawne daty, sala w opisie,
+prefiks w tytule, wyjątki już wbudowane jako brakujące wydarzenia), user importuje JEDNYM
+importem do Google Kalendarza. Przy zmianie w trakcie semestru — nowy PDF, ja
+porównuję/generuję zaktualizowany `.ics`.
+
+**Do zrobienia w apce (niezależne od tego skąd wezmą się wydarzenia)**: pole prefiksu w
+Ustawieniach (sekcja analogiczna do Pracy), rozpoznawanie `[PUR]`-prefiksowanych
+`gcalEvents` + wyciąganie sali z tytułu/opisu, kafelek/widget na dziś, nowe powiadomienie
+X minut przed z salą (osobny przełącznik, dziś synchronizowane wydarzenia z Google w ogóle
+nie mają żadnych push-powiadomień, tylko bierny pill gdy apka otwarta).
+
+**Nie zaczęte — czeka na PDF-y od usera** (research/projekt zrobiony w rozmowie, kod jeszcze
+nie napisany).
+
+## ✅ Fix: eksport postępu pupila pokazywał niezaokrąglony float HP kotka (2026-09-21)
+
+Pełny opis w ARCHITECTURE.md §151. User przysłał 4. eksport testowej rundy (poziom 617) —
+"HP kotka: 6558.331368923098" zamiast czystej liczby. Przyczyna: `rollGearValue()` świadomie
+losuje surowy float (inne miejsca liczą na tej precyzji), a `bossProgressReport.ts` liczyło
+max HP RĘCZNIE zamiast wołać `effectiveCatMaxHp()` (tej samej funkcji co realna walka) —
+pomijając zarówno zaokrąglenie, jak i `potionFlatHp` (aktywna mikstura HP w ogóle nie była
+wliczana). Fix: raport woła `effectiveCatMaxHp()` wprost. Reszta eksportu przejrzana bez
+dalszych anomalii — krzywa nagród MAD (§139) nadal ściśle rosnąca, kampania w pełni pokonana
+~1 ciosem na bossa (oczekiwane na tak ekstremalnym poziomie testowym). `tsc`/`jest` czyste
+(1035 testów, +2). Priorytet testu na urządzeniu: niski — kosmetyczny fix eksportu, żadna
+realna mechanika walki się nie zmieniła.
+
 ## ✅ Humor local-first — zapis offline + auto-sync po powrocie sieci (2026-09-21)
 
 Pełny opis w ARCHITECTURE.md §149 (fix nr 1: timeout, bezpiecznik) i §150 (fix nr 2: PRAWDZIWY

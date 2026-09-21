@@ -9680,6 +9680,43 @@ zsynchronizować się w tle bez żadnej dodatkowej akcji.
 
 ---
 
+## 151. Fix: eksport postępu pupila pokazywał brzydki, niezaokrąglony float HP kotka (2026-09-21)
+
+User przysłał czwarty eksport testowej rundy (poziom 617, 7.6M XP total, prośba: "ogarnij
+pupila i bossy... dostosowanie musimy implementowalne zrobić"). W eksporcie: `HP kotka:
+6558.331368923098` — realna liczba dziesiętna, nie zaokrąglona jak wszędzie indziej w apce.
+
+**Przyczyna**: `rollGearValue()` (gear.ts) świadomie losuje `OwnedGear.value` jako SUROWY
+float (`min + rand()*(max-min)`, nigdy nie zaokrąglany — inne miejsca liczą na tej precyzji
+przy sumowaniu wielu bonusów). Realna walka/ekran Pupila zawsze pokazuje HP przez
+`effectiveCatMaxHp()`, która na końcu robi `Math.round(...)` — ale `bossProgressReport.ts`
+liczyło `maxHp` RĘCZNIE (`catMaxHp(s.catMaxHpBonus) + gearFlatHp(...)`), pomijając zarówno to
+zaokrąglenie, JAK I `potionFlatHp` (aktywna mikstura HP w ogóle nie była wliczana — `Progress
+ReportInput` nie miało nawet pola `activePotion`). Dwa bugi w jednym miejscu: brzydki output +
+zła wartość gdy user ma aktywną miksturę.
+
+**Fix**: `bossProgressReport.ts` woła teraz `effectiveCatMaxHp()` wprost zamiast reimplementować
+wzór — jedno źródło prawdy, ten sam co w realnej walce. `ProgressReportInput` dostał opcjonalne
+`activePotion?: ActivePotion | null` (caller w `settings.tsx` przekazuje CAŁY stan
+`usePetStore.getState()`, więc żadnej zmiany w call site nie trzeba było robić — strukturalne
+typowanie).
+
+**Reszta danych z eksportu przejrzana bez znalezienia dalszych anomalii**: krzywa nagród MAD
+(§139) nadal ściśle rosnąca na widocznym zakresie orderów (24k→75k monet w kolejności bossów,
+zgodne z projektem); kampania w pełni pokonana ~1 ciosem na bossa przy tych statach — oczekiwane
+na tak ekstremalnym poziomie testowym (kampania to early-game content). Nic więcej nie
+naprawiane bez konkretnego sygnału co user uważa za "nie tak" — zgadywanie dalszych zmian
+balansu bez wskazówki ryzykowałoby zepsucie czegoś działającego poprawnie.
+
+`tsc`/`jest` czyste (1035 testów, +2 nowe — float z gearu zaokrąglony w raporcie, mikstura HP
+wliczona).
+
+**Priorytet testu na urządzeniu — niski** (kosmetyczny fix eksportu, nie zmienia żadnej
+realnej mechaniki walki/HP w grze — to zawsze było poprawnie liczone, zły był tylko tekst
+raportu).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
