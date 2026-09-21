@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { userCol, userDoc } from './firebase';
+import { userCol, userDoc, withTimeout } from './firebase';
 import { MoodEntry } from '@/types';
 
 const COL = 'mood';
@@ -22,18 +22,21 @@ export const moodService = {
     return { id: d.id, ...d.data() } as MoodEntry;
   },
 
+  // `withTimeout` (2026-09-21, user: zapis humoru zawieszony na "Zapisuję..." bez końca) —
+  // bez lokalnego cache Firestore te zapisy inaczej wiszą bezterminowo na słabym połączeniu
+  // zamiast się nie udać, patrz komentarz przy `withTimeout` w firebase.ts.
   async add(entry: Omit<MoodEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<MoodEntry> {
     const now = new Date().toISOString();
     const data = strip({ ...entry, createdAt: now, updatedAt: now });
-    const ref = await addDoc(await userCol(COL), data);
+    const ref = await withTimeout(addDoc(await userCol(COL), data));
     return { ...entry, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async update(id: string, updates: Partial<MoodEntry>): Promise<void> {
-    await updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await withTimeout(updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() })));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(await userDoc(COL, id));
+    await withTimeout(deleteDoc(await userDoc(COL, id)));
   },
 };
