@@ -110,3 +110,23 @@ export const userSubcol = async (col: string, id: string, sub: string) =>
   collection(db, 'users', await uid(), col, id, sub);
 export const userSubdoc = async (col: string, id: string, sub: string, subId: string) =>
   doc(db, 'users', await uid(), col, id, sub, subId);
+
+// Firestore writes here use the default (no offline persistence/`localCache`) config —
+// `initializeFirestore` above only sets `ignoreUndefinedProperties`. Without persistence,
+// `addDoc`/`updateDoc`/`deleteDoc` don't resolve OR reject on bad connectivity: the write
+// just queues silently and the returned Promise hangs until an actual server round-trip
+// succeeds, however long that takes (2026-09-21, user: screenshot of the mood check-in stuck
+// forever on "Zapisuję..." — no error, no timeout, note/tags never lost but also never saved).
+// `whenAuthReady()` already has its own 4s ceiling for the AUTH half of a write; this covers
+// the actual network write itself. Callers see a normal thrown Error after `ms`, so existing
+// try/catch/finally (resets a `saving` flag, shows an Alert) just works without a rewrite.
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms = 10000,
+  message = 'Zapis trwa zbyt długo — sprawdź połączenie z internetem i spróbuj ponownie.',
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}

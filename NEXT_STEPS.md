@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Zapis humoru wisiał wiecznie na "Zapisuję..." — timeout na zapis Firestore (2026-09-21)
+
+Pełny opis w ARCHITECTURE.md §149. User przysłał screenshot: przycisk zapisu check-inu
+zamrożony, nic się nie dzieje. Przyczyna: Firestore bez offline persistence NIE rzuca błędu
+na słabym połączeniu, tylko wiesza się bezterminowo — `handleSave`'s try/catch/finally nigdy
+się nie odpalał, bo Promise nigdy się nie rozstrzygał. Nowy `withTimeout()` w `firebase.ts`
+(10s, potem czytelny błąd) zastosowany w `moodService.ts`. Notatka/tagi nie giną — modal
+zamyka się tylko przy sukcesie. `tsc`/`jest` czyste (1033 testy, bez zmiany).
+
+**🆕 Systemowy zakres, NIE zrobiony teraz**: TEN SAM brak timeoutu jest we WSZYSTKICH
+serwisach piszących do Firestore — `expensesService.ts` (najważniejszy!), `calendarService.ts`,
+`debtsService.ts`, `maintenanceService.ts`, `subscriptionsService.ts`, `templatesService.ts`,
+`vehiclesService.ts`, `workService.ts`, `backupService.ts`. `withTimeout()` gotowy do
+ponownego użycia — kandydat na dedykowany PR (sweep), jeśli to samo zawieszenie wystąpi gdzie
+indziej albo user zdecyduje się ochronić resztę zapisów prewencyjnie.
+
+**Priorytet testu na urządzeniu — wysoki**: zapisz check-in humoru normalnie (powinno
+działać), potem spróbuj z wyłączonym internetem — po ~10s Alert z błędem zamiast wiecznego
+"Zapisuję...".
+
 ## 🆕 Rejestr lagu wątku JS na starcie — czeka na REALNE dane z urządzenia (2026-09-20)
 
 Pełny opis w ARCHITECTURE.md §146. User: "zawsze te startupy animacje lagują... nie mogę

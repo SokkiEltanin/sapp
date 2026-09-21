@@ -9590,6 +9590,46 @@ sprawdź kolejność i widoczną datę.
 
 ---
 
+## 149. Zapis humoru wisiał wiecznie na "Zapisuję..." — brak timeoutu na zapis Firestore (2026-09-21)
+
+User przysłał screenshot: przycisk zapisu check-inu humoru zamrożony na "Zapisuję..."
+(disabled), nic się nie dzieje. Przyczyna: `initializeFirestore` w `firebase.ts` NIE włącza
+offline persistence/`localCache` (tylko `ignoreUndefinedProperties`) — bez tego `addDoc`/
+`updateDoc`/`deleteDoc` na słabym/zerwanym połączeniu NIE rzucają błędu i NIE hangują z
+timeoutem, tylko cicho czekają w nieskończoność na faktyczny round-trip do serwera. `handleSave`
+w `MoodCheckInModal.tsx` ma poprawny try/catch/finally (`setSaving(false)` w finally, Alert w
+catch) — ale skoro Promise z `addDoc()` sam nigdy się nie rozstrzyga, żadna z tych gałęzi nigdy
+nie odpala. `whenAuthReady()` (§ z 2026-09-15) ma WŁASNY 4s ceiling, ale to pokrywa tylko fazę
+autoryzacji, nie sam zapis sieciowy.
+
+**Fix**: nowy `withTimeout()` w `firebase.ts` — `Promise.race` przeciw `setTimeout` (10s
+domyślnie), rzuca czytelny błąd ("Zapis trwa zbyt długo — sprawdź połączenie...") zamiast
+wiecznie wisieć. Zastosowany w `moodService.ts` (`add`/`update`/`remove`) — reszta kodu
+(`handleSave` w modalu) działa bez zmian, bo teraz Promise faktycznie się rozstrzyga (reject),
+więc catch/finally wreszcie się odpalają. Notatka/tagi/mood NIE giną przy błędzie — modal
+zamyka się TYLKO przy sukcesie (`onClose()` po `await`), więc user po prostu klika Zapisz
+jeszcze raz.
+
+**Świadomie NIE zrobione teraz — systemowy zakres, nie tylko mood**: TEN SAM brak timeoutu
+istnieje we WSZYSTKICH serwisach piszących bezpośrednio do Firestore: `expensesService.ts`
+(najważniejszy — wydatki/paragony), `calendarService.ts`, `debtsService.ts`,
+`maintenanceService.ts`, `subscriptionsService.ts`, `templatesService.ts`,
+`vehiclesService.ts`, `workService.ts`, `backupService.ts`. `withTimeout()` jest już
+wyeksportowany z `firebase.ts` gotowy do ponownego użycia — kandydat na osobny, dedykowany PR
+(sweep przez wszystkie serwisy), jeśli user zgłosi to samo zawieszenie gdzie indziej albo
+zdecyduje się prewencyjnie ochronić resztę zapisów. Patrz NEXT_STEPS.md.
+
+`tsc`/`jest` czyste (1033 testy, bez zmiany — `firebase.ts`/`moodService.ts` nigdy nie miały
+testów, żaden test nie importuje modułu firebase, `withTimeout` sam jest zbyt trywialny/
+generyczny żeby uzasadniać osobny test bez realnego Firestore).
+
+**Priorytet testu na urządzeniu — wysoki**: zapisz check-in humoru przy dobrym połączeniu
+(powinno zadziałać normalnie), potem spróbuj przy wyłączonym internecie — po ~10s powinien
+pokazać się Alert z błędem zamiast wiecznego "Zapisuję...", a notatka/wybory zostają w modalu
+do ponownej próby.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
