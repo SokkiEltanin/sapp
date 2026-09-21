@@ -14,6 +14,39 @@ const base: ProgressReportInput = {
   bossLog: [],
 };
 
+// 2026-09-21, user: eksport postępu pupila pokazał "HP kotka: 6558.331368923098" — brzydki,
+// niezaokrąglony float zamiast czystej liczby jak wszędzie indziej w apce (na ekranie
+// Pupila/w walce HP zawsze przechodzi przez `effectiveCatMaxHp`'s `Math.round`). Przyczyna:
+// `rollGearValue` (gear.ts) losuje `OwnedGear.value` jako SUROWY float
+// (`min + rand()*(max-min)`, nigdy nie zaokrąglany — świadomie, bo inne miejsca liczą na tej
+// precyzji), a raport dotąd sumował `catMaxHp(...) + gearFlatHp(...)` RĘCZNIE, pomijając i
+// zaokrąglenie, i `potionFlatHp` (aktywna mikstura HP). Fix: raport woła `effectiveCatMaxHp`
+// wprost, jak walka.
+describe('bossProgressReport — HP kotka liczone tak samo jak w walce', () => {
+  test('gear z ułamkowym wylosowanym `.value` → HP w raporcie i tak zaokrąglone', () => {
+    const s: ProgressReportInput = {
+      ...base,
+      catMaxHpBonus: 50,
+      equippedGear: { zbroja: 'zbroja_szmaciana' },
+      ownedGear: { zbroja_szmaciana: { rarity: 'common', value: 12.7291834 } },
+    };
+    const report = buildBossProgressReport(s);
+    expect(report).toMatch(/HP kotka: \d+ \(/);       // liczba całkowita, żadnej kropki dziesiętnej
+    expect(report).not.toContain('.729');
+  });
+
+  test('aktywna mikstura HP wliczona (dotąd całkowicie pomijana w raporcie)', () => {
+    const withoutPotion = buildBossProgressReport({ ...base, catMaxHpBonus: 0 });
+    const withPotion = buildBossProgressReport({
+      ...base,
+      catMaxHpBonus: 0,
+      activePotion: { kind: 'hp', endsAt: new Date(Date.now() + 3600_000).toISOString() },
+    });
+    const hpOf = (report: string) => Number(report.match(/HP kotka: (\d+)/)?.[1]);
+    expect(hpOf(withPotion)).toBeGreaterThan(hpOf(withoutPotion));
+  });
+});
+
 describe('bossProgressReport', () => {
   test('pusty stan nie wybucha i wypisuje poziom 1', () => {
     const report = buildBossProgressReport(base);

@@ -3,8 +3,9 @@
 // funkcja (state → string), żeby dało się testować bez odpalania całego Zustand store.
 import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK, combatItemSlotsFor } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
-import { levelFromXp, catMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
-import { gearCombatBonuses, gearFlatHp, GearSlot, OwnedGear } from '@/utils/gear';
+import { levelFromXp, effectiveCatMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
+import { gearCombatBonuses, GearSlot, OwnedGear } from '@/utils/gear';
+import { ActivePotion } from '@/utils/potions';
 import { plPlural } from '@/utils/plural';
 
 export interface ProgressReportInput {
@@ -23,6 +24,7 @@ export interface ProgressReportInput {
   lastResetAt?: string | null; // istniejące wywołania/testy bez tych pól dalej działały.
   equippedGear?: Partial<Record<GearSlot, string>>;   // 2026-08-19 — krok 8, opcjonalne z tego
   ownedGear?: Partial<Record<string, OwnedGear>>;    // samego powodu co pola resetu wyżej.
+  activePotion?: ActivePotion | null; // 2026-09-21 — jw., patrz komentarz przy `maxHp` niżej.
 }
 
 const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
@@ -48,7 +50,13 @@ export function buildBossProgressReport(s: ProgressReportInput, detailLimit = 30
   const bonuses = { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   const power = atkPower(s.atkStatBonus, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
-  const maxHp = catMaxHp(s.catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
+  // Musi wołać TĘ SAMĄ funkcję co realna walka (`effectiveCatMaxHp` w petStore.ts), nie
+  // reimplementować wzoru ręcznie — poprzednia wersja (`catMaxHp(...) + gearFlatHp(...)`, bez
+  // `Math.round`/`potionFlatHp`) dawała (1) brzydki, nierealny float w eksporcie (np.
+  // "6558.331368923098" zamiast zaokrąglonej liczby jak wszędzie indziej w apce) i (2) ZŁĄ
+  // wartość gdy user miał aktywną miksturę HP (pomijała `potionFlatHp` całkowicie) — 2026-09-21,
+  // wychwycone w eksporcie postępu pupila usera.
+  const maxHp = effectiveCatMaxHp(s.catMaxHpBonus, equippedGear, ownedGear, s.activePotion ?? null);
   const attempts = dailyAttempts(bonuses.energyMult);
   const slots = combatItemSlotsFor(lvl.level);
 
