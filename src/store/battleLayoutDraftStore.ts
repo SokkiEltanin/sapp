@@ -33,11 +33,13 @@ export interface BattleLayoutDraft {
 
 // Musi zgadzać się 1:1 z realnymi stałymi w app/boss-fight.tsx (PORTRAIT_SIZE=150,
 // CAT_PORTRAIT_SIZE=205, oba offsetY sprite'ów=45, oba offsetY pasków HP=10, bg domyślne =
-// GORSKILAS, cienie=0.62/0.18/0 — dzisiejszy STAŁY ułamek z boss-fight.tsx, patrz wyżej) —
-// żeby otwarcie Edytora renderowało DOKŁADNIE to co widać w realnej walce, zero wizualnej
-// różnicy, dopóki user czegoś nie ruszy. (2026-09-20 — poprzednia wersja tej stałej NIE
-// została zaktualizowana po ostatnim eksporcie z 2026-09-18, więc Edytor otwierał się z
-// INNYM layoutem niż realna arena — sam sobie zaprzeczał jako "podgląd 1:1".)
+// GORSKILAS, cień bossa=0.62/0.18, cień kotka=0.45/0.13 — patrz CAT_SHADOW_SCALE_X/Y w
+// boss-fight.tsx dla wyliczenia) — żeby otwarcie Edytora renderowało DOKŁADNIE to co widać w
+// realnej walce, zero wizualnej różnicy, dopóki user czegoś nie ruszy. (2026-09-20 —
+// poprzednia wersja tej stałej NIE została zaktualizowana po ostatnim eksporcie z 2026-09-18,
+// więc Edytor otwierał się z INNYM layoutem niż realna arena — sam sobie zaprzeczał jako
+// "podgląd 1:1"; jeśli masz już otwarty Edytor wcześniej i widzisz stare 0.62/0.18 dla kotka,
+// wciśnij Reset, żeby dogonić ten nowy default — persisted draft NIE nadpisuje się sam.)
 export const BATTLE_LAYOUT_DEFAULT: BattleLayoutDraft = {
   bg: 'gorskislas',
   catSize: 205,
@@ -46,7 +48,7 @@ export const BATTLE_LAYOUT_DEFAULT: BattleLayoutDraft = {
   bossOffsetX: 0, bossOffsetY: 45,
   catHpOffsetX: 0, catHpOffsetY: 10,
   bossHpOffsetX: 0, bossHpOffsetY: 10,
-  catShadowScaleX: 0.62, catShadowScaleY: 0.18, catShadowOffsetY: 0,
+  catShadowScaleX: 0.45, catShadowScaleY: 0.13, catShadowOffsetY: 0,
   bossShadowScaleX: 0.62, bossShadowScaleY: 0.18, bossShadowOffsetY: 0,
 };
 

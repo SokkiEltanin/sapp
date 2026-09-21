@@ -1,7 +1,7 @@
 import {
   normalizeProductName, productGroupKey, productGroupLabel, productNameSimilarity,
   canonicalProductName, brandTag, parseWeightFromName, priceAnomaly, suggestSimilarName,
-  allKnownTags, tagsMatchingWords,
+  allKnownTags, tagsMatchingWords, allKnownSubTags,
   PriceStat,
 } from '@/utils/productMemory';
 
@@ -132,6 +132,18 @@ describe('productMemory — allKnownTags', () => {
   });
   test('pusta pamięć → pusta lista', () => {
     expect(allKnownTags({})).toEqual([]);
+  });
+});
+
+// 2026-09-21, user: "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz 500g)" — podkategoria
+// WEWNĄTRZ pierwszego zwykłego tagu, JEDNA (nie lista), osobna pamięć od `allKnownTags`.
+describe('productMemory — allKnownSubTags', () => {
+  test('unia wszystkich podtagów kiedykolwiek użytych, bez duplikatów', () => {
+    const mem = { 'pudliszki ketchup 250g': 'ketchupy', 'heinz ketchup 500g': 'ketchupy', 'majonez kielecki': 'majonezy' };
+    expect(allKnownSubTags(mem).sort()).toEqual(['ketchupy', 'majonezy']);
+  });
+  test('pusta pamięć → pusta lista', () => {
+    expect(allKnownSubTags({})).toEqual([]);
   });
 });
 

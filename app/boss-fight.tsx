@@ -78,6 +78,20 @@ const CAT_OFFSET_X = 0, CAT_OFFSET_Y = 45;
 const BOSS_OFFSET_X = 0, BOSS_OFFSET_Y = 45;
 const CAT_HP_OFFSET_X = 0, CAT_HP_OFFSET_Y = 10;
 const BOSS_HP_OFFSET_X = 0, BOSS_HP_OFFSET_Y = 10;
+
+// Skala cienia pod łapkami — DOTĄD wspólny ułamek portretu (0.62/0.18) dla obu sprite'ów,
+// user: "cienie nie pasują skali" (2026-09-20, patrz ARCHITECTURE.md §145/§147). Boss zostaje
+// przy 0.62/0.18 (BossArt to PNG przycięty ciasno do sylwetki, ułamek pudełka ≈ ułamek
+// faktycznej sylwetki). Kotek dostaje WYLICZONY, nie zmierzony wizualnie, ułamek: skoro
+// CAT_PORTRAIT_SIZE (205) jest ~35% większe od PORTRAIT_SIZE (150) TYLKO po to, żeby
+// skompensować pusty margines SVG i wyjść na TĘ SAMĄ apparentną wielkość co boss (patrz
+// komentarz przy CAT_PORTRAIT_SIZE wyżej), to realna sylwetka kotka w jego (większym) pudełku
+// zajmuje z grubsza taki sam ułamek co boss w SWOIM (mniejszym) pudełku — przeskalowany o
+// odwrotność tego samego współczynnika: 0.62 × (150/205) ≈ 0.45, 0.18 × (150/205) ≈ 0.13.
+// TO SZACUNEK, nie pomiar z Edytora (`battle-layout-lab.tsx`, który wciąż jest źródłem
+// prawdy, gdyby user chciał dostroić wizualnie) — priorytet testu na urządzeniu: wysoki.
+const CAT_SHADOW_SCALE_X = 0.45, CAT_SHADOW_SCALE_Y = 0.13;
+const BOSS_SHADOW_SCALE_X = 0.62, BOSS_SHADOW_SCALE_Y = 0.18;
 // Uśrednione przesunięcie Y obu sprite'ów, TYLKO dla `projectile.top` niżej (pocisk leci
 // MIĘDZY nimi, potrzebuje jednego punktu odniesienia) — zastępuje dawne wspólne
 // `SPRITE_GROUND_SHIFT`. Oba offsety akurat wyszły równe w tym eksporcie (45/45), średnia
@@ -786,7 +800,7 @@ export default function BossFight() {
                         jest akurat grafika areny za nim. `GroundShadow` (cień pod łapkami)
                         zostaje bez zmian, to DODATKOWA, osobna poświata za całym sprite'em. */}
                     <RadialGlow size={CAT_PORTRAIT_SIZE * 1.5} color={palette.coat} opacity={0.22} />
-                    <GroundShadow width={CAT_PORTRAIT_SIZE * 0.62} height={CAT_PORTRAIT_SIZE * 0.18} opacity={0.5} />
+                    <GroundShadow width={CAT_PORTRAIT_SIZE * CAT_SHADOW_SCALE_X} height={CAT_PORTRAIT_SIZE * CAT_SHADOW_SCALE_Y} opacity={0.5} />
                     <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
                       {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
                           statyczny bez animacji, bo teraz jest w pełni z głaskaniem
@@ -832,7 +846,7 @@ export default function BossFight() {
                         bossa (`WEAK_COLOR`, już używanym przy etykiecie/motywie), więc poświata
                         nie jest przypadkowa — czyta się jak sygnatura elementu bossa. */}
                     <RadialGlow size={PORTRAIT_SIZE * 1.6} color={WEAK_COLOR[target.weakness] ?? '#F87171'} opacity={0.25} />
-                    <GroundShadow width={PORTRAIT_SIZE * 0.62} height={PORTRAIT_SIZE * 0.18} opacity={0.5} />
+                    <GroundShadow width={PORTRAIT_SIZE * BOSS_SHADOW_SCALE_X} height={PORTRAIT_SIZE * BOSS_SHADOW_SCALE_Y} opacity={0.5} />
                     {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
                         chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
                         się pokazuje, nic więcej). Per-bossowy burst-image (bomby/ogień/…) USUNIĘTY

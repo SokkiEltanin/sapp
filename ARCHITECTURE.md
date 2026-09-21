@@ -9518,6 +9518,78 @@ czasie/`InteractionManager`/przeniesienie części do `requestIdleCallback`-podo
 
 ---
 
+## 147. Cień kotka w walce — wyliczony (nie zmierzony) szacunek zamiast wspólnego ułamka bossa (2026-09-21)
+
+User: "dawaj 1 i 2" (kontynuacja §143/§145 — kategoryzacja produktów i dostrojenie cieni).
+Zamiast czekać na wizualne dostrojenie w Edytorze (`battle-layout-lab.tsx`, wymaga urządzenia),
+policzony szacunek z tego co JUŻ wiadomo o geometrii sprite'ów: `CAT_PORTRAIT_SIZE` (205) jest
+celowo ~35% większe od `PORTRAIT_SIZE` bossa (150) TYLKO po to, żeby skompensować pusty
+margines SVG kotka i wyjść na TĘ SAMĄ apparentną wielkość (patrz komentarz przy
+`CAT_PORTRAIT_SIZE` w `boss-fight.tsx`, §145). Skoro oba portrety mają wyglądać tak samo duże,
+realna sylwetka kotka w jego (większym) pudełku zajmuje z grubsza ten sam ułamek co boss w
+SWOIM (mniejszym, ciasno przyciętym) pudełku, przeskalowany o odwrotność tego samego
+współczynnika: `0.62 × (150/205) ≈ 0.45`, `0.18 × (150/205) ≈ 0.13`.
+
+Nowe stałe `CAT_SHADOW_SCALE_X/Y` (0.45/0.13, boss zostaje przy 0.62/0.18) w `boss-fight.tsx`
++ zaktualizowany `BATTLE_LAYOUT_DEFAULT` w `battleLayoutDraftStore.ts` (utrzymuje "podgląd 1:1"
+z §145 — jeśli masz już otwarty Edytor z wcześniejszym stanem, wciśnij Reset, bo persisted
+draft nie nadpisuje się sam nowym defaultem). **To szacunek, NIE pomiar** — Edytor wciąż jest
+źródłem prawdy do wizualnego dostrojenia, gdyby to nie pasowało na oko.
+
+`tsc`/`jest` czyste (1033 testy). **Priorytet testu na urządzeniu — wysoki**: otwórz walkę,
+sprawdź czy cień kotka teraz wygląda proporcjonalnie do jego sylwetki (węższy/płytszy niż
+wcześniej); jeśli nadal nie pasuje, popraw w Edytorze i wyślij eksport.
+
+---
+
+## 148. Kategoryzacja produktów — dwupoziomowy tag + grupowany widok + sortowanie po dacie (2026-09-21)
+
+Pełny opis propozycji w §143. User: "dawaj 1" — implementacja bez dalszego potwierdzania
+szczegółów (kierunek już zaakceptowany).
+
+**Model danych**: `ReceiptItem` dostał `subTag?: string` — JEDNA podkategoria (nie lista jak
+`tags`), zawsze rozumiana jako WEWNĄTRZ pierwszego z `tags` (np. `tags:['sosy']`,
+`subTag:'ketchupy'`). Osobne pole, nie kolejny wpis w `tags` — żeby nie mylić z resztą
+maszynerii opartej na płaskich tagach (avoid-tracking nawyków w `habits.ts`, dopasowanie
+kategorii jedzenia w `calories.ts`/`food.ts`), które nigdy nie widzą `subTag` i działają
+dokładnie jak wcześniej. Warianty rozmiaru (Pudliszki 250g / Heinz 500g) NIE wymagały żadnej
+zmiany — `canonicalProductName`/`normalizeProductName` już od dawna trzymają je jako osobne
+wpisy (§143), więc trzeci poziom hierarchii usera już istniał.
+
+**Pamięć podkategorii** (`productMemory.ts`): `loadSubTagMemory`/`saveSubTagToMemory`/
+`allKnownSubTags` — TEN SAM wzorzec co `loadTagMemory`/`saveCustomTagsToMemory`/`allKnownTags`
+dla zwykłych tagów, osobny klucz AsyncStorage (`product_subtag_memory`), osobna, prostsza
+pamięć (jeden string, nie tablica).
+
+**`app/products.tsx`**:
+- `Product` dostał `subTag`/`lastPurchasedAt` (max data zakupu wśród pasujących pozycji
+  paragonów, liczona w tej samej pętli co `count`).
+- **Sortowanie** (user: "zeby sortowanie można bylo lepiej edytowac kiedy zalupiono") — dwa
+  chipsy nad listą: "Najczęściej kupowane" (dotychczasowe, po `count`) / "Ostatnio kupione"
+  (po `lastPurchasedAt`). W trybie "Ostatnio" wiersz produktu pokazuje też datę.
+- **Widok grupowany** (TYLKO gdy nie szukamy — szukanie zostaje płaską, szybką listą jak
+  dotąd): sekcje top-level tag (`tags[0]`, "Bez kategorii" gdy brak) → zwijane, wewnątrz
+  opcjonalne podsekcje po `subTag` ("Inne" gdy brak) — POMIJANE gdy kategoria NIGDY nie
+  używała podtagów (unika fałszywego "Inne" wszędzie). Sortowanie sekcji: top-level po sumie
+  `count` w grupie malejąco, "Bez kategorii" zawsze na końcu; to samo wewnątrz sekcji dla
+  podtagów.
+- Edytor produktu dostał pole "Podkategoria" (wolny tekst + chipsy podpowiedzi z historii,
+  jak istniejący "własny tag") — zapis retroaktywnie nadpisuje `subTag` na KAŻDEJ pasującej
+  pozycji paragonu, ten sam mechanizm co tagi/kategoria (§143, fix "wroclo mi do produkty ale
+  nie zapisalo").
+
+**Świadomie NIE zrobione (poza zasięgiem, jak ustalono w §143)**: "gdzie na paragonie"
+(pozycja OCR) — scanner nie zapisuje współrzędnych, wymagałoby przebudowy pipeline'u
+skanowania.
+
+`tsc`/`jest` czyste (1033 testy, +2 nowe dla `allKnownSubTags`). **Priorytet testu na
+urządzeniu — wysoki (nowa funkcja)**: (1) otwórz Produkty bez wyszukiwania — lista powinna być
+teraz grupowana sekcjami zamiast płaska; (2) wejdź w produkt, ustaw podkategorię, zapisz,
+sprawdź że trafił do właściwej podsekcji; (3) przełącz sortowanie na "Ostatnio kupione",
+sprawdź kolejność i widoczną datę.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
