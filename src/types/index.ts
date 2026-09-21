@@ -36,6 +36,12 @@ export interface ReceiptItem {
                         // the scanner lets you set it (default 1 kg for dairy).
   eaters?: string[];    // who consumed this — drives per-person limit bars.
                         // empty = shared (split among everyone). Stats count all.
+  subTag?: string;      // podkategoria WEWNĄTRZ pierwszego z `tags` (2026-09-21, user:
+                        // "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz 500g)") — np.
+                        // tags:['sosy'], subTag:'ketchupy'. Osobne pole, nie kolejny wpis w
+                        // `tags`, żeby nie mylić z resztą maszynerii opartej na płaskich
+                        // tagach (avoid-tracking nawyków, dopasowanie kategorii jedzenia) —
+                        // czysto organizacyjne, patrz productMemory.ts/app/products.tsx.
 }
 
 export interface Expense {

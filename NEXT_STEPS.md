@@ -18,9 +18,24 @@ Wydajność startu apki + przycisk "Udostępnij".
 wyślij eksport z Diagnostyki. Wysoki `maxLagMs`/`totalLagMs` potwierdzi hipotezę burst-efektów
 → dalej faktyczna optymalizacja (rozłożenie w czasie). `tsc`/`jest` czyste (1031 testów, +1).
 
-**Osobno w kolejce (ten sam wątek żądania usera)**: kategoryzacja produktów Finanse/Produkty
-(patrz §143, propozycja czeka na potwierdzenie), dostrojenie cieni w Edytorze walki (§145,
-czeka na eksport od usera).
+## ✅ Kategoryzacja produktów + cień kotka wyliczony (2026-09-21)
+
+Pełne opisy w ARCHITECTURE.md §147 (cień) i §148 (kategoryzacja). User: "dawaj 1 i 2".
+
+**Cień kotka** (§147): zamiast czekać na wizualne dostrojenie w Edytorze, policzony szacunek
+z geometrii sprite'ów (`CAT_SHADOW_SCALE_X/Y = 0.45/0.13`, wyliczone z tego samego ~35%
+współczynnika, który już wcześniej powiększał `CAT_PORTRAIT_SIZE`). **To szacunek, nie
+pomiar** — priorytet testu na urządzeniu wysoki, jeśli nie pasuje popraw w Edytorze.
+
+**Kategoryzacja produktów** (§148): `ReceiptItem.subTag` (jedna podkategoria, wewnątrz
+pierwszego z `tags`) + pamięć w `productMemory.ts` (ten sam wzorzec co zwykłe tagi). Ekran
+Produktów: widok grupowany top-level tag → podtag (tylko gdy nie szukamy), sortowanie
+"Najczęściej kupowane" / "Ostatnio kupione", edytor produktu z nowym polem Podkategoria.
+"Gdzie na paragonie" świadomie NIE zrobione (wymaga przebudowy skanera, poza zasięgiem).
+
+`tsc`/`jest` czyste (1033 testy, +2). Priorytet testu na urządzeniu — wysoki dla obu (nowe
+funkcje): (1) cień kotka wizualnie; (2) grupowany widok Produktów + zapis podkategorii +
+sortowanie po dacie.
 
 ## ✅ TopPill — rotacja przez wszystkie zaległe/dzisiejsze zadania, nie jedno (2026-09-20)
 

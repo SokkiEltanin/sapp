@@ -229,6 +229,44 @@ export async function saveCustomTagsToMemory(
   } catch {}
 }
 
+// ─── Subcategory (podtag) memory ───────────────────────────────────────────────
+// Drugi poziom hierarchii TYLKO organizacyjnej (2026-09-21, user: "sosy>ketchupy>(Pudliszki
+// 250g, Kotlin 980g, Heinz 500g)... zeby sortowanie można bylo lepiej edytowac") — JEDNA
+// podkategoria per produkt (nie lista jak `tags`), zawsze WEWNĄTRZ pierwszego z `tags` (np.
+// tags:['sosy'], subTag:'ketchupy'). Ten sam wzorzec pamięci co `loadTagMemory`/
+// `saveCustomTagsToMemory` wyżej, osobny klucz.
+const SUBTAG_KEY = 'product_subtag_memory';
+type SubTagMemory = Record<string, string>;
+
+export async function loadSubTagMemory(): Promise<SubTagMemory> {
+  try {
+    const raw = await AsyncStorage.getItem(SUBTAG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSubTagToMemory(name: string, subTag: string): Promise<void> {
+  const trimmedName = name.trim();
+  const trimmedSubTag = subTag.trim().toLowerCase();
+  if (!trimmedName) return;
+  try {
+    const memory = await loadSubTagMemory();
+    if (trimmedSubTag) memory[normalize(trimmedName)] = trimmedSubTag;
+    else delete memory[normalize(trimmedName)]; // pusty podtag = wyczyść
+    const entries = Object.entries(memory);
+    const trimmed = entries.length > MAX_ENTRIES ? Object.fromEntries(entries.slice(-MAX_ENTRIES)) : memory;
+    await AsyncStorage.setItem(SUBTAG_KEY, JSON.stringify(trimmed));
+  } catch {}
+}
+
+// Wszystkie podtagi, jakich user kiedykolwiek użył — podpowiedzi w edytorze, jak
+// `allKnownTags` niżej dla zwykłych tagów.
+export function allKnownSubTags(memory: SubTagMemory): string[] {
+  return [...new Set(Object.values(memory))];
+}
+
 // ─── Custom products memory ───────────────────────────────────────────────────
 
 // ─── Tag frequency ────────────────────────────────────────────────────────────

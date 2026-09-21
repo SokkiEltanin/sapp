@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, X, Plus, Receipt } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Search, X, Plus, Receipt, ArrowUpDown } from 'lucide-react-native';
 
 import { expensesService } from '@/services/expensesService';
 import { Expense } from '@/types';
@@ -17,6 +17,7 @@ import {
   saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases,
   productNameSimilarity, removeNameAliases,
   loadTagMemory, allKnownTags,
+  loadSubTagMemory, saveSubTagToMemory, allKnownSubTags,
 } from '@/utils/productMemory';
 import { looksLikeFood } from '@/utils/calories';
 import { FOOD_ITEM_TAGS } from '@/utils/food';
@@ -30,7 +31,17 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 import { plPlural } from '@/utils/plural';
 
-type Product = { name: string; key: string; count: number; category: string; tags: string[] };
+type Product = {
+  name: string; key: string; count: number; category: string; tags: string[];
+  subTag?: string;        // podkategoria WEWNĄTRZ tags[0] — "sosy" > "ketchupy" (2026-09-21)
+  lastPurchasedAt: string; // ISO — najnowsza data zakupu, dla sortowania "ostatnio kupione"
+};
+
+// Grupowanie widoku (2026-09-21, user: "sosy>ketchupy>(Pudliszki 250g, Kotlin 980g, Heinz
+// 500g)... zeby szybciej szukać") — produkty bez tagu/podtagu trafiają do tych koszyków, żeby
+// nigdy nie zniknąć z widoku zamiast wymuszać tagowanie wszystkiego naraz.
+const NO_CATEGORY = 'Bez kategorii';
+const NO_SUBTAG = 'Inne';
 
 function fmtHistoryDate(iso: string): string {
   if (!iso) return '—';
@@ -71,6 +82,29 @@ export default function ProductsScreen() {
     if (!t) return;
     setEditTags(prev => prev.includes(t) ? prev : [...prev, t]);
   };
+
+  // Podkategoria (2026-09-21) — JEDNA, nie lista jak tagi, więc osobny prosty state/pamięć
+  // (productMemory.ts's loadSubTagMemory/saveSubTagToMemory), nie wpięte w resztę maszynerii
+  // tagów (avoid-tracking, kalorie).
+  const [editSubTag, setEditSubTag] = useState('');
+  const [subTagMemory, setSubTagMemory] = useState<Record<string, string>>({});
+  useEffect(() => { loadSubTagMemory().then(setSubTagMemory).catch(() => {}); }, []);
+  const knownSubTags = useMemo(() => allKnownSubTags(subTagMemory), [subTagMemory]);
+
+  // Sortowanie listy (2026-09-21, user: "zeby sortowanie można bylo lepiej edytowac kiedy
+  // zalupiono") — domyślnie najczęściej kupowane (jak dotąd), albo ostatnio kupione.
+  const [sortMode, setSortMode] = useState<'count' | 'recent'>('count');
+  // Zwinięte sekcje kategorii w widoku grupowanym — Set kluczy top-level tagów, domyślnie
+  // wszystko rozwinięte (pusty Set).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (topKey: string) => {
+    haptic.tap();
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(topKey)) next.delete(topKey); else next.add(topKey);
+      return next;
+    });
+  };
   // Pairs the user said are NOT the same — MUST persist, else the same pair keeps
   // reappearing every time you reopen the screen ("klikam że to nie to samo, nie zapisuje").
   const [dismissedDup, setDismissedDup] = useState<Set<string>>(new Set());
@@ -101,7 +135,8 @@ export default function ProductsScreen() {
     return () => sub.remove();
   }, [reload]);
 
-  // Distinct food products actually bought, canonicalised, most-bought first.
+  // Distinct food products actually bought, canonicalised. Sortowanie w osobnym memo niżej
+  // (`sorted`) — zależy od `sortMode`, więc nie może być tu na sztywno po `count`.
   const products = useMemo(() => {
     const map = new Map<string, Product>();
     for (const e of expenses) {
@@ -111,18 +146,64 @@ export default function ProductsScreen() {
         if (!looksLikeFood({ name: it.name, tags: it.tags, category: it.category })) continue; // skip non-food
         const name = canonicalProductName(it.name, aliases);
         const key = normalizeProductName(name);
-        const cur = map.get(key) ?? { name, key, count: 0, category: it.category, tags: it.tags ?? [] };
+        const cur = map.get(key) ?? { name, key, count: 0, category: it.category, tags: it.tags ?? [], subTag: undefined as string | undefined, lastPurchasedAt: '' };
         cur.count += Math.max(1, Math.round(it.quantity || 1));
+        if (it.subTag && !cur.subTag) cur.subTag = it.subTag;
+        if ((e.date ?? '') > cur.lastPurchasedAt) cur.lastPurchasedAt = e.date ?? '';
         map.set(key, cur);
       }
     }
-    return [...map.values()].sort((a, b) => b.count - a.count);
+    return [...map.values()];
   }, [expenses, aliases]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? products.filter(p => p.name.toLowerCase().includes(q)) : products;
   }, [products, query]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => sortMode === 'recent'
+      ? b.lastPurchasedAt.localeCompare(a.lastPurchasedAt)
+      : b.count - a.count);
+    return arr;
+  }, [filtered, sortMode]);
+
+  // Grupowanie top-level tag → subtag → produkty, TYLKO gdy nie szukamy (search zostaje
+  // płaską, szybką listą jak dotąd — grupowanie jest do PRZEGLĄDANIA, nie do wyszukiwania).
+  // Wynik już w PEŁNI posortowany (top-level i sub-level), żeby JSX tylko mapował, bez
+  // sortowania przy każdym renderze.
+  const grouped = useMemo(() => {
+    const top = new Map<string, Map<string, Product[]>>();
+    for (const p of sorted) {
+      const topKey = p.tags[0] || NO_CATEGORY;
+      const subKey = p.subTag || NO_SUBTAG;
+      if (!top.has(topKey)) top.set(topKey, new Map());
+      const subMap = top.get(topKey)!;
+      if (!subMap.has(subKey)) subMap.set(subKey, []);
+      subMap.get(subKey)!.push(p);
+    }
+    const sumCount = (arr: Product[]) => arr.reduce((s, p) => s + p.count, 0);
+    // Bez CATEGORY/Inne zawsze na końcu (najmniej "skategoryzowane"), reszta wg sumy `count`.
+    const topEntries = [...top.entries()].sort(([aKey, aMap], [bKey, bMap]) => {
+      if (aKey === NO_CATEGORY) return 1;
+      if (bKey === NO_CATEGORY) return -1;
+      const sum = (m: Map<string, Product[]>) => [...m.values()].reduce((s, arr) => s + sumCount(arr), 0);
+      return sum(bMap) - sum(aMap);
+    });
+    return topEntries.map(([topKey, subMap]) => {
+      const subEntries = [...subMap.entries()].sort(([aKey, aArr], [bKey, bArr]) => {
+        if (aKey === NO_SUBTAG) return 1;
+        if (bKey === NO_SUBTAG) return -1;
+        return sumCount(bArr) - sumCount(aArr);
+      });
+      // Kategoria która NIGDY nie użyła podtagów pokazuje płaską listę — subheader "Inne"
+      // wyglądałby jak fałszywa podkategoria dla czegoś co po prostu nie ma podtagów.
+      const flatOnly = subEntries.length === 1 && subEntries[0][0] === NO_SUBTAG;
+      const totalCount = subEntries.reduce((s, [, arr]) => s + arr.length, 0);
+      return { topKey, totalCount, flatOnly, subEntries };
+    });
+  }, [sorted]);
 
   // Likely OCR duplicates: highly-similar product names that aren't yet merged
   // (e.g. "HAŁWA STOŁECZNA" ≈ "HAŁWA SŁONECZNA"). High band so we don't nag on
@@ -177,6 +258,7 @@ export default function ProductsScreen() {
     setEditWeightG(w ? String(Math.round(w * 1000)) : '');
     setEditTags([...new Set(p.tags ?? [])]);
     setEditCat((p.category as ExpenseCategory) || 'groceries');
+    setEditSubTag(p.subTag ?? '');
     setEditing(p);
   };
 
@@ -203,6 +285,7 @@ export default function ProductsScreen() {
     const newName = editName.trim() || editing.name;
     const wG = parseFloat(editWeightG.replace(',', '.'));
     const tags = editTags.map(t => t.trim().toLowerCase()).filter(Boolean);
+    const subTag = editSubTag.trim().toLowerCase();
     try {
       // Rename → alias: the old name folds into the new one (a manual MERGE).
       if (newName.toLowerCase() !== editing.name.toLowerCase()) {
@@ -213,19 +296,20 @@ export default function ProductsScreen() {
       if (!isNaN(wG) && wG > 0) await saveWeightMemory([{ name: newName, kg: wG / 1000 }]);
       await saveCustomProductsToMemory([{ name: newName, category: editCat }]);
       if (tags.length > 0) await saveCustomTagsToMemory([{ name: newName, tags }]);
+      await saveSubTagToMemory(newName, subTag);
       // Fix (2026-09-17, user: "wroclo mi do produkty ale nie zapisalo mi produktu") —
       // do tego momentu tag/kategoria trafiały TYLKO do `productMemory` (podpowiedź na
       // PRZYSZŁOŚĆ, przy kolejnym skanie/edycji), nigdy nie były zapisywane wstecz na już
       // istniejących pozycjach paragonów — a ten ekran wyświetla tagi CZYTAJĄC WPROST z
       // historycznych `expenses.receiptItems`, więc "zapisz" wizualnie nic nie zmieniało.
-      // Teraz retroaktywnie nadpisuje tagi/kategorię na KAŻDEJ pozycji paragonu, która
+      // Teraz retroaktywnie nadpisuje tagi/kategorię/podtag na KAŻDEJ pozycji paragonu, która
       // pasuje do tego produktu (ta sama normalizacja co przy grupowaniu w `products`).
       const matching = expenses.filter(e => e.type !== 'income'
         && (e.receiptItems ?? []).some(it => normalizeProductName(canonicalProductName(it.name, aliases)) === editing.key));
       await Promise.all(matching.map(e => {
         const newItems = (e.receiptItems ?? []).map(it =>
           normalizeProductName(canonicalProductName(it.name, aliases)) === editing.key
-            ? { ...it, tags, category: editCat }
+            ? { ...it, tags, category: editCat, subTag: subTag || undefined }
             : it,
         );
         return expensesService.update(e.id, { receiptItems: newItems });
@@ -233,6 +317,7 @@ export default function ProductsScreen() {
       await Promise.all([
         loadWeightMemory().then(setWeightMem),
         loadNameAliases().then(setAliases),
+        loadSubTagMemory().then(setSubTagMemory),
       ]);
       reload();
       setEditing(null);
@@ -262,6 +347,16 @@ export default function ProductsScreen() {
         />
       </View>
 
+      <View style={s.sortRow}>
+        <ArrowUpDown size={12} color={c.text.muted} />
+        <TouchableOpacity onPress={() => { haptic.tap(); setSortMode('count'); }} style={[s.sortChip, sortMode === 'count' && s.sortChipActive]}>
+          <Text style={[s.sortChipText, sortMode === 'count' && s.sortChipTextActive]}>Najczęściej kupowane</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { haptic.tap(); setSortMode('recent'); }} style={[s.sortChip, sortMode === 'recent' && s.sortChipActive]}>
+          <Text style={[s.sortChipText, sortMode === 'recent' && s.sortChipTextActive]}>Ostatnio kupione</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={{ padding: spacing[4], paddingBottom: 120, gap: spacing[2] }} showsVerticalScrollIndicator={false}>
         {!query && (duplicatePairs.length > 0 || mergeHistory.length > 0) && (
           <TouchableOpacity style={s.dupBtn} activeOpacity={0.85} onPress={() => { haptic.tap(); setDupOpen(true); }}>
@@ -273,19 +368,34 @@ export default function ProductsScreen() {
             <ChevronLeft size={16} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
           </TouchableOpacity>
         )}
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <Text style={s.empty}>{products.length === 0 ? 'Brak produktów — zeskanuj paragony, by je tu zobaczyć.' : 'Nic nie pasuje.'}</Text>
-        ) : filtered.map(p => (
-            <TouchableOpacity key={p.key} style={s.row} activeOpacity={0.8} onPress={() => openEdit(p)}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
-                <Text style={s.rowMeta} numberOfLines={1}>
-                  ×{p.count}{p.tags.length > 0 ? ` · ${p.tags.slice(0, 3).join(', ')}` : ''}
-                </Text>
+        ) : query ? (
+          // Szukanie: płaska lista jak dotąd — szybko, bez sekcji do rozwijania.
+          sorted.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)
+        ) : (
+          // Przeglądanie: grupowane sekcje top-level tag → (opcjonalnie) podtag.
+          grouped.map(({ topKey, totalCount, flatOnly, subEntries }) => {
+            const isCollapsed = collapsedGroups.has(topKey);
+            return (
+              <View key={topKey} style={s.groupBlock}>
+                <TouchableOpacity style={s.groupHeader} activeOpacity={0.7} onPress={() => toggleGroup(topKey)}>
+                  <ChevronDown size={14} color={c.text.muted} style={{ transform: [{ rotate: isCollapsed ? '-90deg' : '0deg' }] }} />
+                  <Text style={s.groupTitle} numberOfLines={1}>{topKey}</Text>
+                  <Text style={s.groupCount}>{totalCount}</Text>
+                </TouchableOpacity>
+                {!isCollapsed && (flatOnly
+                  ? subEntries[0][1].map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)
+                  : subEntries.map(([subKey, items]) => (
+                      <View key={subKey} style={s.subGroupBlock}>
+                        <Text style={s.subGroupTitle}>{subKey}</Text>
+                        {items.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)}
+                      </View>
+                    )))}
               </View>
-              <ChevronLeft size={15} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
-            </TouchableOpacity>
-        ))}
+            );
+          })
+        )}
       </ScrollView>
 
       {/* kcal edit modal */}
@@ -325,6 +435,29 @@ export default function ProductsScreen() {
                   />
                 </View>
               </View>
+
+              {/* Podkategoria (2026-09-21) — WEWNĄTRZ pierwszego z Tagi wyżej, np. Tagi:
+                  "sosy" + Podkategoria: "ketchupy" → "sosy > ketchupy > (ten produkt)" w
+                  widoku grupowanym. Wolne pole tekstowe + podpowiedzi z historii (jak
+                  własny tag wyżej), nie sztywna lista. */}
+              <Text style={s.sheetLabel}>Podkategoria (opcjonalnie)</Text>
+              <TextInput
+                value={editSubTag} onChangeText={setEditSubTag}
+                placeholder="np. ketchupy" placeholderTextColor={c.text.muted}
+                autoCapitalize="none" style={s.fieldInput}
+              />
+              {knownSubTags.length > 0 && (
+                <View style={[s.catRow, { marginTop: 6 }]}>
+                  {knownSubTags.map(t => {
+                    const on = editSubTag.toLowerCase() === t;
+                    return (
+                      <TouchableOpacity key={t} onPress={() => { haptic.tap(); setEditSubTag(on ? '' : t); }} style={[s.catChip, on && { borderColor: '#4ECBA8', backgroundColor: '#4ECBA822' }]}>
+                        <Text style={[s.catChipText, on && { color: '#4ECBA8', fontWeight: '700' }]}>{t}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               <Text style={s.sheetLabel}>Kategoria</Text>
               <View style={s.catRow}>
@@ -416,6 +549,26 @@ export default function ProductsScreen() {
   );
 }
 
+// Jeden wiersz produktu — współdzielony przez płaską listę (szukanie) i grupowany widok
+// (przeglądanie), żeby wygląd wiersza nie rozjechał się między dwoma trybami.
+function ProductRow({ p, sortMode, onPress, s, c }: {
+  p: Product; sortMode: 'count' | 'recent'; onPress: () => void; s: any; c: any;
+}) {
+  const metaParts: string[] = [`×${p.count}`];
+  if (sortMode === 'recent' && p.lastPurchasedAt) metaParts.push(fmtHistoryDate(p.lastPurchasedAt));
+  if (p.subTag) metaParts.push(p.subTag);
+  if (p.tags.length > 0) metaParts.push(p.tags.slice(0, 3).join(', '));
+  return (
+    <TouchableOpacity style={s.row} activeOpacity={0.8} onPress={onPress}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
+        <Text style={s.rowMeta} numberOfLines={1}>{metaParts.join(' · ')}</Text>
+      </View>
+      <ChevronLeft size={15} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+    </TouchableOpacity>
+  );
+}
+
 function PressableBack({ onPress, color }: { onPress: () => void; color: string }) {
   return (
     <TouchableOpacity onPress={onPress} hitSlop={10} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
@@ -436,6 +589,17 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: c.text.primary, padding: 0 },
   empty: { fontSize: 13, color: c.text.muted, textAlign: 'center', marginTop: spacing[6], lineHeight: 19 },
+  sortRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[4], marginTop: spacing[2] },
+  sortChip: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  sortChipActive: { borderColor: '#FB923C', backgroundColor: '#FB923C22' },
+  sortChipText: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary },
+  sortChipTextActive: { color: '#FB923C', fontWeight: '800' },
+  groupBlock: { gap: spacing[2] },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: spacing[2] },
+  groupTitle: { flex: 1, fontSize: 13, fontWeight: '800', color: c.text.primary, textTransform: 'capitalize' },
+  groupCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
+  subGroupBlock: { gap: spacing[2], marginLeft: spacing[3] },
+  subGroupTitle: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   dupBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: '#46B0DE44', paddingHorizontal: spacing[3], paddingVertical: spacing[3] },
   dupBtnIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   dupBtnTitle: { fontSize: 14, fontWeight: '800', color: '#46B0DE' },
