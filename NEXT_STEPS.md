@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Plan zajęć — wirtualny podgląd tygodnia, ostatni kawałek (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §161 (kontynuacja §157-160, KOMPLET rozbudowy planu zajęć z tej
+sesji). User potwierdził (AskUserQuestion): dashboardowy kafelek wystarcza jako "widget" bez
+zmian; chciał "wirtualny podgląd" — nowy ekran `app/class-schedule.tsx`, siatka dni
+(kolumny=Pon-Nie, poziomy scroll), chronologiczna lista zajęć per dzień, nawigacja tydzień
+wstecz/naprzód. Dostęp: Ustawienia → Plan zajęć → "Podgląd tygodnia" + tapnięcie w
+dashboardowy kafelek. Nowy `src/utils/weekGrid.ts` (`mondayOf`/`fmtWeekRange`, wydzielone dla
+testowalności — uwaga na przypadek niedzieli w `Date.getDay()`, pokryte testem).
+`tsc`/`jest` czyste (1075 testów, +8).
+
+**🆕 Priorytet testu na urządzeniu — średni**: nowy ekran, nawigacja tygodni, scroll dni.
+
 ## ✅ Plan zajęć w TopPillu (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §160. User: "żeby też łapało że mam zajęcia w pillu" —
@@ -10,11 +23,6 @@ Pełny opis w ARCHITECTURE.md §160. User: "żeby też łapało że mam zajęcia
 nawiasami). Nowy priorytet 3b, pozycjonowany jak zmiana pracy, format "TYP: PRZEDMIOT · SALA",
 fioletowy akcent spójny z resztą funkcji planu zajęć. `tsc`/`jest` czyste (1067 testów, bez
 zmiany — `TopPill.tsx` bez istniejącego pokrycia testami).
-
-**🆕 Reszta rozbudowy planu zajęć (user poprosił, jeszcze nie zaczęte)**: (1) wirtualny
-podgląd całego tygodnia (jak siatka którą user przysyłał — dni×godziny), (2) sprawdzić czy
-dashboardowy kafelek `class-schedule` (§158) wystarcza jako "widget", czy user chce czegoś
-więcej. Do zaproponowania userowi zanim się zacznie kodować (większy zakres niż pill).
 
 ## ✅ Fix: licznik wody potrafił cofnąć się po synchronizacji z zegarka (2026-09-22)
 

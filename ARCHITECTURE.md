@@ -10116,6 +10116,42 @@ jeśli jest ich kilka danego dnia, i znika dopiero po zakończeniu ostatnich (ni
 
 ---
 
+## 161. Plan zajęć — wirtualny podgląd tygodnia, nowy ekran (2026-09-22)
+
+Ostatni kawałek rozbudowy planu zajęć z tej sesji (kontynuacja §157-160). User potwierdził
+przez AskUserQuestion: dashboardowy kafelek (§158) wystarcza jako "widget" (bez zmian), ale
+chce "wirtualny podgląd" — siatkę jak w oryginalnym planie z UR, który przysłał jako zrzut.
+
+**Nowy `app/class-schedule.tsx`** — kolumny = dni tygodnia (Pon-Nie, poziomy scroll), w
+każdej kolumnie chronologiczna lista tego dnia. ŚWIADOMIE NIE ściśle proporcjonalna do
+godziny (1px = 1min zrobiłoby albo gigantyczny ekran, albo nieczytelnie małe bloki dla
+90-minutowych zajęć na telefonie) — bloki mają kolor wg typu (W/C/L/P, ta sama paleta co
+`ClassScheduleCard`), czas/typ/przedmiot/salę. Nawigacja tydzień wstecz/naprzód +
+szybki powrót ("wróć do dziś" gdy `weekOffset !== 0`). Dane = te same `gcalEvents` +
+`isClassEvent`/`parseClassEvent` co dashboardowy kafelek (§158) i TopPill (§160) — WSZYSTKIE
+TRZY miejsca zawsze pokazują to samo, zero duplikacji logiki.
+
+**Nowy `src/utils/weekGrid.ts`** — `mondayOf()`/`fmtWeekRange()`/`toYMD()` WYDZIELONE z
+`class-schedule.tsx` (importuje `react-native`, nietestowalny bezpośrednio — ten sam wzorzec
+co `streakTiers.ts` w §156). Warto było: `mondayOf()` ma nietrywialny przypadek — `Date.
+getDay()` zwraca 0 dla NIEDZIELI (nie 7), więc naiwne `1 - dow` cofnęłoby niedzielę o -6 dni
+(do poniedziałku NASTĘPNEGO tygodnia) zamiast o -1 dzień (do poniedziałku tygodnia który się
+właśnie kończy) — jawny `dow === 0 ? -6 : 1 - dow` obsługuje to poprawnie, pokryte testem.
+
+**Dostęp**: link w Ustawieniach → Plan zajęć → "Podgląd tygodnia", ORAZ tapnięcie w
+dashboardowy kafelek `ClassScheduleCard` (wcześniej niekliknięty — `GCalCard`, na którym był
+wzorowany, też nie jest klikalny, ale tu dodanie nawigacji miało oczywisty cel: pełny tydzień
+zamiast tylko dziś/jutro).
+
+**Testy**: `__tests__/weekGrid.test.ts` (8 testów) — w tym granica niedzieli i granica
+miesiąca. `tsc`/`jest` czyste (1075 testów, +8).
+
+**Priorytet testu na urządzeniu — średni**: sprawdź ekran (Ustawienia → Plan zajęć → Podgląd
+tygodnia, lub tapnij kafelek dashboardu), nawigację tydzień wstecz/naprzód, i czy poziomy
+scroll do dalszych dni tygodnia działa płynnie na telefonie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

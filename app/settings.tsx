@@ -1323,6 +1323,16 @@ export default function SettingsScreen() {
           keywords: ['prefiks', 'plan zajęć', 'uczelnia', 'kalendarz', 'pur'],
           control: { kind: 'text' as const, value: classPrefix, onChangeText: setClassPrefix, onBlur: () => saveClassPrefix(classPrefix), placeholder: '[PUR]', width: 80 },
         },
+        {
+          // Wirtualny podgląd tygodnia (2026-09-22, user: "żebym miał podgląd planu taki
+          // wirtualny") — osobny ekran, link tu + tapnięcie w dashboardowy kafelek
+          // (ClassScheduleCard.tsx) prowadzą w to samo miejsce.
+          id: 'class-schedule-link', title: 'Podgląd tygodnia',
+          subtitle: 'Siatka dni z Twoimi zajęciami, tydzień po tygodniu',
+          icon: LucideIcons.CalendarRange, accentColor: '#A78BFA',
+          keywords: ['plan zajęć', 'podgląd', 'tydzień', 'siatka', 'uczelnia'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/class-schedule' as any); } },
+        },
       ],
     },
     {
