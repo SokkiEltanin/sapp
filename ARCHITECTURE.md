@@ -10086,6 +10086,36 @@ się" po synchronizacji.
 
 ---
 
+## 160. Plan zajęć w TopPillu — wydzielone z generycznej puli gcal, priorytet jak zmiana pracy (2026-09-22)
+
+User: "żeby też łapało że mam zajęcia w pillu". Zajęcia `[PUR]` technicznie JUŻ trafiały do
+pilla — jako zwykłe eventy Google Kalendarza w priorytecie 6 ("gcal event today") — ale w
+BRZYDKIEJ formie: surowy tytuł z nawiasami (`"[PUR] W - KOMP. MODEL. STRUKTUR..."`), bez
+wyciągniętego typu/sali. Ten sam problem co zmiany pracy miałyby, gdyby NIE zostały wydzielone
+do własnego priorytetu 3 — więc ten sam fix: nowy priorytet **3b**, między "zmiana pracy jutro"
+a "zaległe zadania", pozycjonowany jak zmiana pracy (rozumowanie: "musisz gdzieś fizycznie być
+o konkretnej godzinie" to ta sama pilność co zmiana w pracy, wyższa niż generyczny event w
+kalendarzu).
+
+Filtr "jeszcze trwa/się nie zaczęło" TEN SAM co priorytet 6 (gcalToday), ale patrzy na
+`endTime` nie `startTime` (event nadal aktualny dopóki się nie skończy, nie tylko dopóki nie
+wystartuje — inaczej 90-minutowe zajęcia znikałyby z pilla po 45 min mimo trwania). Rotacja
+przez WSZYSTKIE dzisiejsze zajęcia via `calmTick`, jak reszta multi-item priorytetów w tym
+pliku (overdue/today-tasks/budget/gcal). Format: `"{TYP}: {PRZEDMIOT} · {SALA}"` (np. "WYKŁAD:
+KOMP. MODEL. STRUKTUR I WŁ. MAT. · 203 B3"), fioletowy akcent `#A78BFA` — spójny z sekcją
+"Plan zajęć" w Ustawieniach (§157) i dashboardowym kafelkiem (§158). Priorytet 6 (generyczny
+gcal) dostał `!isClassEvent(...)` filtr, żeby `[PUR]`-eventy NIGDY nie pokazały się tam w
+brzydkiej, surowej formie jako "zapasowa" ścieżka — jeden, przewidywalny format zawsze.
+
+`tsc`/`jest` czyste (1067 testów, bez zmiany — `TopPill.tsx` bez istniejącego pokrycia testami,
+ten plik nigdy go nie miał, nowy priorytet nie łamie tego wzorca).
+
+**Priorytet testu na urządzeniu — średni**: po imporcie `.ics` z §158, sprawdź czy pill
+pokazuje dzisiejsze zajęcia z ładnym formatem (typ+przedmiot+sala), rotuje przez wszystkie
+jeśli jest ich kilka danego dnia, i znika dopiero po zakończeniu ostatnich (nie po starcie).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Plan zajęć w TopPillu (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §160. User: "żeby też łapało że mam zajęcia w pillu" —
+`[PUR]`-eventy już trafiały do pilla (generyczny gcal-priorytet), ale brzydko (surowy tytuł z
+nawiasami). Nowy priorytet 3b, pozycjonowany jak zmiana pracy, format "TYP: PRZEDMIOT · SALA",
+fioletowy akcent spójny z resztą funkcji planu zajęć. `tsc`/`jest` czyste (1067 testów, bez
+zmiany — `TopPill.tsx` bez istniejącego pokrycia testami).
+
+**🆕 Reszta rozbudowy planu zajęć (user poprosił, jeszcze nie zaczęte)**: (1) wirtualny
+podgląd całego tygodnia (jak siatka którą user przysyłał — dni×godziny), (2) sprawdzić czy
+dashboardowy kafelek `class-schedule` (§158) wystarcza jako "widget", czy user chce czegoś
+więcej. Do zaproponowania userowi zanim się zacznie kodować (większy zakres niż pill).
+
 ## ✅ Fix: licznik wody potrafił cofnąć się po synchronizacji z zegarka (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §159. User: "na zegarku kliknąłem z 5/8 na 8/8, w apce po

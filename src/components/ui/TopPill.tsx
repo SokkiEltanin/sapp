@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AppState } from 'react-native';
 import { router } from 'expo-router';
-import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords, Bell } from 'lucide-react-native';
+import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords, Bell, GraduationCap } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { usePillFlash } from '@/store/pillFlashStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -12,6 +12,8 @@ import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { usePetStore } from '@/store/petStore';
+import { useClassScheduleStore } from '@/store/classScheduleStore';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL } from '@/utils/classSchedule';
 import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -67,6 +69,7 @@ function pillIcon(key: string): any {
   if (key.startsWith('flash-')) return Bell;
   if (key.startsWith('pom-')) return Timer;
   if (key.startsWith('earn-') || key.startsWith('shift-')) return Briefcase;
+  if (key.startsWith('class-')) return GraduationCap;
   if (key.startsWith('overdue-')) return AlertTriangle;
   if (key.startsWith('today-') || key.startsWith('pending-')) return ListTodo;
   if (key.startsWith('budget-')) return Wallet;
@@ -111,6 +114,7 @@ export default function TopPill() {
 
   const calTasks   = useCalendarStore(s => s.tasks);
   const gcalEvents = useCalendarStore(s => s.gcalEvents);
+  const classPrefix = useClassScheduleStore(s => s.prefix);
 
   const shifts        = useWorkStore(s => s.shifts);
   const workSettings  = useWorkStore(s => s.settings);
@@ -245,6 +249,41 @@ export default function TopPill() {
       };
     }
 
+    // 3b — Plan zajęć (2026-09-22, user: "żeby też łapało że mam zajęcia w pillu") —
+    // WYDZIELONE z generycznej puli "6 — Google Calendar event today" niżej (ten sam
+    // "jeszcze się nie zaczęło/trwa" filtr, ten sam wzorzec co wydzielenie zmian pracy w
+    // priorytecie 3 wyżej), żeby pokazać typ+przedmiot+salę zamiast surowego
+    // "[PUR] W - Nazwa - Sala" tytułu z nawiasami. Ten sam priorytet-poziom co zmiana pracy
+    // (3) — "musisz gdzieś fizycznie być o konkretnej godzinie" to ta sama pilność.
+    const nowMinsClass = new Date().getHours() * 60 + new Date().getMinutes();
+    const classToday = gcalEvents
+      .filter(e => e.date === today && isClassEvent(e.title, classPrefix))
+      .filter(e => {
+        if (!e.startTime || !e.endTime) return true;
+        const [eh, em] = e.endTime.split(':').map(Number);
+        return eh * 60 + em >= nowMinsClass;
+      })
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+    if (classToday.length > 0) {
+      const ev = classToday[calmTick % classToday.length];
+      const parsed = parseClassEvent(ev.title, classPrefix);
+      let timeLabel = 'DZIŚ';
+      if (ev.startTime) {
+        const [h, m] = ev.startTime.split(':').map(Number);
+        const diffM = h * 60 + m - nowMinsClass;
+        timeLabel = diffM <= 0 ? 'TERAZ' : diffM < 60 ? `ZA ${diffM} MIN` : ev.startTime;
+      }
+      const typePrefix = parsed?.type ? `${CLASS_TYPE_LABEL[parsed.type].toUpperCase()}: ` : '';
+      const roomSuffix = parsed?.room ? ` · ${parsed.room}` : '';
+      return {
+        badge: timeLabel,
+        color:  '#A78BFA',             // fioletowy — spójny z sekcją "Plan zajęć" (Ustawienia/dashboard)
+        text:   `${typePrefix}${up(parsed?.subject ?? ev.title)}${roomSuffix}`,
+        route:  '/(tabs)',
+        key:    `class-${ev.id}`,
+      };
+    }
+
     // 4 — Overdue tasks (status pending + deadline < today). Rotuje przez WSZYSTKIE
     // zaległe (jak pula LUŹNA niżej, ten sam `calmTick`), nie tylko najstarsze — user
     // z 3 zaległymi widziałby wiecznie TO SAMO jedno zadanie, resztę tylko po wejściu w
@@ -311,10 +350,12 @@ export default function TopPill() {
       };
     }
 
-    // 6 — Google Calendar event today (first upcoming by startTime)
+    // 6 — Google Calendar event today (first upcoming by startTime). `[PUR]`-eventy
+    // WYŁĄCZONE stąd — mają własną, wydzieloną priorytet "3b" wyżej z ładniejszym
+    // formatowaniem, nie powinny się dublować tu w surowym formacie.
     const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
     const gcalToday = gcalEvents
-      .filter(e => e.date === today)
+      .filter(e => e.date === today && !isClassEvent(e.title, classPrefix))
       .filter(e => {
         if (!e.startTime) return false;
         const [h, m] = e.startTime.split(':').map(Number);
@@ -457,7 +498,7 @@ export default function TopPill() {
     workEarnings.isWorking, workEarnings.totalEarned, workEarnings.activeEventTitle,
     shifts, workPrefix,
     calTasks,
-    gcalEvents,
+    gcalEvents, classPrefix,
     expenses, budgets,
     missionEndsAt, missionStartedAt, bossEnergy, calmTick,
     habits, todayDone,
