@@ -91,27 +91,31 @@ losuje już topowego ekwipunku. Pierwsze podejście do kalibracji — do docalib
 świeżych danych z "Statystyki skrzynek" po dłuższym graniu (analogicznie jak krzywa nagród
 MAD i krzywa levelu wyżej — obie przeszły iteracje po realnych danych).
 
-## 🆕 POMYSŁ (zapisany, nie zaczęty): plan zajęć [PUR] z importu PDF (2026-09-21)
+## 🆕 W TRAKCIE: plan zajęć [PUR] — prefiks gotowy, reszta czeka na realne eventy (2026-09-22)
 
 User (student UR) chce widget/przypomnienia dla planu zajęć — sala, X minut przed. Ustalony
-kierunek: prefiks `[PUR]` (jak `[JD]` dla pracy), konfigurowalny w Ustawieniach identycznie
-jak `workPrefix`; źródło wydarzeń = Google Kalendarz (cykliczność + wyjątki — dni rektorskie,
-sesja — obsługuje NATYWNIE Kalendarz, apka tylko czyta co zwraca, ZERO parsera/logiki
-wyjątków po stronie apki). Dodatkowy pomysł usera: zamiast ręcznie ustawiać cykl w Kalendarzu,
-wysłać mi (w rozmowie, nie jako funkcja w apce) PDF z planem + PDF z wolnymi tygodniami — ja
-czytam PDF-y i generuję gotowy plik `.ics` z całym semestrem (poprawne daty, sala w opisie,
-prefiks w tytule, wyjątki już wbudowane jako brakujące wydarzenia), user importuje JEDNYM
-importem do Google Kalendarza. Przy zmianie w trakcie semestru — nowy PDF, ja
-porównuję/generuję zaktualizowany `.ics`.
+format tytułu w Google Kalendarzu: `[PUR] Angielski techniczny - 203 B3` (prefiks + nazwa
+przedmiotu + " - " + sala). Źródło wydarzeń = Google Kalendarz (cykliczność + wyjątki — dni
+rektorskie, sesja — obsługuje NATYWNIE Kalendarz, apka tylko czyta co zwraca, ZERO
+parsera/logiki wyjątków po stronie apki). User dodaje eventy sam ręcznie (pomysł z PDF→`.ics`
+z wcześniejszej rozmowy odłożony na razie, niewykorzystany).
 
-**Do zrobienia w apce (niezależne od tego skąd wezmą się wydarzenia)**: pole prefiksu w
-Ustawieniach (sekcja analogiczna do Pracy), rozpoznawanie `[PUR]`-prefiksowanych
-`gcalEvents` + wyciąganie sali z tytułu/opisu, kafelek/widget na dziś, nowe powiadomienie
+**Zrobione**: `src/store/classScheduleStore.ts` — jeden globalny, edytowalny prefiks
+(domyślnie `[PUR]`), Ustawienia → nowa sekcja "Plan zajęć" (analogiczna do "Prefix eventów
+pracy" w Pracy). `tsc`/`jest` czyste (1053 testów, bez zmiany netto — czysty magazyn
+gettera/settera, ten sam wzorzec co `profileStore.ts`/`streakFreezeStore.ts`, nic złożonego
+do testowania).
+
+**Świadomie NIE zrobione jeszcze**: rozpoznawanie `[PUR]`-prefiksowanych `gcalEvents` +
+wyciąganie sali z tytułu (`" - 203 B3"` na końcu), kafelek/widget na dziś, nowe powiadomienie
 X minut przed z salą (osobny przełącznik, dziś synchronizowane wydarzenia z Google w ogóle
-nie mają żadnych push-powiadomień, tylko bierny pill gdy apka otwarta).
-
-**Nie zaczęte — czeka na PDF-y od usera** (research/projekt zrobiony w rozmowie, kod jeszcze
-nie napisany).
+nie mają żadnych push-powiadomień, tylko bierny pill gdy apka otwarta). Ta sama dyscyplina co
+przy MAD reward curve/ekonomii skrzynek w tej sesji — user dopiero zaczyna wpisywać eventy do
+kalendarza, sensowniej zbudować rozpoznawanie/UI na realnym eksporcie `gcalEvents` niż
+zgadywać z góry. Wzorzec do naśladowania przy budowie: `isWorkEvent()`/`shiftClockRange()`
+w `src/utils/workEvents.ts` (analogiczny `isClassEvent()`/`classRoomFor()` w nowym
+`src/utils/classSchedule.ts`), ale PROŚCIEJ — żadnego parsera godzin z tytułu, to zwykłe w
+pełni czasowe eventy (start/koniec z WŁASNYCH czasów eventu, nie z tekstu).
 
 ## ✅ Fix: eksport postępu pupila pokazywał niezaokrąglony float HP kotka (2026-09-21)
 
