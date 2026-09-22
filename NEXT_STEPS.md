@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: licznik wody potrafił cofnąć się po synchronizacji z zegarka (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §159. User: "na zegarku kliknąłem z 5/8 na 8/8, w apce po
+odświeżeniu zestuckowało się na 7/8". Przyczyna: `useWaterTracker.ts`'s odroczony (350ms)
+zapis po tapnięciu w `food.tsx` nadpisywał storage gołą lokalną wartością bez sprawdzenia
+czy Health Connect w tle nie zaktualizował licznika świeższą wartością z zegarka (wyścig z
+`feedWaterHabit()` w `habits.ts`, który już ma poprawny MAX-merge). Fix: `persist()` odczytuje
+fresh storage tuż przed zapisem, finalna wartość = `Math.max(fresh, lokalna)` — spójne z
+`feedWaterHabit()`'s "w ciągu dnia liczba tylko rośnie". Brak automatycznego testu (hook,
+nietestowalny w obecnym Jest setupie), logika reużyta z już przetestowanego
+`feedWaterHabit()`. `tsc`/`jest` czyste.
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: bezpośrednia odpowiedź na zgłoszony bug, trudno
+idealnie odtworzyć (wymaga realnego wyścigu z synchronizacją zegarka) — obserwuj czy licznik
+wody jeszcze kiedyś "cofnie się" po synchronizacji.
+
 ## ✅ Streaki: 2 nowe progi koloru + pasek postępu — najdłuższe "ciche" odcinki przycięte o połowę (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §156. User: "jestem zestresowany na różowym kolorze już

@@ -55,13 +55,28 @@ export function useWaterTracker() {
     return habit.id;
   };
 
+  // Zapis USTALA finalną wartość na Math.max(świeży-storage, nasz-lokalny) zamiast ślepo
+  // nadpisywać `ref.current` (2026-09-22, user: "na zegarku kliknąłem z 5/8 3 razy na 8/8...
+  // w apce po odświeżeniu zestuckowało się na 7/8" — realny bug, nie zgłoszenie bez
+  // przyczyny). Wyścig: Health Connect w tle synchronizuje wodę z zegarka (`feedWaterHabit`
+  // w habits.ts, ten sam plik) DOKŁADNIE w oknie, gdy w tym hooku wisi jeszcze odroczony
+  // zapis (`timer.current` niepuste) — `load()`'s guard wyżej wtedy CELOWO pomija
+  // przeładowanie (żeby nie zgubić optymistycznego lokalnego tapnięcia), więc `ref.current`
+  // zostaje NIEŚWIADOMY świeższej wartości z zegarka. Gdy debounce w końcu odpala, goły
+  // `counts[id] = ref.current` nadpisywał storage starszą liczbą — realnie KASOWAŁ wodę
+  // zalogowaną z zegarka w tym oknie, nie tylko opóźniał UI. `Math.max` tu to DOKŁADNIE ten
+  // sam „w ciągu dnia liczba tylko rośnie" wzorzec co `feedWaterHabit()` niżej w tym pliku —
+  // spójne dla obu ścieżek zapisu tego samego licznika, nie tylko jednej.
   const persist = async () => {
     const id = habitId.current ?? await ensure();
     if (!id) return;
     const date = todayDate();
     const counts = await getCounts(date);
-    counts[id] = ref.current;
+    const fresh = Math.max(0, counts[id] ?? 0);
+    const final = Math.max(fresh, ref.current);
+    counts[id] = final;
     await setCounts(date, counts);
+    if (final !== ref.current) { ref.current = final; setGlasses(final); }
     bump();   // notify Nawyki / dashboard / pet
   };
 
