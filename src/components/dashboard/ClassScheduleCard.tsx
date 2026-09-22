@@ -1,8 +1,10 @@
 import { memo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import { GraduationCap } from 'lucide-react-native';
 import { CalendarEvent } from '@/types';
 import { parseClassEvent } from '@/utils/classSchedule';
+import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -39,7 +41,11 @@ function ClassScheduleCard({ today, tomorrow, prefix, cardBg }: ClassScheduleCar
   };
 
   return (
-    <View style={[s.card, { backgroundColor: cardBg }]}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => { haptic.tap(); router.push('/class-schedule' as any); }}
+      style={[s.card, { backgroundColor: cardBg }]}
+    >
       <View style={s.cardHeader}>
         <GraduationCap size={13} color={c.text.muted} />
         <Text style={s.cardTitle}>Plan zajęć</Text>
@@ -56,7 +62,7 @@ function ClassScheduleCard({ today, tomorrow, prefix, cardBg }: ClassScheduleCar
           {tomorrow.map(renderRow)}
         </>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
