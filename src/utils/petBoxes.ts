@@ -15,7 +15,7 @@
 // (umiejętności/"ulepszenia ogólne") ZOSTAJE bez zmian — to świadomie najrzadsza kategoria,
 // niezależna od tej korekty.
 import { CrateTier } from '@/utils/crates';
-import { GearRarity, unlockedGearFor, GEAR_SLOTS, rollGearValue } from '@/utils/gear';
+import { GearRarity, unlockedGearFor, GEAR_SLOTS, rollGearValue, TIER_LEVELS } from '@/utils/gear';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 
 export type BoxId = 'sardine' | 'iron' | 'gold' | 'divine';
@@ -42,6 +42,33 @@ export const DAILY_BOX_ICON = require('../../assets/chests/chest_daily.png');
 // ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"). Gdyby kiedyś doszedł 5. tier, wystarczy dopisać
 // go tutaj — logika niżej porównuje RANGI, nie konkretne id.
 export const BOX_RANK: Record<BoxId, number> = { sardine: 0, iron: 1, gold: 2, divine: 3 };
+
+// Przebalans ekonomii skrzynek (2026-09-22) — user przysłał realne statystyki: drewniana
+// (najtańsza) wychodziła cały czas mocno na plus (ROI liczone z wartością odsprzedaży
+// dropniętego ekwipunku, nie tylko surowych monet z ekranu statystyk, ~120-200%+), a boska
+// (najdroższa) NIGDY nie dawała monet — prawdziwy bug: `gearChance + combatItemChance` dla
+// gold (0.96+0.08=1.04) i divine (0.92+0.16=1.08) PRZEKRACZAŁO 100%, więc `rollBox()`'owy
+// branch monet niżej był matematycznie nieosiągalny (los 0-1 zawsze łapał się w
+// ekwipunek/umiejętność zanim dotarł do monet) — potwierdzone realnymi danymi usera (40
+// otwarć boskiej, dokładnie 0% monet). Korzeń DRUGIEGO problemu (drewniana zbyt op): pula
+// itemów do wylosowania w `rollBox()` była capowana WYŁĄCZNIE poziomem gracza
+// (`unlockedGearFor(slot, level)`), NIE tierem skrzynki — przy wysokim poziomie pupila tania
+// skrzynka miała dokładnie ten sam dostęp do itemów co droga, różniły się tylko WAGI
+// rzadkości (i to niewiele: śr. mnożnik rzadkości drewniana ×1.2 → boska ×2.6, ledwie 2.1×
+// różnicy), podczas gdy cena rosła 35→450 (12.9× różnicy) — płacenie więcej dawało
+// nieproporcjonalnie mało.
+//
+// Fix: (1) `gearChance`/`combatItemChance` przycięte tak, żeby suma zawsze < 1 (monety
+// realnie osiągalne we WSZYSTKICH skrzynkach); (2) `BOX_MAX_GEAR_TIER` niżej — PRAWDZIWY cap
+// puli itemów per skrzynka (nie tylko poziom gracza), więc drewniana/żelazna fizycznie nie
+// mogą wylosować topowych tierów niezależnie jak wysoko jest gracz; (3) zasięg monet
+// drewnianej przycięty (była najbardziej dysproporcjonalna). Reszta zakresów monet
+// (iron/gold/divine) BEZ ZMIAN — to było zawsze poprawnie zaprojektowane (50-300% własnego
+// kosztu), tylko nieosiągalne przez bug wyżej. Zweryfikowane node'ową symulacją EV (coins
+// branch + gear branch przez `gearSellValue`) na reprezentatywnych poziomach gracza przed
+// wdrożeniem — drewniana spadła z ~120-200%+ ROI do ~90-105% (break-even, zgodnie z
+// życzeniem usera), reszta rośnie w górę bez skoku do zera przy boskiej.
+export const BOX_MAX_GEAR_TIER: Record<BoxId, number> = { sardine: 1, iron: 2, gold: 3, divine: 4 };
 
 export interface LootBox {
   id: BoxId;
@@ -78,35 +105,46 @@ export const LOOT_BOXES: LootBox[] = [
   {
     id: 'sardine', name: 'Drewniana skrzynka', cost: 35, color: '#9AA6B2', emoji: '🪵', icon: BOX_ICON.sardine,
     blurb: 'Tania — głównie monety, czasem item ekwipunku',
+    // gearChance BEZ ZMIAN (nigdy nie było buga tutaj — suma z combatItemChance zawsze <1).
+    // Zasięg monet PRZYCIĘTY (2026-09-22, patrz komentarz przy BOX_MAX_GEAR_TIER wyżej) —
+    // było 18-105 (51-300% kosztu), za dużo w połączeniu z niecapowaną wcześniej pulą itemów.
     gearChance: 0.40, combatItemChance: 0.02,
     gearRarityWeight: { common: 70, rare: 25, epic: 4, legendary: 0.9, mythic: 0.1 },
-    coins: { min: 18, max: 105, jackpot: 40, jackpotChance: 0.03 },
+    coins: { min: 12, max: 70, jackpot: 30, jackpotChance: 0.02 },
   },
   {
     // Dawniej "silver"/"Srebrna skrzynka" — PRZEMIANOWANA (2026-09-08, user: "miała być ta
-    // nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"), liczby BEZ ZMIAN, tylko nazwa/emoji/kolor.
+    // nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA"). `gearChance` PRZYCIĘTE 0.76→0.65 (2026-09-22,
+    // patrz komentarz przy BOX_MAX_GEAR_TIER wyżej) — zostawia więcej miejsca na monety, które
+    // reszta ekonomii teraz faktycznie potrzebuje (box-tier cap zabrał części dawnej
+    // "przewagi" gearChance nad drewnianą). Zasięg monet BEZ ZMIAN.
     id: 'iron', name: 'Żelazna skrzynka', cost: 90, color: '#8A93A8', emoji: '⚙️', icon: BOX_ICON.iron,
     blurb: 'Lepsze szanse na item ekwipunku wyższej rzadkości',
-    gearChance: 0.76, combatItemChance: 0.05,
+    gearChance: 0.65, combatItemChance: 0.05,
     gearRarityWeight: { common: 40, rare: 35, epic: 18, legendary: 6, mythic: 1 },
     coins: { min: 45, max: 270, jackpot: 90, jackpotChance: 0.04 },
   },
   {
+    // `gearChance` PRZYCIĘTE 0.96→0.70 (2026-09-22) — realny BUG: 0.96+combatItemChance(0.08)
+    // = 1.04 > 1, więc branch monet w `rollBox()` był matematycznie nieosiągalny (potwierdzone
+    // statystykami usera). Zasięg monet BEZ ZMIAN, teraz wreszcie realnie osiągalny.
     id: 'gold', name: 'Złota skrzynka', cost: 200, color: '#FBBF24', emoji: '🥇', icon: BOX_ICON.gold,
     blurb: 'Bardzo dobre szanse — wysokiej rzadkości ekwipunek',
-    gearChance: 0.96, combatItemChance: 0.08,
+    gearChance: 0.70, combatItemChance: 0.08,
     gearRarityWeight: { common: 15, rare: 30, epic: 30, legendary: 18, mythic: 7 },
     coins: { min: 100, max: 600, jackpot: 200, jackpotChance: 0.05 },
   },
   {
     // NOWY 4. tier (2026-09-08, user: "miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA")
     // — najdroższa, najlepsze szanse ze wszystkich. Koszt/monety wg tej samej skali co reszta
-    // (50%-300% WŁASNEGO kosztu). `gearRarityWeight` mocno przechylone w legendary/mythic,
-    // `combatItemChance` PRAWIE DWA RAZY wyższe niż gold. Do skorygowania po realnym teście
-    // balansu.
+    // (50%-300% WŁASNEGO kosztu). `gearChance` PRZYCIĘTE 0.92→0.65 (2026-09-22) — TEN SAM
+    // bug co gold, drastyczniejszy (0.92+0.16=1.08>1): user przysłał realne statystyki, 40
+    // otwarć boskiej, DOKŁADNIE 0% monet — branch w kodzie był całkowicie nieosiągalny.
+    // `combatItemChance` (0.16) teraz wreszcie realnie DWA razy wyższe niż gold (dawniej,
+    // przez przepełnienie, efektywnie działało jak ~0.08 — połowa deklarowanej wartości).
     id: 'divine', name: 'Boska skrzynka', cost: 450, color: '#C4B5FD', emoji: '👑', icon: BOX_ICON.divine,
     blurb: 'Absolutny szczyt — mitycznej jakości ekwipunek i umiejętności bossów',
-    gearChance: 0.92, combatItemChance: 0.16,
+    gearChance: 0.65, combatItemChance: 0.16,
     gearRarityWeight: { common: 5, rare: 20, epic: 30, legendary: 30, mythic: 15 },
     coins: { min: 225, max: 1350, jackpot: 900, jackpotChance: 0.07 },
   },
@@ -145,9 +183,11 @@ export function pickWeighted<T>(items: { item: T; w: number }[]): T | null {
 }
 
 // Wylosuj nagrodę. `level` = poziom pupila, ogranicza pulę itemów ekwipunku do odblokowanych
-// (unlockLevel). `ownedCombatItems` (2026-08-29) = posiadane perki bossów wg poziomu —
-// decyduje, czy trafienie w strefę `combatItemChance` da NOWY perk czy ULEPSZENIE już
-// posiadanego (patrz niżej).
+// (unlockLevel) — dodatkowo capowana przez `BOX_MAX_GEAR_TIER` wg TIERU SKRZYNKI (2026-09-22,
+// patrz komentarz tam), więc drewniana/żelazna nie mogą wylosować topowych itemów nawet przy
+// bardzo wysokim poziomie gracza. `ownedCombatItems` (2026-08-29) = posiadane perki bossów wg
+// poziomu — decyduje, czy trafienie w strefę `combatItemChance` da NOWY perk czy ULEPSZENIE
+// już posiadanego (patrz niżej).
 export function rollBox(
   box: LootBox, level: number,
   ownedCombatItems: Partial<Record<CombatItemId, number>> = {},
@@ -155,9 +195,11 @@ export function rollBox(
   const r = Math.random();
   const gearCut = box.gearChance;
   const combatItemCut = gearCut + (box.combatItemChance ?? 0);
-  // 1) EKWIPUNEK (dowolny slot, tylko odblokowane wg poziomu; rzadkość ważona wg skrzynki)
+  const gearLevelCap = Math.min(level, TIER_LEVELS[BOX_MAX_GEAR_TIER[box.id]]);
+  // 1) EKWIPUNEK (dowolny slot, tylko odblokowane wg poziomu ORAZ tieru skrzynki; rzadkość
+  // ważona wg skrzynki)
   if (r < gearCut) {
-    const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
+    const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, gearLevelCap));
     if (unlocked.length > 0) {
       const item = unlocked[Math.floor(Math.random() * unlocked.length)];
       const rarity = pickWeighted((Object.keys(box.gearRarityWeight) as GearRarity[]).map(g => ({ item: g, w: box.gearRarityWeight[g] })));

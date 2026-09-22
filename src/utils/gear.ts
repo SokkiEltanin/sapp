@@ -258,7 +258,9 @@ function pseudoRandom01(seed: string): number {
   return (hashOf(seed, 31) % 100000) / 100000;
 }
 
-const TIER_LEVELS = [1, 20, 40, 65, 90];
+// Eksportowane (2026-09-22) — petBoxes.ts's BOX_MAX_GEAR_TIER czyta te progi, żeby capować
+// pulę itemów SKRZYNKI (nie tylko poziomu gracza), patrz komentarz tam.
+export const TIER_LEVELS = [1, 20, 40, 65, 90];
 const TIER_BASE_COST = [40, 90, 160, 260, 400];
 const DAILY_RARITY_COST_MULT: Record<GearRarity, number> = {
   common: 1, rare: 1.6, epic: 2.2, legendary: 3, mythic: 4.2,

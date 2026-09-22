@@ -36,18 +36,25 @@ zmierzone optimum. User ma obserwować 5. rundę testową i zgłosić czy skoki 
 walkach MAD są teraz sensowne (analogicznie do krzywej nagród MAD, która przeszła 2 iteracje
 zanim osiadła).
 
-## 🆕 W TRAKCIE: ekonomia skrzynek (loot boxów) — user podejrzewa że najtańsza jest zepsuta/zbyt OP (2026-09-22)
+## ✅ Przebalans ekonomii skrzynek — bug przepełnienia progów + box-tier cap na puli itemów (2026-09-22)
 
-User przysłał zrzut ekranu "Statystyki skrzynek": z najtańszej skrzynki (Drewniana) średnio
-wypada ~40 monet i cały czas jest się na plus, mimo że statystyki w apce liczą TYLKO surowe
-monety z nagród, NIE wartość otrzymanych itemów ekwipunku — więc realny zysk może być jeszcze
-wyższy niż pokazuje ekran. User chce przebalansować całą ekonomię skrzynek (ceny + zawartość),
-i floated pomysł: zrobić legendarną/najwyższą skrzynkę bardziej OP, ale postawić cenę na ~2k
-monet. **Nie zaczęte** — trzeba doczytać pełny katalog itemów w `gear.ts` (tylko częściowo
-przeczytany) i zbudować symulację EV (coins branch + gear branch przez `gearSellValue`) dla
-wszystkich 4 tierów skrzynek (sardynka/żelazna/złota/boska) na reprezentatywnych poziomach
-gracza, ZANIM dotknie się jakichkolwiek liczb balansu — ta sama dyscyplina co przy MAD reward
-curve i krzywej levelu wyżej.
+Pełny opis w ARCHITECTURE.md §154. User przysłał zrzut "Statystyki skrzynek" — drewniana
+(najtańsza) cały czas mocno na plus, boska (najdroższa) dokładnie 0% monet na 40 otwarć.
+Symulacja EV (`gearSellValue` + coins branch, przed dotknięciem liczb) ujawniła DWA problemy:
+(1) prawdziwy bug — `gearChance+combatItemChance` przekraczało 100% dla gold/divine, branch
+monet matematycznie nieosiągalny; (2) strukturalna wada — pula itemów capowana tylko
+poziomem gracza, nie tierem skrzynki, więc tania miała dostęp do tych samych itemów co droga.
+Fix: nowy `BOX_MAX_GEAR_TIER` (prawdziwy cap puli per skrzynka), `gearChance` przycięte żeby
+suma z `combatItemChance` zawsze <1, zasięg monet drewnianej przycięty. User zdecydował:
+przebuduj 4 istniejące tiery (nie dodawaj 5. za ~2k), ściągnij drewnianą do break-even. ROI
+(symulacja, poziom 90+): drewniana ~104% (było ~207%), iron ~96%, gold ~79%, divine ~62%
+(było -6%/0%-monet-bug). `tsc`/`jest` czyste (1043 testy, +3 regresyjne na oba bugi).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: otwórz po kilka skrzynek każdego tieru,
+sprawdź że złota/boska realnie dają monety, i że drewniana przy wysokim poziomie pupila nie
+losuje już topowego ekwipunku. Pierwsze podejście do kalibracji — do docalibrowania na
+świeżych danych z "Statystyki skrzynek" po dłuższym graniu (analogicznie jak krzywa nagród
+MAD i krzywa levelu wyżej — obie przeszły iteracje po realnych danych).
 
 ## 🆕 POMYSŁ (zapisany, nie zaczęty): plan zajęć [PUR] z importu PDF (2026-09-21)
 
