@@ -50,6 +50,7 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'mood-wave',
   'month-tasks',
   'gcal',
+  'class-schedule',
 ] as const;
 
 export type SectionId = typeof DEFAULT_DASHBOARD_SECTIONS[number];
@@ -99,6 +100,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'mood-wave':      'Nastrój — 8 tygodni',
   'month-tasks':    'Statystyki zadań (miesiąc)',
   'gcal':           'Kalendarz Google',
+  'class-schedule': 'Plan zajęć',
 };
 
 // Short "what it shows" line per section — surfaced in the dashboard editor so you
@@ -147,6 +149,7 @@ export const SECTION_DESC: Record<string, string> = {
   'mood-wave':      'Nastrój — fala 8 tygodni',
   'month-tasks':    'Statystyki ukończonych zadań (miesiąc)',
   'gcal':           'Nadchodzące wydarzenia z Google Calendar',
+  'class-schedule': 'Dzisiejsze/jutrzejsze zajęcia — typ, przedmiot, sala',
 };
 
 // Category for grouping the "add section" pool in the editor.
@@ -175,6 +178,9 @@ export const SECTION_GROUP: Record<string, string> = {
   'reflections': 'Inne',
   'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki', 'month-summary': 'Przegląd i statystyki',
   'pet': 'Inne',
+  // "co dziś na uczelni/gdzie idę" — codzienny, nawykowy sygnał jak today-tasks/habits-today,
+  // nie ogólna przeglądarka kalendarza (gcal), stąd inna grupa mimo wspólnego źródła danych.
+  'class-schedule': 'Zadania i nawyki',
 };
 export const SECTION_GROUP_ORDER = ['Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
 

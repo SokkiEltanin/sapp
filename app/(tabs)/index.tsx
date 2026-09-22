@@ -34,6 +34,8 @@ import { useHabits } from '@/hooks/useHabits';
 import { useMoodCheckIn } from '@/hooks/useMoodCheckIn';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useClassScheduleStore } from '@/store/classScheduleStore';
+import { isClassEvent } from '@/utils/classSchedule';
 import {
   MOOD_COLORS, MOOD_LABELS, ENERGY_COLORS, ENERGY_LABELS,
   MoodEntry, MoodLevel, Expense, Subscription, BillingCycle,
@@ -83,6 +85,7 @@ import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
+import ClassScheduleCard from '@/components/dashboard/ClassScheduleCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -322,6 +325,7 @@ export default function DashboardScreen() {
   const confirmMoodSync = useMoodStore(s => s.confirmSync);
   const events = useCalendarStore(s => s.events);
   const gcalEvents = useCalendarStore(s => s.gcalEvents);
+  const classPrefix = useClassScheduleStore(s => s.prefix);
   const calTasks = useCalendarStore(s => s.tasks);
   const setEvents = useCalendarStore(s => s.setEvents);
   const setGcalEvents = useCalendarStore(s => s.setGcalEvents);
@@ -1332,6 +1336,24 @@ export default function DashboardScreen() {
       .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
   }, [gcalEvents, today]);
   const gcalTomorrow = useMemo(() => gcalEvents.filter(e => e.date === tomorrow).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')), [gcalEvents, tomorrow]);
+  // Plan zajęć (2026-09-22) — TEN SAM filtr "jeszcze się nie skończyło" co gcalToday wyżej,
+  // dodatkowo zawężony do `[PUR]`-prefiksowanych eventów (patrz classSchedule.ts).
+  const classToday = useMemo(() => {
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const t2m = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+    return gcalEvents
+      .filter(e => e.date === today && isClassEvent(e.title, classPrefix))
+      .filter(e => {
+        const r = shiftClockRange(e);
+        if (!r) return true;
+        return t2m(r.end) >= nowMins;
+      })
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+  }, [gcalEvents, today, classPrefix]);
+  const classTomorrow = useMemo(
+    () => gcalEvents.filter(e => e.date === tomorrow && isClassEvent(e.title, classPrefix)).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
+    [gcalEvents, tomorrow, classPrefix],
+  );
 
   const nextDeadline = useMemo(() => {
     const upcoming = pendingTasks.filter(t => t.deadline).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? ''))[0];
@@ -3372,6 +3394,11 @@ export default function DashboardScreen() {
             // patrz komentarz przy `nodes['pinned-notes']` wyżej.
             nodes['gcal'] = (gcalToday.length > 0 || gcalTomorrow.length > 0) && (
               <GCalCard today={gcalToday} tomorrow={gcalTomorrow} cardBg={cardBgDark} />
+            );
+
+            // Plan zajęć (2026-09-22) — ten sam guard-w-index wzorzec co gcal wyżej.
+            nodes['class-schedule'] = (classToday.length > 0 || classTomorrow.length > 0) && (
+              <ClassScheduleCard today={classToday} tomorrow={classTomorrow} prefix={classPrefix} cardBg={cardBgDark} />
             );
 
               // custom user tiles

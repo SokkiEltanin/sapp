@@ -91,31 +91,29 @@ losuje już topowego ekwipunku. Pierwsze podejście do kalibracji — do docalib
 świeżych danych z "Statystyki skrzynek" po dłuższym graniu (analogicznie jak krzywa nagród
 MAD i krzywa levelu wyżej — obie przeszły iteracje po realnych danych).
 
-## 🆕 W TRAKCIE: plan zajęć [PUR] — prefiks gotowy, reszta czeka na realne eventy (2026-09-22)
+## ✅ Plan zajęć [PUR] — rozpoznawanie eventów + kafelek dashboardu (2026-09-22)
 
-User (student UR) chce widget/przypomnienia dla planu zajęć — sala, X minut przed. Ustalony
-format tytułu w Google Kalendarzu: `[PUR] Angielski techniczny - 203 B3` (prefiks + nazwa
-przedmiotu + " - " + sala). Źródło wydarzeń = Google Kalendarz (cykliczność + wyjątki — dni
-rektorskie, sesja — obsługuje NATYWNIE Kalendarz, apka tylko czyta co zwraca, ZERO
-parsera/logiki wyjątków po stronie apki). User dodaje eventy sam ręcznie (pomysł z PDF→`.ics`
-z wcześniejszej rozmowy odłożony na razie, niewykorzystany).
+Pełny opis w ARCHITECTURE.md §158 (kontynuacja §157). User (student UR) przesłał zarządzenie
+Rektora UR o organizacji roku 2026/2027 + zrzut swojego planu zajęć — w rozmowie (nie w apce)
+wygenerowany gotowy plik `.ics` na semestr zimowy, finalny format tytułu:
+`[PUR] TYP - NAZWA - SALA` (TYP ∈ W/C/L/P — Wykład/Ćwiczenia/Laboratorium/Projekt). Mając już
+realne dane do zweryfikowania, user poprosił o prawdziwą funkcję w apce (nie tylko prefiks).
 
-**Zrobione**: `src/store/classScheduleStore.ts` — jeden globalny, edytowalny prefiks
-(domyślnie `[PUR]`), Ustawienia → nowa sekcja "Plan zajęć" (analogiczna do "Prefix eventów
-pracy" w Pracy). `tsc`/`jest` czyste (1053 testów, bez zmiany netto — czysty magazyn
-gettera/settera, ten sam wzorzec co `profileStore.ts`/`streakFreezeStore.ts`, nic złożonego
-do testowania).
+**Zrobione**: `src/utils/classSchedule.ts` (`isClassEvent`/`parseClassEvent`, analogiczne do
+`isWorkEvent()` ale bez parsera godzin z tytułu — zajęcia mają godziny WPROST z
+`CalendarEvent`), nowa sekcja dashboardu `class-schedule` (`ClassScheduleCard.tsx`, layout
+skopiowany z `GCalCard.tsx` + odznaka typu + sala, grupa "Zadania i nawyki", ładuje się w
+pierwszej klatce jak `gcal`). `__tests__/classSchedule.test.ts` — fixtures to REALNE tytuły z
+planu usera. `tsc`/`jest` czyste (1067 testów, +14).
 
-**Świadomie NIE zrobione jeszcze**: rozpoznawanie `[PUR]`-prefiksowanych `gcalEvents` +
-wyciąganie sali z tytułu (`" - 203 B3"` na końcu), kafelek/widget na dziś, nowe powiadomienie
-X minut przed z salą (osobny przełącznik, dziś synchronizowane wydarzenia z Google w ogóle
-nie mają żadnych push-powiadomień, tylko bierny pill gdy apka otwarta). Ta sama dyscyplina co
-przy MAD reward curve/ekonomii skrzynek w tej sesji — user dopiero zaczyna wpisywać eventy do
-kalendarza, sensowniej zbudować rozpoznawanie/UI na realnym eksporcie `gcalEvents` niż
-zgadywać z góry. Wzorzec do naśladowania przy budowie: `isWorkEvent()`/`shiftClockRange()`
-w `src/utils/workEvents.ts` (analogiczny `isClassEvent()`/`classRoomFor()` w nowym
-`src/utils/classSchedule.ts`), ale PROŚCIEJ — żadnego parsera godzin z tytułu, to zwykłe w
-pełni czasowe eventy (start/koniec z WŁASNYCH czasów eventu, nie z tekstu).
+**🆕 Świadomie NIE zrobione jeszcze**: powiadomienie X minut przed z salą (osobny przełącznik
+w Ustawieniach, dziś synchronizowane wydarzenia z Google w ogóle nie mają push-powiadomień,
+tylko bierny kafelek gdy apka otwarta) — ten sam wzorzec co powiadomienia o zmianach pracy w
+`notificationsService.ts`, do zrobienia jako osobny krok.
+
+**Priorytet testu na urządzeniu — wysoki**: zaimportuj plik `.ics` (osobny kalendarz Google,
+łatwy do usunięcia jednym klikiem jeśli coś nie gra), poczekaj na sync, sprawdź kafelek
+"Plan zajęć" na dashboardzie.
 
 ## ✅ Fix: eksport postępu pupila pokazywał niezaokrąglony float HP kotka (2026-09-21)
 
