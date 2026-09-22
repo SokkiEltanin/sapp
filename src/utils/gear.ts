@@ -31,11 +31,12 @@ export const RARITY_META: Record<GearRarity, { label: string; color: string; gra
 };
 
 // Który stat gracza dana kategoria slotu podbija — jeden slot = jeden stat, bez nakładania.
-export type GearStat = 'critPct' | 'flatHp' | 'dodgePct' | 'atkPct' | 'energyMultPct' | 'coinsPct';
+// `atkFlat` (nie `atkPct` — zmienione 2026-09-22, patrz komentarz przy `gearAtkFlat` niżej)
+export type GearStat = 'critPct' | 'flatHp' | 'dodgePct' | 'atkFlat' | 'energyMultPct' | 'coinsPct';
 
 export const SLOT_STAT: Record<GearSlot, GearStat> = {
   helm: 'critPct', zbroja: 'flatHp', buty: 'dodgePct',
-  obroza: 'atkPct', talizman: 'energyMultPct', kolczyki: 'coinsPct',
+  obroza: 'atkFlat', talizman: 'energyMultPct', kolczyki: 'coinsPct',
 };
 
 export const SLOT_META: Record<GearSlot, { label: string; icon: string }> = {
@@ -107,6 +108,25 @@ const ICONS: Record<string, ImageSourcePropType> = {
 // pojedynczy item) lądował w okolicach 20-30% TEJ sumy — zauważalny, ale nie dominujący
 // dodatek. zbroja (flatHp) T1 ZOSTAJE dokładnie jak podał user (common+1/rare+5/mythic+15) —
 // tylko T2-T5 dointerpolowane tak, żeby mythic T5 nie przekraczał ~50% CAT_BASE_MAX_HP (100).
+//
+// ── Obroża przebudowana z % na FLAT (2026-09-22) ────────────────────────────────────────
+// User: "ogarnij ekwipunek — patrz jak teraz stoi z bossami". Zmierzone node'em (nie
+// zgadywane): `atkMultiplier(level, bonuses) = 1 + level×0.03 + bonuses.atk` — poziom
+// BEZ SUFITU dominuje mnożnik coraz mocniej z każdym levelem, więc jakikolwiek STAŁY %
+// bonus (obroża, ale też loot kampanii) matematycznie zbiega do zera znaczenia: mityczna T5
+// obroża dawała ~9% CAŁEGO mnożnika na Lv20, ~4.4% na Lv116 (koniec kampanii), ~1.2% na
+// Lv617 (realna runda testowa usera) — w praktyce 0 ciosów różnicy w walce na tak wysokim
+// poziomie. Pozostałych 5 slotów NIE ma tego problemu (crit/dodge/energyMult/coinsPct to
+// płaskie % NIEZALEŻNE od poziomu, flatHp to płaska liczba) — tylko obroża siedziała W ŚRODKU
+// mnożnika, konkurując wprost z nieograniczonym członem poziomu.
+//
+// Fix: obroża teraz działa jak `atkStatBonus` (kupowany za monety, PRZED mnożnikiem, patrz
+// `gearAtkFlat` niżej) zamiast jak loot (%, WEWNĄTRZ mnożnika) — `(BASE_ATK+atkStatBonus+
+// gearAtkFlat) × mult` zamiast `BASE_ATK × (mult+gearAtkPct)`. Efekt: % boost z obroży jest
+// TERAZ IDENTYCZNY na każdym poziomie (nie maleje), bo to stosunek dwóch członów rosnących
+// razem z mnożnikiem, nie różnica malejąca względem niego. baseValue skalibrowane tak, żeby
+// mythic T5 (0.27×15=4.05 flat atk) dawał ~10% więcej mocy — ten sam rząd wielkości co stary
+// system dawał na Lv20 (start normalnej gry), tylko trzymany na TYM poziomie zamiast gasnąć.
 export const GEAR_ITEMS: GearItemDef[] = [
   // ── Hełm (crit%) — mythic T5 = 0.008×15 = 12% (kampania: suma 36%) ──
   { id: 'helm_slomiany', slot: 'helm', name: 'Słomiany Kapelusz', unlockLevel: 1, baseValue: 0.0015, icon: ICONS.helm_slomiany },
@@ -130,12 +150,14 @@ export const GEAR_ITEMS: GearItemDef[] = [
   { id: 'buty_cien', slot: 'buty', name: 'Sandały Cienia', unlockLevel: 65, baseValue: 0.009, icon: ICONS.buty_cien },
   { id: 'buty_kometa', slot: 'buty', name: 'Buty Komety', unlockLevel: 90, baseValue: 0.013, icon: ICONS.buty_kometa },
 
-  // ── Obroża (atk%) — mythic T5 = 0.0167×15 ≈ 25% (kampania: suma 92%) ──
-  { id: 'obroza_sznurek', slot: 'obroza', name: 'Sznurkowa Obroża', unlockLevel: 1, baseValue: 0.0025, icon: ICONS.obroza_sznurek },
-  { id: 'obroza_kolce', slot: 'obroza', name: 'Nabijana Obroża', unlockLevel: 20, baseValue: 0.005, icon: ICONS.obroza_kolce },
-  { id: 'obroza_wilcza', slot: 'obroza', name: 'Wilczy Kieł', unlockLevel: 40, baseValue: 0.0085, icon: ICONS.obroza_wilcza },
-  { id: 'obroza_plomien', slot: 'obroza', name: 'Płonący Naszyjnik', unlockLevel: 65, baseValue: 0.012, icon: ICONS.obroza_plomien },
-  { id: 'obroza_tytan', slot: 'obroza', name: 'Obroża Tytana', unlockLevel: 90, baseValue: 0.0167, icon: ICONS.obroza_tytan },
+  // ── Obroża (atk FLAT, nie % — przebudowane 2026-09-22, patrz gearAtkFlat niżej) — mythic
+  // T5 = 0.27×15 = 4.05 flat atk ≈ +10% mocy przy BASE_ATK=40, TA SAMA % różnica na KAŻDYM
+  // poziomie (level-niezależne, w przeciwieństwie do reszty slotów-%) ──
+  { id: 'obroza_sznurek', slot: 'obroza', name: 'Sznurkowa Obroża', unlockLevel: 1, baseValue: 0.08, icon: ICONS.obroza_sznurek },
+  { id: 'obroza_kolce', slot: 'obroza', name: 'Nabijana Obroża', unlockLevel: 20, baseValue: 0.12, icon: ICONS.obroza_kolce },
+  { id: 'obroza_wilcza', slot: 'obroza', name: 'Wilczy Kieł', unlockLevel: 40, baseValue: 0.16, icon: ICONS.obroza_wilcza },
+  { id: 'obroza_plomien', slot: 'obroza', name: 'Płonący Naszyjnik', unlockLevel: 65, baseValue: 0.22, icon: ICONS.obroza_plomien },
+  { id: 'obroza_tytan', slot: 'obroza', name: 'Obroża Tytana', unlockLevel: 90, baseValue: 0.27, icon: ICONS.obroza_tytan },
 
   // ── Talizman (energyMult%) — mythic T5 = 0.0133×15 ≈ 20% (kampania: suma 75%) ──
   { id: 'talizman_kamyk', slot: 'talizman', name: 'Talizman z Kamyka', unlockLevel: 1, baseValue: 0.002, icon: ICONS.talizman_kamyk },
@@ -230,10 +252,10 @@ export function parseGearInstanceId(id: string): { itemId: string; seq: number }
 // pet-shop.tsx (podgląd przed zakupem w Sklepie dnia), więc jedna wspólna definicja
 // zamiast dwóch kopii tej samej mapy/formatu.
 export const GEAR_STAT_LABEL: Record<GearStat, string> = {
-  critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkPct: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
+  critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkFlat: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
 };
 export function fmtGearStat(stat: GearStat, v: number): string {
-  return stat === 'flatHp' ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
+  return (stat === 'flatHp' || stat === 'atkFlat') ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
 }
 
 // Itemy odblokowane (możliwe do wylosowania) dla danego poziomu pupila, per slot.
@@ -312,11 +334,14 @@ export function gearSellValue(item: GearItemDef, rarity: GearRarity): number {
 }
 
 // ── Krok 8 — wpięcie w realne formuły walki/ekonomii ──────────────────────────────────
-// Cztery sloty (helm/buty/obroza/talizman) mapują 1:1 na `Bonuses{atk,dodge,crit,
-// energyMult}` z bosses.ts (ten sam kształt co bonusy z lootu kampanii, patrz
-// `bossBonuses()` tam) — jeden slot = jeden stat, więc SUMOWANIE tu to zawsze co najwyżej
-// jeden składnik (gracz ma max 1 item założony na slot). zbroja (flatHp) i kolczyki
-// (coinsPct) nie pasują do tego kształtu, stąd osobne funkcje niżej.
+// Trzy sloty (helm/buty/talizman) mapują 1:1 na `Bonuses{atk,dodge,crit,energyMult}` z
+// bosses.ts (ten sam kształt co bonusy z lootu kampanii, patrz `bossBonuses()` tam) — jeden
+// slot = jeden stat, więc SUMOWANIE tu to zawsze co najwyżej jeden składnik (gracz ma max 1
+// item założony na slot). zbroja (flatHp), obroża (atkFlat, od 2026-09-22 — patrz
+// `gearAtkFlat` niżej) i kolczyki (coinsPct) nie pasują do tego kształtu, stąd osobne funkcje
+// niżej — `out.atk` w tej funkcji ZOSTAJE zawsze 0 (żaden slot już nie mapuje na 'atkFlat'
+// tutaj, tylko przez `gearAtkFlat`), pole zostaje w interfejsie dla zgodności kształtu z
+// `Bonuses`.
 export interface GearCombatBonuses { atk: number; dodge: number; crit: number; energyMult: number }
 
 export function gearCombatBonuses(
@@ -335,7 +360,6 @@ export function gearCombatBonuses(
     const stat = SLOT_STAT[slot];
     if (stat === 'critPct') out.crit += val;
     else if (stat === 'dodgePct') out.dodge += val;
-    else if (stat === 'atkPct') out.atk += val;
     else if (stat === 'energyMultPct') out.energyMult += val;
   }
   return out;
@@ -349,6 +373,25 @@ export function gearFlatHp(
   ownedGear: Partial<Record<string, OwnedGear>>,
 ): number {
   const itemId = equippedGear.zbroja;
+  if (!itemId) return 0;
+  const owned = ownedGear[itemId];
+  if (!owned) return 0;
+  return owned.value;
+}
+
+// Doda się do `atkStatBonus` (PRZED mnożnikiem poziomu/lootu, patrz `atkPower` w bosses.ts),
+// NIE do `bonuses.atk` — przebudowane z % na flat (2026-09-22, patrz obszerny komentarz nad
+// GEAR_ITEMS). Dokładnie ten sam wzorzec co `gearFlatHp` wyżej (zbroja): jeden slot, płaska
+// liczba, poza kształtem `Bonuses`. Efekt: % boost z obroży jest IDENTYCZNY na każdym
+// poziomie (siedzi w członie który rośnie razem z mnożnikiem, nie konkuruje z nim), zamiast
+// gasnąć asymptotycznie do zera jak przy starym %-podejściu. Wołający MUSI dodać wynik do
+// `atkStatBonus` przed przekazaniem do `atkPower`/`computeDamage`/`simulateFight` — ten sam
+// wzorzec co już istniejący, kupowany za monety `atkStatBonus` w petStore.ts.
+export function gearAtkFlat(
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
+): number {
+  const itemId = equippedGear.obroza;
   if (!itemId) return 0;
   const owned = ownedGear[itemId];
   if (!owned) return 0;

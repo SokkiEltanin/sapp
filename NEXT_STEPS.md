@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Obroża przebudowana z % na flat — jedyny slot gearu gasnący do zera na wysokim poziomie (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §155. User: "ogarnij ekwipunek — patrz jak teraz stoi z
+bossami". Zmierzone node'em: 5 z 6 slotów gearu (hełm/buty/talizman/kolczyki/zbroja) trzyma
+wartość na każdym poziomie, ale obroża (atak%) matematycznie gasła — `atkMultiplier =
+1+level×0.03+bonuses.atk`, poziom bez sufitu dominuje mnożnik, więc mityczna T5 obroża dawała
+~9% mnożnika na Lv20, ~1.2% na Lv617 (realna runda testowa usera) = 0 ciosów różnicy w
+walce. User wybrał (AskUserQuestion): przerobić obroża na PŁASKIE punkty ataku (jak kupiony
+`atkStatBonus`, PRZED mnożnikiem) zamiast %. Nowa `gearAtkFlat()` w `gear.ts`, wpięta we
+WSZYSTKIE tory walki (`app/boss-fight.tsx`, `app/pet.tsx`, `bossProgressReport.ts`). Efekt
+zweryfikowany node'em: % boost z mitycznej T5 obroży TERAZ identyczny na Lv20 i Lv617
+(+10.1% oba), zamiast gasnąć. `tsc`/`jest` czyste (1046 testów, +3).
+
+**🆕 Priorytet testu na urządzeniu — średni**: ekran Ekwipunku (obroża pokazuje teraz płaską
+liczbę "+N" zamiast "%"), ekran Pupila → Siła bojowa (rozbicie mocy ataku pokazuje gear
+osobno). Efekt realnie widoczny dopiero z mityczną/legendarną obrożą założoną.
+
 ## ✅ Fix: siatka nastrój×energia w check-inie humoru nie łapała dotknięć (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §153. User: "Nie dziala" + zrzut — kropka zostawała na środku,

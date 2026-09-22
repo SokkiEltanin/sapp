@@ -4,7 +4,7 @@
 import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK, combatItemSlotsFor } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { levelFromXp, effectiveCatMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
-import { gearCombatBonuses, GearSlot, OwnedGear } from '@/utils/gear';
+import { gearCombatBonuses, gearAtkFlat, GearSlot, OwnedGear } from '@/utils/gear';
 import { ActivePotion } from '@/utils/potions';
 import { plPlural } from '@/utils/plural';
 
@@ -46,9 +46,10 @@ export function buildBossProgressReport(s: ProgressReportInput, detailLimit = 30
   const equippedGear = s.equippedGear ?? {};
   const ownedGear = s.ownedGear ?? {};
   const gear = gearCombatBonuses(equippedGear, ownedGear);
+  const gearAtk = gearAtkFlat(equippedGear, ownedGear); // obroża — flat, PRZED mnożnikiem (2026-09-22)
   const loot = bossBonuses(s.ownedItems);
   const bonuses = { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
-  const power = atkPower(s.atkStatBonus, lvl.level, bonuses);
+  const power = atkPower(s.atkStatBonus + gearAtk, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
   // Musi wołać TĘ SAMĄ funkcję co realna walka (`effectiveCatMaxHp` w petStore.ts), nie
   // reimplementować wzoru ręcznie — poprzednia wersja (`catMaxHp(...) + gearFlatHp(...)`, bez
@@ -72,7 +73,7 @@ export function buildBossProgressReport(s: ProgressReportInput, detailLimit = 30
   lines.push('');
   lines.push(`Poziom: ${lvl.level} (${lvl.inLevel}/${lvl.needed} XP w poziomie, ${s.xp} XP total)`);
   lines.push(`Monety: ${s.coins}`);
-  lines.push(`ATK: baza ${BASE_ATK} + kupione ${s.atkStatBonus} = ${Math.round(power)} realnej mocy (×${mult.toFixed(2)} mnożnik z poziomu+łupu)`);
+  lines.push(`ATK: baza ${BASE_ATK} + kupione ${s.atkStatBonus}${gearAtk > 0 ? ` + gear ${Math.round(gearAtk)}` : ''} = ${Math.round(power)} realnej mocy (×${mult.toFixed(2)} mnożnik z poziomu+łupu)`);
   lines.push(`HP kotka: ${maxHp} (baza ${CAT_BASE_MAX_HP} + kupione ${s.catMaxHpBonus})`);
   // 0.1% precyzja (2026-08-26, user: "te statystyki jak atak unik itp musimy pokazywać 0.1
   // dokladnosci") — ta sama zmiana co w pet.tsx, żeby raport zgadzał się z tym co user widzi

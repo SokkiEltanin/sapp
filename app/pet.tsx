@@ -22,7 +22,7 @@ import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/u
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
-import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
+import { gearCombatBonuses, gearFlatHp, gearAtkFlat } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
@@ -336,7 +336,12 @@ export default function Pet() {
     // boss-fight.tsx, ta "Siła bojowa" ma pokazywać DOKŁADNIE to, co realnie liczy się w walce.
     return { atk: loot.atk + gear.atk + potionAtkBonus(activePotion), dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   }, [ownedItems, equippedGear, ownedGear, activePotion]);
-  const power = atkPower(atkStatBonus, lvl.level, bonuses);
+  // Obroża (atkFlat, 2026-09-22) dokłada się DO atkStatBonus, nie do bonuses.atk — patrz
+  // identyczny komentarz w boss-fight.tsx. "Siła bojowa" tu MUSI pokazywać to samo co realnie
+  // liczy się w walce, więc wołanie musi być dokładnie to samo.
+  const gearAtk = gearAtkFlat(equippedGear, ownedGear);
+  const effectiveAtkStat = atkStatBonus + gearAtk;
+  const power = atkPower(effectiveAtkStat, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
   const maxHp = effectiveCatMaxHp(catMaxHpBonus, equippedGear, ownedGear, activePotion);
   const attempts = dailyAttempts(bonuses.energyMult);
@@ -591,7 +596,7 @@ export default function Pet() {
             <Swords size={15} color="#F87171" />
             <Text style={s.statVal}>{Math.round(power)}</Text>
             <Text style={s.statLabel}>Moc ataku</Text>
-            <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
+            <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}{gearAtk > 0 ? `+${Math.round(gearAtk)}` : ''}) × {mult.toFixed(2)}</Text>
             <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 4 }]} activeOpacity={0.8}>
               <Swords size={10} color="#F87171" /><Text style={[s.buyPillTxt, { color: '#F87171' }]}>+{ATK_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text>

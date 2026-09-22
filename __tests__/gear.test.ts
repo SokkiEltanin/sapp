@@ -1,8 +1,9 @@
 import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
   gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots, gearSellValue,
-  gearCombatBonuses, gearFlatHp, gearCoinsMult,
+  gearCombatBonuses, gearFlatHp, gearCoinsMult, gearAtkFlat,
 } from '@/utils/gear';
+import { atkPower } from '@/utils/bosses';
 
 describe('gear — katalog', () => {
   test('30 itemów total, dokładnie 5 na każdy z 6 slotów', () => {
@@ -154,28 +155,29 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
   });
 
   // Kalibracja balansu (patrz komentarz nad GEAR_ITEMS w gear.ts): pełny mityczny T5
-  // loadout na WSZYSTKICH 4 slotach walki NIE MOŻE przebić sumy bonusów z całej kampanii
-  // (22 bossy, policzone raz node'em z bosses.ts: atk 0.92, dodge 0.72, crit 0.36,
-  // energyMult 0.75) — jeśli ten test kiedyś zacznie failować po zmianie baseValue w
-  // gear.ts, to sygnał że ktoś przypadkiem złamał tę kalibrację, nie "false positive".
-  test('pełny mityczny T5 loadout (wszystkie 4 sloty walki) zostaje WYRAŹNIE poniżej sumy bonusów z całej kampanii', () => {
-    const equipped = { helm: 'helm_koronaBurzy', buty: 'buty_kometa', obroza: 'obroza_tytan', talizman: 'talizman_nieskonczonosc' };
+  // loadout na slotach walki-% (helm/buty/talizman — obroża od 2026-09-22 jest FLAT, patrz
+  // niżej, nie wchodzi już do tego kształtu) NIE MOŻE przebić sumy bonusów z całej kampanii
+  // (22 bossy, policzone raz node'em z bosses.ts: dodge 0.72, crit 0.36, energyMult 0.75) —
+  // jeśli ten test kiedyś zacznie failować po zmianie baseValue w gear.ts, to sygnał że ktoś
+  // przypadkiem złamał tę kalibrację, nie "false positive".
+  test('pełny mityczny T5 loadout (3 sloty walki-%) zostaje WYRAŹNIE poniżej sumy bonusów z całej kampanii', () => {
+    const equipped = { helm: 'helm_koronaBurzy', buty: 'buty_kometa', talizman: 'talizman_nieskonczonosc' };
     const mythicOwned = (itemId: string) => ({ rarity: 'mythic' as const, value: gearStatValue(gearById(itemId)!, 'mythic') });
     const owned = {
       helm_koronaBurzy: mythicOwned('helm_koronaBurzy'), buty_kometa: mythicOwned('buty_kometa'),
-      obroza_tytan: mythicOwned('obroza_tytan'), talizman_nieskonczonosc: mythicOwned('talizman_nieskonczonosc'),
+      talizman_nieskonczonosc: mythicOwned('talizman_nieskonczonosc'),
     };
     const b = gearCombatBonuses(equipped as any, owned);
-    const CAMPAIGN_SUM = { atk: 0.92, dodge: 0.72, crit: 0.36, energyMult: 0.75 };
+    const CAMPAIGN_SUM = { dodge: 0.72, crit: 0.36, energyMult: 0.75 };
     expect(b.crit).toBeLessThan(CAMPAIGN_SUM.crit);
     expect(b.dodge).toBeLessThan(CAMPAIGN_SUM.dodge);
-    expect(b.atk).toBeLessThan(CAMPAIGN_SUM.atk);
     expect(b.energyMult).toBeLessThan(CAMPAIGN_SUM.energyMult);
     // I nie jest to śladowa wartość — powinno być zauważalne (>5% dla każdego statu).
     expect(b.crit).toBeGreaterThan(0.05);
     expect(b.dodge).toBeGreaterThan(0.05);
-    expect(b.atk).toBeGreaterThan(0.05);
     expect(b.energyMult).toBeGreaterThan(0.05);
+    // atk NIE dostaje już nic z gear (obroża wyprowadzona z tego kształtu) — patrz gearAtkFlat.
+    expect(b.atk).toBe(0);
   });
 
   test('gearFlatHp: mityczna T5 zbroja zostaje wyraźnie poniżej CAT_BASE_MAX_HP (100)', () => {
@@ -198,16 +200,53 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
     expect(mult).toBeLessThan(1.5); // +50% złota z jednego itemu byłoby już za dużo
   });
 
-  test('gearCombatBonuses ignoruje sloty bez odpowiednika w Bonuses (zbroja/kolczyki)', () => {
+  test('gearCombatBonuses ignoruje sloty bez odpowiednika w Bonuses (zbroja/obroża/kolczyki)', () => {
     const zbrojaSzmaciana = gearById('zbroja_szmaciana')!;
+    const obrozaSznurek = gearById('obroza_sznurek')!;
     const kolczykiDrewniane = gearById('kolczyki_drewniane')!;
     const b = gearCombatBonuses(
-      { zbroja: 'zbroja_szmaciana', kolczyki: 'kolczyki_drewniane' },
+      { zbroja: 'zbroja_szmaciana', obroza: 'obroza_sznurek', kolczyki: 'kolczyki_drewniane' },
       {
         zbroja_szmaciana: { rarity: 'common', value: gearStatValue(zbrojaSzmaciana, 'common') },
+        obroza_sznurek: { rarity: 'common', value: gearStatValue(obrozaSznurek, 'common') },
         kolczyki_drewniane: { rarity: 'common', value: gearStatValue(kolczykiDrewniane, 'common') },
       },
     );
     expect(b).toEqual({ atk: 0, dodge: 0, crit: 0, energyMult: 0 });
+  });
+});
+
+// Obroża przebudowana z % na FLAT (2026-09-22) — patrz obszerny komentarz nad GEAR_ITEMS w
+// gear.ts. Zmierzone node'em: `atkMultiplier(level,bonuses) = 1+level×0.03+bonuses.atk`,
+// poziom bez sufitu dominuje mnożnik coraz mocniej, więc jakikolwiek STAŁY % bonus (stary
+// system) matematycznie gasł do ~0 znaczenia na wysokich poziomach (mityczna T5 obroża:
+// ~9% mnożnika na Lv20, ~1.2% na Lv617 z realnej rundy testowej usera). Flat stat (jak
+// zbroja/jak kupiony atkStatBonus) NIE ma tego problemu — dokłada się PRZED mnożnikiem.
+describe('gear — gearAtkFlat (obroża, 2026-09-22 — flat zamiast %, patrz gearFlatHp wzorzec)', () => {
+  test('brak obroży → 0', () => {
+    expect(gearAtkFlat({}, {})).toBe(0);
+  });
+
+  test('mityczna T5 obroża daje ~10% dodatkowej mocy przy BASE_ATK=40 (rząd wielkości starego systemu na Lv20, ale bez wygasania)', () => {
+    const obrozaTytan = gearById('obroza_tytan')!;
+    const flatAtk = gearAtkFlat({ obroza: 'obroza_tytan' }, { obroza_tytan: { rarity: 'mythic', value: gearStatValue(obrozaTytan, 'mythic') } });
+    const BASE_ATK = 40;
+    const boostPct = flatAtk / BASE_ATK;
+    expect(boostPct).toBeGreaterThan(0.05);
+    expect(boostPct).toBeLessThan(0.15);
+  });
+
+  test('% boost z obroży jest IDENTYCZNY na każdym poziomie — nie gaśnie jak stary %-system (istota fixu)', () => {
+    const obrozaTytan = gearById('obroza_tytan')!;
+    const flatAtk = gearAtkFlat({ obroza: 'obroza_tytan' }, { obroza_tytan: { rarity: 'mythic', value: gearStatValue(obrozaTytan, 'mythic') } });
+    const noGearBonus = { atk: 0.92, dodge: 0, crit: 0, energyMult: 0 }; // loot kampanii, bez gear
+    for (const level of [20, 116, 617]) {
+      const withoutGear = atkPower(0, level, noGearBonus);
+      const withGear = atkPower(flatAtk, level, noGearBonus);
+      const boostPct = (withGear - withoutGear) / withoutGear;
+      // Ten sam % na każdym poziomie (dopuszczalny epsilon na float) — DOKŁADNIE odwrotność
+      // starego zachowania (9%→4.4%→1.2% malejąco z poziomem).
+      expect(boostPct).toBeCloseTo(flatAtk / 40, 5);
+    }
   });
 });
