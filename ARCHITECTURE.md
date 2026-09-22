@@ -9994,6 +9994,59 @@ zapisuje prefiks poprawnie.
 
 ---
 
+## 158. Plan zajęć [PUR] — rozpoznawanie eventów + kafelek dashboardu (2026-09-22)
+
+Kontynuacja §157 (magazyn prefiksu). User przesłał zarządzenie Rektora UR o organizacji roku
+akademickiego 2026/2027 + zrzut swojego planu zajęć (2 Inżynieria Materiałowa, sem. 2, z
+podziałem tydz. A/B) — na tej podstawie w ROZMOWIE (nie w apce) wygenerowany gotowy plik
+`.ics` na semestr zimowy (format `[PUR] TYP - NAZWA - SALA`, TYP ∈ {W,C,L,P}, weryfikowany
+node'em względem zarządzenia — święta wypadające w trakcie zajęć wycięte, tydzień
+przesunięty 21-23.12 z powodu krótkiego startu semestru obsłużony poprawnie). User poprosił
+o realną funkcję w apce, mając już prawdziwe dane do zweryfikowania — dokładnie ten moment,
+na który czekaliśmy (patrz §157: "świadomie odłożone do czasu aż user wpisze realne eventy").
+
+**Nowy `src/utils/classSchedule.ts`** — `isClassEvent()`/`parseClassEvent()`, analogiczne do
+`isWorkEvent()` w `workEvents.ts`, ale PROŚCIEJ: zero parsera godzin z tytułu (zajęcia to
+zwykłe w pełni czasowe eventy Google Kalendarza, `startTime`/`endTime` z samego `CalendarEvent`,
+nie z tekstu — w przeciwieństwie do zmian pracy, które mają godziny WPISANE w tytuł przy
+stałym czasie eventu). `parseClassEvent()` rozbija `"[PUR] W - Nazwa - Sala"` na
+`{type, subject, room}` przez split po `" - "` — pierwszy segment to litera typu (W/C/L/P),
+ostatni to sala, środek to nazwa (join z powrotem przez `" - "`, gdyby nazwa sama miała ten
+separator — nie miała w realnych danych usera, ale bezpieczne na przyszłość). Fallback dla
+nierozpoznanego formatu (2 segmenty → subject+room bez type; 1 segment → cały tekst jako
+subject) — event PRZESZŁY `isClassEvent()` nigdy nie znika po cichu, zawsze się pokazuje,
+nawet gorzej sformatowany.
+
+**Typ "P" (Projekt) dodany do trio W/C/L** — user w trakcie ustalania formatu zgłosił sesje
+oznaczone w realnym planie jako "pr." (np. "KMSiWM-pr"), które nie mieściły się w
+pierwotnych trzech literach.
+
+**Nowa sekcja dashboardu `class-schedule`** (playbook §12) — `ClassScheduleCard.tsx`,
+skopiowany layout z `GCalCard.tsx` (dziś/jutro, kropka+godzina+tytuł) rozszerzony o odznakę
+typu (W/C/L/P, fioletowy akcent #A78BFA — spójny z sekcją "Plan zajęć" w Ustawieniach z §157)
+i salę. Filtr "dziś, ale jeszcze się nie skończyło" (`shiftClockRange` z `workEvents.ts` —
+reużyty WPROST, bo dla eventu bez godzin-w-tytule to po prostu `ev.startTime`/`ev.endTime`)
+skopiowany z istniejącego `gcalToday` — identyczna logika, dodatkowo zawężona
+`isClassEvent()`-em. Grupa w edytorze: "Zadania i nawyki" (nie "Inne" jak `gcal` — to
+codzienny, nawykowy sygnał "gdzie dziś idę", bliżej `today-tasks`/`habits-today` niż ogólna
+przeglądarka kalendarza), priorytet renderowania: NIE w `DEFERRED_SECTIONS` (ładuje się w
+pierwszej, synchronicznej klatce jak `gcal`/`today-tasks` — "co dziś muszę zrobić").
+
+**Testy**: `__tests__/classSchedule.test.ts` (14 testów) — fixtures to REALNE tytuły z planu
+usera (nie wymyślone), w tym przypadek "sala z myślnikiem w środku" (`135-136 B1`) który
+mógłby pomylić naiwny parser liczący segmenty. `tsc`/`jest` czyste (1067 testów, +14).
+
+**Świadomie NIE zbudowane jeszcze**: powiadomienie X minut przed z salą (osobny przełącznik
+w Ustawieniach) — kafelek dashboardu odpowiada na "co dziś/jutro", ale nie ma jeszcze
+proaktywnego push. Do zrobienia jako osobny krok, ten sam wzorzec co powiadomienia o
+zmianach pracy w `notificationsService.ts`.
+
+**Priorytet testu na urządzeniu — wysoki**: zaimportuj plik `.ics` (osobny kalendarz Google,
+łatwy do usunięcia jednym klikiem jeśli coś nie gra), poczekaj na sync `gcalEvents`, sprawdź
+czy kafelek "Plan zajęć" pokazuje dzisiejsze/jutrzejsze zajęcia z poprawnym typem i salą.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
