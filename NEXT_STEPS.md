@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: siatka nastrój×energia w check-inie humoru nie łapała dotknięć (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §153. User: "Nie dziala" + zrzut — kropka zostawała na środku,
+"Jeszcze nie zaznaczono" mimo przeciągania, "Zapisz" zablokowany. Przyczyna: `ScrollView` w
+`MoodCheckInModal.tsx` importowany z gołego `'react-native'`, nie `'react-native-gesture-
+handler'` — konfliktował z `Gesture.Pan()` siatki (`MoodEnergyGrid.tsx`) i wygrywał dotyk
+zanim gest siatki się odpalił. Dokładnie ten scenariusz poprzedni autor przewidział w
+komentarzu przy siatce (2026-09-19), ale nie był jeszcze potwierdzony na urządzeniu. Fix:
+zmiana importu na RNGH-owy `ScrollView` (drop-in). **Priorytet testu — wysoki**, sprawdź czy
+przeciąganie/tapanie siatki teraz działa i odblokowuje Zapisz.
+
+**🆕 Wzorzec do pilnowania na przyszłość**: każdy `GestureDetector`/`Gesture.*` (RNGH) wewnątrz
+scrollowalnego rodzica wymaga `ScrollView`/`FlatList` TEŻ z `'react-native-gesture-handler'`,
+nie z gołego `'react-native'` — inaczej rodzic może "zjadać" dotyk dziecka bez żadnego błędu
+w konsoli (cichy, mylący objaw).
+
 ## ✅ Krzywa XP/poziom przyspiesza po kampanii — tłumienie skoków levelu z MAD (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §152. User (5. runda testowa, po resecie): "z tymi bossami jest

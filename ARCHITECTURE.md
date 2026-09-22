@@ -9760,6 +9760,40 @@ sensowne, czy nadal za duże/za małe.
 
 ---
 
+## 153. Siatka nastrój×energia w check-inie humoru nie łapała dotknięć — ScrollView z RN zamiast RNGH (2026-09-22)
+
+User: "Nie dziala" + zrzut ekranu — kropka-wskaźnik siedziała na środku siatki, tekst pod
+nią cały czas pokazywał "Jeszcze nie zaznaczono" mimo przeciągania/tapania, przycisk "Zapisz"
+zostawał zablokowany (`disabled={saving || !mood || !energy}`).
+
+**Przyczyna — dokładnie ten scenariusz, który poprzedni autor sam przewidział w komentarzu
+przy `MoodEnergyGrid.tsx`'s `Gesture.Pan()`** (redesign siatki z §"Siatka nastrój×energia",
+2026-09-19): siatka (RNGH `GestureDetector`/`Gesture.Pan().minDistance(0)`) siedzi wewnątrz
+`ScrollView` w `MoodCheckInModal.tsx`, który był importowany z gołego `'react-native'`, nie z
+`'react-native-gesture-handler'`. Zwykły RN ScrollView ma własny responder system, niezależny
+od RNGH — wygrywał odpowiedź na dotyk zanim `Gesture.Pan()` siatki zdążył się odpalić, więc
+`onChange`/`commit()` nigdy nie były wołane. `minDistance(0)` (rozwiązanie dla tap-vs-pan
+wewnątrz samej siatki) nie miało wpływu na TEN konflikt (rodzic kontra dziecko, różne
+biblioteki gestów).
+
+**Fix**: `ScrollView` w `MoodCheckInModal.tsx` przełączony na import z
+`'react-native-gesture-handler'` (drop-in, identyczne API) — poprawnie koordynuje zagnieżdżone
+gesty tej samej biblioteki (siatka wygrywa dotyk zaczęty na sobie, scroll modala działa
+normalnie poza nią, zgodnie z pierwotnym zamysłem). Import zmieniony raz na górze pliku —
+obejmuje też drugi, poziomy `ScrollView` z tagami (`tagsScrollRef`), bez osobnej zmiany.
+
+**Wzorzec do zapamiętania**: gdziekolwiek `GestureDetector`/`Gesture.*` z RNGH żyje wewnątrz
+scrollowalnego rodzica, ten rodzic MUSI być `ScrollView`/`FlatList` z
+`'react-native-gesture-handler'`, nie z gołego `'react-native'` — inaczej gest dziecka może
+nigdy nie dostać dotyku. `tsc`/`jest` czyste (1040 testów, bez zmiany — czysto interakcyjny
+fix, nic nie testowalne w Jest bez symulacji gestów).
+
+**Priorytet testu na urządzeniu — wysoki**: to bezpośrednia naprawa zgłoszonego "Nie działa",
+sprawdź czy przeciąganie/tapanie siatki teraz normalnie ustawia nastrój+energię i odblokowuje
+"Zapisz", oraz że scroll modala (w tym scroll poziomy tagów) nadal działa płynnie poza siatką.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

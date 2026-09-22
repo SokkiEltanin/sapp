@@ -2,9 +2,15 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
 import { todayISO } from '@/utils/date';
 import {
-  View, Text, StyleSheet, Modal, ScrollView, Alert,
+  View, Text, StyleSheet, Modal, Alert,
   Animated, Pressable, TouchableOpacity, TextInput, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
+// ScrollView z react-native-gesture-handler (nie 'react-native') — MoodEnergyGrid wewnątrz
+// używa Gesture.Pan() (RNGH), a zwykły ScrollView z RN wygrywał odpowiedź na dotyk zanim
+// gest siatki zdążył się odpalić (user: "Nie dziala" — kropka zostawała na środku, "Jeszcze
+// nie zaznaczono" mimo przeciągania). RNGH-owy ScrollView poprawnie koordynuje zagnieżdżone
+// gesty tej samej biblioteki, drop-in ten sam props API.
+import { ScrollView } from 'react-native-gesture-handler';
 import { X, Check, Plus } from 'lucide-react-native';
 
 import MoodEnergyGrid from './MoodEnergyGrid';

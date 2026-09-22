@@ -48,14 +48,13 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
     onChange(m, e);
   };
 
-  // RYZYKO DO SPRAWDZENIA NA URZĄDZENIU: siatka siedzi wewnątrz zwykłego `ScrollView`
-  // (react-native, nie gesture-handler) w MoodCheckInModal.tsx — `minDistance(0)` powinno
-  // dać temu gestowi priorytet nad scrollem rodzica dla dotknięć zaczynających się NA
-  // siatce (podobny do "samodzielnej kontrolki" wzorzec, np. suwak), więc scroll modala
-  // powinien działać normalnie poza nią. Jeśli w praktyce siatka "gubi" dotknięcia albo
-  // blokuje scroll modala — najprostszy fix to zamiana importu `ScrollView` w
-  // MoodCheckInModal.tsx z 'react-native' na 'react-native-gesture-handler' (drop-in,
-  // ten sam props API), która poprawnie koordynuje zagnieżdżone gesty RNGH.
+  // POTWIERDZONY BUG na urządziu (2026-09-22, user: "Nie dziala" — kropka zostawała na
+  // środku, "Jeszcze nie zaznaczono" mimo przeciągania): siatka siedziała wewnątrz zwykłego
+  // `ScrollView` z 'react-native' w MoodCheckInModal.tsx, który wygrywał odpowiedź na dotyk
+  // zanim `Gesture.Pan()` tej siatki zdążył się odpalić — `minDistance(0)` nie wystarczył.
+  // Fix: `ScrollView` w MoodCheckInModal.tsx przełączony na import z
+  // 'react-native-gesture-handler' (drop-in, ten sam props API) — poprawnie koordynuje
+  // zagnieżdżone gesty tej samej biblioteki.
   const pan = useMemo(() => Gesture.Pan()
     .minDistance(0)
     .onUpdate(evt => {
