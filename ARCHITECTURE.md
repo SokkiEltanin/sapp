@@ -9956,6 +9956,44 @@ dobrze obok reszty palety.
 
 ---
 
+## 157. Plan zajęć [PUR] — magazyn prefiksu w Ustawieniach, reszta świadomie odłożona (2026-09-22)
+
+User (student UR) ustalił finalny format tytułu eventów w Google Kalendarzu:
+`[PUR] Angielski techniczny - 203 B3` (prefiks + spacja + nazwa przedmiotu + " - " + sala),
+i poprosił: "dodaj mi w ustawieniach możliwość edytowania go w razie czego" (np. zmiana
+uczelni/kierunku w przyszłości).
+
+**Nowy `src/store/classScheduleStore.ts`** — minimalny, jednopolowy Zustand store
+(`prefix: string`, domyślnie `[PUR]`) z `persist`, ten sam wzorzec co `profileStore.ts`/
+`streakFreezeStore.ts` (mały, jednoznaczny cel, bez rozbudowanej logiki). ŚWIADOMIE prostszy
+niż `workPrefix`/`Employer` (praca ma wielu "pracodawców" do przełączania w historii — plan
+zajęć to JEDEN, globalny prefiks, nie ma odpowiednika "zmiany uczelni w trakcie" do
+zarządzania).
+
+**Ustawienia** — nowa sekcja "Plan zajęć" (między "Praca" a "Saldo konta"), jeden wiersz
+"Prefiks eventów planu zajęć" — dokładnie ten sam UI-wzorzec (`control: {kind:'text',
+onBlur: save}`) co istniejący wiersz "Prefix eventów pracy" w sekcji Praca.
+
+**Świadomie NIE zbudowane w tym samym kroku** (patrz pełny opis w NEXT_STEPS.md):
+rozpoznawanie `[PUR]`-prefiksowanych `gcalEvents`, wyciąganie sali z tytułu, kafelek/widget,
+powiadomienie X minut przed. User dopiero zaczyna wpisywać realne eventy do Kalendarza —
+ta sama dyscyplina "najpierw dane, potem kod" co przy MAD reward curve/ekonomii skrzynek w
+tej sesji. Gdy user potwierdzi że ma realne `[PUR]`-eventy w Kalendarzu: zbudować
+`src/utils/classSchedule.ts` analogicznie do `workEvents.ts`'s `isWorkEvent()` (prefiks-match
+na `title`), ale PROŚCIEJ — bez parsera godzin z tytułu (`titleTimeRange`/`HOUR_RANGE_RE` w
+`workEvents.ts` istnieją bo zmiany pracy mają realne godziny WPISANE w tytuł, przy stałym
+czasie eventu w Kalendarzu; zajęcia to zwykłe w pełni czasowe eventy — start/koniec z
+WŁASNYCH czasów `CalendarEvent`, nie z tekstu) — tylko regex na sufiks `" - <sala>"`.
+
+`tsc`/`jest` czyste (1053 testów, bez zmiany netto — czysty getter/setter store, nic
+złożonego do testowania na tym etapie).
+
+**Priorytet testu na urządzeniu — niski**: kosmetyczna zmiana w Ustawieniach, żadna
+istniejąca funkcja się nie zmieniła. Sprawdź że nowa sekcja "Plan zajęć" pokazuje się i
+zapisuje prefiks poprawnie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

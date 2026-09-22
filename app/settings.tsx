@@ -43,6 +43,7 @@ import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory, DEFAULT_WORK_SETTINGS, Employer } from '@/types';
 import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
+import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
@@ -365,6 +366,13 @@ export default function SettingsScreen() {
   }, [workDiag, workSettings]);
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
+  // Plan zajęć (2026-09-22) — patrz classScheduleStore.ts. Jeden globalny, edytowalny
+  // prefiks (user: "dodaj mi w ustawieniach możliwość edytowania go w razie czego").
+  const classPrefixStore = useClassScheduleStore(s => s.prefix);
+  const setClassPrefixStore = useClassScheduleStore(s => s.setPrefix);
+  const [classPrefix, setClassPrefix] = useState(classPrefixStore);
+  useEffect(() => { setClassPrefix(classPrefixStore); }, [classPrefixStore]);
+  const saveClassPrefix = (prefix: string) => setClassPrefixStore(prefix.trim());
   // Editable overrides for the two inputs the rate is built from. Empty = use the
   // value the app reads (previous-month calendar hours / last [JD] paycheck).
   const [hoursOvrField, setHoursOvrField]   = useState(workSettings.hoursOverride != null ? String(workSettings.hoursOverride) : '');
@@ -1296,6 +1304,25 @@ export default function SettingsScreen() {
           control: { kind: 'custom' as const, render: () => <ConfirmedMonths payMonths={payMonths} /> },
         },
         ]),
+      ],
+    },
+    {
+      // Plan zajęć (2026-09-22, user, student UR) — TYLKO magazyn prefiksu na razie
+      // (patrz obszerny komentarz w classScheduleStore.ts). Reszta pipeline'u (rozpoznawanie
+      // eventów, kafelek, powiadomienia) czeka aż user zacznie realnie wpisywać eventy do
+      // Google Kalendarza — ta sama dyscyplina "najpierw dane" co przy innych balansach.
+      id: 'plan-zajec', title: 'Plan zajęć', icon: LucideIcons.GraduationCap, color: '#A78BFA', defaultOpen: false,
+      keywords: ['plan zajęć', 'uczelnia', 'studia', 'kalendarz', 'prefiks', 'pur', 'sala'],
+      items: [
+        {
+          id: 'class-prefix', title: 'Prefiks eventów planu zajęć',
+          subtitle: classPrefix.trim()
+            ? `Eventy zaczynające się od "${classPrefix.trim()}" = zajęcia`
+            : 'Np. [PUR] — eventy z tym prefixem w Kalendarzu Google = zajęcia',
+          icon: LucideIcons.GraduationCap, accentColor: '#A78BFA',
+          keywords: ['prefiks', 'plan zajęć', 'uczelnia', 'kalendarz', 'pur'],
+          control: { kind: 'text' as const, value: classPrefix, onChangeText: setClassPrefix, onBlur: () => saveClassPrefix(classPrefix), placeholder: '[PUR]', width: 80 },
+        },
       ],
     },
     {
