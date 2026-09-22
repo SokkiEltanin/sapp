@@ -25,7 +25,7 @@ import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from 
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor, fmtMissionDuration } from '@/utils/missions';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
-import { gearCombatBonuses, gearCoinsMult } from '@/utils/gear';
+import { gearCombatBonuses, gearCoinsMult, gearAtkFlat } from '@/utils/gear';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
@@ -199,6 +199,12 @@ export default function BossFight() {
     // czysty addytywny dodatek do tego samego `bonuses.atk`, nie osobny mnożnik.
     return { atk: loot.atk + gear.atk + potionAtkBonus(activePotion), dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   }, [ownedItems, equippedGear, ownedGear, activePotion]);
+  // Obroża (atkFlat, 2026-09-22 — patrz obszerny komentarz nad GEAR_ITEMS w gear.ts) dokłada
+  // się DO `atkStatBonus`, nie do `bonuses.atk` — siedzi PRZED mnożnikiem poziomu/lootu, jak
+  // kupiony za monety stat, więc jej % wpływ na moc NIE gaśnie z poziomem jak reszta gearu.
+  // WSZĘDZIE gdzie liczy się realna moc ataku (questBoss/missionBoss/raid/menace/walka
+  // właściwa niżej) musi wołać `effectiveAtkStat`, nie goły `atkStatBonus` ze store'u.
+  const effectiveAtkStat = useMemo(() => atkStatBonus + gearAtkFlat(equippedGear, ownedGear), [atkStatBonus, equippedGear, ownedGear]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
   const equippedItems: EquippedItem[] = useMemo(
     () => equippedCombatItems.map(id => ({ id, level: ownedCombatItems[id] ?? 1 })),
@@ -261,7 +267,7 @@ export default function BossFight() {
   // Bez energii/limitu prób — quest już wykonany realnie, retry po przegranej jest darmowy.
   const today = todayISO();
   const questMb = kind === 'quest' && questId ? minibossForQuest(today, questId) : null;
-  const questBoss = questMb ? minibossAsBoss(questMb, atkStatBonus, level, bonuses) : null;
+  const questBoss = questMb ? minibossAsBoss(questMb, effectiveAtkStat, level, bonuses) : null;
   const questAlreadyClaimed = kind === 'quest' && questId ? !!dayClaims[`${questId}:${today}`] : false;
 
   // ── MAD (2026-08-15) — druga, silniejsza fala tych samych 22 bossów kampanii dla lvl 50+,
@@ -285,7 +291,7 @@ export default function BossFight() {
   // podróży" (w drodze, 2026-08-20). `missionBoss` (realny cel do ataku) zostaje gated TYLKO
   // na `missionReady`, żeby nie dało się zaatakować przed czasem.
   const missionMb = missionStartedAt ? minibossForMission(missionStartedAt) : null;
-  const missionBoss = missionReady && missionMb ? minibossAsBoss(missionMb, atkStatBonus, level, bonuses) : null;
+  const missionBoss = missionReady && missionMb ? minibossAsBoss(missionMb, effectiveAtkStat, level, bonuses) : null;
   const missionReward = missionRewardFor(level, missionProfile ?? 'balanced');
   const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
   const missionTotalMs = missionStartedAt && missionEndsAt
@@ -456,13 +462,13 @@ export default function BossFight() {
     // tygodniowej (`raidRemaining` jako `boss.hp` wprost) — `counterHp` osobno, bezpiecznie
     // skalowane, żeby kontratak nie zabijał kotka od realnej, wielotysięcznej puli. Patrz pełny
     // komentarz na górze pliku i w raid.ts nad raidAsBoss.
-    const raidCounterHp = kind === 'raid' ? raidCounterHpFor(atkStatBonus, level, bonuses) : 0;
+    const raidCounterHp = kind === 'raid' ? raidCounterHpFor(effectiveAtkStat, level, bonuses) : 0;
     const raidRealStart = kind === 'raid' ? raidRemaining : 0;
     // Nemesis (2026-08-18): dawna sesja-wobec-trwałej-puli sztuczka co raid MIAŁ — patrz
     // komentarz przy menaceHpFor w seasonalEvents.ts (surowa menaceHpFor jest za duża dla
     // counterDamage%). Nemesis świadomie NIE dostał tego samego fixu co raid 2026-08-25 —
     // user zgłosił problem tylko dla raidu, ten sam wzorzec do powielenia gdyby zgłosił i tu.
-    const menaceSessionHp = kind === 'event' && isMenace ? menaceSessionHpFor(atkStatBonus, level, bonuses) : 0;
+    const menaceSessionHp = kind === 'event' && isMenace ? menaceSessionHpFor(effectiveAtkStat, level, bonuses) : 0;
     const menaceRealStart = kind === 'event' && isMenace ? menaceRemaining : 0;
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
@@ -497,7 +503,7 @@ export default function BossFight() {
       }
     }
     resetCatHp();
-    const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
+    const result = simulateFight(effectiveAtkStat, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
     // Przebieg TEJ próby do bossLog (2026-08-17, user: "nie zapisujesz... dokładnie walk z
     // ilością HP w czasie i dmg zadanego" — patrz BossFightDetail w petStore.ts). Budowane RAZ
     // tutaj (z surowego result.rounds, PRZED odtworzeniem animacji), używane niżej w finish()

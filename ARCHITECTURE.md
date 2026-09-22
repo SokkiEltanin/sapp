@@ -9862,6 +9862,56 @@ do docalibrowania na świeżych danych z "Statystyki skrzynek" po dłuższym gra
 
 ---
 
+## 155. Obroża przebudowana z % na flat — jedyny slot gearu który gasł do zera na wysokim poziomie (2026-09-22)
+
+User: "ogarnij ekwipunek — patrz jak teraz stoi z bossami" (po wcześniejszej zapowiedzi
+"musiał być jako profesjonalista looknąć, pomyśleć, potem zrobić"). Zmierzone node'em
+(nie zgadywane) jak KAŻDY z 6 slotów gearu wpływa realnie na walkę na różnych poziomach —
+5 z 6 slotów trzyma wartość zawsze (hełm/buty/talizman/kolczyki to płaskie %, level-
+niezależne; zbroja to płaska liczba HP), ale **obroża (atak%) matematycznie gasła do zera**:
+`atkMultiplier(level, bonuses) = 1 + level×0.03 + bonuses.atk` — poziom BEZ SUFITU dominuje
+mnożnik coraz mocniej, więc mityczna T5 obroża dawała ~9% CAŁEGO mnożnika na Lv20, ~4.4% na
+Lv116 (koniec kampanii), ~1.2% na Lv617 (realna runda testowa usera) — w praktyce 0 ciosów
+różnicy w walce na tak wysokim poziomie. Już zauważalne przy normalnym końcu kampanii, nie
+tylko w ekstremalnych testach.
+
+**Przyczyna strukturalna**: `atkStatBonus` (kupowany za monety, TRWAŁY stat) siedzi PRZED
+mnożnikiem (`(BASE_ATK+atkStatBonus) × mult`) i rośnie razem z poziomem/gearem, podczas gdy
+loot/gear-% siedzi W ŚRODKU mnożnika, konkurując wprost z nieograniczonym członem poziomu —
+z góry skazane na asymptotyczne wygaszenie. Loot kampanii ma ten sam problem, ale jest
+jednorazowy (kampania kończy się na Lv116) — gear to jedyny STALE dokupowalny/dropowalny
+%-atak, więc jego wygaszanie jest bardziej dotkliwe.
+
+**Fix (user wybrał, AskUserQuestion, z dwóch opcji)**: obroża przestała dawać `bonuses.atk`
+(%), zaczęła dawać PŁASKIE punkty ataku — dokładnie jak kupiony `atkStatBonus`, PRZED
+mnożnikiem, przez nową `gearAtkFlat()` w `gear.ts` (ten sam wzorzec co istniejące
+`gearFlatHp()` dla zbroi). Efekt: % boost z obroży jest teraz TEN SAM na każdym poziomie
+(zweryfikowane node'em: +10.1% na Lv20 I Lv617, identycznie) zamiast gasnąć. `baseValue`
+obroży przeliczone na nową skalę (0.08→0.27 na tierach T1-T5, ×RARITY_MULT jak reszta) —
+mityczna T5 = 0.27×15=4.05 flat atk ≈ +10% mocy, ten sam rząd wielkości co stary system
+dawał na Lv20 (start normalnej gry), tylko trzymany na TYM poziomie zamiast gasnąć.
+
+**Dotknięte miejsca** (wszędzie gdzie liczy się realna moc ataku): `gear.ts` (`GearStat`
+`'atkPct'`→`'atkFlat'`, `gearCombatBonuses()` już nie zbiera atk z obroży, nowa
+`gearAtkFlat()`, `fmtGearStat`/`GEAR_STAT_LABEL` zaktualizowane), `app/boss-fight.tsx`
+(nowy `effectiveAtkStat = atkStatBonus + gearAtkFlat(...)`, użyty we WSZYSTKICH torach walki:
+quest/misja/raid/nemesis/walka właściwa), `app/pet.tsx` (ekran "Siła bojowa" pokazuje
+dokładnie to co realnie liczy się w walce, w tym w rozbiciu `(baza+kupione+gear)×mnożnik`),
+`src/utils/bossProgressReport.ts` (eksport tekstowy pokazuje gear osobno w linii ATK).
+`GearCombatBonuses.atk` ZOSTAJE w interfejsie (zgodność kształtu z `Bonuses`), ale zawsze
+zwraca 0 — żaden slot już na niego nie mapuje.
+
+**Testy**: `__tests__/gear.test.ts` — kalibracja "T5 loadout poniżej sumy kampanii"
+przepisana na 3 sloty-% (bez obroży), nowy `describe` dla `gearAtkFlat` (brak obroży→0,
+mityczna T5≈10% BASE_ATK, i KLUCZOWY test: % boost identyczny na Lv20/116/617 — istota
+fixu). `tsc`/`jest` czyste (1046 testów, +3).
+
+**Priorytet testu na urządzeniu — średni**: sprawdź ekran Ekwipunku (obroża pokazuje teraz
+płaską liczbę "+N", nie "%"), i ekran Pupila → Siła bojowa (rozbicie mocy ataku uwzględnia
+gear). Efekt bojowy realnie widoczny dopiero z equipped mityczną/legendarną obrożą.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
