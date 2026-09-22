@@ -3,6 +3,36 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Krzywa XP/poziom przyspiesza po kampanii — tłumienie skoków levelu z MAD (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §152. User (5. runda testowa, po resecie): "z tymi bossami jest
+popierdolone za dużo tego się dostaje przez co jest skok mnóstwo w górę lvl" — realny przykład
+z 4. rundy: jedna walka MAD = ~28-29 poziomów w jednej walce. User sam zaproponował kierunek
+zamiast przeskalowania nagrody MAD: "a może po prostu zamiast skakać level tak bardzo to
+zwiększymy XP później per level". Fix w `petStore.ts`'s `levelFromXp`: krzywa identyczna do
+poziomu 116 (koniec kampanii, cała wcześniejsza kalibracja nietknięta), od 117 wzwyż krok
+XP/poziom rośnie dodatkowo `20*(level-116)` ponad poprzedni krok. Stała `m=20` wybrana z
+przetestowanego zakresu na realnych danych usera — sprowadza przykładowy skok 697500 XP z ~29
+do ~4 poziomów. `tsc`/`jest` czyste (1040 testów, +5, nowy plik `levelFromXp.test.ts`).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI**: to pierwsze podejście, `m=20` to szacunek nie
+zmierzone optimum. User ma obserwować 5. rundę testową i zgłosić czy skoki levelu przy dużych
+walkach MAD są teraz sensowne (analogicznie do krzywej nagród MAD, która przeszła 2 iteracje
+zanim osiadła).
+
+## 🆕 W TRAKCIE: ekonomia skrzynek (loot boxów) — user podejrzewa że najtańsza jest zepsuta/zbyt OP (2026-09-22)
+
+User przysłał zrzut ekranu "Statystyki skrzynek": z najtańszej skrzynki (Drewniana) średnio
+wypada ~40 monet i cały czas jest się na plus, mimo że statystyki w apce liczą TYLKO surowe
+monety z nagród, NIE wartość otrzymanych itemów ekwipunku — więc realny zysk może być jeszcze
+wyższy niż pokazuje ekran. User chce przebalansować całą ekonomię skrzynek (ceny + zawartość),
+i floated pomysł: zrobić legendarną/najwyższą skrzynkę bardziej OP, ale postawić cenę na ~2k
+monet. **Nie zaczęte** — trzeba doczytać pełny katalog itemów w `gear.ts` (tylko częściowo
+przeczytany) i zbudować symulację EV (coins branch + gear branch przez `gearSellValue`) dla
+wszystkich 4 tierów skrzynek (sardynka/żelazna/złota/boska) na reprezentatywnych poziomach
+gracza, ZANIM dotknie się jakichkolwiek liczb balansu — ta sama dyscyplina co przy MAD reward
+curve i krzywej levelu wyżej.
+
 ## 🆕 POMYSŁ (zapisany, nie zaczęty): plan zajęć [PUR] z importu PDF (2026-09-21)
 
 User (student UR) chce widget/przypomnienia dla planu zajęć — sala, X minut przed. Ustalony

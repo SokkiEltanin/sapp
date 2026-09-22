@@ -1217,9 +1217,34 @@ setTimeout(() => { if (!usePetStore.getState()._hydrated) usePetStore.setState({
 // ─── Level / growth from xp ─────────────────────────────────────────────────────
 // Gentle curve: each level costs a bit more. Growth stage drives the blob's size
 // and features on the pet page.
+//
+// Przyspieszona krzywa PO kampanii (2026-09-22, user po realnym eksporcie 4. rundy testowej,
+// poziom 617: "za dużo tego się dostaje przez co jest skok mnóstwo w górę lvl" — konkretnie:
+// jedna walka MAD dała 697500 XP = ~28 poziomów w JEDNEJ walce, bo nagroda MAD skaluje się z
+// pozycją bossa w kolejce (order), całkowicie niezależnie od poziomu gracza, podczas gdy
+// wymóg XP/poziom rósł tylko LINIOWO — im dalej w endgame, tym bardziej nagroda "uciekała"
+// ponad to co krzywa poziomów przewidywała. User: "a może po prostu zamiast skakać level tak
+// bardzo to zwiększymy XP później per level" — zamiast przerabiać (już raz skalibrowaną,
+// §139/monotoniczną) formułę nagród MAD, przyspiesz samą krzywą poziomów PO zakończeniu
+// kampanii (level > 116 = unlockLevel finałowego bossa "Iluzja Kontroli", bosses.ts) —
+// campaign/quest/raid balans PONIŻEJ 116 zostaje BEZ ZMIAN (cała throwaway-symulacyjna
+// kalibracja z wcześniejszych sesji dalej ważna), tylko endgame płaci więcej za każdy
+// kolejny poziom. Zweryfikowane Node-symulacją na REALNYCH liczbach z eksportu usera: ten
+// sam zastrzyk 697500 XP przy `POST_CAMPAIGN_LEVEL_STEP_GROWTH=20` daje ~4 poziomy zamiast
+// ~28 (m=5→7 poziomów, m=10→6, m=40→4, m=100→2 — 20 to środek stawki, do dalszego
+// kalibrowania na świeżych danych z rundy #5, tak jak MAD reward curve przeszła 2 iteracje).
+const CAMPAIGN_FINALE_LEVEL = 116; // unlockLevel finałowego bossa kampanii (wizard/Iluzja Kontroli, bosses.ts)
+const POST_CAMPAIGN_LEVEL_STEP_GROWTH = 20; // dodatkowy przyrost KROKU XP/poziom za każdy poziom powyżej 116
+
 export function levelFromXp(xp: number): { level: number; inLevel: number; needed: number; progress: number } {
   let level = 1, need = 100, acc = 0;
-  while (xp >= acc + need) { acc += need; level++; need = 100 + (level - 1) * 40; }
+  while (xp >= acc + need) {
+    acc += need;
+    level++;
+    need = level <= CAMPAIGN_FINALE_LEVEL
+      ? 100 + (level - 1) * 40
+      : need + POST_CAMPAIGN_LEVEL_STEP_GROWTH * (level - CAMPAIGN_FINALE_LEVEL);
+  }
   const inLevel = xp - acc;
   return { level, inLevel, needed: need, progress: need > 0 ? inLevel / need : 0 };
 }
