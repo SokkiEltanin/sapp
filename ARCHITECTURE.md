@@ -10047,6 +10047,45 @@ czy kafelek "Plan zajęć" pokazuje dzisiejsze/jutrzejsze zajęcia z poprawnym t
 
 ---
 
+## 159. Fix: licznik wody potrafił cofnąć się po synchronizacji z zegarka (2026-09-22)
+
+User: "na zegarku kliknąłem z 5/8 szklanek 3 razy na 8/8, to w aplikacji po odświeżeniu
+zestuckowało się na 7/8 jakbym nie wykonał celu" — realny bug, nie zgłoszenie bez przyczyny.
+
+**Przyczyna**: `useWaterTracker.ts`'s `persist()` (odroczony 350ms zapis po tapnięciu +/- w
+`app/(tabs)/food.tsx`) nadpisywał storage GOŁYM `counts[id] = ref.current` — lokalną wartością
+z pamięci hooka, bez sprawdzenia czy coś zmieniło storage w międzyczasie. Health Connect
+synchronizuje wodę z zegarka w tle (`healthAutoSync.ts` → `feedWaterHabit()` w `habits.ts`,
+TEN SAM plik, już poprawnie z MAX-merge — komentarz tam: "w ciągu dnia liczba tylko rośnie").
+Wyścig: gdy `feedWaterHabit()` woła `bump()` DOKŁADNIE w oknie, w którym w
+`useWaterTracker`'s hooku wisi jeszcze odroczony zapis (`timer.current` niepuste),
+`load()`'s istniejący guard (`if (timer.current) return` — celowo pomija przeładowanie, żeby
+nie zgubić optymistycznego tapnięcia) sprawia że `ref.current` NIGDY nie dowiaduje się o
+świeższej wartości z zegarka. Gdy debounce w końcu odpala, `persist()` nadpisuje storage
+STARĄ lokalną liczbą — realnie KASUJE wodę zalogowaną z zegarka w tym oknie, nie tylko
+opóźnia UI.
+
+**Fix**: `persist()` odczytuje FRESH storage tuż przed zapisem i ustala finalną wartość jako
+`Math.max(fresh, ref.current)` — dokładnie ten sam "w ciągu dnia liczba tylko rośnie" wzorzec
+co `feedWaterHabit()`, teraz spójny dla OBU ścieżek zapisu tego samego licznika (ręczny tap w
+apce i sync z zegarka), nie tylko jednej. Jeśli finalna wartość różni się od tego co hook
+lokalnie myślał (czyli storage było świeższe), UI też się aktualizuje (`ref.current`/
+`setGlasses`), żeby nie pokazywać stale liczby po zapisie.
+
+**Nie napisano automatycznego testu** — `useWaterTracker.ts` to hook (React state + timery +
+`expo-router`), nietestowalny bezpośrednio w obecnym Jest setupie (brak
+`@testing-library/react-hooks` w projekcie, ten sam znany limit co pliki importujące RN-owe
+moduły gdzie indziej w tej sesji). Logika reużyta z `feedWaterHabit()`, która MA pokrycie
+testami (`__tests__/habits.test.ts`, "feedWaterHabit — MAX-merge, nigdy nie cofa ręcznego
+zapisu"). `tsc`/`jest` czyste (1067 testów, bez zmiany — plik i tak poza zasięgiem testów).
+
+**Priorytet testu na urządzeniu — wysoki**: bezpośrednia odpowiedź na zgłoszony bug. Trudno
+odtworzyć idealnie (wymaga realnego wyścigu czasowego z synchronizacją zegarka), ale fix
+usuwa mechanizm który mógł to powodować — obserwuj czy licznik wody jeszcze kiedyś "cofnie
+się" po synchronizacji.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
