@@ -9912,6 +9912,50 @@ gear). Efekt bojowy realnie widoczny dopiero z equipped mityczną/legendarną ob
 
 ---
 
+## 156. Streaki: 2 nowe progi koloru + pasek postępu — najdłuższe "ciche" odcinki przycięte o połowę (2026-09-22)
+
+User: "zapisz że jestem zestresowany na różowym kolorze już [długo]... zaczyna dręczyć nie
+motywować" — utknięcie na jednym kolorze kafelka streaka przez długi czas zaczęło działać
+odwrotnie do zamierzonego (Duolingo-style) efektu motywacyjnego.
+
+**Diagnoza (policzona, nie zgadywana)**: progi kolorów (`STREAK_TIERS`) rosły z coraz
+większym odstępem — 1→7→14→30→60→100 dni, czyli odcinki BEZ ŻADNEJ zmiany koloru: 6, 7, 16,
+**30**, **40** dni. Różowy (Róż, 30-59 dni) to ponad dwa razy dłuższy odcinek ciszy wizualnej
+niż wszystkie trzy wcześniejsze progi razem wzięte (29 dni), a błękit (60-99) jeszcze dłuższy
+(40 dni) — dokładnie w miejscu gdzie user utknął. Wcześniejsze progi zmieniały się mniej
+więcej co tydzień-dwa, dając ciągłe poczucie progresu; potem nagle miesiąc+ ciszy.
+
+**Fix (user wybrał, AskUserQuestion, oba na raz)**:
+1. **Dwa nowe progi** wstawione w środku obu najgorszych odcinków: Ametyst (45 dni, między
+   Róż i Błękit) i Indygo (80 dni, między Błękit i Legenda) — przycina maksymalną długość
+   "ciszy" z 30/40 dni do ~15/20. Kolory SYSTEMATYCZNIE wyliczone jako RGB-środek sąsiednich
+   progów (róż↔błękit, błękit↔legenda), nie zgadywane — płynne przejście barwy. `FLAME_PALETTE`
+   (trzy-tonowa paleta dla dużego płomienia-naklejki) dostała analogicznie wyliczone wpisy dla
+   obu nowych progów (blend sąsiednich flame/halo/core tonów).
+2. **Pasek postępu do następnego progu** na każdym kafelku `StreakWallCard` — cienki biały
+   pasek u dołu, wypełnienie = `(days-tier.min)/(tier.next-tier.min)`. Daje codzienny,
+   widoczny mikroruch NAWET w trakcie długiego odcinka między progami, nie tylko skok koloru
+   raz na kilka tygodni. Brak paska dla złamanej serii i dla tieru terminalnego (Legenda,
+   `next===null` — to już "wygrane", nic do czego dążyć).
+
+**Refaktor przy okazji**: `STREAK_TIERS`/`streakTier()`/`streakColor()` WYDZIELONE z
+`StreakFlame.tsx` do nowego `src/utils/streakTiers.ts` — `StreakFlame.tsx` importuje
+`'react-native'` (komponenty), więc był nietestowalny bezpośrednio w Jest (ten sam znany limit
+co np. `notificationsService.ts`). `StreakFlame.tsx` re-eksportuje dla wstecznej zgodności (5
+miejsc w apce importowało stamtąd) — zero zmian w call site'ach.
+
+**Testy**: nowy `__tests__/streakTiers.test.ts` (7 testów) — granice każdego progu (dokładnie
+na/tuż przed), `next` poprawny (null tylko na Legendzie), **regresja pilnująca że żaden
+odcinek między progami nie przekracza 20 dni** (bezpośrednia obrona przed powrotem tego
+konkretnego problemu), monotoniczność indeksów. `tsc`/`jest` czyste (1053 testy, +7).
+
+**Priorytet testu na urządzeniu — wysoki**: to bezpośrednia odpowiedź na zgłoszony dyskomfort.
+Sprawdź czy pasek postępu jest widoczny i czytelny na kafelkach (szczególnie przy długiej
+serii w środku odcinka Ametyst/Błękit/Indygo), i czy nowe kolory (Ametyst, Indygo) wyglądają
+dobrze obok reszty palety.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

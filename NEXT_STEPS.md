@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Streaki: 2 nowe progi koloru + pasek postępu — najdłuższe "ciche" odcinki przycięte o połowę (2026-09-22)
+
+Pełny opis w ARCHITECTURE.md §156. User: "jestem zestresowany na różowym kolorze już
+[długo]... zaczyna dręczyć nie motywować". Policzone: progi koloru rosły z coraz większym
+odstępem (1/7/14/30/60/100), więc różowy (30-59 dni) i błękit (60-99 dni) były 30/40-dniowymi
+odcinkami BEZ ŻADNEJ zmiany koloru — dużo dłuższymi niż wcześniejsze progi (co tydzień-dwa).
+Fix (user wybrał oba na raz): (1) dwa nowe progi wstawione w środku obu najgorszych odcinków
+(Ametyst=45, Indygo=80, kolory systematycznie wyliczone jako RGB-środek sąsiednich progów),
+przycina max "ciszę" z 30/40 do ~15/20 dni; (2) pasek postępu do następnego progu na
+kafelkach `StreakWallCard` — codzienny mikroruch nawet w trakcie długiego odcinka. Przy okazji
+`STREAK_TIERS`/`streakTier`/`streakColor` wydzielone do nowego `src/utils/streakTiers.ts`
+(testowalność — `StreakFlame.tsx` importuje RN, było nietestowalne). `tsc`/`jest` czyste
+(1053 testy, +7, w tym regresja pilnująca że żaden odcinek nie przekracza 20 dni).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: to bezpośrednia odpowiedź na zgłoszony
+dyskomfort. Sprawdź pasek postępu na kafelkach i czy nowe kolory (Ametyst, Indygo) pasują do
+reszty palety.
+
 ## ✅ Obroża przebudowana z % na flat — jedyny slot gearu gasnący do zera na wysokim poziomie (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §155. User: "ogarnij ekwipunek — patrz jak teraz stoi z
