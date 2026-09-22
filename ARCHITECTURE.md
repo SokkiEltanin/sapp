@@ -9717,6 +9717,49 @@ raportu).
 
 ---
 
+## 152. Krzywa XP/poziom przyspiesza po kampanii — tłumienie skoków levelu z MAD (2026-09-22)
+
+User zresetował pupila (5. runda testowa) i zgłosił rdzeń problemu jeszcze raz: "z tymi
+bossami jest popierdolone za dużo tego się dostaje przez co jest skok mnóstwo w górę lvl".
+Realny przykład z eksportu poziomu 617: jedna walka MAD dała 697500 XP = ~28-29 poziomów W
+JEDNEJ WALCE pod starą, czysto liniową krzywą (`need = 100+(level-1)*40` dla KAŻDEGO poziomu,
+bez końca). Krzywa nagród MAD (`madRewardFor`, §139) jest sama w sobie poprawnie skalibrowana
+i ściśle rosnąca po orderze bossa — problem nie w nagrodzie, tylko w tym że próg XP/poziom
+rośnie tylko LINIOWO, więc przy bardzo dużych zastrzykach XP z endgame'u (MAD/raid) jeden
+fight zawsze zjada dziesiątki poziomów, niezależnie jak wysoko user już jest.
+
+**Rozważana alternatywa (odrzucona przez usera)**: przeskalować nagrodę MAD zależnie od
+aktualnego poziomu gracza (analogicznie do raidu). User: "a może po prostu zamiast skakać
+level tak bardzo to zwiększymy XP później per level" — czyli zostawić już skalibrowaną
+nagrodę MAD w spokoju i zamiast tego stromić krzywą wymagań po stronie poziomu.
+
+**Fix** (`petStore.ts`'s `levelFromXp`): krzywa **identyczna do poziomu 116** (`unlockLevel`
+finałowego bossa kampanii — cała wcześniejsza kalibracja questów/kampanii/raidu poniżej tego
+progu nietknięta). Od poziomu 117 wzwyż krok XP/poziom rośnie DODATKOWO o
+`POST_CAMPAIGN_LEVEL_STEP_GROWTH(20) * (level-116)` ponad poprzedni krok — krzywa robi się
+kwadratowa w `(level-116)` dla ogona endgame'u. Efekt: te same duże zastrzyki XP z
+MAD/raidu dają MNIEJ poziomów, nie mniej XP (progresja total-XP nietknięta, tylko przelicznik
+na poziom).
+
+Stała `m=20` wybrana z przetestowanego zakresu `m=5..100` (throwaway `/tmp/level_curve_check
+.mjs` na realnych liczbach z eksportu usera) — sprowadza przykładowy skok 697500 XP z ~29
+poziomów do ~4. **Pierwsze podejście, do docalibrowania na świeżych danych z 5. rundy** —
+identyczny tryb pracy jak krzywa nagród MAD, która też przeszła 2 iteracje (§136→§139) zanim
+osiadła.
+
+`__tests__/levelFromXp.test.ts` (nowy plik, `levelFromXp` jest bezpośrednio testowalne w
+Jest — `petStore.ts`, w przeciwieństwie do `moodStore.ts`, nie importuje `notificationsService`
+→ `expo-notifications`): poziom 116 identyczny co pod starą formułą (needed=4700), suma XP
+do poziomu 200 wyraźnie wyższa niż pod czysto liniową krzywą, realny scenariusz 697500 XP
+daje skok w rozsądnym zakresie (0 < skok < 10). `tsc`/`jest` czyste (1040 testów, +5).
+
+**Priorytet testu na urządzeniu — wysoki**: to bezpośrednia odpowiedź na powtarzający się
+zgłoszony problem, ale kalibracja `m=20` jest szacunkiem, nie zmierzonym optimum — user ma
+obserwować 5. rundę testową i zgłosić czy skoki levelu przy dużych walkach MAD są teraz
+sensowne, czy nadal za duże/za małe.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
