@@ -113,6 +113,16 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
       else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
       else router.push('/counters' as any);
     };
+    // Pasek postępu do NASTĘPNEGO progu (2026-09-22, user: "jestem zestresowany na różowym
+    // kolorze... zaczyna dręczyć nie motywować" — patrz obszerny komentarz przy STREAK_TIERS
+    // w StreakFlame.tsx). Nawet po wstawieniu 2 dodatkowych progów, odcinki bez zmiany koloru
+    // wciąż trwają kilkanaście dni — pasek daje codzienny, widoczny mikroruch W TRAKCIE takiego
+    // odcinka, nie tylko skok raz na jakiś czas. Brak paska dla tieru terminalnego (Legenda,
+    // `next === null` — to już "wygrane", nic do czego dążyć) i dla złamanej serii (isZero).
+    const tier = streakTier(r.days);
+    const tierProgress = !isZero && tier.next != null
+      ? Math.min(1, Math.max(0, (r.days - tier.min) / (tier.next - tier.min)))
+      : null;
     // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
@@ -123,6 +133,11 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
         </View>
         <Text style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</Text>
         <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
+        {tierProgress != null && (
+          <View style={s.tierBarTrack} pointerEvents="none">
+            <View style={[s.tierBarFill, { width: `${tierProgress * 100}%` }]} />
+          </View>
+        )}
       </>
     );
     return (
@@ -162,6 +177,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   tileZero: { backgroundColor: '#23273A', borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle },
   tileFlame: { position: 'absolute', right: -12, bottom: -10 },
+  // Pasek postępu do następnego progu serii (2026-09-22) — cienki, przy samym dole kafla,
+  // NAD płomieniem w z-order (deklarowany później w JSX) ale pod jego wizualnym środkiem
+  // ciężkości (płomień jest w prawym-dolnym rogu, pasek na całej szerokości u dołu).
+  tierBarTrack: {
+    position: 'absolute', left: spacing[2], right: spacing[2], bottom: 5,
+    height: 3, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+  },
+  tierBarFill: { height: '100%', borderRadius: radius.full, backgroundColor: '#FFFFFF' },
   // BEZ fontWeight — ArchivoBlack to already-heavy font (jedyny plik/waga zarejestrowana
   // w useFonts), a fontWeight obok custom fontFamily na Androidzie potrafi po cichu cofnąć
   // się do systemowego (cienkiego) fontu, bo RN szuka pliku "ArchivoBlack-Bold" którego nie

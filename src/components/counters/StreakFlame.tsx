@@ -2,45 +2,30 @@ import { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
 import { Flame } from 'lucide-react-native';
 import { fonts } from '@/theme';
-
-// Progi serii — wspólny język kolorów dla całej apki (płomienie + kafelki „Twoje serie").
-// Im dłuższa seria, tym rzadszy „rarity" kolor kafelka: bordo → czerwień → pomarańcz →
-// róż → błękit → fiolet (legenda). Przekroczenie progu = celebracja (StreakWallCard).
-export interface StreakTier { i: number; color: string; name: string; min: number; next: number | null }
-const STREAK_TIERS: { min: number; color: string; name: string }[] = [
-  { min: 1,   color: '#9A3444', name: 'Bordo' },
-  { min: 7,   color: '#DC2626', name: 'Czerwień' },
-  { min: 14,  color: '#F97316', name: 'Pomarańcz' },
-  { min: 30,  color: '#EC4899', name: 'Róż' },
-  { min: 60,  color: '#3B82F6', name: 'Błękit' },
-  { min: 100, color: '#8B5CF6', name: 'Legenda' },
-];
-export function streakTier(days: number): StreakTier {
-  let i = 0;
-  for (let k = 0; k < STREAK_TIERS.length; k++) if (days >= STREAK_TIERS[k].min) i = k;
-  const t = STREAK_TIERS[i];
-  return { i, color: t.color, name: t.name, min: t.min, next: i + 1 < STREAK_TIERS.length ? STREAK_TIERS[i + 1].min : null };
-}
-
-// Duolingo-style streak flame: the day count sits inside a flickering flame whose
-// colour "heats up" with the streak length (via the shared tier scheme above).
-export function streakColor(days: number): string {
-  if (days < 1) return '#8A93A8'; // cold grey (0 days)
-  return streakTier(days).color;
-}
+// Progi serii WYDZIELONE do streakTiers.ts (2026-09-22, patrz komentarz tam — testowalność
+// w Jest, ten plik importuje 'react-native' więc sam nie może być). Re-eksport zachowuje
+// wsteczną zgodność — 5 miejsc w apce importuje `streakTier`/`streakColor`/`StreakTier` stąd.
+import { streakTier, streakColor } from '@/utils/streakTiers';
+import type { StreakTier } from '@/utils/streakTiers';
+export { streakTier, streakColor };
+export type { StreakTier };
 
 // Three-tone palette for the BIG decorative flame on dashboard streak tiles (StreakWallCard) —
 // a richer flame shade than the tile's own background (STREAK_TIERS.color), a light tint for
 // the sticker-style outline "halo", and a lighter tint for the inner glow. Hand-picked per
 // tier (not derived) to match the exact palette approved in the design comparison artifact —
-// indices line up with STREAK_TIERS.
+// indices line up with STREAK_TIERS. Ametyst/Indygo (2026-09-22, patrz komentarz przy
+// STREAK_TIERS) SĄ derywowane (RGB-środek sąsiadujących tonów Róż↔Błękit / Błękit↔Legenda,
+// nie odręcznie dobrane) — konsekwentne z tym jak wyliczono ich tier-kolory wyżej.
 interface FlameTone { flame: string; halo: string; core: string }
 const FLAME_PALETTE: FlameTone[] = [
   { flame: '#7A2836', halo: '#C39EA5', core: '#E39AA6' }, // Bordo
   { flame: '#B91C1C', halo: '#E09999', core: '#FCA5A5' }, // Czerwień
   { flame: '#E8630A', halo: '#F5B991', core: '#FFC466' }, // Pomarańcz
   { flame: '#D63384', halo: '#EDA3C8', core: '#FFB3D6' }, // Róż
+  { flame: '#7E4BB8', halo: '#C5AEDF', core: '#DFC7EA' }, // Ametyst
   { flame: '#2563EB', halo: '#9DB9F6', core: '#BFDBFE' }, // Błękit
+  { flame: '#514FEC', halo: '#B1B0F7', core: '#CED9FE' }, // Indygo
   { flame: '#7C3AED', halo: '#C4A6F7', core: '#DDD6FE' }, // Legenda (fiolet)
 ];
 const ZERO_FLAME_TONE: FlameTone = { flame: '#3A3F52', halo: '#54596D', core: '#4E5468' };
