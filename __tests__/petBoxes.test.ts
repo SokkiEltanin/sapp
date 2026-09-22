@@ -14,7 +14,12 @@ import { gearById, gearValueRange } from '@/utils/gear';
 // (patrz petBoxes.ts) — CAŁKOWITE progi "coś ciekawego" są identyczne jak przed zmianą, tylko
 // jednolite: gearCut = gearChance, combatItemCut = gearCut + combatItemChance.
 //
-// Progi: sardine gearCut=0.40, combatItemCut=0.42. gold gearCut=0.96, combatItemCut=1.04.
+// Progi (2026-09-22, PO przebalansie ekonomii skrzynek — patrz komentarz przy
+// BOX_MAX_GEAR_TIER w petBoxes.ts): sardine gearCut=0.40, combatItemCut=0.42 (bez zmian —
+// nigdy nie było tu buga). iron gearCut=0.65, combatItemCut=0.70 (było 0.76/0.81). gold
+// gearCut=0.70, combatItemCut=0.78 (było 0.96/1.04 — PRZEKRACZAŁO 1, prawdziwy bug, branch
+// monet był matematycznie nieosiągalny). divine gearCut=0.65, combatItemCut=0.81 (było
+// 0.92/1.08 — ten sam bug, drastyczniejszy).
 
 describe('petBoxes — boxById', () => {
   test('znaleziona skrzynka po id', () => {
@@ -42,7 +47,8 @@ describe('petBoxes — 4 tiery skrzyń (drewniana/żelazna/złota/boska, 2026-09
   });
   test('divine, tak jak gold, PREFERUJE ulepszenie posiadanego perku (nie tylko gold)', () => {
     const divine = boxById('divine');
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0);
+    // divine: strefa perków [0.65, 0.81) po przebalansie (2026-09-22) — r=0.75 mieści się w środku.
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.75).mockReturnValueOnce(0);
     const reward = rollBox(divine, 1, { dodge: 1 });
     expect(reward).toEqual({ type: 'combatItem', itemId: 'dodge', name: 'Unik', level: 2, isUpgrade: true, rarity: 'legendary' });
     jest.restoreAllMocks();
@@ -96,8 +102,10 @@ describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
 
 // 2026-08-29, user: "te itemy bossów... to są bardziej UMIEJĘTNOŚCI... BASIC ITEMY > STREAK
 // FREEZE > COINY 50-300% > TE ITEMY BOSSÓW" — najrzadsza strefa `combatItemChance`.
-// Progi: sardine combatItemCut=0.42 (gearCut 0.40 + 0.02), gold combatItemCut=1.04 (gearCut
-// 0.96 + 0.08, w praktyce do 1.0 bo Math.random()<1).
+// Progi (2026-09-22, PO przebalansie): sardine combatItemCut=0.42 (gearCut 0.40 + 0.02, bez
+// zmian). gold combatItemCut=0.78 (gearCut 0.70 + 0.08) — dawniej 1.04, PRZEKRACZAŁO 1
+// (prawdziwy bug: branch monet matematycznie nieosiągalny, potwierdzone realnymi
+// statystykami usera — 0% monet z boskiej skrzynki na 40 otwarć).
 describe('petBoxes — rollBox strefa PERKÓW BOSSÓW (combatItemChance, 2026-08-29)', () => {
   afterEach(() => jest.restoreAllMocks());
   const sardine = boxById('sardine');
@@ -110,13 +118,13 @@ describe('petBoxes — rollBox strefa PERKÓW BOSSÓW (combatItemChance, 2026-08
   });
 
   test('gold (preferUpgrade=true): PREFERUJE ulepszenie już posiadanego nieMAXowanego perku', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.97).mockReturnValueOnce(0); // gold: [0.96, 1.04)
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.75).mockReturnValueOnce(0); // gold: [0.70, 0.78)
     const reward = rollBox(gold, 1, { dodge: 1 }); // dodge maxLevel=4, więc jest upgradowalny
     expect(reward).toEqual({ type: 'combatItem', itemId: 'dodge', name: 'Unik', level: 2, isUpgrade: true, rarity: 'legendary' });
   });
 
   test('gold, brak upgradowalnych (jedyny posiadany już na maksie) → fallback do NOWEGO nieposiadanego perku', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.97).mockReturnValueOnce(0);
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.75).mockReturnValueOnce(0);
     const reward = rollBox(gold, 1, { headshot: 1 }); // headshot maxLevel=1 — nic do ulepszenia
     expect(reward).toEqual({ type: 'combatItem', itemId: 'heal', name: 'Uzdrowienie', level: 1, isUpgrade: false, rarity: 'legendary' });
   });
@@ -132,5 +140,40 @@ describe('petBoxes — rollBox strefa PERKÓW BOSSÓW (combatItemChance, 2026-08
     jest.spyOn(Math, 'random').mockReturnValueOnce(0.41).mockReturnValueOnce(0);
     const reward = rollBox(sardine, 1); // 3. argument pominięty
     expect(reward.type).toBe('combatItem');
+  });
+});
+
+// 2026-09-22 — przebalans ekonomii skrzynek: user przysłał realne statystyki pokazujące dwa
+// problemy naraz (patrz komentarz przy BOX_MAX_GEAR_TIER w petBoxes.ts): (1) gearChance +
+// combatItemChance PRZEKRACZAŁO 100% dla gold/divine → branch monet matematycznie
+// nieosiągalny; (2) pula itemów w rollBox() była capowana WYŁĄCZNIE poziomem gracza, nie
+// tierem skrzynki, więc drewniana miała przy wysokim poziomie ten sam dostęp co boska.
+describe('petBoxes — przebalans ekonomii (2026-09-22): fix przepełnienia + box-tier cap', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('gearChance + combatItemChance < 1 dla KAŻDEJ skrzynki (monety zawsze realnie osiągalne)', () => {
+    for (const box of LOOT_BOXES) {
+      expect(box.gearChance + (box.combatItemChance ?? 0)).toBeLessThan(1);
+    }
+  });
+
+  test('drewniana (sardine) NIE MOŻE wylosować itemu z tieru powyżej unlockLevel=20, nawet przy bardzo wysokim poziomie pupila', () => {
+    const sardine = boxById('sardine');
+    // r1=0.30 → strefa ekwipunku; r2=0.99 → OSTATNI item w (capowanej) puli; r3/r4=0.
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    const reward = rollBox(sardine, 999);
+    expect(reward.type).toBe('gear');
+    if (reward.type === 'gear') {
+      expect(reward.itemId).toBe('kolczyki_miedziane'); // unlockLevel=20 — ostatni w capowanej puli
+      expect(reward.itemId).not.toBe('kolczyki_krezus'); // unlockLevel=90 — poza capem sardine
+    }
+  });
+
+  test('boska (divine) MA dostęp do pełnego katalogu (cap = 90) przy wysokim poziomie pupila', () => {
+    const divine = boxById('divine');
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    const reward = rollBox(divine, 999);
+    expect(reward.type).toBe('gear');
+    if (reward.type === 'gear') expect(reward.itemId).toBe('kolczyki_krezus'); // unlockLevel=90 — szczyt katalogu
   });
 });

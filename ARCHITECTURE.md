@@ -9794,6 +9794,74 @@ sprawdź czy przeciąganie/tapanie siatki teraz normalnie ustawia nastrój+energ
 
 ---
 
+## 154. Przebalans ekonomii skrzynek — bug przepełnienia progów + box-tier cap na puli itemów (2026-09-22)
+
+User przysłał zrzut ekranu "Statystyki skrzynek" (log realnych otwarć na urządzeniu, patrz
+`boxStatsAnalysis.ts`): "skrzynka najtańsza ma albo bug albo jest zbyt op, względem żelaznej i
+złotej... bo teraz z tej najtańszej średnio wypada koło 40 monet i cały czas jest się na plus
+bo te informacje o sprzedaży itemów nie bierze tylko same Monety". Zrzut pokazywał REALNE
+dane: Drewniana (35/otwarcie) — 180 otwarć, bilans monet -1276 (blisko zera W SAMYCH monetach,
+zgodnie z projektem coins.min/max), ale 50% otwarć dało ekwipunek (nieliczony w bilansie
+ekranu). Boska (450/otwarcie) — 40 otwarć, bilans -18000, **dokładnie 0% monet**.
+
+**Zweryfikowano node'ową symulacją EV przed dotknięciem liczb** (`/tmp/box_ev*.mjs`, coins
+branch + gear branch liczony przez `gearSellValue()` — realną, choć niższą niż `rollGearValue`,
+wartość odsprzedaży itemu — nie samą deklarowaną `gearStatValue`) — dwa NIEZALEŻNE problemy:
+
+1. **Prawdziwy bug**: `gearChance + combatItemChance` PRZEKRACZAŁO 100% dla gold (0.96+0.08=
+   1.04) i divine (0.92+0.16=1.08). `rollBox()`'s branch monet (`r < combatItemCut` zawsze
+   prawda skoro `combatItemCut>1` i `r<1`) był matematycznie NIEOSIĄGALNY — dokładnie
+   potwierdzone przez zrzut usera (0% monet na 40 otwarć boskiej). Efekt uboczny: deklarowane
+   `combatItemChance` gold/divine w praktyce działało jak POŁOWA wartości (reszta zabrana przez
+   przepełnienie, np. divine realnie ~0.08 zamiast deklarowanych 0.16).
+
+2. **Strukturalna wada balansu**: pula itemów w `rollBox()` (`unlockedGearFor(slot, level)`)
+   była capowana WYŁĄCZNIE poziomem PUPILA, nigdy tierem SKRZYNKI — przy wysokim poziomie
+   drewniana miała dokładnie ten sam dostęp do itemów co boska, różniły się tylko wagami
+   rzadkości (śr. mnożnik rzadkości: drewniana ×1.2 → boska ×2.6, ledwie 2.1× różnicy), a cena
+   rosła 35→450 (12.9× różnicy) — płacenie 12.9× więcej dawało tylko 2.1× lepszą jakość.
+
+**Fix** (`src/utils/petBoxes.ts`, `src/utils/gear.ts`):
+- `TIER_LEVELS` w `gear.ts` wyeksportowane (było lokalną stałą).
+- Nowy `BOX_MAX_GEAR_TIER: Record<BoxId, number>` — PRAWDZIWY cap puli itemów per skrzynka
+  (indeks w `TIER_LEVELS`): sardine≤20 (T1-T2), iron≤40 (T1-T3), gold≤65 (T1-T4), divine≤90
+  (pełny katalog). `rollBox()` woła `unlockedGearFor(slot, Math.min(level, TIER_LEVELS[cap]))`
+  zamiast gołego `level` — drewniana/żelazna fizycznie nie mogą wylosować topowych itemów
+  niezależnie jak wysoko jest pupil.
+- `gearChance` przycięte tak, żeby suma z `combatItemChance` ZAWSZE < 1 (monety realnie
+  osiągalne wszędzie): iron 0.76→0.65, gold 0.96→0.70, divine 0.92→0.65 (sardine bez zmian,
+  nigdy nie było tu buga).
+- Zasięg monet drewnianej przycięty (18-105→12-70, jackpot 40→30) — była najbardziej
+  dysproporcjonalna. Iron/gold/divine BEZ ZMIAN w zasięgu monet (było zawsze poprawnie
+  zaprojektowane 50-300% własnego kosztu, tylko nieosiągalne przez bug #1).
+
+**Wynik symulacji EV (poziom pupila 90+, pełny katalog odblokowany)**: ROI (coins EV + gear
+EV via `gearSellValue`, względem kosztu skrzynki) spadło z drewnianej ~207%/nigdy-ujemne do
+~104% (break-even, zgodnie z życzeniem usera), iron ~96%, gold ~79%, divine ~62% (dawniej
+skrajnie -6%/0% monet — teraz solidnie dodatnie, coins branch znów działa). ROI nie rośnie
+ściśle z tierem — świadomie zaakceptowane: `gearSellValue` = 40% wartości (`SELL_FRACTION`),
+więc czysta symulacja "sprzedaj wszystko" NIEDOSZACOWUJE prawdziwą wartość wyższych tierów
+(gracz zwykle ZAKŁADA mitycznego dropa zamiast go sprzedawać — realna moc bojowa nieliniowo
+wyższa niż cena odsprzedaży). Kluczowe: żadna skrzynka już nie jest "oczywistym" wyborem
+kosztem innych, i żadna nie jest matematycznie martwa.
+
+User w rozmowie zdecydował (2 pytania): (1) przebuduj istniejące 4 tiery zamiast dodawać nowy
+5. tier "Legendarna" za ~2k (był floated jako "albo jakoś tak", tentative) — (2) ściągnij
+drewnianą do break-even zamiast dociągać drogie w górę do jej poziomu.
+
+`__tests__/petBoxes.test.ts` zaktualizowane (stare progi r-values w mockach `Math.random`
+odzwierciedlały STARE, przepełnione granice — poprawione na nowe) + 3 nowe testy: suma
+gearChance+combatItemChance<1 dla każdej skrzynki (regresja na bug #1), drewniana NIE MOŻE
+wylosować itemu >T2 nawet przy poziomie 999 (regresja na problem #2), boska WCIĄŻ MA pełny
+katalog przy wysokim poziomie. `tsc`/`jest` czyste (1043 testy, +3).
+
+**Priorytet testu na urządzeniu — wysoki**: otwórz kilka skrzynek każdego tieru, sprawdź że
+złota/boska teraz realnie dają monety (nie tylko ekwipunek/umiejętności), i że drewniana przy
+wysokim poziomie pupila nie losuje już topowego ekwipunku. Pierwsze podejście do kalibracji —
+do docalibrowania na świeżych danych z "Statystyki skrzynek" po dłuższym graniu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
