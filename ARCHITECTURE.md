@@ -10585,6 +10585,34 @@ temu" na dashboardzie (kolor eskalujący z dniami, jak flame na streaku).
 
 ---
 
+## 171. Panel Praca: usunięte "cele"-skarbonki, zostają tylko stałe wydatki (2026-09-23)
+
+User (item #11 z batcha feedbacku): "Panel na dashboardzie spoko ale bym z pracy wywalił
+jednak te cele wszystkie i zostawił tylko STAŁE WYDATKI tam jakby i pokazywał ile zarobiłem
+do stałych a ile powyżej." Sekcja "Skarbonki" w panelu Pracy (otwieranym z kafelka dashboardu)
+dzieliła zarobek DO TERAZ po kolei na 3 "potrzeby" (stałe → jedzenie → zmienne, każda ze swoim
+paskiem/celem) — user odebrał to jako 3 osobne "cele". Zredukowane do JEDNEJ karty: ile
+zarobione vs ile trzeba na stałe (mieszkanie/prąd/internet, cel = średnia poprzednich
+miesięcy jak wcześniej), plus zdanie "+X zł powyżej stałych wydatków" gdy zarobek przekracza
+cel. `workBudgetProgress()` (zwracał `BudgetBucket[]`, 3 elementy) zastąpiony przez
+`workFixedProgress()` w `fixedVariable.ts` — zwraca JEDEN obiekt `{ target, filled, pct,
+above }` zamiast tablicy, bo nie ma już po co iterować po kubełkach. Sekcje "Zaplanowane
+naprzód"/"Stawka"/"Godziny — ostatnie 6 miesięcy"/"W liczbach"/"Wypłaty" w tym samym panelu
+BEZ zmian — user je explicite pochwalił ("Panel na dashboardzie spoko"), adresowana wyłącznie
+sekcja skarbonek. Kolejna rozbudowa panelu Pracy o nowe widgety ("brakuje mi czegoś w tej
+zakładce PRACA... do pomyślenia jeszcze") zostaje otwartym pytaniem do usera — konkretnych
+pomysłów jeszcze nie było.
+
+**Testy**: `__tests__/fixedVariable.test.ts`'s `workBudgetProgress` describe-block przepisany
+na `workFixedProgress` (4 testy: cel+filled+above z historią, zarobek poniżej celu, zarobek
+pokrywający wszystko, brak historii). `tsc --noEmit` czyste, pełny `jest` czysty (1100 testów).
+
+**Priorytet testu na urządzeniu — niski**: otwórz panel Pracy (tap kafelka na dashboardzie) i
+sprawdź nową kartę "Zarobek do teraz vs stałe wydatki" — jeden pasek + ew. zdanie o nadwyżce
+zamiast dawnych 3 skarbonek.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

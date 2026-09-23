@@ -141,31 +141,23 @@ export function topVariableContributors(expenses: Expense[], month: string, n = 
     .slice(0, n);
 }
 
-export interface BudgetBucket { label: string; target: number; filled: number; pct: number; }
+export interface FixedProgress { target: number; filled: number; pct: number; above: number }
 
-// "Skarbonki" dla widgetu Pracy — zarobek w tym miesiącu rozdzielony PO KOLEI (stałe → jedzenie
-// → zmienne, priorytet od najpilniejszego) na 3 potrzeby, każda wypełniana do swojego celu
-// zanim nadwyżka przechodzi do następnej (2026-09-10, user: "jak zarabiam na ten moment...
-// ile muszę uzbierać... paski wypełniające się jakby skarbonki ile na mieszkanie+prąd+
-// internet, a ile na jedzenie, a ile śr. na zmienne wydaje"). Cel = średnia z poprzednich
-// (nie-zerowych) miesięcy `fvMonths`; bez historii cel = ten miesiąc, żeby pasek miał w ogóle
-// jakiś mianownik zamiast dzielenia przez zero.
-export function workBudgetProgress(earnings: number, fvMonths: FVMonth[]): BudgetBucket[] {
+// "Stałe wydatki" dla widgetu Pracy — zarobek w tym miesiącu vs ile potrzeba na stałe
+// (mieszkanie/prąd/internet), plus nadwyżka ponad to (2026-09-10, user: "jak zarabiam na ten
+// moment... ile muszę uzbierać na stałych wydatkach"; zawężone 2026-09-23, user: "bym z pracy
+// wywalił jednak te cele wszystkie i zostawił tylko STAŁE WYDATKI... i pokazywał ile
+// zarobiłem do stałych a ile powyżej" — wcześniejsza wersja (`workBudgetProgress`) dzieliła
+// zarobek na 3 „skarbonki" po kolei (stałe→jedzenie→zmienne); usera raziły jako „cele"; teraz
+// TYLKO stałe). Cel = średnia z poprzednich (nie-zerowych) miesięcy `fvMonths`; bez historii
+// cel = ten miesiąc, żeby pasek miał w ogóle jakiś mianownik zamiast dzielenia przez zero.
+export function workFixedProgress(earnings: number, fvMonths: FVMonth[]): FixedProgress {
   const cur = fvMonths[fvMonths.length - 1];
   const prev = fvMonths.slice(0, -1).filter(m => m.fixed + m.variable + m.food > 0);
-  const target = (sel: (m: FVMonth) => number) =>
-    prev.length ? prev.reduce((a, m) => a + sel(m), 0) / prev.length : (cur ? sel(cur) : 0);
-  const buckets = [
-    { label: 'Stałe · mieszkanie/prąd/internet', target: Math.round(target(m => m.fixed)) },
-    { label: 'Jedzenie', target: Math.round(target(m => m.food)) },
-    { label: 'Zmienne', target: Math.round(target(m => m.variable)) },
-  ];
-  let left = Math.max(0, earnings);
-  return buckets.map(b => {
-    const filled = Math.min(left, b.target);
-    left -= filled;
-    return { ...b, filled: Math.round(filled), pct: b.target > 0 ? filled / b.target : 1 };
-  });
+  const target = Math.round(prev.length ? prev.reduce((a, m) => a + m.fixed, 0) / prev.length : (cur ? cur.fixed : 0));
+  const earned = Math.max(0, earnings);
+  const filled = Math.round(Math.min(earned, target));
+  return { target, filled, pct: target > 0 ? filled / target : 1, above: Math.round(Math.max(0, earned - target)) };
 }
 
 export interface FixedItem { label: string; amount: number; }

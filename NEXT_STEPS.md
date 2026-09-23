@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Panel Praca — usunięte "cele"-skarbonki, zostają tylko stałe wydatki (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §171. User (item #11 feedbacku): "bym z pracy wywalił jednak te
+cele wszystkie i zostawił tylko STAŁE WYDATKI tam jakby i pokazywał ile zarobiłem do stałych a
+ile powyżej". Sekcja "Skarbonki" (3 paski: stałe/jedzenie/zmienne) zredukowana do JEDNEJ karty
+— zarobek vs stałe wydatki + zdanie o nadwyżce ponad nie. `workBudgetProgress()` →
+`workFixedProgress()` w `fixedVariable.ts` (zwraca jeden obiekt zamiast tablicy 3 kubełków).
+Reszta panelu (Stawka/Zaplanowane naprzód/Godziny/W liczbach/Wypłaty) BEZ zmian — user je
+pochwalił. `tsc`/`jest` czyste (1100 testów, +1).
+
+**🆕 Priorytet testu na urządzeniu — niski**: otwórz panel Pracy z dashboardu, sprawdź nową
+kartę "Zarobek do teraz vs stałe wydatki".
+
+**🆕 Otwarte**: user chciał też "rozbudować więcej widgetów... do pomyślenia jeszcze bo nie
+wiem czego, ale brakuje mi czegoś w tej zakładce PRACA" — brak konkretnego pomysłu na razie,
+czeka na usera.
+
 ## ✅ Liczniki — gruby pasek-donacja + duża kolorowana liczba zamiast kafelków (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §170. User (item #13 feedbacku): "musimy ulepszyć LICZNIKI...
@@ -26,9 +43,6 @@ temu" na dashboardzie.
 - **#7 Edytor layoutu bossów**: user zgłosił że edytor "nie jeden do jeden" (bug wymaga
   diagnozy na urządzeniu, nie da się znaleźć z samego kodu) + zapowiedział wgranie NOWYCH
   customowych bossów w miejsce starych z neta — czeka na przesłanie plików przez usera.
-- **#11 Panel Praca na dashboardzie**: user chce wywalić WSZYSTKIE cele, zostawić tylko stałe
-  wydatki (zarobione vs powyżej) + rozbudować o nowe widgety — jeszcze NIE zaczęte (item #13
-  wszedł pierwszy, bo user napisał "dawaj dalej" na niego explicite).
 - **#12 Cold start lag**: user narzeka na animacje przy starcie + ogólny lag — istnieje już
   DIAGNOSTYKA w Ustawienia → Diagnostyka → "Wydajność startu apki" → "Udostępnij" (export).
   Czeka na usera żeby przesłał wyeksportowane dane — bez realnych liczb dalsza praca to

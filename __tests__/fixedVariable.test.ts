@@ -1,4 +1,4 @@
-import { isFixedExpense, fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, bucketOf, bucketTransactions, fvSplitOf, FVMonth } from '@/utils/fixedVariable';
+import { isFixedExpense, fixedVariableMonths, fixedDeviations, topVariableContributors, workFixedProgress, bucketOf, bucketTransactions, fvSplitOf, FVMonth } from '@/utils/fixedVariable';
 import { Expense, ReceiptItem } from '@/types';
 
 const e = (o: Partial<Expense>): Expense => ({
@@ -221,32 +221,39 @@ describe('fixedVariable — bucketTransactions', () => {
 });
 
 // 2026-09-10, user: "w pracy dodać widget jak zarabiam na ten moment... ile muszę uzbierać na
-// stałych wydatkach i śr. jedzenia... paski wypełniające się jakby skarbonki".
-describe('fixedVariable — workBudgetProgress', () => {
+// stałych wydatkach". Zawężone 2026-09-23, user: "wywalił z pracy te cele wszystkie i zostawił
+// tylko STAŁE WYDATKI... ile zarobiłem do stałych a ile powyżej" — dawne 3 "skarbonki"
+// (stałe/jedzenie/zmienne) zredukowane do jednej: stałe + nadwyżka.
+describe('fixedVariable — workFixedProgress', () => {
   const months: FVMonth[] = [
     { month: '2026-06', fixed: 1000, variable: 200, food: 400 },
     { month: '2026-07', fixed: 1000, variable: 300, food: 500 },
     { month: '2026-08', fixed: 1050, variable: 100, food: 100 }, // bieżący (cel liczony z 06/07)
   ];
 
-  test('rozdziela zarobek PO KOLEI: najpierw stałe, potem jedzenie, potem zmienne', () => {
-    // cele = śr(06,07): stałe 1000, jedzenie 450, zmienne 250
-    const out = workBudgetProgress(1200, months);
-    expect(out[0].target).toBe(1000);
-    expect(out[0].filled).toBe(1000); // stałe w pełni pokryte
-    expect(out[1].target).toBe(450);
-    expect(out[1].filled).toBe(200);  // reszta (1200-1000) idzie w jedzenie, nie starcza do celu
-    expect(out[2].filled).toBe(0);    // nic nie zostało na zmienne
+  test('cel = śr. poprzednich miesięcy, filled = min(zarobek, cel), above = nadwyżka', () => {
+    const out = workFixedProgress(1200, months);
+    expect(out.target).toBe(1000);
+    expect(out.filled).toBe(1000); // stałe w pełni pokryte
+    expect(out.above).toBe(200);   // reszta (1200-1000) to nadwyżka ponad stałe
   });
 
-  test('zarobek pokrywający wszystko → każda skarbonka pełna (pct ≥ 1)', () => {
-    const out = workBudgetProgress(999999, months);
-    for (const b of out) expect(b.pct).toBeGreaterThanOrEqual(1);
+  test('zarobek poniżej celu → above = 0, pct < 1', () => {
+    const out = workFixedProgress(600, months);
+    expect(out.filled).toBe(600);
+    expect(out.above).toBe(0);
+    expect(out.pct).toBeCloseTo(0.6);
+  });
+
+  test('zarobek pokrywający wszystko → pct ≥ 1', () => {
+    const out = workFixedProgress(999999, months);
+    expect(out.pct).toBeGreaterThanOrEqual(1);
+    expect(out.above).toBeGreaterThan(0);
   });
 
   test('brak historii (tylko bieżący miesiąc) → cel = ten miesiąc, nie dzieli przez zero', () => {
-    const out = workBudgetProgress(500, [months[2]]);
-    expect(out[0].target).toBe(1050);
-    expect(Number.isFinite(out[0].pct)).toBe(true);
+    const out = workFixedProgress(500, [months[2]]);
+    expect(out.target).toBe(1050);
+    expect(Number.isFinite(out.pct)).toBe(true);
   });
 });
