@@ -10613,6 +10613,34 @@ zamiast dawnych 3 skarbonek.
 
 ---
 
+## 172. Ekwipunek: ostatnie emotki monet wywalone, item'y i sloty większe (2026-09-23)
+
+User (item #5 z batcha feedbacku): "Sloty spoko tylko ekwipunek ma EMOTKI które chciałem
+wywalić i przy okazji trochę go zmienić że lepiej się pokazują te rzeczy... możemy zrobić to
+eq większe ogólniej bardziej czytelne czy coś." Sloty (`SLOT_ICON`) już nie miały emotek od
+§154-ish (2026-09-18, patrz istniejący komentarz w pliku) — zostały TYLKO monetowe "🪙" w
+tekstach `GearPanel.tsx` (przyciski sprzedaży, licznik "sprzedaj wszystkie", stepper ilości,
+3 toasty po sprzedaży). Zamienione na `<Coins size={11} color="#FBBF24" />` (ten sam
+komponent+kolor co reszta apki, np. `pet.tsx`) wszędzie gdzie renderuje się jako JSX (przyciski
+sprzedaży, "Otrzymasz: N" w stepperze); w 3 stringach `toast.success(...)` (plain-text, nie da
+się osadzić ikonki) zamienione na słowo "monet" — ten sam zwrot co już istniejące
+`ConfirmDialog` w tym pliku ("otrzymasz X monet"), więc spójne wewnątrz ekranu. Rozmiary
+podniesione dla czytelności: sloty ekwipunku 62→70px (grafika 44→52px), miniaturki itemów w
+liście 44→56px, nazwa itemu 13.5→15px, padding karty grupy itemu spacing[3]→spacing[4].
+
+**Wciąż otwarte**: user chciał też "łatwiej sprzedawać" jako szerszy cel — na razie tylko
+rozmiar/czytelność, bez zmiany samego flow sprzedaży (grupowanie/bulk-sell/qty-picker już
+istniały i zostają). Jeśli user chce więcej (np. przeprojektowanie samego flow), wróci z
+konkretami po zobaczeniu tej wersji.
+
+**Testy**: brak nowych (czysto wizualna zmiana, bez logiki). `tsc --noEmit` czyste, `jest`
+czysty (1100 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: otwórz Ekwipunek z ekranu pupila, sprawdź że nigdzie
+nie ma już "🪙" (ikonka monety zamiast), i że itemy/sloty są wyraźnie większe niż wcześniej.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
