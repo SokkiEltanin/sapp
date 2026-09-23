@@ -10493,6 +10493,52 @@ tylko JEDEN wpis + toast o pominiętym duplikacie przy kolejnych tapnięciach.
 
 ---
 
+## 169. Dwie korekty po pierwszym realnym teście: widget przestał się dodawać + zły kolor tasków (2026-09-23)
+
+User przetestował wczorajsze zmiany i zgłosił dwa realne problemy.
+
+**(1) Widget przestał się dawać dodać na pulpit** — regresja z §166 (ekran configu z
+przełącznikiem przezroczystości). Android WYMAGA, żeby `android:configure`-Activity zwróciła
+`RESULT_OK` zanim W OGÓLE dokończy dodawanie widgetu — jeśli user nie tapnął jawnie "Zapisz"
+(np. spodziewając się, że widget po prostu się pojawi jak wcześniej, zanim doszedł ekran
+configu), Android po cichu ANULOWAŁ całe dodanie. **Fix**: `TasksWidgetConfigActivity.kt` i
+cały mechanizm `android:configure` USUNIĘTE — przezroczystość teraz zwykły przełącznik w
+Ustawieniach (`app/settings.tsx`, nowa sekcja "Widget pulpitu — Zadania"), który NICZEGO nie
+gate'uje. Zmiana architektury: ustawienie przezroczystości z per-`appWidgetId` (SharedPreferences
+kluczowane po id instancji) na JEDNĄ GLOBALNĄ wartość (`TasksWidgetProvider.PREF_TRANSPARENT`,
+bez sufiksu) — prostsze, i tak w praktyce jedna instancja widgetu na urządzenie. Nowy
+`TasksWidgetModule.setTransparent(Boolean)` (JS→natywny most) pisze do SharedPreferences +
+budzi `updateAll()`. Nowy `src/store/widgetSettingsStore.ts` (JS-side tylko do pokazania stanu
+przełącznika w UI — prawda leży w natywnym SharedPreferences). `onDeleted()`
+per-instance-cleanup w providerze też usunięty (nic już nie ma do sprzątania per-id).
+
+**(2) Zły kolor kart zadań** — user po zobaczeniu §164 (kolor wg RODZAJU: quick=zielony/
+deep=niebieski/waiting=bursztyn): "Zadania nadal mają zielony kolor, powinny być raczej
+zrobione pod neutralny a kolor być znaczeniem TERMINOWOŚCI (czy aktualnie jest — NIEBIESKI
+kafelek cały | czy zaległe — CZERWONY | czy odłożone na później — CIEMNY)". Całkowite
+cofnięcie osi koloru z §164 na inną: **zaległe** (bez zmian, było już wcześniej) = czerwony;
+**"aktualnie"** (termin dziś LUB w toku pomodoro) = NIEBIESKI (`#6C9EFF`, ten sam co
+`KIND_META.deep` — reużyty, nie nowy kolor), CAŁY kafelek (pasek+wash+border), bez gradacji
+priorytetem (user chciał jeden spójny niebieski, nie warianty mocy); **wszystko inne**
+(jutro/tydzień/później/bez terminu) = zwykły ciemny/neutralny, ZERO akcentu. Ikonka rodzaju
+(Zap/Target/Hourglass) ZOSTAJE jako czysto informacyjny kształt, ale przemalowana na
+neutralny szary — kolor rodzaju już nigdzie nie steruje wyglądem KARTY (wciąż steruje
+nagłówkami sekcji widoku "wg rodzaju" i podglądem chipa przy szybkim dodawaniu — TE miejsca
+mają sens kolorowane wg rodzaju, bo ich JEDYNY cel to pokazać rodzaj). Martwe pole `G.green`
+(już niewykorzystywane po tej zmianie) usunięte z obu palet w pliku.
+
+**Testy**: brak nowych (oba czysto wizualne/natywne poprawki). `tsc`/`jest` czyste (1094
+testy, bez zmiany). `expo prebuild` uruchomiony ponownie po usunięciu configu — potwierdzone
+że `TasksWidgetConfigActivity`/`tasks_widget_config.xml`/atrybut `configure` całkowicie znikły
+z wygenerowanego projektu.
+
+**Priorytet testu na urządzeniu — wysoki, wymaga NOWEGO APK**: (1) spróbuj dodać widget na
+pulpit — powinien pojawić się od razu, bez żadnego ekranu pośredniego; sprawdź przełącznik
+przezroczystości w Ustawieniach osobno. (2) sprawdź kartę zadania z terminem dziś (niebieska
+cała) vs jutro/później (neutralna) vs zaległe (czerwona) vs w toku pomodoro (niebieska).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

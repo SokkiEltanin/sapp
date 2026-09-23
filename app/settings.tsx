@@ -44,6 +44,8 @@ import { ExpenseCategory, DEFAULT_WORK_SETTINGS, Employer } from '@/types';
 import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
+import { useWidgetSettingsStore } from '@/store/widgetSettingsStore';
+import { setWidgetTransparent } from '@/services/widgetSync';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
@@ -373,6 +375,12 @@ export default function SettingsScreen() {
   const [classPrefix, setClassPrefix] = useState(classPrefixStore);
   useEffect(() => { setClassPrefix(classPrefixStore); }, [classPrefixStore]);
   const saveClassPrefix = (prefix: string) => setClassPrefixStore(prefix.trim());
+  // Widget pulpitu "Zadania" (2026-09-23) — zwykły przełącznik zamiast osobnego natywnego
+  // ekranu configu (odrzucony po tym jak zgate'ował dodawanie widgetu, patrz
+  // widgetSettingsStore.ts). Zapisuje JS-side (do pokazania stanu przełącznika) I woła
+  // natywny most (rzeczywiste źródło prawdy dla renderowania widgetu).
+  const widgetTransparent = useWidgetSettingsStore(s => s.transparentBg);
+  const setWidgetTransparentStore = useWidgetSettingsStore(s => s.setTransparentBg);
   // Editable overrides for the two inputs the rate is built from. Empty = use the
   // value the app reads (previous-month calendar hours / last [JD] paycheck).
   const [hoursOvrField, setHoursOvrField]   = useState(workSettings.hoursOverride != null ? String(workSettings.hoursOverride) : '');
@@ -1332,6 +1340,25 @@ export default function SettingsScreen() {
           icon: LucideIcons.CalendarRange, accentColor: '#A78BFA',
           keywords: ['plan zajęć', 'podgląd', 'tydzień', 'siatka', 'uczelnia'],
           control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/class-schedule' as any); } },
+        },
+      ],
+    },
+    {
+      // Widget pulpitu "Zadania" (2026-09-23) — na razie JEDNO ustawienie (przezroczyste
+      // tło). Zwykły przełącznik, nie gate'uje dodawania widgetu (patrz komentarz przy
+      // widgetTransparent wyżej).
+      id: 'widget-zadania', title: 'Widget pulpitu — Zadania', icon: LucideIcons.LayoutGrid, color: '#ECEEEE', defaultOpen: false,
+      keywords: ['widget', 'pulpit', 'zadania', 'ekran główny', 'przezroczyste'],
+      items: [
+        {
+          id: 'widget-transparent', title: 'Przezroczyste tło',
+          subtitle: 'Widget pokazuje Twoją tapetę zamiast ciemnej karty',
+          icon: LucideIcons.LayoutGrid, accentColor: '#ECEEEE',
+          keywords: ['widget', 'przezroczyste', 'tło', 'tapeta'],
+          control: {
+            kind: 'switch', value: widgetTransparent,
+            onChange: (v: boolean) => { haptic.tap(); setWidgetTransparentStore(v); setWidgetTransparent(v); },
+          },
         },
       ],
     },
