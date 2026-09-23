@@ -10196,6 +10196,33 @@ tagów, TextInput notatki, przycisk zamknięcia) nadal działa normalnie z nowym
 
 ---
 
+## 163. Plan zajęć — kafelek dashboardu pokazuje najbliższy dzień, nie znika w weekendy/przerwy (2026-09-23)
+
+User: kafelek "musi pokazywać aktualny plan... następny dzień jaki będę miał z datą i za ile
+dni" — dotychczas `ClassScheduleCard` (§158) renderował tylko dziś/jutro i CAŁKOWICIE znikał
+(`return null`), gdy oba były puste (weekend, przerwa międzysemestralna, dzień wolny z
+zarządzenia Rektora UR) — w praktyce kafelek był niewidoczny większość tygodnia dla planu z
+zajęciami tylko pon/wt/śr.
+
+**Fix**: nowy `classNextDay` memo w `index.tsx` (liczony TYLKO gdy `classToday`/`classTomorrow`
+oba puste — w normalny dzień szkolny się nie odpala) — szuka od pojutrza najbliższej daty z
+choć jednym `[PUR]`-eventem, zwraca `{date, daysAway, events}`. `ClassScheduleCard` dostaje
+nowy opcjonalny prop `nextDay` i renderuje go jako trzeci wariant (po dziś/jutro), z etykietą
+z nowej `fmtNextClassLabel(dateYMD, daysAway)` w `classSchedule.ts` — "Śr 24 wrz · za 2 dni",
+odmiana "dzień/dni" przez `plPlural` (ten sam wzorzec co `za ${d} dni` gdzie indziej w
+`index.tsx`). Ręczne tablice dni/miesięcy zamiast `toLocaleDateString` — ten sam powód co
+`weekGrid.ts`'s `fmtWeekRange()` (§161): pewna testowalność bez zależności od locale ICU pod
+Jest/Hermes. Guard w `index.tsx` rozszerzony o `|| !!classNextDay`. Tap na kafelku ZAWSZE
+prowadzi do pełnego widoku tygodnia (`/class-schedule`, §161) niezależnie od wariantu.
+
+**Testy**: `__tests__/classSchedule.test.ts` +4 (`fmtNextClassLabel`: odmiana 1/3/12,
+poprawny dzień tygodnia z samego YMD dla niedzieli). `tsc`/`jest` czyste (1079 testów, +4).
+
+**Priorytet testu na urządzeniu — średni**: sprawdź kafelek w weekend albo w dniu bez zajęć —
+powinien pokazać najbliższy przyszły dzień z datą i "za X dni", tap nadal otwiera pełny tydzień.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

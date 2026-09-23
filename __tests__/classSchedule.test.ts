@@ -1,4 +1,4 @@
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL } from '@/utils/classSchedule';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel } from '@/utils/classSchedule';
 
 // Fixtures = REALNE tytuły z planu zajęć usera (2 Inżynieria Materiałowa, sem. zimowy
 // 2026/2027, wygenerowane z jego prawdziwego planu + zarządzenia Rektora UR) — nie
@@ -66,5 +66,20 @@ describe('CLASS_TYPE_LABEL — czytelne etykiety dla wszystkich 4 typów', () =>
     expect(CLASS_TYPE_LABEL.C).toBe('Ćwiczenia');
     expect(CLASS_TYPE_LABEL.L).toBe('Laboratorium');
     expect(CLASS_TYPE_LABEL.P).toBe('Projekt');
+  });
+});
+
+describe('fmtNextClassLabel — etykieta najbliższego dnia z zajęciami (fallback kafelka)', () => {
+  test('odmiana "dzień" dla 1', () => {
+    expect(fmtNextClassLabel('2026-10-05', 1)).toBe('Pon 5 paź · za 1 dzień');
+  });
+  test('odmiana "dni" dla 2-4', () => {
+    expect(fmtNextClassLabel('2026-10-07', 3)).toBe('Śr 7 paź · za 3 dni');
+  });
+  test('odmiana "dni" dla 5+ (i dla 12-14, wyjątek od "few")', () => {
+    expect(fmtNextClassLabel('2026-10-17', 12)).toBe('Sob 17 paź · za 12 dni');
+  });
+  test('dzień tygodnia liczony poprawnie z YMD (niedziela)', () => {
+    expect(fmtNextClassLabel('2026-10-11', 6)).toBe('Nie 11 paź · za 6 dni');
   });
 });

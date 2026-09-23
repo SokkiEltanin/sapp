@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Plan zajęć — kafelek dashboardu pokazuje najbliższy dzień zamiast znikać (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §163. User: kafelek "musi pokazywać... następny dzień jaki będę
+miał z datą i za ile dni". Wcześniej kafelek całkowicie znikał gdy dziś/jutro puste (weekend,
+przerwa międzysemestralna) — dodany fallback `classNextDay` (index.tsx) + nowa
+`fmtNextClassLabel()` w `classSchedule.ts` ("Śr 24 wrz · za 2 dni"). Tap nadal prowadzi do
+pełnego tygodnia. `tsc`/`jest` czyste (1079 testów, +4).
+
+**🆕 Priorytet testu na urządzeniu — średni**: sprawdź kafelek w dniu/weekendzie bez zajęć.
+
 ## ✅ Siatka nastrój×energia — DRUGI fix, brakujący GestureHandlerRootView w Modalu (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §162. Po fixie ScrollView (§153) user zgłosił że nadal "Nie mogę
