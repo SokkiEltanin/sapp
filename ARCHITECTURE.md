@@ -10223,6 +10223,47 @@ powinien pokazać najbliższy przyszły dzień z datą i "za X dni", tap nadal o
 
 ---
 
+## 164. Taski — kolor rodzaju (quick/deep/waiting) z powrotem na KAŻDEJ karcie, nie tylko w nagłówku grupy (2026-09-23)
+
+User: "ulepsz kolorystycznie taski tylko tak rozsądnie" — przy okazji innej pracy nad ekranem.
+`app/(tabs)/tasks.tsx` przeszedł wcześniej świadomy "mono redesign" (komentarz w pliku: "chrome
+zadań = biel; overdue ZOSTAJE czerwony") — pasek/tło aktywnego zadania było na sztywno zielone
+(`G.green`) NIEZALEŻNIE od rodzaju (`KIND_META`: quick=zielony/deep=niebieski/waiting=bursztyn).
+Te 3 kolory już istniały i były używane — ale TYLKO w nagłówku sekcji widoku "wg rodzaju" i w
+podglądzie chipa przy szybkim dodawaniu; sama karta zadania na liście nie dawała żadnej
+wskazówki jakiego jest rodzaju.
+
+**Fix — rozsądny, nie chaotyczny**: żadnych nowych kolorów, TYLKO reużycie istniejących 3 z
+`KIND_META`, i tylko w dwóch, wąsko dobranych miejscach:
+1. Lewy pasek + delikatny wash tła aktywnej karty (`accentBar`/`greenWash`) — kolor rodzaju
+   zamiast sztywnego zielonego, ta sama intensywność/alpha co wcześniej (0.06/0.11 wash,
+   0.55/pełny pasek), tylko przemalowane.
+2. Mała ikonka rodzaju (Zap/Target/Hourglass, te same co w KIND_ICON) przy tytule —
+   `titleRow` nowy wrapper, `cardTitleFlex` żeby tekst nadal zawijał się do 2 linii.
+
+**Hierarchia kolorów, żeby nic się nie gryzło**: overdue (czerwony) i done/snoozed (neutralny/
+wyciszony) dalej WYGRYWAJĄ nad kolorem rodzaju — te gałęzie logiki bez zmian, kolor rodzaju
+wchodzi wyłącznie tam, gdzie wcześniej był sztywny zielony dla aktywnych zadań. Kolor pilności
+(`subColor` — dziś/jutro na zielono) zostaje osobną osią, NIE zmieniony — rodzaj≠pilność, dwie
+różne informacje nie powinny dzielić jednego koloru. Priorytet "wysoki" nadal podbija tylko
+kolor TYTUŁU (biel/accent), bez zmian. Wynik: 4 niezależne, nieprzecinające się sygnały —
+rodzaj (pasek+ikonka), pilność (podtytuł), priorytet (tytuł), status (całość karty overdue/done).
+
+Przy okazji usunięte 2 martwe pola (`G.activeBorder`/`G.greenStrong`, w module-level `G` i w
+`gFor()`) i `greenWashStrong`/twardy kolor w `accentBarStrong` — wszystkie zastąpione inline
+kolorem rodzaju, więc już nieużywane.
+
+**Testy**: brak nowych (czysto wizualny redesign karty, `tasks.tsx` bez istniejącego pokrycia
+testami — jak reszta ekranów RN w projekcie). `tsc`/`jest` czyste (1079 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: sprawdź listę zadań — każda aktywna karta powinna
+mieć cienki kolorowy pasek z lewej + małą ikonkę przy tytule (zielony=Szybkie,
+niebieski=Do skupienia, bursztynowy=Poczekalnia), overdue nadal czerwone, done/snoozed nadal
+wyciszone/białe. Sprawdź też oba tryby grupowania (wg terminu i wg rodzaju) — kolor karty i
+kolor nagłówka grupy powinny się teraz zgadzać.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
