@@ -110,7 +110,7 @@ import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill, advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, PendingSubConfirm } from '@/utils/subscriptionAuto';
-import { fixedVariableMonths, fixedDeviations, topVariableContributors, workBudgetProgress, FvBucket } from '@/utils/fixedVariable';
+import { fixedVariableMonths, fixedDeviations, topVariableContributors, workFixedProgress, FvBucket } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFloor, EarnedMap } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
@@ -1551,11 +1551,12 @@ export default function DashboardScreen() {
   );
   const workAvg = useMemo(() => payMonthsSummary(workPayMonths), [workPayMonths]);
   // 2026-09-10, user: "w pracy dodać widget jak zarabiam na ten moment... ile muszę uzbierać
-  // na stałych wydatkach i śr. jedzenia... paski jakby skarbonki" — `workMonthly.workedEarnings`
-  // (godziny przepracowane DO TERAZ w tym miesiącu × stawka) rozdzielone po kolei na potrzeby
-  // z `fvMonths` (ten sam widget co "Na co idą pieniądze").
-  const workBudget = useMemo(
-    () => workBudgetProgress(workMonthly?.workedEarnings ?? 0, fvMonths),
+  // na stałych wydatkach" (zawężone 2026-09-23, user: "wywalił z pracy te cele wszystkie i
+  // zostawił tylko STAŁE WYDATKI... ile zarobiłem do stałych a ile powyżej") —
+  // `workMonthly.workedEarnings` (godziny przepracowane DO TERAZ w tym miesiącu × stawka) vs
+  // średnie stałe wydatki z `fvMonths` (ten sam widget co "Na co idą pieniądze").
+  const workFixed = useMemo(
+    () => workFixedProgress(workMonthly?.workedEarnings ?? 0, fvMonths),
     [workMonthly, fvMonths],
   );
 
@@ -3675,21 +3676,26 @@ export default function DashboardScreen() {
                     )}
                   </View>
 
-                  {/* ── Skarbonki: zarobek do teraz rozdzielony na potrzeby (2026-09-10) ── */}
-                  {hasRate && workBudget.some(b => b.target > 0) && (
+                  {/* ── Stałe wydatki: zarobek do teraz vs stałe + nadwyżka (2026-09-10,
+                      zawężone 2026-09-23 — user: "wywalił z pracy te cele wszystkie i zostawił
+                      tylko STAŁE WYDATKI... ile zarobiłem do stałych a ile powyżej") ── */}
+                  {hasRate && workFixed.target > 0 && (
                     <View style={[s.wpCard, { gap: spacing[3] }]}>
-                      <Text style={s.wpCardLabel}>Zarobek do teraz vs potrzeby</Text>
-                      {workBudget.map(b => (
-                        <View key={b.label} style={s.wbBucket}>
-                          <View style={s.wbBucketHead}>
-                            <Text style={s.wbBucketLbl} numberOfLines={1}>{b.label}</Text>
-                            <Text style={s.wbBucketAmt}>{Math.round(b.filled).toLocaleString('pl-PL')} / {Math.round(b.target).toLocaleString('pl-PL')} zł</Text>
-                          </View>
-                          <View style={s.wbBarTrack}>
-                            <View style={{ width: `${Math.min(b.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: WORK_ACCENT }} />
-                          </View>
+                      <Text style={s.wpCardLabel}>Zarobek do teraz vs stałe wydatki</Text>
+                      <View style={s.wbBucket}>
+                        <View style={s.wbBucketHead}>
+                          <Text style={s.wbBucketLbl} numberOfLines={1}>Stałe · mieszkanie/prąd/internet</Text>
+                          <Text style={s.wbBucketAmt}>{workFixed.filled.toLocaleString('pl-PL')} / {workFixed.target.toLocaleString('pl-PL')} zł</Text>
                         </View>
-                      ))}
+                        <View style={s.wbBarTrack}>
+                          <View style={{ width: `${Math.min(workFixed.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: WORK_ACCENT }} />
+                        </View>
+                      </View>
+                      {workFixed.above > 0 && (
+                        <Text style={s.wpSub}>
+                          + <Text style={{ color: '#34D399', fontWeight: '800' }}>{workFixed.above.toLocaleString('pl-PL')} zł</Text> powyżej stałych wydatków
+                        </Text>
+                      )}
                     </View>
                   )}
 
