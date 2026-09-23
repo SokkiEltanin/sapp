@@ -10264,6 +10264,92 @@ kolor nagłówka grupy powinny się teraz zgadzać.
 
 ---
 
+## 165. Widget pulpitu Androida "Zadania" — pierwszy natywny bridge module w projekcie (2026-09-23)
+
+User: "bardzo lubiłem mieć na ekranie co muszę zrobić/kupić" — home-screen widget (Android
+App Widget), NIE dashboardowy kafelek w apce. To inna klasa zmiany niż cokolwiek innego w tej
+sesji: natywny surface, nie JS — wymaga nowego builda APK (nie poleci przez OTA), i to
+PIERWSZY w tym projekcie natywny moduł z callable bridge (JS→Kotlin), nie tylko pasywny
+kod jak dotychczasowe pluginy.
+
+**Decyzja architektoniczna — własny Kotlin, NIE `react-native-android-widget`**: ten projekt
+już raz oberwał za third-party natywny pakiet (`withBankNotificationListener.js`'s komentarz:
+"avoids the stale module's AGP-8 `namespace` build break on SDK 54"). AppWidgetProvider/
+RemoteViews to stabilne, udokumentowane od lat natywne API Androida — pisanie własnego Kotlina
+przez config-plugin (jak `withBankNotificationListener.js`/`withNativeCrashCatcher.js`) było
+mniej ryzykowne niż kolejna zewnętrzna zależność z niepewnym stanem utrzymania. User potwierdził
+zakres przez AskUserQuestion: v1 = tylko podgląd (tap otwiera apkę, BEZ odznaczania na
+widgecie — odłożone jako v2, bo headless JS na klik bez otwartej apki jest dużo bardziej
+zawodny), budować teraz.
+
+**Przepływ (JS → plik → natywny Kotlin, NIE bezpośrednie wywołanie z danymi)**:
+1. `src/utils/widgetTasks.ts` (`pickWidgetTasks`, czyste, testowalne) — filtruje do
+   `status==='pending'`, sortuje zaległe→dziś→jutro→reszta wg terminu→bez terminu na końcu
+   (spłaszczona wersja `sortTasks(...,'deadline')` z tasks.tsx, bez nagłówków sekcji — widget
+   ma miejsce na płaską listę), limit 6 (RemoteViews nie wspiera scrolla/listy bez
+   `RemoteViewsService` — 6 stałych slotów to świadomy, prostszy odpowiednik). Kolor rodzaju =
+   `KIND_META[resolveKind(t)].color` (§164 — te same 3 kolory, teraz i na widgecie).
+2. `src/services/widgetSync.ts` (`syncTasksWidget`) — pisze JSON do
+   `${FileSystem.documentDirectory}widget_tasks.json` (TA SAMA konwencja ścieżki co
+   `bankNotificationDrain.ts` — `documentDirectory` === Android `context.filesDir`, tylko
+   kierunek odwrotny: tu JS pisze, natywne czyta), potem woła
+   `NativeModules.TasksWidget?.requestUpdate?.()`. Dedup: nie pisze/nie budzi widgetu gdy JSON
+   identyczny jak ostatnio. `Platform.OS!=='android'` i brak `documentDirectory` → cichy no-op
+   (bezpieczne wołać zawsze, bez feature-flagi) — **kluczowe**: `NativeModules.TasksWidget` nie
+   istnieje dopóki nie powstanie NOWY build APK z tym pluginem, więc `?.` na każdym wywołaniu
+   jest obowiązkowe, nie kosmetyczne.
+3. `app/_layout.tsx` — nowy `useEffect`: `useCalendarStore.subscribe()` na zmianę `tasks`
+   (debounce 600ms, jak `throttledStorage.ts`), plus wywołanie na `AppState` active/background
+   (łapie cold start i przypadki poza samym store). Aktualizacja więc: na żywo przy zmianie
+   listy zadań w otwartej apce, i przy każdym wejściu/wyjściu z apki.
+
+**Natywna strona — `plugins/withTasksWidget.js`** (nowy config plugin, zarejestrowany w
+`app.json`, ten sam `withDangerousMod`/Kotlin-do-wygenerowanego-projektu wzorzec co pozostałe
+`plugins/with*.js`):
+- `TasksWidgetProvider.kt` (`AppWidgetProvider`) — `updateAll()` (companion, wołane z
+  `onUpdate()` I z modułu bridge) czyta `widget_tasks.json`, buduje `RemoteViews` z do 6 wierszy
+  (`setViewVisibility`/`setTextViewText`/`setInt(...,"setColorFilter",...)` na kropce —
+  reflection-safe RemoteViews trick do tintowania `ImageView`), `PendingIntent` na cały widget
+  otwiera `sapp://tasks` (istniejący scheme z app.json, `expo-router` mapuje na
+  `app/(tabs)/tasks.tsx`). Pusta lista → komunikat "Brak zaległych zadań 🎉" zamiast pustych
+  wierszy.
+- `TasksWidgetModule.kt` (`ReactContextBaseJavaModule`, nazwa mostu `"TasksWidget"`) — JEDNA
+  metoda `requestUpdate()`, woła `TasksWidgetProvider.updateAll()` (DRY: ten sam kod renderujący
+  co okresowy `onUpdate()`, moduł tylko go budzi na żądanie).
+- `TasksWidgetPackage.kt` (`ReactPackage`) — rejestruje moduł. Wpięcie w `MainApplication.kt`
+  przez `withMainApplication`+`mergeContents` (oficjalna technika Expo, idempotentna między
+  prebuildami) zaczepione o wygenerowany podpowiadający komentarz
+  (`// add(MyReactNativePackage())` wewnątrz `PackageList(this).packages.apply { }` —
+  **zweryfikowane realnym `npx expo prebuild` na SDK 54**, nie zgadywane: pierwsza wersja
+  anchora zakładała starszy wzorzec `packages.add(new MyReactNativePackage());` z e2e fixture
+  innego pakietu i faktycznie nie trafiła przy pierwszym dry-runie — poprawione po zobaczeniu
+  prawdziwego wygenerowanego pliku).
+- `res/layout/tasks_widget.xml` + `res/drawable/widget_bg.xml`/`widget_dot_circle.xml` +
+  `res/xml/tasks_widget_info.xml` (`updatePeriodMillis=1800000` — 30 min, Android minimum,
+  fallback dla przypadków poza AppState/subscribe powyżej, np. gdy urządzenie ubija JS w tle).
+- `<receiver>` w `AndroidManifest.xml` (przez `withAndroidManifest`) z
+  `android.appwidget.action.APPWIDGET_UPDATE` + `meta-data` na `tasks_widget_info.xml`. Zero
+  nowych `android.permissions` (App Widget provider ich nie wymaga).
+
+**Weryfikacja bez Android SDK w tym środowisku**: pełny `npx expo prebuild --platform android`
+uruchomiony naprawdę (nie tylko przeczytany kod) — złapał realny błąd anchora przy pierwszym
+dry-runie (patrz wyżej), po fixie przeszedł czysto; wygenerowany `MainApplication.kt`/
+`AndroidManifest.xml`/wszystkie XMLe zweryfikowane ręcznie + `xmllint --noout` (wszystkie
+poprawne). Prawdziwa kompilacja Kotlina nastąpi dopiero w CI (`.github/workflows/build.yml`,
+`./gradlew assembleRelease` — **osobny workflow od zwykłego `ci.yml`**, odpala się
+AUTOMATYCZNIE na każdy push do `master` i publikuje APK jako GitHub Release). To JEDYNE
+miejsce gdzie ten Kotlin faktycznie się skompiluje — po merge'u tego PR-a trzeba dopilnować
+TEGO workflow (nie tylko zwykłego "check" CI), bo błąd kompilacji Kotlina pojawi się TYLKO tam.
+`tsc`/`jest` czyste (1085 testów, +6 — `pickWidgetTasks`).
+
+**Priorytet testu na urządzeniu — wysoki, wymaga NOWEGO APK** (nie poleci przez OTA — plugin/
+natywny kod): po zbudowaniu, dodaj widget "Sapp — Zadania" na pulpit, sprawdź że pokazuje
+realne zadania z kolorami rodzaju, że tap otwiera apkę na zakładce Zadań, że lista aktualizuje
+się po zmianach w apce (bez konieczności ręcznego usuwania/dodawania widgetu ponownie), i że
+pusta lista pokazuje komunikat zamiast pustych wierszy.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

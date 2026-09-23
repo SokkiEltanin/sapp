@@ -83,6 +83,7 @@
       "./plugins/withBankNotificationListener",
       "./plugins/withNativeCrashCatcher",
       "./plugins/withResizeConfig",
+      "./plugins/withTasksWidget",
       [
         "expo-build-properties",
         {
