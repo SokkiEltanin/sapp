@@ -10,7 +10,7 @@ import {
 // gest siatki zdążył się odpalić (user: "Nie dziala" — kropka zostawała na środku, "Jeszcze
 // nie zaznaczono" mimo przeciągania). RNGH-owy ScrollView poprawnie koordynuje zagnieżdżone
 // gesty tej samej biblioteki, drop-in ten sam props API.
-import { ScrollView } from 'react-native-gesture-handler';
+import { ScrollView, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { X, Check, Plus } from 'lucide-react-native';
 
 import MoodEnergyGrid from './MoodEnergyGrid';
@@ -160,6 +160,12 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      {/* RN's Modal portals swoją zawartość do OSOBNEJ natywnej hierarchii (nowe okno na
+          Androidzie / osobny kontroler na iOS) — poza drzewem, które `GestureHandlerRootView`
+          w app/_layout.tsx opakowuje. Bez WŁASNEGO roota tutaj `Gesture.Pan()` w
+          MoodEnergyGrid nigdy nie dostawał poprawnie routowanych dotknięć (2026-09-23,
+          POTWIERDZONY BUG #2 na urządziu: sama zmiana ScrollView z §wcześniej NIE wystarczyła). */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim, paddingBottom: kb }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
@@ -263,6 +269,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
           </View>
         </Animated.View>
       </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -48,13 +48,19 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
     onChange(m, e);
   };
 
-  // POTWIERDZONY BUG na urządziu (2026-09-22, user: "Nie dziala" — kropka zostawała na
-  // środku, "Jeszcze nie zaznaczono" mimo przeciągania): siatka siedziała wewnątrz zwykłego
-  // `ScrollView` z 'react-native' w MoodCheckInModal.tsx, który wygrywał odpowiedź na dotyk
-  // zanim `Gesture.Pan()` tej siatki zdążył się odpalić — `minDistance(0)` nie wystarczył.
-  // Fix: `ScrollView` w MoodCheckInModal.tsx przełączony na import z
-  // 'react-native-gesture-handler' (drop-in, ten sam props API) — poprawnie koordynuje
-  // zagnieżdżone gesty tej samej biblioteki.
+  // POTWIERDZONY BUG na urządziu (2026-09-22 → nadal "Nie dziala" po pierwszym fixie,
+  // 2026-09-23): DWIE osobne przyczyny nałożone na siebie.
+  // (1) siatka siedziała wewnątrz zwykłego `ScrollView` z 'react-native' w
+  //     MoodCheckInModal.tsx, który wygrywał odpowiedź na dotyk zanim `Gesture.Pan()` tej
+  //     siatki zdążył się odpalić — naprawione, `ScrollView` tam przełączony na import z
+  //     'react-native-gesture-handler'.
+  // (2) TA sama siatka żyje wewnątrz natywnego `Modal` z 'react-native', który portuje swoją
+  //     zawartość do OSOBNEJ natywnej hierarchii (nowe okno na Androidzie / osobny kontroler
+  //     na iOS) — poza drzewem, które jedyny `GestureHandlerRootView` (app/_layout.tsx)
+  //     opakowuje. Bez WŁASNEGO roota wewnątrz Modala `Gesture.Pan()` nigdy nie dostawał
+  //     poprawnie routowanych dotknięć niezależnie od (1) — naprawione w
+  //     MoodCheckInModal.tsx dodaniem zagnieżdżonego `GestureHandlerRootView` tuż wewnątrz
+  //     `<Modal>`.
   const pan = useMemo(() => Gesture.Pan()
     .minDistance(0)
     .onUpdate(evt => {
