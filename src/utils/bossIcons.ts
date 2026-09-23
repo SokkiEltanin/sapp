@@ -10,13 +10,16 @@ import { AttackKind } from '@/utils/bosses';
 //
 // Foldery (2026-09-02, posegregowane analogicznie do `assets/ekwipunek/<slot>/` —
 // user: "wszystkie bossy posegregować na kampanie/questy/eventy-rajdy, umiejętności"):
-//   assets/bossy/kampania/      — 22 bossów kampanii (samurai...wizard) + 2 martwe
+//   assets/bossy/kampania/      — 22 bossów kampanii (samurai...wizard) + 3 martwe
 //                                 pliki zostawione na wypadek przyszłego użycia
 //                                 (BOSS_atakfire_adventure.png — brak odpowiadającego
-//                                 id w BOSSES).
+//                                 id w BOSSES; BOSS_reaperatack_reaper.png/BOSS_
+//                                 pazurattack_cerberus.png — zastąpione customowym
+//                                 artem burnout/doubt 2026-09-23).
 //   assets/bossy/questy/        — minibossy questowe (mb_*, dawne assets/minibosses/ +
-//                                 wilk/grizzly/osa) + 2 martwe (goat/whale, wycofane
-//                                 z rotacji 2026-08-26, zostawione na wypadek powrotu).
+//                                 wilk/grizzly/osa) + 3 martwe (goat/whale, wycofane
+//                                 z rotacji 2026-08-26; MINIBOSS_duck.png, zastąpiony
+//                                 customowym mb_ropucha 2026-09-23).
 //   assets/bossy/eventy-rajdy/  — sezonowe eventy (wakacje/wiosna/jesien/zima) I raid
 //                                 (kraken/golem/phantom + ich warianty MAD) razem,
 //                                 tak jak user zgrupował w jednej zakładce.
@@ -33,12 +36,19 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   scroll:    require('../../assets/bossy/kampania/BOSS_atakreka_thief.png'),
   stress:    require('../../assets/bossy/kampania/BOSS_atakukaszenie_tarantula.png'),
   junk:      require('../../assets/bossy/kampania/BOSS_maczukaatack_cyclops.png'),
-  burnout:   require('../../assets/bossy/kampania/BOSS_reaperatack_reaper.png'),
+  // Custom art (2026-09-23, user #7: "wrzuciłem Ci nowe bossy, zamieniamy te stare...
+  // moje są customowe") — pierwsze 2 z 22 kampanijnych bossów dostają własny art zamiast
+  // pożyczonego stockowego; dawne `BOSS_reaperatack_reaper.png`/`BOSS_pazurattack_
+  // cerberus.png` zostają na dysku nieużywane, ten sam wzorzec co pozostałe "martwe"
+  // pliki w tym folderze (patrz komentarz przy definicji `BOSS_PNG` wyżej). Oba źródłowe
+  // pliki (i `MINIBOSS_ROPUCHA.png` niżej) przeskalowane 1536×1024/~2MB → 600×400/~290KB
+  // (Pillow LANCZOS, alfa zachowana) — ten sam próg co `mb_lodowykrolik` (§94).
+  burnout:   require('../../assets/bossy/kampania/BOSS_DYMNYNIEDZWIEDZ.png'),
   insomnia:  require('../../assets/bossy/kampania/BOSS_atakbone_skeleton.png'),
   compare:   require('../../assets/bossy/kampania/BOSS_atakmagicrod_magician.png'),
   drought:   require('../../assets/bossy/kampania/BOSS_ataksoundwave_mermaid.png'),
   procrast:  require('../../assets/bossy/kampania/BOSS_BOLTATTACK_zeus.png'),
-  doubt:     require('../../assets/bossy/kampania/BOSS_pazurattack_cerberus.png'),
+  doubt:     require('../../assets/bossy/kampania/BOSS_MROCZNYKRUK.png'),
   devourer:  require('../../assets/bossy/kampania/BOSS_axeattack_executioner.png'),
   // ── prestiż (2026-08-09) ──
   samurai:       require('../../assets/bossy/kampania/BOSS_atakkatana_samurai.png'),
@@ -58,7 +68,10 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   // ── minibossy questowe (minibosses.ts, 2026-08-14) — TA SAMA mapa/BossArt co reszta,
   // id-e (mb_*) się nie kolidują z kampanią/wydarzeniami, więc bez osobnego komponentu ──
   mb_capybara: require('../../assets/bossy/questy/MINIBOSS_capybara.png'),
-  mb_duck:     require('../../assets/bossy/questy/MINIBOSS_duck.png'),
+  // mb_duck USUNIĘTY z minibosses.ts (2026-09-23, user #7: "możesz wywalić kaczkę") —
+  // wpis tu też skasowany (ten sam wzorzec co mb_goat/mb_whale niżej), zastąpiony nowym
+  // customowym mb_ropucha. `MINIBOSS_duck.png` zostaje na dysku nieużywany.
+  mb_ropucha:  require('../../assets/bossy/questy/MINIBOSS_ROPUCHA.png'),
   mb_shark:    require('../../assets/bossy/questy/MINIBOSS_shark.png'),
   mb_harpy:    require('../../assets/bossy/questy/MINIBOSS_harpy-eagle.png'),
   mb_macaws:   require('../../assets/bossy/questy/MINIBOSS_macaws.png'),
