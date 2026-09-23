@@ -10539,6 +10539,52 @@ cała) vs jutro/później (neutralna) vs zaległe (czerwona) vs w toku pomodoro 
 
 ---
 
+## 170. Redesign widgetów Liczników: gruby pasek-donacja + duża kolorowana liczba (2026-09-23)
+
+User (item #13 z batcha feedbacku): "Musimy ulepszyć LICZNIKI... jak odliczanie do, to od
+dzisiaj wypełnia się pasek... gruby napis w pasku wypełniając się jak donate na Twitch...
+ikonki wywalamy... A ile dni temu musi być liczba jak na streak ale nie w kafelku tylko
+jakąś ciekawszą — sama liczba gruba... w barwie im więcej dni jak w streaku." Delegowany
+kierunek kreatywny ("Nie wiem, wymyślisz coś").
+
+**"Odliczania" (`kind: 'until'`) — nowy `src/components/counters/DonationBar.tsx`** zastąpił
+usunięty `WalkProgress.tsx` (cienki 10px pasek + chodzik/samochodzik/emoji skaczące nad nim,
+3 miejsca użycia). Gruby pasek (domyślnie 44px), tekst BIAŁY+cień ZAWSZE na wierzchu (ten sam
+trik czytelności co liczba na `StreakFlame`), animowane wypełnienie `Animated.timing`. Brak
+figurki/emoji jadącej po pasku — cały ruch niesie sam pasek, styl celu-donacji na Twitch.
+Nowe pola na `Counter` (`countersStore.ts`): `barColor?: string` (wybór z tej samej palety
+`BAR_COLORS` co swatche w `items.tsx`) i `fillStyle?: 'smooth' | 'stepped'` (domyślnie
+`smooth` = `untilProgress()` płynie co renderowanie; `stepped` = nowa `untilProgressStepped()`
+zaokrągla w dół do granicy pełnego dnia, więc pasek skacze RAZ dziennie o północy zamiast
+płynąć — testy w `__tests__/countersStore.test.ts`). Pole `emoji` na `Counter` zostaje jako
+LEGACY (stare liczniki mogą je jeszcze mieć w AsyncStorage, `DonationBar` go po prostu nie
+rysuje; `counters/[id].tsx`'s nagłówek nadal je czyta dla wstecznej kompatybilności starych
+wpisów). Podpięte we WSZYSTKICH 3 miejscach (żeby nie zostawić dead-enda — zasada #7 z
+CLAUDE.md): `CountdownsCard.tsx` (widget dashboardu), `app/counters.tsx` (pełna lista +
+formularz dodawania/edycji — sekcja "Ikonka na pasku" zastąpiona wyborem koloru + przełącznikiem
+płynnie/co dzień), `app/counters/[id].tsx` (ekran szczegółów).
+
+**"Ile dni temu" (`kind: 'since'`) — `SinceCountersCard.tsx`** (widget dashboardu): kwadratowa
+siatka kafelków (`sinceGrid`/`sinceTile`, 31.5% szerokości, mała liczba w środku) zastąpiona
+pionową listą wierszy — każdy z chipem-płomieniem (16px `Flame`, kolorowany przez
+`streakTier(days).color`, ten sam system eskalacji co `StreakFlame`/`StreakCard`) + nazwą +
+DUŻĄ pogrubioną liczbą dni (`fontFamily: fonts.display, fontSize: 22`, kolorowaną tym samym
+tierem). NAJDŁUŻSZY licznik nadal dostaje bogatą `StreakCard` (płomień + pasek tygodnia/
+miesiąca/półrocza) bez zmian — user to explicite pochwalił wcześniej ("Panel na dashboardzie
+spoko"). Pełna lista w `app/counters.tsx`'s sekcji "Ile dni temu" NIE była w kafelkach (już
+pełnej szerokości karty z `StreakFlame`+`WeekStrip`) — zostawiona bez zmian, adresowany
+problem dotyczył wyłącznie widgetu dashboardu.
+
+**Testy**: 5 nowych w `__tests__/countersStore.test.ts` dla `untilProgressStepped()` (start=0,
+płaskie w trakcie dnia, skok dokładnie o północy, meta=1, start=cel tego samego dnia →
+od razu 1 bez dzielenia przez zero). `tsc --noEmit` czyste, pełny `jest` czysty (1099 testów).
+
+**Priorytet testu na urządzeniu — średni**: sprawdź nowy pasek-donację na widgecie dashboardu
+i na `/counters` (płynnie vs co dzień, wybór koloru w formularzu), oraz nową listę "ile dni
+temu" na dashboardzie (kolor eskalujący z dniami, jak flame na streaku).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

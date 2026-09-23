@@ -3,6 +3,37 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Liczniki — gruby pasek-donacja + duża kolorowana liczba zamiast kafelków (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §170. User (item #13 feedbacku): "musimy ulepszyć LICZNIKI...
+gruby napis w pasku wypełniając się jak donate na Twitch... ikonki wywalamy" + "ile dni temu
+musi być liczba jak na streak ale nie w kafelku tylko jakąś ciekawszą, sama liczba gruba... w
+barwie im więcej dni jak w streaku". Nowy `DonationBar.tsx` (zastąpił `WalkProgress.tsx`,
+usunięty) na widgecie dashboardu + `/counters` + `/counters/[id]`, z wyborem koloru paska i
+płynnym/skokowym (co dzień) wypełnianiem. `SinceCountersCard.tsx`'s kwadratowa siatka kafelków
+zastąpiona pionową listą wierszy z dużą pogrubioną liczbą kolorowaną tierem streaka. `tsc`/
+`jest` czyste (1099 testów, +5).
+
+**🆕 Priorytet testu na urządzeniu — średni**: sprawdź nowy pasek na dashboardzie i `/counters`
+(oba tryby wypełniania, wybór koloru w formularzu dodawania/edycji), i nową listę "ile dni
+temu" na dashboardzie.
+
+## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czekają na usera
+
+- **#5 Ekwipunek**: user chce wywalić emotki z ekwipunku i zrobić go czytelniejszym/większym
+  ("łatwiej sprzedawać") — czeka na odpowiedź usera czy reużyć istniejącą grafikę przedmiotów
+  czy najpierw omówić kierunek wizualny.
+- **#7 Edytor layoutu bossów**: user zgłosił że edytor "nie jeden do jeden" (bug wymaga
+  diagnozy na urządzeniu, nie da się znaleźć z samego kodu) + zapowiedział wgranie NOWYCH
+  customowych bossów w miejsce starych z neta — czeka na przesłanie plików przez usera.
+- **#11 Panel Praca na dashboardzie**: user chce wywalić WSZYSTKIE cele, zostawić tylko stałe
+  wydatki (zarobione vs powyżej) + rozbudować o nowe widgety — jeszcze NIE zaczęte (item #13
+  wszedł pierwszy, bo user napisał "dawaj dalej" na niego explicite).
+- **#12 Cold start lag**: user narzeka na animacje przy starcie + ogólny lag — istnieje już
+  DIAGNOSTYKA w Ustawienia → Diagnostyka → "Wydajność startu apki" → "Udostępnij" (export).
+  Czeka na usera żeby przesłał wyeksportowane dane — bez realnych liczb dalsza praca to
+  zgadywanie.
+
 ## ✅ Dwie korekty po realnym teście: widget przestał się dodawać + zły kolor tasków (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §169. User przetestował §165/§166/§164 i zgłosił: (1) widget

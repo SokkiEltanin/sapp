@@ -10,11 +10,11 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
-import WalkProgress from '@/components/counters/WalkProgress';
+import DonationBar from '@/components/counters/DonationBar';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import { WeekStrip } from '@/components/counters/StreakCard';
 import {
-  useCounters, daysSince, daysUntil, untilProgress, autoDaysWithout,
+  useCounters, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout,
   isDuringEvent, daysUntilEnd, isOver, eventProgress,
 } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -89,7 +89,7 @@ export default function CounterDetail() {
   const over = isUntil && isOver(counter);
   const left = isUntil ? daysUntil(counter) : 0;
   const endLeft = isUntil ? daysUntilEnd(counter) : 0;
-  const prog = isUntil ? (during ? eventProgress(counter) : untilProgress(counter)) : 0;
+  const prog = isUntil ? (during ? eventProgress(counter) : (counter.fillStyle === 'stepped' ? untilProgressStepped(counter) : untilProgress(counter))) : 0;
   const bigLabel = !isUntil ? '' : over ? 'minęło'
     : during ? (endLeft > 1 ? `koniec za ${endLeft} dni` : endLeft === 1 ? 'ostatni dzień!' : 'kończy się dziś!')
     : untilLabel(left);
@@ -151,9 +151,9 @@ export default function CounterDetail() {
             <>
               <View style={s.cardTop}>
                 {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
-                <Text style={[s.cardBig, over && { color: c.text.muted }, during && { color: '#2AC68F' }]}>{bigLabel}</Text>
+                <Text style={s.cardTopLabel}>{during ? 'w trakcie wyjazdu' : 'odliczanie'}</Text>
               </View>
-              <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} emoji={counter.emoji} />
+              <DonationBar progress={prog} color={during ? '#2AC68F' : (counter.barColor || ACCENT)} label={bigLabel} />
               <Text style={s.cardMeta}>
                 {during ? `w trakcie · wróć ${counter.endDate}`
                   : counter.endDate && !over ? `${counter.date} → ${counter.endDate}`
@@ -299,6 +299,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[4] },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing[2] },
   cardBig: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  cardTopLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   cardMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 6 },
   sinceUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
 

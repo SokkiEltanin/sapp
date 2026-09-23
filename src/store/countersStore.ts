@@ -11,8 +11,14 @@ export interface Counter {
   date: string;       // until → target date; since → last-done date (YYYY-MM-DD)
   startDate: string;  // until → progress start (creation day); since → baseline for auto
   endDate?: string;   // until only → end of an event window (e.g. trip's last day)
-  emoji?: string;     // until only → marker that hops along the bar instead of the walker
+  emoji?: string;     // legacy — do 2026-09-23 marker hopping po pasku (DonationBar go nie
+                       // rysuje), zostaje tylko jako pole odczytywane na starych licznikach
   icon?: string;      // optional lucide key (see counterIcons)
+  barColor?: string;  // until only — kolor paska DonationBar (2026-09-23, user: "można też
+                       // dodać kolor paska"). Brak = domyślny akcent.
+  fillStyle?: 'smooth' | 'stepped'; // until only — pasek rośnie płynnie co klatkę, czy
+                       // skokowo raz dziennie (2026-09-23, user: "płynnym przejście albo
+                       // krokowe co dzień"). Domyślnie 'smooth'.
   mode?: 'auto';      // since only: 'days without X' auto-tracked
   keyword?: string;   // auto: '|'-separated keywords matched against expenses / meals
   presetKey?: string; // auto: if chosen from AVOID_PRESETS, its `key` — resolved LIVE at read
@@ -71,6 +77,20 @@ export function untilProgress(c: Counter, now = Date.now()): number {
   const end = atMidnight(c.date);
   if (end <= start) return 1;
   return Math.min(1, Math.max(0, (now - start) / (end - start)));
+}
+
+// until, KROKOWO (2026-09-23, user: "można dodać płynne przejście albo krokowe co dzień") —
+// TA SAMA podróż co untilProgress(), ale zaokrąglona w DÓŁ do granicy pełnego dnia, więc pasek
+// skacze RAZ dziennie zamiast płynąć co sekundę. `fillStyle: 'stepped'` na liczniku wybiera
+// to zamiast untilProgress() w DonationBar.
+export function untilProgressStepped(c: Counter, now = Date.now()): number {
+  const start = atMidnight(c.startDate || c.createdAt.slice(0, 10));
+  const end = atMidnight(c.date);
+  if (end <= start) return 1;
+  const totalDays = Math.round((end - start) / MS_DAY);
+  if (totalDays <= 0) return 1;
+  const elapsedDays = Math.floor((now - start) / MS_DAY);
+  return Math.min(1, Math.max(0, elapsedDays / totalDays));
 }
 
 // ── Event window (a trip that lasts several days) ───────────────────────────
