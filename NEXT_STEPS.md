@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Trzy nowe custom bossy podpięte + kaczka wywalona (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §175. Druga część item #7: user wypchnął 3 pliki bezpośrednio
+(`assets/bossy/kampania/BOSS_DYMNYNIEDZWIEDZ.png`+`BOSS_MROCZNYKRUK.png`,
+`assets/bossy/questy/MINIBOSS_ROPUCHA.png`) — podpięte w całości z kodu. Niedźwiedź z
+dymu/pustki → `burnout`/"Pustka Wypalenia" (dopasowanie tematyczne — user NIE sprecyzował
+którego z 22 bossów kampanii podmienić, wybrane po koncepcie), mroczny kruk → `doubt`/"Cień
+Zwątpienia". Nowy quest-miniboss `mb_ropucha`/"Ropucha Bagna" zastąpił USUNIĘTY
+`mb_duck`/"Kaczka Kałuży" (user: "możesz wywalić kaczkę"). Wszystkie 3 źródłowe pliki
+(1536×1024/~2MB każdy) przeskalowane do 600×400/~290KB (ten sam próg co reszta folderu
+`bossy/`), żeby nie napompować APK. `tsc`/`jest` czyste (1105 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: zobacz "Pustka Wypalenia" (poz. 22+) i "Cień
+Zwątpienia" (poz. 46+) w kampanii, i "Ropucha Bagna" w rotacji questów dziennych (zamiast
+kaczki).
+
+**🆕 Otwarte**: który-boss-dostał-który-art był MOJĄ decyzją (dopasowanie tematyczne, user nie
+wskazał konkretnie) — jeśli user chciał inaczej, to tylko 2 linie w `bossIcons.ts` do zmiany.
+
 ## ✅ Woda — znaleziony DRUGI wyścig (health.tsx) + diagnostyka per-rekordowa w Ustawieniach (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §174. User (item #14): "wypiłem 8 szklanek a pokazuje mniej...
@@ -88,11 +107,8 @@ zastąpiona pionową listą wierszy z dużą pogrubioną liczbą kolorowaną tie
 (oba tryby wypełniania, wybór koloru w formularzu dodawania/edycji), i nową listę "ile dni
 temu" na dashboardzie.
 
-## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czekają na usera
+## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czeka na usera
 
-- **#7 Nowe custom bossy**: user zapowiedział wgranie NOWYCH customowych bossów w miejsce
-  starych z neta (edytora bug — patrz osobny wpis wyżej, już naprawiony) — czeka na przesłanie
-  plików przez usera.
 - **#12 Cold start lag**: user narzeka na animacje przy starcie + ogólny lag — istnieje już
   DIAGNOSTYKA w Ustawienia → Diagnostyka → "Wydajność startu apki" → "Udostępnij" (export).
   Czeka na usera żeby przesłał wyeksportowane dane — bez realnych liczb dalsza praca to

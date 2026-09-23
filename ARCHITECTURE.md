@@ -10730,6 +10730,51 @@ liczba się NIE cofa.
 
 ---
 
+## 175. Trzy nowe custom bossy podpięte + kaczka wywalona z rotacji questowej (2026-09-23)
+
+User (druga część item #7): "Wysłałem 3 nowe... 2 do kampanii pod zmianę tych starych, i
+jeden pod quest, możesz wywalić kaczkę czy coś." User wypchnął 3 pliki bezpośrednio do
+`assets/bossy/` (commity `c3ab853`/`9e43d19`, poza tą sesją) — podpięcie do rosteru zrobione
+teraz, w całości z samego kodu, bez dalszych pytań.
+
+**Kampania — 2 nowe grafiki, WYBÓR którego bossa podmienić zrobiony przez dopasowanie
+tematyczne** (user nie sprecyzował którego z 22, więc dopasowane po NAZWIE/koncepcie, nie po
+kolejności): `BOSS_DYMNYNIEDZWIEDZ.png` (niedźwiedź z dymu/pustki, pazury) →
+**`burnout`/"Pustka Wypalenia"** (dosłowne dopasowanie: bestia zrobiona z pustki/dymu =
+koncept wypalenia), `BOSS_MROCZNYKRUK.png` (widmowy kruk, szpony) →
+**`doubt`/"Cień Zwątpienia"** (kruk = klasyczny symbol złego omenu/wątpliwości, "Cień" już
+pasuje). Oba dostały `attackKind: 'claw'` (wyraźne pazury/szpony w nowym arcie — `doubt` je
+już miał, `burnout` wcześniej był bez `attackKind`, teraz jawnie). Dawne pożyczone pliki
+(`BOSS_reaperatack_reaper.png`/`BOSS_pazurattack_cerberus.png`) zostają na dysku nieużywane —
+ten sam wzorzec co pozostałe "martwe" pliki w folderze (żadne id już ich nie czyta, ale nic
+nie kasujemy na wypadek przyszłego użycia).
+
+**Quest — nowy `mb_ropucha`/"Ropucha Bagna"** (`MINIBOSS_ROPUCHA.png`), zastąpił USUNIĘTY
+`mb_duck`/"Kaczka Kałuży" (user: "możesz wywalić kaczkę") w `minibosses.ts`. Bez dedykowanego
+tła lokacji jeszcze — spada na `DEFAULT_ARENA_BG`, dokładnie jak `mb_grizzly` dziś, nic się
+nie psuje (ten sam fallback-chain co reszta rosteru). `mb_duck`'s stare id nie było czytane
+NIGDZIE indziej w kodzie (żadnego stanu/postępu keyowanego po nim) — usunięcie w pełni
+bezpieczne, `minibossForQuest`'s deterministyczny hash po prostu wybiera z 10 wpisów zamiast
+poprzednich 10 (ta sama długość tablicy, inny skład).
+
+**Rozmiar plików** — źródłowe pliki od usera to 1536×1024/~1.9-2MB każdy (surowy eksport z
+generatora obrazów), znacznie ponad próg reszty folderu `bossy/`. Przeskalowane (Pillow
+LANCZOS, alfa RGBA zachowana) do 600×400/~280-300KB — DOKŁADNIE ten sam próg co
+`MBOSS_LODOWYKROLIK.png` (§94, ustalony wcześniej jako standard dla tego folderu), żeby nie
+napompować APK ~6MB trzema nowymi plikami.
+
+**Testy**: brak nowych (czyste podpięcie assetów przez istniejący `bossPng(id)`
+lookup-by-id — ten sam mechanizm co cała reszta rosteru, zero nowej logiki do przetestowania).
+`tsc --noEmit` czyste, `jest` czysty (1105 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) pokonaj/zobacz bossa "Pustka Wypalenia"
+(poziom 22+) i "Cień Zwątpienia" (poziom 46+) w kampanii — sprawdź czy nowy art się pokazuje;
+(2) zrób kilka questów dziennych, sprawdź czy "Ropucha Bagna" pojawia się w rotacji zamiast
+kaczki. Jeśli user chciał INNYCH 2 bossów kampanii podmienionych (dopasowanie zrobione bez
+jego potwierdzenia) — łatwo zmienić, to tylko 2 linie w `bossIcons.ts`.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -210,6 +210,12 @@ export const BOSSES: Boss[] = [
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +2% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.02, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
+    // Custom art (2026-09-23, user #7: "wrzuciłem CI nowe bossy, zamieniamy te stare...
+    // moje są customowe") — niedźwiedź z dymu/pustki pasuje 1:1 do "Pustki Wypalenia"
+    // dosłownie lepiej niż stary, pożyczony reaper. Dawny `BOSS_reaperatack_reaper.png`
+    // zostaje na dysku nieużywany (ten sam wzorzec co pozostałe "martwe" pliki w
+    // bossIcons.ts — nic go już nie czyta, ale nie kasujemy na wypadek przyszłego użycia).
+    attackKind: 'claw', // BOSS_DYMNYNIEDZWIEDZ.png — wyraźne pazury w nowym arcie
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
@@ -240,7 +246,11 @@ export const BOSSES: Boss[] = [
   },
   {
     id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 3956,
-    attackKind: 'claw', // pazurattack_cerberus.png
+    // Custom art (2026-09-23, user #7 — patrz komentarz przy `burnout` wyżej) — mroczny,
+    // widmowy kruk pasuje do "Cienia Zwątpienia" (kruk = klasyczny symbol złego omenu/
+    // zwątpienia) wyraźnie lepiej niż stary, pożyczony cerberus. Dawny
+    // `BOSS_pazurattack_cerberus.png` zostaje na dysku nieużywany.
+    attackKind: 'claw', // BOSS_MROCZNYKRUK.png — wyraźne szpony w nowym arcie
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +3% uniku', bonus: { atk: 0.08, dodge: 0.03 } },
     coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,

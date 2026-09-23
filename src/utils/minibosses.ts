@@ -49,7 +49,12 @@ export interface MiniBoss {
 // żeby dwie różne lokacje nie kolidowały tematycznie.
 export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…', destination: 'Leniwe Bajoro' },
-  { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…', destination: 'Kałuża za Płotem' },
+  // mb_duck USUNIĘTY (2026-09-23, user #7: "możesz wywalić kaczkę") — zastąpiony
+  // customowym mb_ropucha (user dostarczył WŁASNY art, `MINIBOSS_ROPUCHA.png`, ten sam
+  // wzorzec co mb_lodowykrolik). Bez dedykowanego tła lokacji jeszcze (patrz
+  // MISSION_LOCATION_BG w bossIcons.ts) — spada na DEFAULT_ARENA_BG, dokładnie jak
+  // mb_grizzly, nic się nie psuje.
+  { id: 'mb_ropucha', name: 'Ropucha Bagna', emoji: '🐸', taunt: 'Po co skakać dalej, tu jest wygodnie…', destination: 'Zatęchłe Bagno' },
   { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…', destination: 'Rafa Przypływu' },
   { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw', destination: 'Wichrowy Szczyt' },
   { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', attackKind: 'claw', destination: 'Szmaragdowa Dżungla' },
