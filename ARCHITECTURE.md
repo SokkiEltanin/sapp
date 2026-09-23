@@ -10688,6 +10688,48 @@ przesłanie plików przez usera — patrz NEXT_STEPS.md.
 
 ---
 
+## 174. Woda: znaleziony DRUGI wyścig (health.tsx) + diagnostyka per-rekordowa + w Ustawieniach (2026-09-23)
+
+User (item #14): "Możliwe że źle łapie wodę z zegarka... możesz mi dać gdzie w ustawieniach
+dosłownie co łapie kiedy i ile ml? Żebym potwierdził, bo zaznaczam który raz mam tak, że
+wypiłem 8 szklanek a pokazuje mniej." Dwie osobne prace, obie dały się zrobić z samego kodu:
+
+**(1) Znaleziony DRUGI, nienaprawiony wyścig wody — dokładnie ten sam objaw co #7's cousin
+z 09-22.** `useWaterTracker.ts` (hook) dostał wtedy fix: `persist()` bierze `Math.max(fresh-z-
+magazynu, lokalny)` zamiast ślepo nadpisywać, bo Health Connect w tle (`autoSyncHealth` →
+`feedWaterHabit`) może zapisać WYŻSZĄ wartość z zegarka DOKŁADNIE w oknie debounce'u. Ale
+`app/(tabs)/health.tsx` ma WŁASNĄ, CAŁKOWICIE OSOBNĄ implementację licznika wody
+(`persistWater`/`loadWater`/`waterRef`/`bumpWater`) — 09-22 jej nie dotknął, bo hook i ekran
+Zdrowie to dwa niezależne, zdublowane byty czytające/piszące ten sam `habits_cnt_YYYY-MM-DD`.
+Health.tsx miał TEN SAM bug w DWÓCH miejscach: `persistWater()` robił goły `counts[id] =
+waterRef.current` (fix: `Math.max` jak w hooku), a `loadWater()` NIE MIAŁA guardu „nie
+przeładowuj gdy wisi odroczony zapis" (fix: `if (waterPersistTimer.current) return;`, ten sam
+wzorzec co hook). To bardzo prawdopodobnie REALNA przyczyna zgłoszenia usera — Zdrowie to
+ekran, na którym faktycznie taponuje szklanki.
+
+**(2) Diagnostyka wody rozszerzona o listę per-rekordową + druga lokalizacja w Ustawieniach.**
+Istniejący `probeHydration()` (healthConnectService.ts) liczył dotąd TYLKO sumę za 7 dni —
+nie dało się zweryfikować POJEDYNCZYCH wpisów. `WaterProbe` dostał nowe pole `entries:
+{time, ml, source}[]` (per-rekord, najnowsze pierwsze). Formatowanie werdyktu wydzielone do
+`formatWaterDiagnostic()` (współdzielone, nie duplikowane) — teraz dopisuje listę "kiedy — ile
+ml (źródło)" (do 20 wpisów + licznik reszty). Przycisk "Diagnostyka wody z zegarka" ISTNIAŁ
+już wcześniej, ale TYLKO wewnątrz sheeta edycji rozmiaru kubka na zakładce Zdrowie — user
+szukał go w Ustawieniach i nie znalazł. Dodany DRUGI punkt wejścia: Ustawienia → Diagnostyka →
+"Diagnostyka wody z zegarka" (ten sam `probeHydration`+`formatWaterDiagnostic`, zero
+duplikacji logiki).
+
+**Testy**: 5 nowych w `__tests__/waterDiagnostic.test.ts` dla `formatWaterDiagnostic()` (pure
+function, testowalna bez mockowania natywnego Health Connect) — rekordy obecne+lista wpisów,
+Nutrition-fallback, brak dostępu, zero rekordów wszędzie, ucinanie listy do 20+licznik. `tsc
+--noEmit` czyste, pełny `jest` czysty (1105 testów, +5).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) sprawdź `Ustawienia → Diagnostyka →
+Diagnostyka wody z zegarka` istnieje i pokazuje listę wpisów kiedy/ile ml; (2) na Zdrowie
+taponuj szklanki szybko kilka razy pod rząd, poczekaj na sync z zegarka w tle, sprawdź że
+liczba się NIE cofa.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

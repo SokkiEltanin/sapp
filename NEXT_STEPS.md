@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Woda — znaleziony DRUGI wyścig (health.tsx) + diagnostyka per-rekordowa w Ustawieniach (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §174. User (item #14): "wypiłem 8 szklanek a pokazuje mniej...
+gdzie w ustawieniach dosłownie co łapie kiedy i ile ml, żebym potwierdził". Dwie rzeczy:
+(1) znaleziony DRUGI, nienaprawiony wyścig wody — `app/(tabs)/health.tsx` ma WŁASNĄ, osobną od
+`useWaterTracker.ts` implementację licznika wody, którą fix z 09-22 pominął. `persistWater()`
+robił goły `counts[id] = waterRef.current` (naprawione: `Math.max` z fresh-z-magazynu), a
+`loadWater()` nie miała guardu "nie przeładowuj gdy wisi odroczony zapis" (naprawione). To
+bardzo prawdopodobnie REALNA przyczyna zgłoszenia — Zdrowie to ekran gdzie user faktycznie
+taponuje szklanki. (2) `probeHydration()` dostał per-rekordową listę wpisów (kiedy/ile ml/
+źródło, nie tylko sumę), i "Diagnostyka wody z zegarka" jest teraz DOSTĘPNA W USTAWIENIACH
+(Diagnostyka), nie tylko schowana w sheecie edycji kubka na Zdrowiu. `tsc`/`jest` czyste (1105
+testów, +5).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: (1) `Ustawienia → Diagnostyka → Diagnostyka
+wody z zegarka` — sprawdź listę wpisów kiedy/ile ml; (2) na Zdrowie taponuj szklanki szybko
+kilka razy, poczekaj na sync z zegarka w tle, sprawdź że liczba się NIE cofa.
+
 ## ✅ Edytor układu walki — znaleziony i naprawiony realny "nie 1:1" bug (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §173. User (item #7 feedbacku): "ten edytor dziwny i chyba nie

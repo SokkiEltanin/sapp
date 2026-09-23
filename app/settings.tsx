@@ -49,6 +49,7 @@ import { setWidgetTransparent } from '@/services/widgetSync';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
+import { probeHydration, formatWaterDiagnostic } from '@/services/healthConnectService';
 import { haptic } from '@/utils/haptics';
 import { runSelfTest } from '@/utils/selfTest';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
@@ -2175,6 +2176,23 @@ export default function SettingsScreen() {
           icon: LucideIcons.Activity, accentColor: '#46B0DE',
           keywords: ['zdrowie', 'kroki', 'sen', 'waga', 'kalorie', 'woda', 'health connect', 'test'],
           control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/health-test' as any); } },
+        },
+        {
+          // 2026-09-23, user #14: "możliwe że źle łapie wodę z zegarka... gdzie w
+          // ustawieniach dosłownie co łapie kiedy i ile ml, żebym potwierdził" — TA SAMA
+          // diagnostyka istniała już od dawna, ale TYLKO wewnątrz sheeta edycji kubka na
+          // zakładce Zdrowie, nie w Ustawieniach, gdzie user jej szukał. Zdublowany punkt
+          // wejścia (formatWaterDiagnostic() dzieli formatowanie z health.tsx, nie
+          // duplikuje logiki) — teraz per-rekordowa lista kiedy/ile ml/źródło, nie tylko
+          // suma za okno.
+          id: 'diag-water', title: 'Diagnostyka wody z zegarka', subtitle: 'Co Health Connect faktycznie widzi: kiedy i ile ml, z jakiego źródła — ostatnie 7 dni',
+          icon: LucideIcons.Droplets, accentColor: '#60A5FA',
+          keywords: ['woda', 'nawodnienie', 'zegarek', 'health connect', 'szklanki', 'ml', 'hydration'],
+          control: { kind: 'link', onPress: async () => {
+            haptic.tap();
+            const p = await probeHydration(7);
+            Alert.alert('Diagnostyka wody', formatWaterDiagnostic(p));
+          } },
         },
         {
           id: 'diag-backfill', title: `Wgraj zaległe dane z Samsung Health${backfillDone ? ' ✓' : ''}`,
