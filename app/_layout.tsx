@@ -30,6 +30,8 @@ import { drainBankNotifications } from '@/services/bankNotificationDrain';
 import { flushThrottledStorage } from '@/utils/throttledStorage';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { flushPendingMoodWrites } from '@/services/moodSync';
+import { syncTasksWidget } from '@/services/widgetSync';
+import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import { migratePaydayDefaultOff } from '@/utils/payday';
@@ -408,6 +410,29 @@ export default function RootLayout() {
       if (state === 'background' || state === 'inactive') flushThrottledStorage().catch(() => {});
     });
     return () => sub.remove();
+  }, []);
+
+  // Widget pulpitu "Zadania" (2026-09-23, user: "bardzo lubiłem mieć na ekranie co muszę
+  // zrobić/kupić") — pisze świeży snapshot + budzi natywny widget na KAŻDĄ zmianę listy
+  // zadań (przez zustand `subscribe`, nie React-render, żeby nie zależeć od tego czy akurat
+  // jakiś ekran ma tasks store zamontowany), z debounce'em jak throttledStorage (jedna
+  // seria zmian = jeden zapis, nie jeden per task w pętli importu/edycji). Dodatkowo na
+  // background/foreground — łapie przypadki poza samym store (np. cold start z danymi
+  // już w pamięci). Na iOS/przed nowym buildem APK `syncTasksWidget()` jest cichym no-opem
+  // (patrz widgetSync.ts) — bezpieczne wołać zawsze, bez feature-flagi.
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => syncTasksWidget(useCalendarStore.getState().tasks).catch(() => {});
+    const unsub = useCalendarStore.subscribe((state, prev) => {
+      if (state.tasks === prev.tasks) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(flush, 600);
+    });
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' || state === 'background') flush();
+    });
+    flush();
+    return () => { if (t) clearTimeout(t); unsub(); sub.remove(); };
   }, []);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),
