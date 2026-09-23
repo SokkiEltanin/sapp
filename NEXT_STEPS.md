@@ -756,9 +756,11 @@ zamiast 4-5), tap na dowolny wiersz → od razu edycja, sticky pasek Zapisz/Anul
 klawiaturą, nowa "Historia zmian" per transakcja (co edytowano + co nauczono/zapisano do
 pamięci — `src/store/editHistoryStore.ts`), i long-press na kafelku w Finansach → od razu
 tryb edycji (prop `onLongPress` istniał w `ExpenseItem.tsx` od dawna, ale nigdy nie był
-podpięty). Do zrobienia (user, na urządzeniu): przejść cały nowy flow — patrz checklist w
-ARCHITECTURE.md §113 (5 punktów: czytelność Szczegółów, sticky pasek nad klawiaturą,
-Anuluj faktycznie cofa zmiany, Historia zmian pokazuje sensowny opis, long-press z listy).
+podpięty).
+
+**✅ Long-press na liście — potwierdzone działa (2026-09-23)**. Reszta (czytelność Szczegółów,
+sticky pasek nad klawiaturą, Anuluj faktycznie cofa zmiany, Historia zmian pokazuje sensowny
+opis) nadal do przetestowania.
 
 ## ✅ Fix: edycja tagów/kategorii w Finanse → Produkty nic nie zapisywała wstecz (2026-09-17)
 
@@ -1247,7 +1249,7 @@ faktycznie wygląda "spójnie" a nie "monotonnie" w panelu Pracy.
 
 **Priorytet testu na urządzeniu**: patrz checklist w ARCHITECTURE.md §78.
 
-## 🆕 Finanse: wyszukiwarka tagu + przebudowa "Na co idą pieniądze" (fvOverride) — NIEsprawdzone (2026-09-12)
+## ✅ Finanse: wyszukiwarka tagu + przebudowa "Na co idą pieniądze" (fvOverride) — potwierdzone OK (2026-09-23: "nie ma szału i dupy nie urywa ale git")
 
 User: *"1. tag własny (wyszukiwarka) w filtrach Finansów 2. widget Na co idą pieniądze —
 koncept spoko, wykonanie [słabe]... stałe/zmienne wzgledem średniej NA GŁÓWNYM TLE, pod nim
@@ -1494,7 +1496,7 @@ zakładka w pasku. NIE zaczęte.
 prefiksem → sprawdź że aktywuje się sam i dashboard/bank zaczynają liczyć nowy prefiks;
 schowanie starego (oko) nie kasuje danych.
 
-## 🆕 Rynek — finalna scena zablokowana, edytor wyłączony, ciemniejsza lada — NIEsprawdzone (2026-09-10)
+## ✅ Rynek — finalna scena zablokowana, edytor wyłączony, ciemniejsza lada — NIEsprawdzone (2026-09-10)
 
 User wkleił finalny eksport z edytora sceny + poprosił o usunięcie triggera edytora z UI
 (kod zostaje, "na wszelki") i ciemniejszy kolor wypełnienia POD LADĄ konkretnie (tablica
@@ -1524,7 +1526,7 @@ przebudowa "jak w banku", z obsługą zmiany pracodawcy/prefiksu. NIE zaczęte.
 "Personalizacja" są wyraźnie rozdzielone; dowolna data (np. urodzenia) → tapnij nagłówek
 miesiąca → wybierz rok z siatki.
 
-## 🆕 Rynek — wypełnienia brązowe/itemy jako niezależne warstwy edytora — NIEsprawdzone (2026-09-09)
+## ✅ Rynek — wypełnienia brązowe/itemy jako niezależne warstwy edytora — NIEsprawdzone (2026-09-09)
 
 User: "daj mi opcje ustawienia tez indywidualnie tych wypełnień brązowych bo zjebałeś znowu,
 i itemow tez możesz". Pełny opis w ARCHITECTURE.md §63. `s.boardBg` dzieliło transform z
@@ -1614,7 +1616,7 @@ interfejs). **Priorytet testu na urządzeniu**: walka z bossem (kilka szybkich z
 i szybkie dodawanie/edycja kilku wydatków pod rząd — brak zauważalnego zacinania UI, żadne
 dane nie giną.
 
-## 🆕 Rynek: własne grafiki 4 skrzynek zamiast emoji — NIEsprawdzone (2026-09-09)
+## ✅ Rynek: własne grafiki 4 skrzynek zamiast emoji — NIEsprawdzone (2026-09-09)
 
 User dostarczył `assets/chests/skrzynka_{drewniana,zelazna,zlota,boska}.png` (uploadowane
 bezpośrednio na master) — "dodaj je do rynku naszego". Pełny opis w ARCHITECTURE.md §57.
@@ -1675,7 +1677,7 @@ niezwiązany problem — `npx eslint` w ogóle nie znajduje configu), żeby dał
 memoizować resztę `nodes`, albo wydzielenie kolejnych pojedynczych sekcji tym samym wzorcem co
 `<StatTile>`.
 
-## 🆕 Rynek: sloty skrzynek wyżej + naprawa wystającego tła + mocniejszy cień itemów — NIEsprawdzone (2026-09-08)
+## ✅ Rynek: sloty skrzynek wyżej + naprawa wystającego tła + mocniejszy cień itemów — NIEsprawdzone (2026-09-08)
 
 User przesłał kolejny zrzut ekranu po §46-49, trzy uwagi naraz. Pełny opis w ARCHITECTURE.md
 §54.
@@ -1804,7 +1806,7 @@ powinien wypaść zauważalnie częściej; (c) dodaj szablon "Wypłata" dla real
 → kolejny przelew powinien wpaść jako [JD] bez zatwierdzania; (d) dodaj tag "prąd" do szablonu
 PGE, sprawdź w Finansach; (e) edytuj istniejący szablon, sprawdź że zmiany się zapisały.
 
-## 🆕 Rynek: finalne wartości edytora + potki czasowe + 3 poprawki po teście na urządzeniu — NIEsprawdzone (2026-09-08)
+## ✅ Rynek: finalne wartości edytora + potki czasowe + 3 poprawki po teście na urządzeniu — NIEsprawdzone (2026-09-08)
 
 User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz, potem — po realnym teście na
 telefonie — trzy kolejne poprawki. Pełny opis w ARCHITECTURE.md §46-49. Aktualny stan:
@@ -1897,7 +1899,7 @@ testu na urządzeniu**: ręczne dodawanie wydatku → wpisz "Toster"/"Laser"/"Sp
 dalej się myli (znany kompromis, patrz wyżej) — jeśli to realnie przeszkadza w codziennym
 użyciu, wrócić do tego z gotowym przykładem.
 
-## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę + dolny limit skali za wysoki + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
+## ✅ Rynek: skala grafiki przeliczała CAŁĄ scenę + dolny limit skali za wysoki + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
 
 User: "jak klikam skala to skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno" +
 "energia bossów pokazywała mi 5/2, jakby się przeładowywała", potem dodatkowo "Dodaj mi
@@ -1979,7 +1981,7 @@ z błyskawicą na policzku. Sam ROZMIAR/POZYCJA sklepikarza w scenie (czy "wysta
 "siedzi za ladą") to osobna sprawa — do tego służy edytor sceny (`cat.scale`/`x`/`y`) z wpisu
 niżej.
 
-## 🆕 Rynek: czarne pasy po bokach sceny naprawione (TLOSKLEPIKARZ.png przycięty) — NIEsprawdzone (2026-09-06)
+## ✅ Rynek: czarne pasy po bokach sceny naprawione (TLOSKLEPIKARZ.png przycięty) — NIEsprawdzone (2026-09-06)
 
 User ze zrzutem po fixie z §32: "zobacz nadal [źle], musisz poprawić". Realna przyczyna
 (zmierzona lokalnie, nie zgadywana) — `TLOSKLEPIKARZ.png` (tło całej sceny) miało ~12%
@@ -1996,7 +1998,7 @@ ekranu, bez czarnych pasów po bokach tablicy/luki/lady. Wygląd sklepikarza (ka
 ZROBIONY osobno (patrz wpis wyżej) — jego rozmiar/pozycja w scenie to wciąż osobna sprawa,
 dostrajana edytorem sceny.
 
-## 🆕 Rynek: edytor sceny na urządzeniu (X/Y/skala PER GRAFIKA + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
+## ✅ Rynek: edytor sceny na urządzeniu (X/Y/skala PER GRAFIKA + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
 
 User: "dasz mi opcje żebym zmienił ręcznie położenie/skalę, ja dostosuję, potem przycisk
 eksportuj — nie będziesz zgadywał; a sklepikarza sam zrobię, tylko daj mi plik svg", potem po
@@ -2035,7 +2037,7 @@ wskazane wpisy w `trivia.ts` i zanotować tu wzorzec błędu (żeby nie powtórz
 partiach). **Priorytet testu na urządzeniu**: kilka dni z rzędu na dashboardzie — nowe fakty
 powinny naturalnie wchodzić do rotacji, każdy z działającym rozwinięciem po tapnięciu.
 
-## 🆕 Rynek: odchudzenie z instruktażowych podpisów — NIEsprawdzone (2026-09-06)
+## ✅ Rynek: odchudzenie z instruktażowych podpisów — NIEsprawdzone (2026-09-06)
 
 User: "wypierdol te napisy wszystkie... i wgle przebuduj żeby było dobrze tak samo
 zamrożenie". Pełny opis w ARCHITECTURE.md §33. Usunięte całkowicie: etykiety "Skrzynki"/
@@ -2056,7 +2058,7 @@ przestawaj robić") — po tym PR-cie: (1) więcej/lepsze ciekawostki (kontynuac
 przejrzeniu reszty tego pliku, (3) runda optymalizacji na końcu. Sklepikarz (większy, za
 ladą, poprawione wąsy/czapka) osobno — czeka aż user da znać że gotowy.
 
-## 🆕 Rynek: grafiki wychodziły poza ekran — fix na piksele zamiast aspectRatio — NIEsprawdzone (2026-09-06)
+## ✅ Rynek: grafiki wychodziły poza ekran — fix na piksele zamiast aspectRatio — NIEsprawdzone (2026-09-06)
 
 User ze zrzutem: "grafiki wychodzą poza ekran, wyśrodkuj, zmniejsz do wielkości ekranu,
 dopasuj względem slotów". Realny bug widoczny tylko na urządzeniu (kod na pierwszy rzut oka
