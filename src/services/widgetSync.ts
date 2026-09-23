@@ -30,3 +30,11 @@ export async function syncTasksWidget(tasks: Task[]): Promise<void> {
     NativeModules.TasksWidget?.requestUpdate?.();
   } catch {}
 }
+
+// Ustawienia → przełącznik "Przezroczyste tło widgetu" (2026-09-23) — pisze do natywnego
+// SharedPreferences (jedna GLOBALNA wartość, nie per-instancja — po odrzuceniu osobnego
+// ekranu configu, patrz widgetSettingsStore.ts) i budzi widget, żeby przemalował się od razu.
+export function setWidgetTransparent(value: boolean): void {
+  if (Platform.OS !== 'android') return;
+  NativeModules.TasksWidget?.setTransparent?.(value);
+}

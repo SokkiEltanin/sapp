@@ -35,7 +35,6 @@ const G = {
   accentDim:    'rgba(236,238,238,0.12)',
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
-  green:        '#2AC68F',
 };
 function gFor(c: any) {
   return {
@@ -45,7 +44,6 @@ function gFor(c: any) {
     accentDim: 'rgba(236,238,238,0.12)',
     overdueCard: c.bg.card,
     overdueBorder: 'rgba(255,107,107,0.30)',
-    green: '#2AC68F',
   };
 }
 
@@ -215,35 +213,33 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
   const dueDays  = (!overdue && task.status !== 'snoozed' && !isDone && task.deadline) ? daysUntil(task.deadline) : null;
   const isToday  = dueDays === 0;
 
-  // Rodzaj (2026-09-23, user: "ulepsz kolorystycznie taski tylko tak rozsądnie") — te SAME 3
-  // kolory co gdzie indziej (KIND_META, quick-add chip, nagłówki widoku "wg rodzaju"), TERAZ
-  // też na pasku/tle KAŻDEJ karty, nie tylko w nagłówkach grupy — wcześniej po zapisaniu
-  // zadania rodzaj nie był widoczny nigdzie na liście. Świadomie NIE łamie "mono redesign"
-  // (chrome zadań = biel z §wcześniej): tylko cienki pasek + delikatny wash + ikonka, tytuł i
-  // reszta chrome zostają białe/szare. Overdue/done nadal WYGRYWAJĄ nad kolorem rodzaju
-  // (czerwony/neutralny mają pierwszeństwo — te same gałęzie co wcześniej, kolor rodzaju
-  // wchodzi tylko na miejsce dawnego sztywnego zielonego).
-  const kind      = resolveKind(task);
-  const kindColor = KIND_META[kind].color;
-  const KindIcon  = KIND_ICON[kind];
+  const kind     = resolveKind(task);
+  const KindIcon = KIND_ICON[kind];
 
-  // Aktywne (do zrobienia) = akcent koloru rodzaju: tint tła + pasek z lewej + border.
-  // Overdue zostaje czerwony, done/snoozed neutralne. Dziś / wysoki priorytet = mocniej.
-  const isActive  = !isDone && !overdue && task.status !== 'snoozed';
-  const emphasize = isActive && (isToday || task.priority === 'high');
+  // Kolor = TERMINOWOŚĆ, nie rodzaj (2026-09-23, user po pierwszej wersji: "Zadania nadal
+  // mają zielony kolor powinny być raczej zrobione pod neutralny a kolor być znaczeniem
+  // terminowości — czy aktualnie jest NIEBIESKI kafelek cały | czy zaległe CZERWONY | czy
+  // odłożone na później CIEMNY" — cofnięcie poprzedniej wersji, która kolorowała pasek wg
+  // rodzaju zadania (KIND_META); user chciał zupełnie inną oś). Trzy kubełki, każdy JEDEN
+  // kolor, bez gradacji priorytetem: zaległe = czerwony (bez zmian, było już wcześniej),
+  // "aktualnie" (dziś lub w toku pomodoro) = niebieski, CAŁY kafelek (pasek+wash+border) —
+  // wszystko inne (jutro/tydzień/później/bez terminu) = zwykły ciemny/neutralny, bez akcentu.
+  // Ikonka rodzaju ZOSTAJE (informacyjna, kształt) ale zawsze neutralna — kolor rodzaju już
+  // nigdzie nie steruje wyglądem karty, żeby nie było dwóch konkurujących języków koloru.
+  const CURRENT_BLUE = '#6C9EFF';
+  const inProgress = subtitle === 'AKTUALNIE W TOKU';
+  const isCurrent  = !isDone && !overdue && task.status !== 'snoozed' && (isToday || inProgress);
   const cardBg     = overdue ? G.overdueCard : G.card;
   const cardBorder = overdue ? G.overdueBorder
     : isDone || task.status === 'snoozed' ? G.cardBorder
-    : emphasize ? kindColor + '80'
-    : isActive ? kindColor + '38'
+    : isCurrent ? CURRENT_BLUE + '80'
     : G.cardBorder;
-  const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.green
+  const subColor   = inProgress ? CURRENT_BLUE
     : overdue            ? G.accent
     : task.status === 'snoozed' ? colors.text.muted
-    : isToday            ? G.green
-    : dueDays === 1      ? G.green + 'CC'
+    : isToday            ? CURRENT_BLUE
     : colors.text.muted;
-  const iconColor  = isDone || task.status === 'snoozed' ? colors.text.muted : kindColor;
+  const iconColor  = isDone || task.status === 'snoozed' ? colors.text.muted : colors.text.secondary;
 
   return (
     <TouchableOpacity
@@ -251,8 +247,8 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
       onPress={() => onEdit(task)}
       activeOpacity={0.75}
     >
-      {isActive && <View pointerEvents="none" style={[s.greenWash, { backgroundColor: kindColor + (emphasize ? '1C' : '0F') }]} />}
-      {isActive && <View pointerEvents="none" style={[s.accentBar, emphasize && s.accentBarStrong, { backgroundColor: kindColor + (emphasize ? '' : '8C') }]} />}
+      {isCurrent && <View pointerEvents="none" style={[s.greenWash, { backgroundColor: CURRENT_BLUE + '1C' }]} />}
+      {isCurrent && <View pointerEvents="none" style={[s.accentBar, s.accentBarStrong, { backgroundColor: CURRENT_BLUE }]} />}
       {/* Left controls: done swoosh + edit */}
       <View style={s.leftControls}>
         <TouchableOpacity

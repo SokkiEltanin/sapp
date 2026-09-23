@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Dwie korekty po realnym teście: widget przestał się dodawać + zły kolor tasków (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §169. User przetestował §165/§166/§164 i zgłosił: (1) widget
+przestał się dawać dodać na pulpit — regresja z ekranu configu, USUNIĘTY na rzecz zwykłego
+przełącznika w Ustawieniach (nie gate'uje dodawania); (2) kolor kart zadań miał być wg
+terminowości (dziś=niebieski cały kafelek/zaległe=czerwony/reszta=neutralne), nie wg rodzaju
+zadania jak zrobiłem wcześniej — cofnięte i przerobione. `tsc`/`jest` czyste (1094 testy, bez
+zmiany), `expo prebuild` zweryfikowany ponownie.
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga NOWEGO APK**: dodaj widget od zera
+(powinien pojawić się bez ekranu pośredniego), sprawdź przełącznik przezroczystości w
+Ustawieniach, sprawdź kolory kart zadań (dziś=niebieski, zaległe=czerwone, reszta=neutralne).
+
 ## ✅ Fix: skanowanie paragonu mogło dodać ten sam paragon kilka razy pod rząd (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §168. User: zrzut z 4 identycznymi paragonami Lidl (8 produktów,
