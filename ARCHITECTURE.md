@@ -10400,6 +10400,56 @@ spodem), i że reszta (dane/tap/kolory) nadal działa jak wcześniej.
 
 ---
 
+## 167. Plan zajęć — dashboardowy kafelek na fioletowo + ekran dzień/tydzień/miesiąc zamiast samej siatki tygodnia (2026-09-23)
+
+User: "plan zajęć musi być bardziej widocznym kafelkiem z odróżnieniem zajęć... tam zrobiłeś
+przesuwaną listę, dajmy stabilną, domyślnie dzienna i można włączyć widok tygodniowy i
+miesięczny". Dwie osobne zmiany na bazie tego zgłoszenia.
+
+**Kafelek dashboardu (`ClassScheduleCard.tsx`)** — ginął wśród innych neutralnych kart (biały
+tekst/szara ikonka jak wszystkie inne). Fioletowy akcent (`#A78BFA`) już był marką tej funkcji
+(typ W, `dayColToday` w widoku tygodnia) — teraz też na samym kafelku: lewy pasek + delikatny
+wash tła (`#A78BFA14`) + fioletowy border/ikonka/tytuł. TEN SAM przepis co kolor rodzaju na
+kartach zadań (§164) — inny akcent koloru, nie neutralne chrome. Przy okazji usunięty martwy
+prop `cardBg` (kafelek już nie bierze koloru tła z zewnątrz, ma własny stały fioletowy wash).
+
+**Ekran `/class-schedule` — przebudowa z "tylko siatka tygodnia" na 3 tryby**: poprzednia
+wersja (§161) miała WYŁĄCZNIE poziomy `ScrollView` z 7 kolumnami dni (swipe/przesuwanie). User
+chciał to zastąpić spokojniejszym domyślnym widokiem + możliwością włączenia szerszych. Nowe:
+- **Dzień (domyślny)** — jedna kolumna na całą szerokość ekranu (dużo więcej miejsca niż
+  148px kolumna tygodnia), pionowa lista zajęć tego dnia.
+- **Tydzień** — PIONOWE sekcje dni (Pon→Nie, jedna pod drugą, zwykły scroll w dół) zamiast
+  poziomego swipe'a — to jest "stabilna" z prośby usera: nawigacja strzałkami/tapem, nie
+  gestem który trzeba było odkryć.
+- **Miesiąc (nowy)** — siatka kalendarza (`monthGrid()` z `weekGrid.ts`, 5 lub 6 pełnych
+  tygodni Pon-Nie z doklejonymi dniami sąsiednich miesięcy wyszarzonymi), kropka pod dniami z
+  zajęciami, tap dnia → przeskakuje do widoku Dzień na tej dacie.
+
+Trzy taby (segmented control, fioletowy akcent na aktywnym) nad wspólnym paskiem nawigacji
+(strzałki + tap-by-wrócić-do-dziś, jak wcześniej). JEDEN wspólny `selectedDate` jako kotwica
+dla wszystkich trybów (nie osobne offsety per tryb) — przełączenie trybu NIE resetuje pozycji
+(oglądasz dzień X, włączasz "Tydzień", widzisz tydzień zawierający X). `eventsByDate`
+(`Map<YMD, CalendarEvent[]>`) zbudowana RAZ, reużywana przez wszystkie 3 tryby zamiast
+filtrować `gcalEvents` osobno w każdym. `renderEventRow()` reużyty między widokiem dnia i
+tygodnia (ten sam wygląd wiersza, DRY).
+
+**`src/utils/weekGrid.ts` rozszerzony** (ten sam powód testowalności co §161 — matematyka dat
+poza plikiem importującym `react-native`): `addDays()`, `fmtDayLabel()` ("Środa, 23 września" —
+DOPEŁNIACZ miesiąca, inna odmiana niż `fmtMonthLabel()`'s mianownik "Wrzesień 2026" — polski
+nie ma jednej wspólnej formy), `monthGrid()` (siatka kalendarza, zaczyna/kończy na pełnych
+tygodniach Pon-Nie, `inMonth: false` dla dni doklejonych z sąsiednich miesięcy).
+
+**Testy**: `__tests__/weekGrid.test.ts` +9 — w tym miesiąc wymagający 5 tygodni (wrzesień 2026)
+i miesiąc wymagający 6 (listopad 2026, bo 1. wypada w niedzielę — brzegowy przypadek gdzie
+siatka jest największa). `tsc`/`jest` czyste (1094 testy, +9).
+
+**Priorytet testu na urządzeniu — wysoki**: to bezpośrednia realizacja zgłoszenia — sprawdź
+wszystkie 3 taby, nawigację strzałkami w każdym trybie, tap dnia w widoku miesiąca (czy
+przeskakuje poprawnie do Dzień), i czy kafelek na dashboardzie faktycznie wyróżnia się teraz
+kolorem na tle reszty.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

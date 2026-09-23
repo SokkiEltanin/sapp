@@ -3419,7 +3419,7 @@ export default function DashboardScreen() {
             // (2026-09-23) — fallback na najbliższy przyszły dzień trzyma kafelek widocznym też gdy
             // dziś/jutro puste (patrz komentarz przy `classNextDay` wyżej).
             nodes['class-schedule'] = (classToday.length > 0 || classTomorrow.length > 0 || !!classNextDay) && (
-              <ClassScheduleCard today={classToday} tomorrow={classTomorrow} nextDay={classNextDay} prefix={classPrefix} cardBg={cardBgDark} />
+              <ClassScheduleCard today={classToday} tomorrow={classTomorrow} nextDay={classNextDay} prefix={classPrefix} />
             );
 
               // custom user tiles

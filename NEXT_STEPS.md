@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Plan zajęć — kafelek na fioletowo + ekran dzień/tydzień/miesiąc (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §167. User: kafelek "musi być bardziej widocznym... z
+odróżnieniem", i ekran zamiast "przesuwanej listy" ma być "stabilny, domyślnie dzienna i można
+włączyć widok tygodniowy i miesięczny". Kafelek dostał fioletowy akcent (pasek+wash+ikonka,
+ten sam przepis co kolor rodzaju na taskach §164). Ekran `/class-schedule` przebudowany z
+samej siatki tygodnia (poziomy swipe) na 3 taby: Dzień (domyślny, jedna kolumna pełnej
+szerokości)/Tydzień (pionowe sekcje dni, bez gestu)/Miesiąc (nowa siatka kalendarza, tap dnia
+→ widok Dzień). `tsc`/`jest` czyste (1094 testy, +9).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: sprawdź wszystkie 3 taby + nawigację + kolor
+kafelka na dashboardzie.
+
 ## ✅ Widget pulpitu Androida "Zadania" — v1 podstawowy, potwierdzony działający (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §165. User: "bardzo lubiłem mieć na ekranie co muszę zrobić/
