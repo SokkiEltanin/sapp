@@ -36,8 +36,6 @@ const G = {
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
   green:        '#2AC68F',
-  activeBorder: 'rgba(42,198,143,0.22)',
-  greenStrong:  'rgba(42,198,143,0.50)',
 };
 function gFor(c: any) {
   return {
@@ -48,8 +46,6 @@ function gFor(c: any) {
     overdueCard: c.bg.card,
     overdueBorder: 'rgba(255,107,107,0.30)',
     green: '#2AC68F',
-    activeBorder: 'rgba(42,198,143,0.22)',
-    greenStrong: 'rgba(42,198,143,0.50)',
   };
 }
 
@@ -219,15 +215,27 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
   const dueDays  = (!overdue && task.status !== 'snoozed' && !isDone && task.deadline) ? daysUntil(task.deadline) : null;
   const isToday  = dueDays === 0;
 
-  // Aktywne (do zrobienia) = zielony akcent: tint tła + pasek z lewej + zielony border.
+  // Rodzaj (2026-09-23, user: "ulepsz kolorystycznie taski tylko tak rozsądnie") — te SAME 3
+  // kolory co gdzie indziej (KIND_META, quick-add chip, nagłówki widoku "wg rodzaju"), TERAZ
+  // też na pasku/tle KAŻDEJ karty, nie tylko w nagłówkach grupy — wcześniej po zapisaniu
+  // zadania rodzaj nie był widoczny nigdzie na liście. Świadomie NIE łamie "mono redesign"
+  // (chrome zadań = biel z §wcześniej): tylko cienki pasek + delikatny wash + ikonka, tytuł i
+  // reszta chrome zostają białe/szare. Overdue/done nadal WYGRYWAJĄ nad kolorem rodzaju
+  // (czerwony/neutralny mają pierwszeństwo — te same gałęzie co wcześniej, kolor rodzaju
+  // wchodzi tylko na miejsce dawnego sztywnego zielonego).
+  const kind      = resolveKind(task);
+  const kindColor = KIND_META[kind].color;
+  const KindIcon  = KIND_ICON[kind];
+
+  // Aktywne (do zrobienia) = akcent koloru rodzaju: tint tła + pasek z lewej + border.
   // Overdue zostaje czerwony, done/snoozed neutralne. Dziś / wysoki priorytet = mocniej.
   const isActive  = !isDone && !overdue && task.status !== 'snoozed';
   const emphasize = isActive && (isToday || task.priority === 'high');
   const cardBg     = overdue ? G.overdueCard : G.card;
   const cardBorder = overdue ? G.overdueBorder
     : isDone || task.status === 'snoozed' ? G.cardBorder
-    : emphasize ? G.greenStrong
-    : isActive ? G.activeBorder
+    : emphasize ? kindColor + '80'
+    : isActive ? kindColor + '38'
     : G.cardBorder;
   const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.green
     : overdue            ? G.accent
@@ -235,6 +243,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
     : isToday            ? G.green
     : dueDays === 1      ? G.green + 'CC'
     : colors.text.muted;
+  const iconColor  = isDone || task.status === 'snoozed' ? colors.text.muted : kindColor;
 
   return (
     <TouchableOpacity
@@ -242,8 +251,8 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
       onPress={() => onEdit(task)}
       activeOpacity={0.75}
     >
-      {isActive && <View pointerEvents="none" style={[s.greenWash, emphasize && s.greenWashStrong]} />}
-      {isActive && <View pointerEvents="none" style={[s.accentBar, emphasize && s.accentBarStrong]} />}
+      {isActive && <View pointerEvents="none" style={[s.greenWash, { backgroundColor: kindColor + (emphasize ? '1C' : '0F') }]} />}
+      {isActive && <View pointerEvents="none" style={[s.accentBar, emphasize && s.accentBarStrong, { backgroundColor: kindColor + (emphasize ? '' : '8C') }]} />}
       {/* Left controls: done swoosh + edit */}
       <View style={s.leftControls}>
         <TouchableOpacity
@@ -267,12 +276,15 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
 
       {/* Content */}
       <View style={s.cardContent}>
-        <Text
-          style={[s.cardTitle, isDone && s.cardTitleDone, task.priority === 'high' && !isDone && { color: G.accent }]}
-          numberOfLines={2}
-        >
-          {task.title.toUpperCase()}
-        </Text>
+        <View style={s.titleRow}>
+          <KindIcon size={12} color={iconColor} strokeWidth={2.5} style={s.kindIcon} />
+          <Text
+            style={[s.cardTitle, s.cardTitleFlex, isDone && s.cardTitleDone, task.priority === 'high' && !isDone && { color: G.accent }]}
+            numberOfLines={2}
+          >
+            {task.title.toUpperCase()}
+          </Text>
+        </View>
         <Text style={[s.cardSub, { color: subColor }]}>{subtitle}</Text>
         {/* milestone progress — visible so you can see a broken-down task at a glance */}
         {(task.subtasks?.length ?? 0) > 0 && (() => {
@@ -769,11 +781,11 @@ const makeS = (c: any, g: any) => StyleSheet.create({
     position: 'relative', overflow: 'hidden',
   },
   cardDone: { opacity: 0.45 },
-  // zielone „uwypuklenie" aktywnego zadania
+  // "uwypuklenie" aktywnego zadania — backgroundColor ZAWSZE nadpisywany inline kolorem
+  // rodzaju (KIND_META), te tu zostają tylko jako layout/domyślna alpha (patrz TaskCard).
   greenWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(42,198,143,0.06)' },
-  greenWashStrong: { backgroundColor: 'rgba(42,198,143,0.11)' },
   accentBar: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3.5, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: 'rgba(42,198,143,0.55)' },
-  accentBarStrong: { top: 6, bottom: 6, width: 4, backgroundColor: '#2AC68F' },
+  accentBarStrong: { top: 6, bottom: 6, width: 4 },
 
   leftControls: {
     marginLeft: spacing[3],
@@ -810,6 +822,9 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   },
 
   cardContent: { flex: 1, gap: 3 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  kindIcon: { marginTop: 3 },
+  cardTitleFlex: { flex: 1 },
   cardTitle: {
     fontSize: 13, fontWeight: '800', color: c.text.primary,
     letterSpacing: 0.3, lineHeight: 18,

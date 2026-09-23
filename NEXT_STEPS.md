@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Taski — kolor rodzaju z powrotem na każdej karcie, nie tylko w nagłówku grupy (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §164. User: "ulepsz kolorystycznie taski tylko tak rozsądnie".
+Reużyte istniejące 3 kolory `KIND_META` (quick/deep/waiting) na pasku+wash aktywnej karty
+(zamiast sztywnego zielonego) + mała ikonka rodzaju przy tytule. Overdue/done nadal wygrywają,
+pilność/priorytet zostają osobną osią — 4 sygnały się nie gryzą. `tsc`/`jest` czyste (1079
+testów, bez zmiany — czysto wizualny redesign).
+
+**🆕 Priorytet testu na urządzeniu — średni**: sprawdź kolory kart na liście zadań (oba tryby
+grupowania — wg terminu i wg rodzaju).
+
 ## ✅ Plan zajęć — kafelek dashboardu pokazuje najbliższy dzień zamiast znikać (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §163. User: kafelek "musi pokazywać... następny dzień jaki będę
