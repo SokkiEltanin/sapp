@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: skanowanie paragonu mogło dodać ten sam paragon kilka razy pod rząd (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §168. User: zrzut z 4 identycznymi paragonami Lidl (8 produktów,
+62.72 zł) tego samego dnia. Przyczyna: `scan.tsx`'s `saveSelected()` zawsze dodawał nowy
+paragon bez sprawdzenia czy identyczny już nie istnieje — w połączeniu z UDOKUMENTOWANĄ
+historią zawieszania się tego ekranu w trakcie zapisu, kilka tapnięć "Zapisz" w pozornie
+martwy ekran mogło przejść zanim przycisk zdążył się zablokować. Fix: guard sprawdzający
+identyczny paragon (kwota+dzień+sklep) utworzony w ciągu ostatnich 3 minut — pomija jako
+przypadkowy duplikat zamiast dodawać kolejny. `tsc`/`jest` czyste (1094 testy, bez zmiany).
+
+**🆕 WAŻNE**: 4 istniejące duplikaty w danych usera NIE zostały automatycznie usunięte (brak
+dostępu do jego danych z tej sesji) — user musi ręcznie skasować 3 z 4 identycznych wpisów
+Lidl przez ekran szczegółów wydatku. Fix zapobiega tylko przyszłym powtórkom.
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: kilka szybkich tapnięć "Zapisz" przy skanowaniu
+— powinien powstać tylko 1 wpis + toast o pominiętym duplikacie.
+
 ## ✅ Plan zajęć — kafelek na fioletowo + ekran dzień/tydzień/miesiąc (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §167. User: kafelek "musi być bardziej widocznym... z

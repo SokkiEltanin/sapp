@@ -517,64 +517,90 @@ export default function ScanReceiptModal() {
           .catch(() => {});
         toast.success('Dodano paragon do płatności');
       } else {
-        // Reverse-merge: a bank notification for this purchase may already have created
-        // a bare expense (bankMatched, no receiptItems). If one matches on amount + same
-        // day + store, enrich THAT one with the receipt instead of adding a duplicate.
         const store0 = receipt.storeName?.toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
         const dTime = new Date(dateParsed).getTime();
-        // Match a bank-created expense on AMOUNT + SAME DAY (the bank's merchant string
-        // and the receipt's store name are often totally different — e.g. "ZABKA
-        // Z1234 K.1" vs "Żabka" — so the store name must NOT gate the match, only
-        // break ties when several transactions share the exact amount+day).
-        const candidates = useExpensesStore.getState().expenses.filter(e =>
-          e.bankMatched && !e.receiptItems && (e.type === 'expense' || !e.type) &&
+
+        // Zabezpieczenie przed przypadkowym powtórnym zapisem (2026-09-23, user: "znowu sie
+        // kopiują jakby wydatki... z powiadomienia musi sprawdzać czy taki dodał przecież
+        // już") — ten ekran ma UDOKUMENTOWANĄ historię zawieszania się w trakcie zapisu
+        // (patrz scanBreadcrumb.ts), a przycisk "Zapisz" blokuje się dopiero PO re-renderze:
+        // jeśli wątek JS akurat przycina, kilka tapnięć w zawieszony ekran mogło wszystkie
+        // przejść, zanim `disabled` zdążyło zadziałać — każde tworzyło OSOBNY, pełny paragon
+        // (ten sam sklep/kwota/dzień/liczba produktów). Traktuj identyczny paragon (ten sam
+        // sklep + kwota + dzień) zapisany w ciągu OSTATNICH 3 MINUT jako przypadkowy duplikat
+        // zamiast dodawać kolejny — świadomie wąskie okno czasowe, żeby NIE blokować
+        // prawdziwych dwóch zakupów w tym samym sklepie tego samego dnia (rzadkie, ale
+        // możliwe), tylko rzeczywiście szybkie powtórzone zapisy tej samej sesji skanowania.
+        const RECENT_DUP_WINDOW_MS = 3 * 60 * 1000;
+        const nowMs = Date.now();
+        const recentDup = useExpensesStore.getState().expenses.find(e =>
+          !!e.receiptItems && (e.type === 'expense' || !e.type) &&
           Math.abs(e.amount - roundedTotal) <= 0.011 &&
-          !!e.date && sameLocalDay(new Date(e.date).getTime(), dTime),
+          !!e.date && sameLocalDay(new Date(e.date).getTime(), dTime) &&
+          (!store0 || `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0)) &&
+          !!e.createdAt && (nowMs - new Date(e.createdAt).getTime()) < RECENT_DUP_WINDOW_MS,
         );
-        const storeMatch = store0
-          ? candidates.find(e => {
-              const es = (e.storeName ?? '').toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
-              return `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0) || (!!es && store0.includes(es));
-            })
-          : undefined;
-        const existingBank = storeMatch ?? candidates[0];
 
-        // Always add the receipt as its OWN clean expense (identical shape whether or
-        // not a bank payment matched — no special "hybrid" bank+receipt row, which was
-        // the suspected black-screen trigger). Build locally + write to Firestore in the
-        // BACKGROUND: the web SDK's write promise only resolves on server ack, so
-        // awaiting it froze the screen on weak signal. The local store persists to
-        // AsyncStorage immediately (safe even if the app is killed first).
-        const now = new Date().toISOString();
-        const expense: Expense = {
-          id: expensesService.newId(),
-          type: 'expense',
-          amount: roundedTotal,
-          currency: 'PLN',
-          category: dominantCat,
-          tags,
-          note: receipt.storeName || 'Paragon',
-          date: dateParsed,
-          ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
-          ...(payer ? { payer } : {}),
-          paymentMethod,
-          receiptItems,
-          viaScan: true,   // "Za Kulisami" achievement — this receipt was pasted+parsed, not typed line-by-line
-          createdAt: now,
-          updatedAt: now,
-        };
-        addPending(expense);   // shows immediately + survives a refresh until synced
-        expensesService.addWithId(expense.id, expense)
-          .then(() => confirmSync(expense.id))
-          .catch(() => {}); // stays pending; retried on next foreground
+        if (recentDup) {
+          toast.info('Ten paragon już dodałeś przed chwilą — pomijam duplikat');
+        } else {
+          // Reverse-merge: a bank notification for this purchase may already have created
+          // a bare expense (bankMatched, no receiptItems). If one matches on amount + same
+          // day + store, enrich THAT one with the receipt instead of adding a duplicate.
+          // Match a bank-created expense on AMOUNT + SAME DAY (the bank's merchant string
+          // and the receipt's store name are often totally different — e.g. "ZABKA
+          // Z1234 K.1" vs "Żabka" — so the store name must NOT gate the match, only
+          // break ties when several transactions share the exact amount+day).
+          const candidates = useExpensesStore.getState().expenses.filter(e =>
+            e.bankMatched && !e.receiptItems && (e.type === 'expense' || !e.type) &&
+            Math.abs(e.amount - roundedTotal) <= 0.011 &&
+            !!e.date && sameLocalDay(new Date(e.date).getTime(), dTime),
+          );
+          const storeMatch = store0
+            ? candidates.find(e => {
+                const es = (e.storeName ?? '').toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
+                return `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0) || (!!es && store0.includes(es));
+              })
+            : undefined;
+          const existingBank = storeMatch ?? candidates[0];
 
-        if (existingBank) {
-          // Auto-merge, done SAFELY: the receipt above now represents this purchase, so
-          // drop the bare bank stub (matched on amount+day, case-insensitive) to avoid a
-          // duplicate — instead of mutating the stub in place.
-          deleteExpense(existingBank.id);
-          expensesService.remove(existingBank.id).catch(() => {});
-          toast.success('Połączono z płatnością z banku — bez duplikatu');
+          // Always add the receipt as its OWN clean expense (identical shape whether or
+          // not a bank payment matched — no special "hybrid" bank+receipt row, which was
+          // the suspected black-screen trigger). Build locally + write to Firestore in the
+          // BACKGROUND: the web SDK's write promise only resolves on server ack, so
+          // awaiting it froze the screen on weak signal. The local store persists to
+          // AsyncStorage immediately (safe even if the app is killed first).
+          const now = new Date().toISOString();
+          const expense: Expense = {
+            id: expensesService.newId(),
+            type: 'expense',
+            amount: roundedTotal,
+            currency: 'PLN',
+            category: dominantCat,
+            tags,
+            note: receipt.storeName || 'Paragon',
+            date: dateParsed,
+            ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+            ...(payer ? { payer } : {}),
+            paymentMethod,
+            receiptItems,
+            viaScan: true,   // "Za Kulisami" achievement — this receipt was pasted+parsed, not typed line-by-line
+            createdAt: now,
+            updatedAt: now,
+          };
+          addPending(expense);   // shows immediately + survives a refresh until synced
+          expensesService.addWithId(expense.id, expense)
+            .then(() => confirmSync(expense.id))
+            .catch(() => {}); // stays pending; retried on next foreground
+
+          if (existingBank) {
+            // Auto-merge, done SAFELY: the receipt above now represents this purchase, so
+            // drop the bare bank stub (matched on amount+day, case-insensitive) to avoid a
+            // duplicate — instead of mutating the stub in place.
+            deleteExpense(existingBank.id);
+            expensesService.remove(existingBank.id).catch(() => {});
+            toast.success('Połączono z płatnością z banku — bez duplikatu');
+          }
         }
       }
       // Persist corrections to memory for future receipts
