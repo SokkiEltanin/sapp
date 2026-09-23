@@ -11,6 +11,8 @@
 // P(rojekt) — "P" dodane 2026-09-22 dla sesji oznaczonych w planie jako "pr." (np.
 // "KMSiWM-pr"), nie mieściło się w oryginalnym trio W/C/L.
 
+import { plPlural } from './plural';
+
 export type ClassType = 'W' | 'C' | 'L' | 'P';
 const CLASS_TYPES: ClassType[] = ['W', 'C', 'L', 'P'];
 
@@ -46,4 +48,19 @@ export function parseClassEvent(title: string | undefined, prefix: string): Pars
     return { type: null, subject: parts[0], room: parts[1] };
   }
   return { type: null, subject: rest, room: null };
+}
+
+// Etykieta "Śr 24 wrz · za 2 dni" dla dashboardowego kafelka (2026-09-23, user: gdy dziś/jutro
+// puste — weekend, przerwa międzysemestralna, dzień wolny z zarządzenia Rektora UR — kafelek
+// znikał całkowicie zamiast pokazać NAJBLIŻSZY dzień z zajęciami). Ręczne tablice dni/miesięcy
+// zamiast `toLocaleDateString('pl-PL', ...)` — TEN SAM wzorzec co `weekGrid.ts`'s
+// `fmtWeekRange()` (locale ICU niepewne pod Jest/Hermes, a to ma być testowalne bez zgadywania).
+const DAY_SHORT = ['Nie', 'Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob']; // Date.getDay(): 0=Nie..6=Sob
+const MONTH_SHORT = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+
+export function fmtNextClassLabel(dateYMD: string, daysAway: number): string {
+  const [y, m, d] = dateYMD.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const nice = `${DAY_SHORT[date.getDay()]} ${d} ${MONTH_SHORT[m - 1]}`;
+  return `${nice} · za ${daysAway} ${plPlural(daysAway, 'dzień', 'dni', 'dni')}`;
 }

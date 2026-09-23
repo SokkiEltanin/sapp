@@ -1354,6 +1354,25 @@ export default function DashboardScreen() {
     () => gcalEvents.filter(e => e.date === tomorrow && isClassEvent(e.title, classPrefix)).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
     [gcalEvents, tomorrow, classPrefix],
   );
+  // Fallback dla kafelka (2026-09-23) — gdy dziś/jutro puste (weekend, przerwa
+  // międzysemestralna), znajdź NAJBLIŻSZY przyszły dzień (od pojutrza) z choć jednym eventem
+  // planu zajęć. Tylko wtedy warto szukać — w normalny dzień szkolny ta gałąź się nie odpala.
+  const classNextDay = useMemo(() => {
+    if (classToday.length > 0 || classTomorrow.length > 0) return null;
+    const from = new Date(); from.setDate(from.getDate() + 2);
+    const fromYMD = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+    const future = gcalEvents
+      .filter(e => e.date > fromYMD && isClassEvent(e.title, classPrefix))
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+    if (future.length === 0) return null;
+    const nextDate = future[0].date;
+    const events = future.filter(e => e.date === nextDate);
+    const [y, m, d] = nextDate.split('-').map(Number);
+    const target = new Date(y, m - 1, d);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const daysAway = Math.round((target.getTime() - now.getTime()) / 86400000);
+    return { date: nextDate, daysAway, events };
+  }, [gcalEvents, classPrefix, classToday.length, classTomorrow.length]);
 
   const nextDeadline = useMemo(() => {
     const upcoming = pendingTasks.filter(t => t.deadline).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? ''))[0];
@@ -3396,9 +3415,11 @@ export default function DashboardScreen() {
               <GCalCard today={gcalToday} tomorrow={gcalTomorrow} cardBg={cardBgDark} />
             );
 
-            // Plan zajęć (2026-09-22) — ten sam guard-w-index wzorzec co gcal wyżej.
-            nodes['class-schedule'] = (classToday.length > 0 || classTomorrow.length > 0) && (
-              <ClassScheduleCard today={classToday} tomorrow={classTomorrow} prefix={classPrefix} cardBg={cardBgDark} />
+            // Plan zajęć (2026-09-22) — ten sam guard-w-index wzorzec co gcal wyżej. `|| !!classNextDay`
+            // (2026-09-23) — fallback na najbliższy przyszły dzień trzyma kafelek widocznym też gdy
+            // dziś/jutro puste (patrz komentarz przy `classNextDay` wyżej).
+            nodes['class-schedule'] = (classToday.length > 0 || classTomorrow.length > 0 || !!classNextDay) && (
+              <ClassScheduleCard today={classToday} tomorrow={classTomorrow} nextDay={classNextDay} prefix={classPrefix} cardBg={cardBgDark} />
             );
 
               // custom user tiles
