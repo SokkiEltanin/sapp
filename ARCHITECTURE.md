@@ -10450,6 +10450,49 @@ kolorem na tle reszty.
 
 ---
 
+## 168. Fix: skanowanie paragonu mogło dodać ten sam paragon kilka razy pod rząd (2026-09-23)
+
+User: zrzut ekranu z CZTEREMA identycznymi wpisami "Lidl · 8 produktów · -62.72 zł" tego
+samego dnia. "znowu sie kopiują... z powiadomienia musi sprawdzać czy taki dodał przecież już".
+
+**Przyczyna** — NIE bank-notification pipeline (ten ma już dedup, `commitBankTx.ts` sprawdza
+`already`/`findMatchingExpense` przed dodaniem, a bank-owe wpisy i tak nigdy nie mają
+`receiptItems` — te 4 wpisy MIAŁY po 8 produktów, więc każdy pochodził z ekranu skanowania
+paragonu, `app/expenses/scan.tsx`). `saveSelected()` w gałęzi "nie dołączaj do istniejącej
+płatności" ZAWSZE tworzyło nowy `Expense` z `receiptItems` — zero sprawdzenia czy identyczny
+paragon już nie istnieje. Ten ekran ma UDOKUMENTOWANĄ historię zawieszania się w trakcie
+zapisu (stąd cały `scanBreadcrumb.ts` — marker "zapis w toku", czytany po restarcie apki, żeby
+zamienić niewidoczne zawieszenie w coś zgłaszalnego). Przycisk "Zapisz" blokuje się dopiero
+PO re-renderze (`disabled={saving || ...}`) — jeśli wątek JS akurat przycinał (to samo
+zjawisko co ta udokumentowana historia zawieszeń), kilka tapnięć w pozornie martwy ekran mogło
+przejść ZANIM `disabled` zdążyło zadziałać, każde tworząc osobny, pełny paragon.
+
+**Fix**: nowy guard w `saveSelected()` (gałąź "nie dołączaj") — przed dodaniem nowego paragonu
+sprawdź czy w `useExpensesStore` już istnieje wpis z `receiptItems`, tą samą kwotą (±0.011),
+tym samym dniem, tym samym sklepem, utworzony w ciągu OSTATNICH 3 MINUT. Jeśli tak — traktuj
+jako przypadkowy duplikat (toast "Ten paragon już dodałeś przed chwilą — pomijam duplikat"),
+NIE dodawaj kolejnego. Świadomie WĄSKIE okno czasowe (3 min) — nie blokuje dwóch prawdziwych,
+niezależnych zakupów w tym samym sklepie tego samego dnia (rzadkie, ale możliwe), tylko łapie
+szybkie powtórzone zapisy tej samej sesji skanowania. Gałąź "dołącz do istniejącej płatności"
+(`attachToId`) nie wymaga analogicznej poprawki — ona AKTUALIZUJE istniejący wpis
+(`updateExpense`), więc powtórny zapis nadpisuje te same dane, nie duplikuje.
+
+**UWAGA — cztery istniejące duplikaty w danych usera NIE zostały automatycznie usunięte**
+(brak bezpośredniego dostępu do jego danych z tej sesji) — trzeba je ręcznie skasować przez
+ekran szczegółów wydatku (§113: `app/expenses/[id].tsx`, usuń 3 z 4 identycznych wpisów
+Lidl). Fix zapobiega TYLKO przyszłym powtórkom.
+
+**Testy**: brak nowych (logika dopasowania w tym pliku od zawsze inline, nie wydzielona do
+`bankNotification.ts` — ten sam poziom złożoności co sąsiedni istniejący kod reverse-merge w
+tej samej funkcji, który też nie jest wydzielony; wydzielanie tylko TEJ jednej funkcji
+byłoby niespójne). `tsc`/`jest` czyste (1094 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: to bezpośrednia odpowiedź na zgłoszony bug —
+spróbuj kilka razy szybko tapnąć "Zapisz" przy skanowaniu paragonu i sprawdź czy pojawia się
+tylko JEDEN wpis + toast o pominiętym duplikacie przy kolejnych tapnięciach.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
