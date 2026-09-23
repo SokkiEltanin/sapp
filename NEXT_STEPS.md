@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Siatka nastrój×energia — DRUGI fix, brakujący GestureHandlerRootView w Modalu (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §162. Po fixie ScrollView (§153) user zgłosił że nadal "Nie mogę
+dotknąć tam i wpisac humoru" — ten sam zrzut co poprzednio. Prawdziwa, DRUGA przyczyna: siatka
+żyje wewnątrz natywnego `Modal` z `'react-native'`, który portuje zawartość do osobnej natywnej
+hierarchii (nowe okno/kontroler) poza jedynym `GestureHandlerRootView` z `app/_layout.tsx` —
+RNGH nigdy nie dostawał poprawnie zroutowanych dotknięć niezależnie od poprawki ScrollView.
+Fix: zagnieżdżony `GestureHandlerRootView` dodany tuż wewnątrz `<Modal>` w
+`MoodCheckInModal.tsx`. `tsc`/`jest` czyste (1075 testów, bez zmiany — interakcyjny fix).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: DRUGA próba naprawy tego samego zgłoszenia —
+sprawdź czy przeciąganie/tapanie siatki teraz faktycznie ustawia nastrój+energię, "Zapisz" się
+odblokowuje, a reszta modala (scroll, tagi, notatka) nadal działa normalnie.
+
 ## ✅ Plan zajęć — wirtualny podgląd tygodnia, ostatni kawałek (2026-09-22)
 
 Pełny opis w ARCHITECTURE.md §161 (kontynuacja §157-160, KOMPLET rozbudowy planu zajęć z tej

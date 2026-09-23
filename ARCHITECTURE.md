@@ -10152,6 +10152,50 @@ scroll do dalszych dni tygodnia działa płynnie na telefonie.
 
 ---
 
+## 162. Siatka nastrój×energia — DRUGI, prawdziwy powód niełapania dotknięć: brak GestureHandlerRootView wewnątrz Modala (2026-09-23)
+
+User po §153 (fix ScrollView z RN→RNGH): "Nadal nie mogę dotknąć tam i wpisac humoru" + ten sam
+zrzut co poprzednio (kropka na środku, "Jeszcze nie zaznaczono"). §153 był realną poprawką
+właściwego problemu, ale NIE JEDYNEGO — dwie niezależne przyczyny nakładały się na ten sam
+objaw, więc naprawienie tylko jednej nie dało żadnej widocznej zmiany.
+
+**Druga przyczyna**: `MoodCheckInModal.tsx` renderuje siatkę wewnątrz natywnego `Modal` z
+`'react-native'`. `Modal` **portuje swoją zawartość do OSOBNEJ natywnej hierarchii** — nowe
+okno (`Window`) na Androidzie, osobny `UIViewController` na iOS — POZA drzewem widoków, w
+którym żyje reszta apki. Jedyny `GestureHandlerRootView` w całej apce jest w `app/_layout.tsx`,
+opakowuje root nawigacji — ale Modal, jako osobna hierarchia natywna, nie jest jego potomkiem
+w SENSIE NATYWNYM (mimo że jest nim w drzewie React). RNGH potrzebuje `GestureHandlerRootView`
+jako faktycznego natywnego przodka żeby poprawnie przechwytywać/routować touch events —
+bez niego `Gesture.Pan()` siatki (nawet po fixie ScrollView z §153) nigdy nie dostawał
+poprawnie zroutowanych dotknięć. To udokumentowane ograniczenie RNGH przy `Modal`/`Portal`
+(swmansion docs: "placing gesture handler" — modale/portale potrzebują WŁASNEGO roota).
+
+**Fix**: `MoodCheckInModal.tsx` — zagnieżdżony `<GestureHandlerRootView style={{flex:1}}>`
+dodany TUŻ WEWNĄTRZ `<Modal>`, opakowujący całą zawartość (overlay + sheet + scroll + siatkę).
+Import `GestureHandlerRootView` z `'react-native-gesture-handler'` obok istniejącego importu
+`ScrollView` z tej samej biblioteki.
+
+**Wzorzec do zapamiętania (rozszerza wzorzec z §153)**: `GestureDetector`/`Gesture.*` z RNGH
+wewnątrz JAKIEGOKOLWIEK natywnego `Modal` (RN `Modal`, i prawdopodobnie każdy inny komponent
+portujący do osobnego natywnego okna/kontrolera) wymaga WŁASNEGO `GestureHandlerRootView`
+wewnątrz tego Modala — root w `_layout.tsx` go nie obejmuje, niezależnie od poprawności
+`ScrollView`-parenta. Jeśli w przyszłości pojawi się kolejny Modal z gestem RNGH w środku
+(dziś jedyny taki to `MoodCheckInModal` — `DashEditRow.tsx`'s `GestureDetector` żyje INLINE na
+dashboardzie, nie w Modalu, więc korzysta z roota w `_layout.tsx` bez problemu), potrzebuje tej
+samej łaty od razu, nie po zgłoszeniu identycznego buga.
+
+**Weryfikacja**: `tsc`/`jest` czyste (1075 testów, bez zmiany — czysto interakcyjny fix,
+nic nowego do testowania w Jest bez symulacji natywnych gestów w Modalu).
+
+**Priorytet testu na urządzeniu — wysoki**: to DRUGA próba naprawy tego samego zgłoszonego
+"Nie działa"/"Nadal nie mogę dotknąć" — sprawdź czy przeciąganie/tapanie siatki TERAZ faktycznie
+ustawia nastrój+energię (kropka się przesuwa, tekst pod siatką zmienia się z "Jeszcze nie
+zaznaczono"), przycisk "Zapisz" się odblokowuje, i że reszta modala (scroll, poziomy scroll
+tagów, TextInput notatki, przycisk zamknięcia) nadal działa normalnie z nowym zagnieżdżonym
+`GestureHandlerRootView`.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
