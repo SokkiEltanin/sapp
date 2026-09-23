@@ -140,6 +140,13 @@ export default function BattleLayoutLab() {
   const setPatch = useCallback((patch: Partial<BattleLayoutDraft>) => set(patch), [set]);
 
   const sceneHeight = 420;
+  // Musi zgadzać się z `TILE_PORTRAIT_HEIGHT` w boss-fight.tsx (`Math.max(PORTRAIT_SIZE,
+  // CAT_PORTRAIT_SIZE) + 18`) — ROOT CAUSE #7 (2026-09-23, user: "ten edytor dziwny i chyba
+  // nie jeden do jeden"): tu było na sztywno 200px, realna arena liczy Math.max(bossSize,
+  // catSize)+18 (=223 przy defaultowych 150/205) — 23px różnicy w wysokości kolumny portretu
+  // PRZESUWAŁO pionowy środek (skąd liczy się offset Y=0) o ~11px między Edytorem a realną
+  // walką, więc wytunowana w Edytorze pozycja NIE lądowała 1:1 w grze.
+  const portraitColHeight = Math.max(draft.catSize, draft.bossSize) + 18;
   const exportJson = useMemo(() => JSON.stringify(draft, null, 2), [draft]);
 
   return (
@@ -169,7 +176,7 @@ export default function BattleLayoutLab() {
 
           <View style={s.vsRow}>
             <View style={s.tile}>
-              <View style={s.tilePortrait}>
+              <View style={[s.tilePortrait, { height: portraitColHeight }]}>
                 <Draggable x={draft.catOffsetX} y={draft.catOffsetY} onDrag={(x, y) => setPatch({ catOffsetX: Math.round(x), catOffsetY: Math.round(y) })}>
                   <View style={[s.spriteBox, { width: draft.catSize, height: draft.catSize }]}>
                     <RadialGlow size={draft.catSize * 1.5} color={palette.coat} opacity={0.22} />
@@ -195,7 +202,7 @@ export default function BattleLayoutLab() {
             </View>
 
             <View style={s.tile}>
-              <View style={s.tilePortrait}>
+              <View style={[s.tilePortrait, { height: portraitColHeight }]}>
                 <Draggable x={draft.bossOffsetX} y={draft.bossOffsetY} onDrag={(x, y) => setPatch({ bossOffsetX: Math.round(x), bossOffsetY: Math.round(y) })}>
                   <View style={[s.spriteBox, { width: draft.bossSize, height: draft.bossSize }]}>
                     <RadialGlow size={draft.bossSize * 1.6} color="#F87171" opacity={0.25} />
@@ -314,7 +321,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { padding: spacing[4], paddingBottom: spacing[8], gap: spacing[3] },
 
   scene: { width: '100%', borderRadius: radius.xl, overflow: 'hidden', position: 'relative', justifyContent: 'flex-end' },
-  vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%', paddingHorizontal: spacing[3], paddingBottom: spacing[4] },
+  // paddingBottom = spacing[3] (nie spacing[4]) — musi zgadzać się z realną walką, gdzie
+  // JEDYNE obicie treści od krawędzi to `arena`'s jednolite `padding: spacing[3]` na
+  // wszystkie 4 strony (boss-fight.tsx); osobny, większy `paddingBottom` tutaj dawał
+  // dodatkowe ~4px rozjazdu w pionie względem realnej areny (2026-09-23, user #7).
+  vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%', paddingHorizontal: spacing[3], paddingBottom: spacing[3] },
   tile: { flex: 1, minWidth: 0, alignItems: 'center', padding: spacing[2], gap: 6 },
   tilePortrait: { height: 200, width: '100%', justifyContent: 'center', alignItems: 'center' },
   spriteBox: { alignItems: 'center', justifyContent: 'center' },

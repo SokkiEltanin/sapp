@@ -10641,6 +10641,53 @@ nie ma już "🪙" (ikonka monety zamiast), i że itemy/sloty są wyraźnie wię
 
 ---
 
+## 173. Edytor układu walki: znaleziony i naprawiony realny "nie 1:1" bug (2026-09-23)
+
+User (item #7 z batcha feedbacku): "tutaj nie wiem jakby się nic nie zmieniło bo ten edytor
+dziwny i chyba nie jeden do jeden." Bez nowych bossów/plików od usera — to akurat dało się
+zdiagnozować z samego kodu, więc zrobione od razu (nie czekało na #7's drugą część, nowe
+custom bossy, którą wciąż czeka).
+
+Znalezione DWA realne, mierzalne rozjechania między `app/battle-layout-lab.tsx` (edytor) i
+`app/boss-fight.tsx` (realna arena), oba geometrii, nie tylko "wygląda inaczej":
+
+1. **Wysokość kolumny portretu** — edytor miał `tilePortrait: { height: 200 }` na sztywno;
+   realna arena liczy `TILE_PORTRAIT_HEIGHT = Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18`
+   (=223 przy domyślnych 150/205). Skoro oba boksy centrują zawartość (`justifyContent:
+   'center'`), 23px różnicy wysokości przesuwało PIONOWY ŚRODEK (punkt zerowy dla offsetu Y)
+   o ~11px między edytorem a realną walką — pozycja wytunowana w edytorze nie lądowała 1:1 w
+   grze. Fix: `portraitColHeight = Math.max(draft.catSize, draft.bossSize) + 18`, liczone
+   dynamicznie z aktualnych rozmiarów draftu, tak jak robi to realna arena.
+2. **Nadmiarowy `paddingBottom`** — edytorowy `vsRow` miał własny `paddingBottom: spacing[4]`
+   (16px) na wierzchu `paddingHorizontal: spacing[3]`; realna arena ma TYLKO jednolite
+   `padding: spacing[3]` (12px) na wrapperze `arena`, bez dodatkowego bottom. Fix: zrównane do
+   `spacing[3]` (12px) po obu stronach.
+
+**Root cause DRUGIEGO, poważniejszego zjawiska** (nie geometria, tylko "stare liczby") —
+`BATTLE_LAYOUT_DEFAULT` (w `battleLayoutDraftStore.ts`) bywa ręcznie synchronizowany z realnymi
+stałymi w `boss-fight.tsx` po każdym eksporcie (ostatnio 09-18/09-20), ale zustand `persist`
+NIE nadpisuje samo z siebie już zapisanego na urządzeniu drafta nowym defaultem — jedynym
+ratunkiem był user PAMIĘTAJĄCY, żeby ręcznie wcisnąć "Reset" (stary komentarz w kodzie to nawet
+instruował, ale nikt o tym nie pamięta w praktyce). Efekt: Edytor mógł cicho pokazywać STARE
+liczby z poprzedniego eksportu, sam sobie przecząc jako "podgląd 1:1" — dokładnie ten sam objaw
+co zgłoszenie usera, i już RAZ udokumentowany w komentarzu 09-20 jako powracający problem. Fix:
+`PERSIST_VERSION` + `migrate` w zustand `persist` — gdy `BATTLE_LAYOUT_DEFAULT` się zmienia,
+`PERSIST_VERSION` musi teraz rosnąć razem z nim (komentarz nad stałą to teraz jawnie
+przypomina), a `migrate()` wtedy AUTOMATYCZNIE porzuca przeterminowany persisted draft i
+startuje od świeżego defaultu — zero polegania na pamięci usera.
+
+**Testy**: brak nowych (mockowanie zustand `persist`+AsyncStorage dla `migrate` byłoby
+nieproporcjonalnie ciężkie względem prostoty fixu; poprawność `migrate: () => ({ draft:
+BATTLE_LAYOUT_DEFAULT })` czytelna wprost z kodu). `tsc --noEmit` czyste, `jest` czysty (1100
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: otwórz Edytor układu walki (`/battle-layout-lab`),
+wciśnij Reset, sprawdź że pozycja pupila/bossa/pasków HP wygląda TAK SAMO jak w realnej walce z
+tym samym bossem. Druga część #7 (nowe custom bossy, zamiast starych z neta) wciąż czeka na
+przesłanie plików przez usera — patrz NEXT_STEPS.md.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -35,11 +35,13 @@ export interface BattleLayoutDraft {
 // CAT_PORTRAIT_SIZE=205, oba offsetY sprite'ów=45, oba offsetY pasków HP=10, bg domyślne =
 // GORSKILAS, cień bossa=0.62/0.18, cień kotka=0.45/0.13 — patrz CAT_SHADOW_SCALE_X/Y w
 // boss-fight.tsx dla wyliczenia) — żeby otwarcie Edytora renderowało DOKŁADNIE to co widać w
-// realnej walce, zero wizualnej różnicy, dopóki user czegoś nie ruszy. (2026-09-20 —
-// poprzednia wersja tej stałej NIE została zaktualizowana po ostatnim eksporcie z 2026-09-18,
-// więc Edytor otwierał się z INNYM layoutem niż realna arena — sam sobie zaprzeczał jako
-// "podgląd 1:1"; jeśli masz już otwarty Edytor wcześniej i widzisz stare 0.62/0.18 dla kotka,
-// wciśnij Reset, żeby dogonić ten nowy default — persisted draft NIE nadpisuje się sam.)
+// realnej walce, zero wizualnej różnicy, dopóki user czegoś nie ruszy.
+//
+// GDY ZMIENIASZ TĘ STAŁĄ (po każdym eksporcie z Edytora wklejonym do boss-fight.tsx) —
+// ZBUMPUJ TEŻ `PERSIST_VERSION` niżej. Bez tego stary, już zapisany na urządzeniu draft
+// (z poprzedniego eksportu) NIE dogania nowego defaultu sam — Edytor cicho pokazywałby
+// nieaktualne liczby na starcie (2026-09-20/09-23, dwa niezależne zgłoszenia tego samego
+// objawu: "Edytor otwiera się z innym layoutem niż realna arena").
 export const BATTLE_LAYOUT_DEFAULT: BattleLayoutDraft = {
   bg: 'gorskislas',
   catSize: 205,
@@ -58,6 +60,19 @@ interface BattleLayoutDraftState {
   reset: () => void;
 }
 
+// ROOT CAUSE ustalony 2026-09-23 (user #7: "ten edytor dziwny i chyba nie jeden do jeden") —
+// `BATTLE_LAYOUT_DEFAULT` bywał aktualizowany po każdym eksporcie z Edytora (ostatnio 09-18/
+// 09-20), żeby DOGONIĆ realne stałe w boss-fight.tsx (patrz komentarz nad stałą wyżej). Ale
+// zustand `persist` NIE nadpisuje sam z siebie już zapisanego na urządzeniu drafta nowym
+// defaultem — jedynym ratunkiem był user PAMIĘTAJĄCY, żeby ręcznie wcisnąć "Reset" po każdej
+// takiej zmianie (stary komentarz to nawet instruował). Nikt o tym nie pamięta — Edytor cicho
+// pokazywał STARE liczby z poprzedniego eksportu, więc jego "podgląd 1:1" sam sobie zaprzeczał.
+// Fix: `PERSIST_VERSION` + `migrate` — gdy ta stała rośnie (BUMPUJ JĄ przy KAŻDEJ zmianie
+// `BATTLE_LAYOUT_DEFAULT`, czyli przy każdym ręcznym zsynchronizowaniu z boss-fight.tsx),
+// zustand automatycznie PORZUCA przeterminowany persisted draft i startuje od świeżego
+// defaultu — bez czekania aż user się zorientuje i wciśnie Reset sam.
+const PERSIST_VERSION = 1;
+
 export const useBattleLayoutDraft = create<BattleLayoutDraftState>()(
   persist(
     (set) => ({
@@ -68,6 +83,8 @@ export const useBattleLayoutDraft = create<BattleLayoutDraftState>()(
     {
       name: 'battle-layout-draft-v1',
       storage: throttledPersistStorage(),
+      version: PERSIST_VERSION,
+      migrate: () => ({ draft: BATTLE_LAYOUT_DEFAULT }),
       // Domyślny (shallow) merge zostawiałby stary, zapisany `draft` BEZ nowych pól cienia
       // jako `undefined` (merguje tylko klucze top-level stanu, nie zagnieżdżone pola
       // `draft`) — dopisanie defaultów tutaj sprawia, że stary zapis dostaje sensowne

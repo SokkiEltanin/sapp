@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Edytor układu walki — znaleziony i naprawiony realny "nie 1:1" bug (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §173. User (item #7 feedbacku): "ten edytor dziwny i chyba nie
+jeden do jeden" — bez nowych plików dało się to zdiagnozować z samego kodu. Dwa realne
+rozjechania geometrii między edytorem (`battle-layout-lab.tsx`) a realną areną
+(`boss-fight.tsx`): (1) wysokość kolumny portretu była na sztywno 200px zamiast liczonej jak w
+realnej arenie (`Math.max(catSize,bossSize)+18`, =223 domyślnie) — 23px różnicy przesuwało
+pionowy środek o ~11px; (2) edytorowy `vsRow` miał dodatkowe 16px `paddingBottom` zamiast
+jednolitych 12px jak w realnej `arena`. Do tego root cause DRUGIEGO zjawiska: `persist`
+zustanda nie nadpisywał sam z siebie przestarzałego drafta na urządzeniu po każdej aktualizacji
+`BATTLE_LAYOUT_DEFAULT` — user musiał PAMIĘTAĆ o ręcznym Reset. Dodany `PERSIST_VERSION` +
+`migrate()` — teraz automatyczny. `tsc`/`jest` czyste (1100 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: otwórz `/battle-layout-lab`, wciśnij Reset,
+porównaj z realną walką tego samego bossa — powinno wyglądać identycznie.
+
+**🆕 Otwarte**: druga część #7 — user zapowiedział wgranie NOWYCH customowych bossów w miejsce
+starych z neta — wciąż czeka na przesłanie plików.
+
 ## ✅ Ekwipunek — ostatnie emotki monet wywalone, itemy/sloty większe (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §172. User (item #5 feedbacku): "ekwipunek ma EMOTKI które
@@ -53,9 +72,9 @@ temu" na dashboardzie.
 
 ## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czekają na usera
 
-- **#7 Edytor layoutu bossów**: user zgłosił że edytor "nie jeden do jeden" (bug wymaga
-  diagnozy na urządzeniu, nie da się znaleźć z samego kodu) + zapowiedział wgranie NOWYCH
-  customowych bossów w miejsce starych z neta — czeka na przesłanie plików przez usera.
+- **#7 Nowe custom bossy**: user zapowiedział wgranie NOWYCH customowych bossów w miejsce
+  starych z neta (edytora bug — patrz osobny wpis wyżej, już naprawiony) — czeka na przesłanie
+  plików przez usera.
 - **#12 Cold start lag**: user narzeka na animacje przy starcie + ogólny lag — istnieje już
   DIAGNOSTYKA w Ustawienia → Diagnostyka → "Wydajność startu apki" → "Udostępnij" (export).
   Czeka na usera żeby przesłał wyeksportowane dane — bez realnych liczb dalsza praca to
