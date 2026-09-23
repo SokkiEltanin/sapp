@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Ekwipunek — ostatnie emotki monet wywalone, itemy/sloty większe (2026-09-23)
+
+Pełny opis w ARCHITECTURE.md §172. User (item #5 feedbacku): "ekwipunek ma EMOTKI które
+chciałem wywalić... zrobić to eq większe ogólniej bardziej czytelne". Sloty już były bez
+emotek (wcześniejsza sesja); zostały tylko "🪙" w `GearPanel.tsx` (przyciski sprzedaży, stepper
+ilości, 3 toasty) — zamienione na `<Coins/>` ikonkę (JSX) albo słowo "monet" (stringi
+toastów, gdzie ikonki nie da się osadzić). Rozmiary podniesione: sloty 62→70px, miniaturki
+itemów 44→56px, nazwa itemu 13.5→15px. `tsc`/`jest` czyste (1100 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski**: otwórz Ekwipunek, sprawdź brak "🪙" i większe
+itemy/sloty.
+
+**🆕 Otwarte**: user chciał też szerzej "łatwiej sprzedawać" — na razie tylko rozmiar/
+czytelność, sam flow sprzedaży (grupowanie/bulk/qty-picker) bez zmian. Czeka na konkrety od
+usera jeśli chce więcej.
+
 ## ✅ Panel Praca — usunięte "cele"-skarbonki, zostają tylko stałe wydatki (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §171. User (item #11 feedbacku): "bym z pracy wywalił jednak te
@@ -37,9 +53,6 @@ temu" na dashboardzie.
 
 ## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czekają na usera
 
-- **#5 Ekwipunek**: user chce wywalić emotki z ekwipunku i zrobić go czytelniejszym/większym
-  ("łatwiej sprzedawać") — czeka na odpowiedź usera czy reużyć istniejącą grafikę przedmiotów
-  czy najpierw omówić kierunek wizualny.
 - **#7 Edytor layoutu bossów**: user zgłosił że edytor "nie jeden do jeden" (bug wymaga
   diagnozy na urządzeniu, nie da się znaleźć z samego kodu) + zapowiedział wgranie NOWYCH
   customowych bossów w miejsce starych z neta — czeka na przesłanie plików przez usera.

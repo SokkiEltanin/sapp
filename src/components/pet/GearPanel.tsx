@@ -165,7 +165,11 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                 onPress={() => { haptic.tap(); setBulkSell({ slot, ids: allNonEquipped.map(i => i.id), coins: nonEquippedTotal }); }}
               >
                 <Trash2 size={13} color={c.accent.red ?? '#EF4444'} />
-                <Text style={s.bulkSellTxt}>Sprzedaj {allNonEquipped.length} niezałożonych (+{nonEquippedTotal} 🪙)</Text>
+                <Text style={s.bulkSellTxt}>Sprzedaj {allNonEquipped.length} niezałożonych</Text>
+                <View style={s.coinPill}>
+                  <Coins size={11} color="#FBBF24" />
+                  <Text style={s.coinPillTxt}>+{nonEquippedTotal}</Text>
+                </View>
               </TouchableOpacity>
             )}
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
@@ -250,7 +254,8 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                                   hitSlop={6}
                                 >
                                   <Trash2 size={12} color={c.text.muted} />
-                                  <Text style={s.sellBtnTxt}>+{gearSellValue(group.item, inst.rarity)} 🪙</Text>
+                                  <Text style={s.sellBtnTxt}>+{gearSellValue(group.item, inst.rarity)}</Text>
+                                  <Coins size={11} color="#FBBF24" />
                                 </TouchableOpacity>
                               </View>
                             </View>
@@ -276,7 +281,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
       cancelLabel="Anuluj"
       destructive
       onConfirm={() => {
-        if (sellTarget) { sellGear(sellTarget.id); haptic.success(); toast.success(`Sprzedano ${sellTarget.name} — +${sellTarget.coins} 🪙`); }
+        if (sellTarget) { sellGear(sellTarget.id); haptic.success(); toast.success(`Sprzedano ${sellTarget.name} — +${sellTarget.coins} monet`); }
         setSellTarget(null);
       }}
       onCancel={() => setSellTarget(null)}
@@ -293,7 +298,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
         if (bulkSell) {
           const earned = bulkSell.ids.reduce((sum, id) => sum + sellGear(id), 0);
           haptic.success();
-          toast.success(`Sprzedano ${bulkSell.ids.length} ${plPlural(bulkSell.ids.length, 'item', 'itemy', 'itemów')} — +${earned} 🪙`);
+          toast.success(`Sprzedano ${bulkSell.ids.length} ${plPlural(bulkSell.ids.length, 'item', 'itemy', 'itemów')} — +${earned} monet`);
         }
         setBulkSell(null);
       }}
@@ -323,7 +328,10 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
               <Plus size={16} color={c.text.primary} />
             </TouchableOpacity>
           </View>
-          <Text style={s.qtyCoins}>Otrzymasz: {groupSellCoins} 🪙</Text>
+          <View style={s.qtyCoinsRow}>
+            <Text style={s.qtyCoins}>Otrzymasz: {groupSellCoins}</Text>
+            <Coins size={13} color="#FBBF24" />
+          </View>
           <View style={s.qtyActionsRow}>
             <TouchableOpacity style={s.qtyCancelBtn} onPress={() => setGroupSell(null)} activeOpacity={0.8}>
               <Text style={s.qtyCancelTxt}>Anuluj</Text>
@@ -336,7 +344,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                   const toSell = groupSell.candidates.slice(0, groupSell.qty);
                   const earned = toSell.reduce((sum, { id }) => sum + sellGear(id), 0);
                   haptic.success();
-                  toast.success(`Sprzedano ${toSell.length} × ${groupSell.item.name} — +${earned} 🪙`);
+                  toast.success(`Sprzedano ${toSell.length} × ${groupSell.item.name} — +${earned} monet`);
                 }
                 setGroupSell(null);
               }}
@@ -353,10 +361,12 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   flankRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: spacing[2] },
-  flankCol: { width: 68, gap: spacing[2], alignItems: 'center' },
+  flankCol: { width: 74, gap: spacing[2], alignItems: 'center' },
   catCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  slot: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
-  slotImg: { width: 44, height: 44 },
+  // Większe sloty + grafiki (2026-09-23, user: "ekwipunek... możemy zrobić to eq większe
+  // ogólniej bardziej czytelne") — 62→70 / 44→52, żeby item od razu było widać, nie zgadywać.
+  slot: { width: 70, height: 70, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
+  slotImg: { width: 52, height: 52 },
   slotDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#FBBF24' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
@@ -373,10 +383,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   bulkSellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, borderColor: (c.accent.red ?? '#EF4444') + '55', backgroundColor: (c.accent.red ?? '#EF4444') + '14', paddingVertical: 9, marginBottom: spacing[2] },
   bulkSellTxt: { fontSize: 11.5, fontWeight: '700', color: c.accent.red ?? '#EF4444' },
+  // Kwota monet jako ikonka+liczba (2026-09-23, user: "ekwipunek ma EMOTKI które chciałem
+  // wywalić") — zastępuje dawne "🪙" w tekście, ten sam <Coins/> co reszta apki (pet.tsx).
+  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  coinPillTxt: { fontSize: 11.5, fontWeight: '800', color: '#FBBF24' },
 
   // Karta grupy (jeden item, N kopii) — 2026-09-18. Kolapsuje/rozwija instancje.
   itemGroup: { borderRadius: radius.lg, borderWidth: 1, backgroundColor: c.bg.card, marginBottom: spacing[2], overflow: 'hidden' },
-  itemGroupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[3] },
+  itemGroupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[4] },
   itemNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   countBadge: { backgroundColor: '#FBBF2426', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 1 },
   countBadgeTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
@@ -387,10 +401,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   groupSellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: radius.md, borderWidth: 1, borderColor: (c.accent.red ?? '#EF4444') + '44', paddingVertical: 7 },
   groupSellTxt: { fontSize: 10.5, fontWeight: '700', color: c.accent.red ?? '#EF4444' },
 
-  itemImg: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, backgroundColor: c.fill.subtle },
-  itemName: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
-  itemRarity: { fontSize: 10.5, fontWeight: '800', marginTop: 1 },
-  itemStat: { fontSize: 11, color: c.text.secondary, marginTop: 2 },
+  itemImg: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, backgroundColor: c.fill.subtle },
+  itemName: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  itemRarity: { fontSize: 11, fontWeight: '800', marginTop: 1 },
+  itemStat: { fontSize: 11.5, color: c.text.secondary, marginTop: 2 },
   deltaTxt: { fontSize: 10.5, fontWeight: '700', marginTop: 2 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], padding: spacing[2], borderRadius: radius.md, borderWidth: 1, backgroundColor: c.bg.secondary },
   equipBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.border.default },
@@ -407,7 +421,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4], marginTop: spacing[1] },
   qtyBtn: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.card },
   qtyVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, minWidth: 36, textAlign: 'center' },
-  qtyCoins: { fontSize: 13, fontWeight: '700', color: '#FBBF24', textAlign: 'center', marginTop: spacing[1] },
+  qtyCoinsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: spacing[1] },
+  qtyCoins: { fontSize: 13, fontWeight: '700', color: '#FBBF24' },
   qtyActionsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] },
   qtyCancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   qtyCancelTxt: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
