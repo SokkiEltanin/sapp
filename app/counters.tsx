@@ -2,15 +2,15 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, LayoutGrid, Car, PersonStanding } from 'lucide-react-native';
+import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, LayoutGrid, Car } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
-import WalkProgress from '@/components/counters/WalkProgress';
+import DonationBar from '@/components/counters/DonationBar';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import { WeekStrip } from '@/components/counters/StreakCard';
-import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
+import { useCounters, Counter, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
 import { WIDGET_TAGS } from '@/utils/statWidgets';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -26,8 +26,9 @@ const todayStr = () => {
 };
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const ON_ACCENT = '#12100F';   // ciemny tekst/ikona na białym akcencie
-// Marker emojis for countdowns — the chosen one hops along the progress bar.
-const EVENT_EMOJIS = ['🎂', '✈️', '🎁', '❤️', '🏖️', '🎄', '🎉', '🎓', '🏠', '🚗', '⚽', '🎸', '💍', '🍼', '🌸', '🎯', '🔥', '💸'];
+// Kolory paska donation-bar (2026-09-23, user: "można też dodać kolor paska") — ta sama
+// paleta co swatche w items.tsx, żeby nie wymyślać nowych kolorów.
+const BAR_COLORS = ['#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24', '#F472B6', '#FB923C', '#E43434'];
 
 const untilLabel = (n: number) => n > 1 ? `za ${n} dni` : n === 1 ? 'jutro!' : n === 0 ? 'dziś!' : 'minęło';
 const sinceLabel = (n: number) => n === 0 ? 'dziś' : n === 1 ? '1 dzień temu' : `${n} dni temu`;
@@ -51,7 +52,8 @@ export default function Counters() {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
-  const [emoji, setEmoji] = useState('');       // until: hopping marker (blank = walker)
+  const [barColor, setBarColor] = useState<string | undefined>(undefined);   // until: DonationBar color
+  const [fillStyle, setFillStyle] = useState<'smooth' | 'stepped'>('smooth'); // until: pasek płynny/co dzień
   const [keyword, setKeyword] = useState('');
   const [presetKey, setPresetKey] = useState<string | undefined>(undefined);
   const [trackMode, setTrackMode] = useState<'buy' | 'eat'>('eat');   // avoid: reset od zjedzenia / kupna
@@ -70,11 +72,11 @@ export default function Counters() {
       .slice(0, 10);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setPresetKey(undefined); setTrackMode('eat'); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setBarColor(undefined); setFillStyle('smooth'); setKeyword(''); setPresetKey(undefined); setTrackMode('eat'); setOnDash(true); setPickCal(false); setOpen(true); };
   const openEdit = (cn: Counter) => {
     setEditing(cn);
     setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
-    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setPresetKey(cn.presetKey); setTrackMode(cn.track ?? 'eat'); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setBarColor(cn.barColor); setFillStyle(cn.fillStyle ?? 'smooth'); setKeyword(cn.keyword ?? ''); setPresetKey(cn.presetKey); setTrackMode(cn.track ?? 'eat'); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
   };
 
   const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
@@ -88,10 +90,11 @@ export default function Counters() {
     } else {
       const kind = uiKind as 'until' | 'since';
       const evEnd = (kind === 'until' && endDate && endDate >= date) ? endDate : undefined;
-      const evEmoji = kind === 'until' ? (emoji || undefined) : undefined;
-      const patch = { kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, mode: undefined, keyword: undefined, track: undefined, onDashboard: onDash };
+      const evBarColor = kind === 'until' ? barColor : undefined;
+      const evFillStyle = kind === 'until' ? fillStyle : undefined;
+      const patch = { kind, name: name.trim(), date, endDate: evEnd, barColor: evBarColor, fillStyle: evFillStyle, mode: undefined, keyword: undefined, track: undefined, onDashboard: onDash };
       if (editing) update(editing.id, patch);
-      else add({ kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, startDate: todayStr(), onDashboard: onDash });
+      else add({ kind, name: name.trim(), date, endDate: evEnd, barColor: evBarColor, fillStyle: evFillStyle, startDate: todayStr(), onDashboard: onDash });
     }
     setOpen(false);
   };
@@ -127,7 +130,7 @@ export default function Counters() {
           const over = isOver(cn);
           const left = daysUntil(cn);
           const endLeft = daysUntilEnd(cn);
-          const prog = during ? eventProgress(cn) : untilProgress(cn);
+          const prog = during ? eventProgress(cn) : (cn.fillStyle === 'stepped' ? untilProgressStepped(cn) : untilProgress(cn));
           const bigLabel = over ? 'minęło'
             : during ? (endLeft > 1 ? `koniec za ${endLeft} dni` : endLeft === 1 ? 'ostatni dzień!' : 'kończy się dziś!')
             : untilLabel(left);
@@ -139,11 +142,10 @@ export default function Counters() {
               <View style={s.cardTop}>
                 {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
                 <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
-                <Text style={[s.cardBig, over && { color: c.text.muted }, during && { color: '#2AC68F' }]}>{bigLabel}</Text>
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
-              <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
+              <DonationBar progress={prog} color={during ? '#2AC68F' : (cn.barColor || ACCENT)} label={bigLabel} />
               <Text style={s.cardMeta}>{meta}</Text>
             </TouchableOpacity>
           );
@@ -297,17 +299,26 @@ export default function Counters() {
 
             {uiKind === 'until' && (
               <>
-                <Text style={s.fieldLabel}>Ikonka na pasku (skacze do celu)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.emojiRow} keyboardShouldPersistTaps="handled">
-                  <TouchableOpacity style={[s.emojiChip, !emoji && s.emojiChipOn]} onPress={() => { haptic.tap(); setEmoji(''); }} activeOpacity={0.8}>
-                    <PersonStanding size={18} color={!emoji ? ACCENT : c.text.muted} />
-                  </TouchableOpacity>
-                  {EVENT_EMOJIS.map(em => (
-                    <TouchableOpacity key={em} style={[s.emojiChip, emoji === em && s.emojiChipOn]} onPress={() => { haptic.tap(); setEmoji(em); }} activeOpacity={0.8}>
-                      <Text style={s.emojiChar}>{em}</Text>
-                    </TouchableOpacity>
+                <Text style={s.fieldLabel}>Kolor paska</Text>
+                <View style={s.swatchRow}>
+                  {BAR_COLORS.map(col => (
+                    <TouchableOpacity key={col} style={[s.swatch, { backgroundColor: col }, barColor === col && s.swatchOn]}
+                      onPress={() => { haptic.tap(); setBarColor(col); }} activeOpacity={0.8} />
                   ))}
-                </ScrollView>
+                </View>
+                <Text style={s.fieldLabel}>Wypełnianie paska</Text>
+                <View style={s.trackRow}>
+                  {([['smooth', 'Płynnie', 'rośnie co sekundę'], ['stepped', 'Co dzień', 'skacze raz na dobę']] as const).map(([k, lbl, sub]) => {
+                    const active = fillStyle === k;
+                    return (
+                      <TouchableOpacity key={k} style={[s.trackBtn, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
+                        onPress={() => { haptic.tap(); setFillStyle(k); }} activeOpacity={0.8}>
+                        <Text style={[s.trackTitle, active && { color: ACCENT }]}>{lbl}</Text>
+                        <Text style={s.trackSub}>{sub}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </>
             )}
 
@@ -352,7 +363,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[3] },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing[2] },
   cardName: { flex: 1, fontSize: 14, fontWeight: '700', color: c.text.primary },
-  cardBig: { fontSize: 13, fontWeight: '800', color: c.tabs?.day ?? '#46B0DE' },
   iconBtn: { padding: 3 },
   cardMeta: { fontSize: 11, color: c.text.muted, marginTop: 6 },
 
@@ -363,7 +373,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   doneBtnText: { fontSize: 12.5, fontWeight: '700' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  // maxHeight + inner ScrollView so a long form (calendar picker + emoji row) scrolls
+  // maxHeight + inner ScrollView so a long form (calendar picker + color swatches) scrolls
   // instead of spilling its list over the Save button (the old "chaos").
   sheet: { backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing[5], paddingTop: spacing[5], maxHeight: '90%' },
   sheetScroll: { marginHorizontal: -spacing[1] },
@@ -390,10 +400,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   calToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
   calToggleText: { fontSize: 12.5, fontWeight: '700' },
   calList: { gap: 2, overflow: 'hidden' },
-  emojiRow: { flexDirection: 'row', gap: spacing[2], paddingVertical: spacing[1], paddingRight: spacing[2] },
-  emojiChip: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary, alignItems: 'center', justifyContent: 'center' },
-  emojiChipOn: { backgroundColor: ACCENT + '22', borderColor: ACCENT },
-  emojiChar: { fontSize: 22 },
+  swatchRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
+  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  swatchOn: { borderColor: c.text.primary },
   calItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: spacing[2], borderRadius: radius.sm },
   calItemDate: { fontSize: 12, fontWeight: '800', color: '#46B0DE', width: 44 },
   calItemName: { flex: 1, fontSize: 13, color: c.text.secondary },

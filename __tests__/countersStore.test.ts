@@ -1,4 +1,4 @@
-import { matchesAvoid, AVOID_PRESETS, resolveAvoidKeyword, autoDaysWithout, Counter } from '@/store/countersStore';
+import { matchesAvoid, AVOID_PRESETS, resolveAvoidKeyword, autoDaysWithout, untilProgressStepped, Counter } from '@/store/countersStore';
 
 const sweetsKeyword = AVOID_PRESETS.find(p => p.key === 'sweets')!.keyword;
 
@@ -116,5 +116,43 @@ describe('autoDaysWithout — Nutella zjedzona dziś resetuje streak nawet dla s
     const today = new Date().toISOString().slice(0, 10);
     const meals = [{ date: `${today}T12:00:00`, items: [{ name: 'Nutella' }] }];
     expect(autoDaysWithout(staleCounter, [], meals)).toBe(0);
+  });
+});
+
+// 2026-09-23, user: "można też dodać płynne przejście albo krokowe co dzień" — DonationBar
+// (pasek odliczania) ma dwa tryby wypełniania; stepped MUSI skakać RAZ na granicy dnia, nie
+// płynąć co sekundę jak untilProgress().
+describe('untilProgressStepped — pasek rośnie skokowo raz dziennie, nie płynnie', () => {
+  const mk = (over: Partial<Counter>): Counter => ({
+    id: 'c1', kind: 'until', name: 'Test', date: '2026-10-11', startDate: '2026-10-01',
+    createdAt: '2026-10-01T00:00:00.000Z', ...over,
+  });
+
+  test('na starcie (dzień 0 z 10) = 0', () => {
+    const c = mk({});
+    expect(untilProgressStepped(c, new Date('2026-10-01T08:00:00').getTime())).toBe(0);
+  });
+
+  test('w połowie dnia 5 z 10 nadal 5/10, nie 5.3/10 — nie płynie w trakcie dnia', () => {
+    const c = mk({});
+    const noon = new Date('2026-10-06T12:00:00').getTime();   // 5 pełnych dni minęło
+    const evening = new Date('2026-10-06T23:00:00').getTime(); // wciąż ten sam dzień
+    expect(untilProgressStepped(c, noon)).toBeCloseTo(5 / 10);
+    expect(untilProgressStepped(c, evening)).toBeCloseTo(5 / 10); // bez zmiany w ciągu dnia
+  });
+
+  test('dokładnie o północy nowego dnia skacze o kolejny krok', () => {
+    const c = mk({});
+    expect(untilProgressStepped(c, new Date('2026-10-07T00:00:00').getTime())).toBeCloseTo(6 / 10);
+  });
+
+  test('na mecie (dzień 10 z 10) = 1', () => {
+    const c = mk({});
+    expect(untilProgressStepped(c, new Date('2026-10-11T00:00:00').getTime())).toBe(1);
+  });
+
+  test('start i cel ten sam dzień → od razu 1 (bez dzielenia przez zero)', () => {
+    const c = mk({ date: '2026-10-01' });
+    expect(untilProgressStepped(c, new Date('2026-10-01T12:00:00').getTime())).toBe(1);
   });
 });
