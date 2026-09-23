@@ -3,25 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Widget pulpitu Androida "Zadania" — WYMAGA NOWEGO APK, dopilnować build.yml po merge (2026-09-23)
+## ✅ Widget pulpitu Androida "Zadania" — v1 podstawowy, potwierdzony działający (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §165. User: "bardzo lubiłem mieć na ekranie co muszę zrobić/
 kupić". Pierwszy natywny bridge module w projekcie (własny Kotlin przez
-`plugins/withTasksWidget.js`, NIE zewnętrzna biblioteka — projekt już raz oberwał za stale'y
-third-party natywny pakiet, patrz §165). v1 = tylko podgląd (tap otwiera apkę, top 6 zadań wg
-pilności, kolor rodzaju z §164), bez odznaczania na widgecie (v2, odłożone świadomie —
-headless JS na klik bez otwartej apki jest bardziej zawodny).
+`plugins/withTasksWidget.js`, NIE zewnętrzna biblioteka). Build #1045 skompilował się za
+pierwszym razem, user **potwierdził zrzutem ekranu na S22 Ultra**: realne dane, kolory rodzaju,
+działa.
 
-**🆕 WAŻNE — inne niż reszta tej sesji**: to NIE poleci przez OTA. Wymaga nowego builda APK.
-`.github/workflows/build.yml` odpala się automatycznie na push do `master` i publikuje APK
-jako GitHub Release — **po zmergowaniu tego PR-a dopilnować TEGO workflow** (nie tylko
-zwykłego `ci.yml`), bo to JEDYNE miejsce gdzie nowy natywny Kotlin faktycznie się kompiluje
-(bez Android SDK w środowisku sesji nie dało się tego zweryfikować lokalnie poza samym
-`expo prebuild` + ręczną inspekcją wygenerowanych plików).
+## 🆕 Widget "Zadania" — resize mniejszy + przezroczyste tło, WYMAGA NOWEGO APK + re-dodania widgetu (2026-09-23)
 
-**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**: dodaj widget "Sapp —
-Zadania" na pulpit, sprawdź realne dane + kolory rodzaju + tap otwiera Zadania + aktualizacja
-po zmianach w apce + pusta lista pokazuje komunikat zamiast pustych wierszy.
+Pełny opis w ARCHITECTURE.md §166. Dwie prośby po pierwszym teście: (1) mniejszy resize w
+pionie — dodane jawne `minResizeWidth/Height` (wcześniej brakowało, więc Android brał
+`minWidth/Height`=180dp jako limit), plus ogólnie ciaśniejsze paddingi; (2) nowy ekran configu
+(`TasksWidgetConfigActivity`, natywny, zero JS) z przełącznikiem "Przezroczyste tło", per-
+widget-instancja w `SharedPreferences`.
+
+**🆕 WAŻNE**: `android:configure` odpala się TYLKO przy dodawaniu widgetu — już umieszczony
+widget z buildu #1045 NIE dostanie ekranu configu retroaktywnie. Po zainstalowaniu nowego APK
+**usuń obecny widget z pulpitu i dodaj go ponownie** żeby zobaczyć ustawienia przezroczystości.
+Sam mniejszy resize działa na już umieszczonym widgecie bez re-dodawania.
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK + re-dodania widgetu**: sprawdź
+że widget daje się skurczyć mocniej niż poprzednio, że po ponownym dodaniu pokazuje się ekran
+"Widget — Zadania" z przełącznikiem, że włączenie przezroczystości realnie chowa ciemne tło
+(widać tapetę), i że reszta (dane/tap/kolory) nadal działa.
 
 ## ✅ Taski — kolor rodzaju z powrotem na każdej karcie, nie tylko w nagłówku grupy (2026-09-23)
 

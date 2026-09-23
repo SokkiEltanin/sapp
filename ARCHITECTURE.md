@@ -10350,6 +10350,56 @@ pusta lista pokazuje komunikat zamiast pustych wierszy.
 
 ---
 
+## 166. Widget "Zadania" — potwierdzony działający na urządzeniu + resize/przezroczyste tło (2026-09-23)
+
+User potwierdził zrzutem ekranu (S22 Ultra, One UI): widget realnie pokazuje zadania z datami/
+kolorami rodzaju, tap działa. Dwie prośby z tego samego zgłoszenia: (1) "żebym mógł go
+skalować... żeby był na wysokość mniejszy jak się da", (2) "żebym mógł edytować żeby np zrobić
+przezroczyste tło".
+
+**(1) Mniejszy resize**: `tasks_widget_info.xml` miał tylko `minWidth`/`minHeight` (180dp) —
+Android/One UI używa TYCH do limitu resize gdy `minResizeWidth`/`minResizeHeight` nie są
+podane, więc widget nie dawał się skurczyć poniżej ~3 komórek siatki. Fix: jawne
+`minResizeHeight="70dp"` (nagłówek "ZADANIA" + ok. 1 wiersz — najmniejszy sensowny rozmiar),
+`minResizeWidth="140dp"`, `minHeight` domyślne obniżone do 140dp, `targetCellHeight` 3→2.
+Przy okazji: outer padding 12dp→10dp, nagłówek 11sp→10sp, wiersze 4dp→3dp pionowego paddingu —
+ogólnie bardziej kompaktowy domyślny wygląd, nie tylko wyższy limit resize.
+
+**(2) Przezroczyste tło — nowy ekran configu**: dodany `TasksWidgetConfigActivity.kt` (natywny
+Kotlin, zero JS/RN — zwykła `Activity` z przełącznikiem `Switch`), wpięty jako
+`android:configure` w `tasks_widget_info.xml` + `<activity>` w manifeście z intent-filterem
+`APPWIDGET_CONFIGURE` (`exported="true"` — WYMAGANE, launcher/widget-host to inny proces/UID,
+bez tego nie mógłby go odpalić). Ustawienie trzymane per `appWidgetId` w
+`SharedPreferences("TasksWidgetPrefs")`, czyszczone w nowym `onDeleted()` override (żeby nie
+zostawiać martwych kluczy po usunięciu widgetu). `TasksWidgetProvider` przebudowany z
+"jeden `RemoteViews` dla wszystkich instancji" na `updateOne(context, appWidgetId)` per-instancja
+(`buildViews` czyta teraz `appWidgetId`-specyficzny wpis prefs) — `updateAll()`/`onUpdate()`
+oba pętlą się i wołają `updateOne()`, `TasksWidgetConfigActivity` woła je też po zapisaniu.
+Przezroczystość realizowana `views.setInt(R.id.widget_root, "setBackgroundColor", Color.
+TRANSPARENT)` (reflection-safe RemoteViews call, nadpisuje drawable z XML) vs
+`"setBackgroundResource", R.drawable.widget_bg` gdy wyłączone.
+
+**Ograniczenie kontraktu Androida (ważne, powiedziane userowi wprost)**: `android:configure`
+odpala się TYLKO przy DODAWANIU widgetu (bind), nie da się go inaczej ponownie otworzyć dla
+już umieszczonej instancji. Widget z buildu #1045 (już na pulpicie usera) NIE dostanie configu
+retroaktywnie — user musi go usunąć i dodać ponownie, żeby zobaczyć ekran ustawień. Sam resize
+(mniejszy rozmiar) działa na już umieszczonym widgecie bez re-dodawania — to inna, niezależna
+mechanika (`minResizeWidth/Height`, czytane przy każdym przeciągnięciu uchwytu).
+
+**Weryfikacja**: pełny `expo prebuild` uruchomiony ponownie po zmianach — przeszedł czysto za
+pierwszym razem (manifest/`<activity>`/`configure`-atrybut/nowy layout wszystko poprawnie
+wygenerowane, zweryfikowane ręcznie + `xmllint`). `tsc`/`jest` bez zmiany (1085 testów — czysto
+natywna zmiana, JS-owa strona nietknięta). Prawdziwa kompilacja Kotlina znowu tylko w
+`build.yml` po merge'u (jak w §165).
+
+**Priorytet testu na urządzeniu — wysoki, wymaga NOWEGO APK + usunięcia i ponownego dodania
+widgetu** (żeby zobaczyć ekran configu — patrz ograniczenie wyżej): sprawdź że widget daje się
+skurczyć niżej niż poprzednio, że po dodaniu pokazuje się ekran "Widget — Zadania" z
+przełącznikiem, że włączenie przezroczystości faktycznie usuwa ciemne tło (widać tapetę pod
+spodem), i że reszta (dane/tap/kolory) nadal działa jak wcześniej.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
