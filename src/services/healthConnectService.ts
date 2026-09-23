@@ -130,8 +130,14 @@ export async function isPermissionGranted(recordType: string): Promise<boolean> 
 // answers the real question — "does Samsung Health actually export water to Health
 // Connect at all?" — instead of guessing. 0 records = nothing is writing hydration
 // (Samsung side), records present but app shows little = our read/parse side.
+// Per-record breakdown (2026-09-23, user #14: "gdzie w ustawieniach dosłownie co łapie
+// kiedy i ile ml") — dotąd probeHydration liczył tylko sumę za okno, nie dało się
+// zweryfikować POJEDYNCZYCH wpisów (kiedy dokładnie i ile ml każdy).
+export interface WaterProbeEntry { time: string; ml: number; source: string }
+
 export interface WaterProbe {
   permission: boolean; records: number; totalMl: number; sources: string[];
+  entries: WaterProbeEntry[]; // najnowsze pierwsze
   // Nutrition-record probe: Samsung may log water under the Nutrition record type
   // (it appears under HC's "Nutrition" category) rather than as Hydration.
   nutriPermission: boolean; nutriRecords: number; nutriSources: string[]; nutriKeys: string[];
@@ -159,7 +165,7 @@ function stepsBySourceMax(recs: any[]): number {
 export async function probeHydration(days = 7): Promise<WaterProbe> {
   const permission = await isPermissionGranted('Hydration');
   const nutriPermission = await isPermissionGranted('Nutrition');
-  const empty: WaterProbe = { permission, records: 0, totalMl: 0, sources: [], nutriPermission, nutriRecords: 0, nutriSources: [], nutriKeys: [] };
+  const empty: WaterProbe = { permission, records: 0, totalMl: 0, sources: [], entries: [], nutriPermission, nutriRecords: 0, nutriSources: [], nutriKeys: [] };
   const hc = mod();
   if (!hc) return empty;
   try {
@@ -168,17 +174,20 @@ export async function probeHydration(days = 7): Promise<WaterProbe> {
     const start = new Date(); start.setDate(start.getDate() - days);
     const filter = { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
 
-    let totalMl = 0; const sources = new Set<string>();
+    let totalMl = 0; const sources = new Set<string>(); const entries: WaterProbeEntry[] = [];
     try {
       const recs = await read(hc, 'Hydration', filter);
       for (const r of recs) {
-        totalMl += r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
+        const ml = r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
+        totalMl += ml;
         const s = srcOf(r); if (s) sources.add(s);
+        entries.push({ time: r.startTime ?? r.time ?? '', ml: Math.round(ml), source: s ?? 'nieznane' });
       }
       empty.records = recs.length;
     } catch {}
     empty.totalMl = Math.round(totalMl);
     empty.sources = Array.from(sources);
+    empty.entries = entries.sort((a, b) => b.time.localeCompare(a.time));
 
     // Nutrition probe — record count, who wrote them, and the field names present so
     // we can see whether a water/volume value is hiding in there.
@@ -197,6 +206,33 @@ export async function probeHydration(days = 7): Promise<WaterProbe> {
   } catch {
     return empty;
   }
+}
+
+// Wspólne formatowanie werdyktu diagnostyki wody (2026-09-23, user #14: "gdzie w
+// ustawieniach dosłownie co łapie kiedy i ile ml") — WYDZIELONE z health.tsx (był tam
+// jeden przycisk „Diagnostyka wody z zegarka"), żeby to samo, PEŁNE formatowanie (teraz +
+// per-rekordowa lista kiedy/ile ml/źródło) było dostępne z DRUGIEGO miejsca — Ustawienia →
+// Diagnostyka — bez duplikowania tej logiki w dwóch plikach.
+export function formatWaterDiagnostic(p: WaterProbe): string {
+  const lines = [
+    `Nawodnienie (Hydration): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.records} ${plPlural(p.records, 'rekord', 'rekordy', 'rekordów')}${p.records ? ` (${(p.totalMl / 1000).toFixed(2)} l)` : ''}${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+    `Nutrition: ${p.nutriPermission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.nutriRecords} ${plPlural(p.nutriRecords, 'rekord', 'rekordy', 'rekordów')}${p.nutriSources.length ? `\nźródło: ${p.nutriSources.join(', ')}` : ''}`,
+  ];
+  if (p.nutriRecords > 0 && p.nutriKeys.length) lines.push(`Pola Nutrition: ${p.nutriKeys.join(', ')}`);
+  if (p.entries.length) {
+    const rows = p.entries.slice(0, 20).map(e => {
+      const d = e.time ? new Date(e.time) : null;
+      const when = d && !isNaN(d.getTime()) ? d.toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '?';
+      return `${when} — ${e.ml} ml (${e.source})`;
+    });
+    lines.push(`Wpisy z zegarka (najnowsze najpierw):\n${rows.join('\n')}${p.entries.length > 20 ? `\n… i jeszcze ${p.entries.length - 20}` : ''}`);
+  }
+  let verdict: string;
+  if (p.records > 0) verdict = 'Woda JEST jako Hydration ✓. Jeśli apka pokazuje mało — to mój odczyt, wyślij mi to.';
+  else if (p.nutriRecords > 0) verdict = 'Hydration puste, ale są rekordy Nutrition. Wyślij mi listę „Pola Nutrition" — sprawdzę, czy woda siedzi tam i podepnę.';
+  else if (!p.permission && !p.nutriPermission) verdict = 'Brak dostępu do obu — w Health Connect włącz dla Sappa „Nawodnienie" i „Odżywianie", potem Synchronizuj.';
+  else verdict = 'Ani Hydration, ani Nutrition — Samsung Health nie wysyła wody do Health Connect. Włącz eksport w Samsung Health → Health Connect (jeśli „Woda" nie ma na liście, Samsung tego nie eksportuje → wpisuj ręcznie).';
+  return lines.join('\n\n') + '\n\n' + verdict;
 }
 
 // Sleep-STAGE diagnostic — unlike water/calories (each got a probe after being reported

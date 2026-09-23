@@ -22,11 +22,10 @@ import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, probeSleep, sleepProbeVerdict } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, formatWaterDiagnostic, probeSleep, sleepProbeVerdict } from '@/services/healthConnectService';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography, fonts } from '@/theme';
-import { plPlural } from '@/utils/plural';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
 
@@ -462,9 +461,15 @@ export default function HealthScreen() {
         const counts = await getCounts(dateStr(d));
         week[i] = Math.max(0, counts[w.id] ?? 0);
       }
+      setWeekWater(week);
+      // Guard (2026-09-23, user #14: "wypiłem 8 szklanek a pokazuje mniej") — ten sam
+      // wyścig co useWaterTracker.ts naprawiony 09-22: gdy odroczony lokalny zapis
+      // (`waterPersistTimer.current`) jeszcze wisi, ten reload NIE MOŻE nadpisać
+      // `waterRef.current`/`water` świeżo-z-magazynu wartością, bo storage jeszcze nie
+      // widzi tego niedawnego tapnięcia — cofnęłoby optymistyczny lokalny stan.
+      if (waterPersistTimer.current) return;
       waterRef.current = week[todayIdx];
       setWater(week[todayIdx]);
-      setWeekWater(week);
     } else {
       waterRef.current = 0;
       setWater(0);
@@ -494,13 +499,25 @@ export default function HealthScreen() {
   // Persist the current water count to storage (+ notify Habits/pet). Debounced by
   // bumpWater so a burst of taps is ONE async write instead of one per tap — the
   // per-tap AsyncStorage churn (plus the loadWater reload it triggered) was the lag.
+  //
+  // Math.max(fresh-z-magazynu, nasz-lokalny) zamiast ślepego nadpisania (2026-09-23, user
+  // #14: "wypiłem 8 szklanek a pokazuje mniej") — DOKŁADNIE ten sam wyścig co
+  // useWaterTracker.ts naprawiony 09-22, tylko w TEJ, osobnej/zdublowanej implementacji
+  // (ekran Zdrowie ma WŁASNY licznik wody, nie korzysta z tamtego hooka), więc fix z 09-22
+  // jej nie dotknął. Health Connect w tle (`autoSyncHealth`/`feedWaterHabit`) może zapisać
+  // WYŻSZĄ wartość z zegarka DOKŁADNIE w oknie 350ms między tapnięciem a tym debounce'em —
+  // goły `counts[id] = waterRef.current` wtedy KASOWAŁ tę świeższą wartość zamiast ją
+  // uwzględnić.
   const persistWater = async () => {
     const id = waterHabitId ?? await ensureWaterHabit();
     if (!id) return;
     const date = todayDate();
     const counts = await getCounts(date);
-    counts[id] = waterRef.current;   // write the latest authoritative value
+    const fresh = Math.max(0, counts[id] ?? 0);
+    const final = Math.max(fresh, waterRef.current);
+    counts[id] = final;
     await setCounts(date, counts);
+    if (final !== waterRef.current) { waterRef.current = final; setWater(final); }
     bumpHabits();   // notify the Habits screen + pet
   };
 
@@ -1281,17 +1298,7 @@ export default function HealthScreen() {
               onPress={async () => {
                 haptic.tap();
                 const p = await probeHydration(7);
-                const lines = [
-                  `Nawodnienie (Hydration): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.records} ${plPlural(p.records, 'rekord', 'rekordy', 'rekordów')}${p.records ? ` (${(p.totalMl / 1000).toFixed(2)} l)` : ''}${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
-                  `Nutrition: ${p.nutriPermission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.nutriRecords} ${plPlural(p.nutriRecords, 'rekord', 'rekordy', 'rekordów')}${p.nutriSources.length ? `\nźródło: ${p.nutriSources.join(', ')}` : ''}`,
-                ];
-                if (p.nutriRecords > 0 && p.nutriKeys.length) lines.push(`Pola Nutrition: ${p.nutriKeys.join(', ')}`);
-                let verdict: string;
-                if (p.records > 0) verdict = 'Woda JEST jako Hydration ✓. Jeśli apka pokazuje mało — to mój odczyt, wyślij mi to.';
-                else if (p.nutriRecords > 0) verdict = 'Hydration puste, ale są rekordy Nutrition. Wyślij mi listę „Pola Nutrition" — sprawdzę, czy woda siedzi tam i podepnę.';
-                else if (!p.permission && !p.nutriPermission) verdict = 'Brak dostępu do obu — w Health Connect włącz dla Sappa „Nawodnienie" i „Odżywianie", potem Synchronizuj.';
-                else verdict = 'Ani Hydration, ani Nutrition — Samsung Health nie wysyła wody do Health Connect. Włącz eksport w Samsung Health → Health Connect (jeśli „Woda" nie ma na liście, Samsung tego nie eksportuje → wpisuj ręcznie).';
-                Alert.alert('Diagnostyka wody', lines.join('\n\n') + '\n\n' + verdict);
+                Alert.alert('Diagnostyka wody', formatWaterDiagnostic(p));
               }}
             >
               <Text style={wm.diagBtnText}>Diagnostyka wody z zegarka</Text>
