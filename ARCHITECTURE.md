@@ -10918,6 +10918,56 @@ kwotę monet (x5 względem starych wartości).
 
 ---
 
+---
+
+## 179. Cold-start diagnostyka: "0 próbek" to dowód zapchania wątku JS, nie braku lagu (2026-09-24)
+
+User w końcu przesłał realny export z Ustawienia → Diagnostyka → "Wydajność startu apki"
+(20 startów, 2026-09-14 do 2026-09-24, blokowane od §"Wciąż otwarte z batcha 12-punktowego").
+Liczby: `1. klatka` 586-1680ms, `gotowy` 771-1967ms — ale **`lag JS max 0ms / suma 0ms (0
+próbek)` przy WSZYSTKICH 20 startach, bez wyjątku**.
+
+**To NIE znaczy "brak lagu"** — `startColdStartLagSampling()` (perfLog.ts) odpala co 50ms
+`setTimeout` i mierzy, o ile się spóźnił. Przy oknie 600ms-1,9s powinno zdążyć się odpalić
+kilkanaście-kilkadziesiąt próbek. Zero — przy KAŻDYM starcie — oznacza, że nawet WŁASNY timer
+próbnika ani razu nie dostał szansy się odpalić: `setTimeout` (makrotask) czeka, aż stos
+wywołań/kolejka mikrozadań się opróżni, więc "0 próbek" = wątek JS był NIEPRZERWANIE zajęty
+przez całe okno startu. To dokładnie ten sam mechanizm co pierwotna skarga usera (2026-09-20):
+"jak wchodzę i próbuję kliknąć to jest impossible" — dotyk w RN jest obsługiwany na TYM SAMYM
+wątku JS, więc jeśli nawet 50ms timer nie ma szansy się wcisnąć, dotyki też nie mają.
+
+**Root cause namierzony z kodu `app/_layout.tsx`** (bez zgadywania — sprawdzone, które efekty
+faktycznie startują NATYCHMIAST, bez `setTimeout`): duże rzeczy (auto-backup, sync zdrowia,
+bank, mood-sync) są już opóźnione (`setTimeout` 1500-8000ms w kodzie), więc to nie one — w
+typowym oknie 600-900ms jeszcze się nie odpaliły. Winowajca to klaster **~8 efektów bez
+żadnego opóźnienia**, wszystkie startujące w TYM SAMYM ticku co pierwsza klatka dashboardu:
+`appSettings.loadAll()`, `migrateBalanceModel()`, `migratePaydayDefaultOff()`, `loadNonFood()`,
+`loadOwnName()`, dwa sprawdzenia crash-loga (native JVM + JS, każde robi FileSystem+AsyncStorage
+odczyt), `notificationsService.ensureAndroidChannel()`, natychmiastowy `flush()` widgetu
+"Zadania" (`syncTasksWidget`).
+
+**Fix**: nowy helper `afterInteractions(fn)` w `RootLayout` (owija
+`InteractionManager.runAfterInteractions`, zwraca funkcję czyszczącą do cleanupu efektu) —
+wszystkie 8 powyższych efektów przepisane, żeby odpalać się PRZEZ ten helper zamiast
+bezpośrednio, więc nie walczą już o wątek JS w dokładnie tym samym momencie co render. Żadne
+z nich nie jest potrzebne SYNCHRONICZNIE pierwszej klatce: `appSettings` ma cache w pamięci z
+domyślną wartością (`_hapticsEnabled = true`) zanim `loadAll()` się skończy, migracje/
+`loadNonFood`/`loadOwnName` dotyczą flow'ów używanych PÓŹNIEJ (dodawanie wydatków, wykrywanie
+przelewów), nie startowego ekranu. Widget-sync: owinięty tylko POCZĄTKOWY `flush()` — sam
+`subscribe()`/`AppState` listener zostaje podpięty natychmiast, żeby nie przegapić zmian.
+
+**Testy**: brak nowych (czysto sequencing/timing zmiana, logika efektów bez zmian).
+`tsc --noEmit` czyste, `jest` czysty (1105 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → Diagnostyka → "Wydajność startu
+apki" po kilku kolejnych cold-startach — sprawdź, czy `(N próbek)` jest teraz > 0 (dowód że
+wątek JS zdążył złapać choć jeden oddech), i czy dotyk zaraz po starcie faktycznie działa
+płynniej. Jeśli nadal `0 próbek` — oznacza to, że kongestia siedzi GDZIE INDZIEJ (np. w
+natywnym moście/JSI podczas równoległych wywołań), nie w tych 8 efektach — wróć z nowym
+exportem.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -7,7 +7,7 @@ import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, StyleSheet, AppState, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AppState, Alert, Pressable, InteractionManager } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
@@ -188,6 +188,23 @@ export default function RootLayout() {
   // zapętliłoby prawdziwe timery w testach Jest, patrz komentarz tam).
   useEffect(() => { startColdStartLagSampling(); }, []);
 
+  // Fix na podstawie WYNIKU tego rejestru (2026-09-24, user przysłał realny export z
+  // urządzenia): "0 próbek" przy WSZYSTKICH 20 startach, mimo że "gotowy" trwało 600ms-1,9s —
+  // to znaczy, że nawet WŁASNY 50ms timer próbnika ani razu nie zdążył się odpalić, czyli
+  // wątek JS był NIEPRZERWANIE zajęty przez całe okno startu (dokładnie to samo zjawisko co
+  // "dotyk nie działa zaraz po starcie" — dotyk w RN jest obsługiwany na tym samym wątku).
+  // Winowajcą nie są duże, już opóźnione rzeczy (auto-backup/sync zdrowia/bank — te mają
+  // `setTimeout` 1500-8000ms), tylko klaster ~8 efektów, które odpalały się RAZEM, bez
+  // żadnego opóźnienia, w tym samym ticku co pierwsza klatka dashboardu. Owinięte w
+  // `InteractionManager.runAfterInteractions` — zepchnięte o jeden tick+ dalej, żeby nie
+  // walczyły o wątek JS z samym renderem. Żadne z nich nie jest czytane synchronicznie
+  // przez pierwszy render (appSettings ma cache w pamięci z domyślną wartością, migracje/
+  // loadNonFood/loadOwnName dotyczą flow'ów używanych później, nie startowego ekranu).
+  function afterInteractions(fn: () => void): () => void {
+    const handle = InteractionManager.runAfterInteractions(fn);
+    return () => handle.cancel();
+  }
+
   // Still used by the two "wait for auth" effects further down (autobackup, restore-
   // prompt) and the StatusBar color — no longer gates the Stack itself, see `whenAuthReady()`
   // in firebase.ts.
@@ -217,11 +234,11 @@ export default function RootLayout() {
     ArchivoBlack:  require('../assets/fonts/ArchivoBlack.ttf'), // wielkie liczby (heavy 900)
   });
 
-  useEffect(() => { appSettings.loadAll(); }, []);
-  useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
-  useEffect(() => { migratePaydayDefaultOff().catch(() => {}); }, []);
-  useEffect(() => { loadNonFood().catch(() => {}); }, []);   // "to nie jedzenie" exclusions → module set
-  useEffect(() => { loadOwnName().catch(() => {}); }, []);   // własne imię → wykrywanie przelewów do siebie (bankNotification.ts)
+  useEffect(() => afterInteractions(() => { appSettings.loadAll(); }), []);
+  useEffect(() => afterInteractions(() => { migrateBalanceModel().catch(() => {}); }), []);
+  useEffect(() => afterInteractions(() => { migratePaydayDefaultOff().catch(() => {}); }), []);
+  useEffect(() => afterInteractions(() => { loadNonFood().catch(() => {}); }), []);   // "to nie jedzenie" exclusions → module set
+  useEffect(() => afterInteractions(() => { loadOwnName().catch(() => {}); }), []);   // własne imię → wykrywanie przelewów do siebie (bankNotification.ts)
 
   // Lokalny licznik użycia ekranów (2026-09-12, user: "coś ala meta pixel... obieg
   // zamknięty" — patrz `usageStatsStore.ts`/`screenStats.ts` dla pełnego opisu). JEDNO
@@ -253,7 +270,7 @@ export default function RootLayout() {
   // Surface a FRESH crash right after a restart, so a black-screen crash reports
   // itself (message + top of stack) instead of the user having to dig into Settings.
   // Only very recent ones — an old crash shouldn't nag on every launch.
-  useEffect(() => {
+  useEffect(() => afterInteractions(() => {
     (async () => {
       // 1) NATIVE (JVM) crash caught by the ContentProvider handler — this is the
       //    black-screen case a JS boundary can't see. Prefer it if present.
@@ -283,12 +300,12 @@ export default function RootLayout() {
         setTimeout(() => Alert.alert('Ostatni błąd (wyślij mi to)', `${cr.message ?? '—'}\n\n${stackTop}`), 1400);
       } catch {}
     })();
-  }, []);
+  }), []);
 
   // A receipt save that started but never finished = the screen froze (an ANR, not a
   // JS crash — which is why nothing shows in the crash log). Surface it so the freeze
   // is finally reportable instead of invisible.
-  useEffect(() => {
+  useEffect(() => afterInteractions(() => {
     (async () => {
       try {
         const d = await takeDanglingScanSave();
@@ -301,9 +318,9 @@ export default function RootLayout() {
         ), 1800);
       } catch {}
     })();
-  }, []);
+  }), []);
 
-  useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
+  useEffect(() => afterInteractions(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }), []);
 
   // Auth resolution itself MOVED to firebase.ts (2026-09-15, `whenAuthReady()`) — the
   // `<Stack>` below no longer waits for it (patrz komentarz przy JSX niżej), this
@@ -431,8 +448,8 @@ export default function RootLayout() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' || state === 'background') flush();
     });
-    flush();
-    return () => { if (t) clearTimeout(t); unsub(); sub.remove(); };
+    const cancelInitial = afterInteractions(flush);
+    return () => { if (t) clearTimeout(t); unsub(); sub.remove(); cancelInitial(); };
   }, []);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),

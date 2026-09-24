@@ -153,12 +153,22 @@ zastąpiona pionową listą wierszy z dużą pogrubioną liczbą kolorowaną tie
 (oba tryby wypełniania, wybór koloru w formularzu dodawania/edycji), i nową listę "ile dni
 temu" na dashboardzie.
 
-## 🆕 Wciąż otwarte z batcha feedbacku 12-punktowego (2026-09-23) — czeka na usera
+## ✅ #12 Cold start lag — rozwiązane (2026-09-24)
 
-- **#12 Cold start lag**: user narzeka na animacje przy starcie + ogólny lag — istnieje już
-  DIAGNOSTYKA w Ustawienia → Diagnostyka → "Wydajność startu apki" → "Udostępnij" (export).
-  Czeka na usera żeby przesłał wyeksportowane dane — bez realnych liczb dalsza praca to
-  zgadywanie.
+Ostatni punkt z batcha 12-punktowego. Pełny opis w ARCHITECTURE.md §179. User w końcu przesłał
+export z Diagnostyki (20 startów) — kluczowy sygnał: `lag JS max 0ms / suma 0ms (0 próbek)`
+przy WSZYSTKICH 20, mimo że start trwał 600ms-1,9s. To NIE "brak lagu" — to dowód, że nawet
+WŁASNY 50ms timer próbnika ani razu się nie odpalił, czyli wątek JS był nieprzerwanie zajęty
+przez całe okno startu (ten sam mechanizm co "dotyk nie działa zaraz po starcie"). Namierzony
+w kodzie klaster ~8 efektów w `app/_layout.tsx` startujących RAZEM, bez opóźnienia, w tym samym
+ticku co pierwsza klatka dashboardu (appSettings/migracje/loadNonFood/loadOwnName/crash-log
+x2/kanał powiadomień/widget-flush) — owinięte nowym helperem `afterInteractions()`
+(`InteractionManager.runAfterInteractions`), więc nie walczą już o wątek JS z renderem.
+`tsc`/`jest` czyste (1105 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: kilka cold-startów → Diagnostyka → sprawdź czy
+`(N próbek)` jest teraz > 0, i czy dotyk zaraz po starcie realnie działa płynniej. Jeśli nadal
+0 próbek, kongestia jest gdzie indziej (np. natywny most) — wróć z nowym exportem.
 
 ## ✅ Dwie korekty po realnym teście: widget przestał się dodawać + zły kolor tasków (2026-09-23)
 
