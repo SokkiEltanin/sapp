@@ -10775,6 +10775,55 @@ jego potwierdzenia) — łatwo zmienić, to tylko 2 linie w `bossIcons.ts`.
 
 ---
 
+## 176. Liczniki runda 2: pierścień zamiast paska + poświata zamiast kafelka (2026-09-24)
+
+User po zobaczeniu §170's DonationBar/rows na żywo: "te liczniki zjebałeś, wygląda ten pasek
+na za gruby, tanio wgle bez sensu, tak samo... ten stary chujowy look, przerób ten kafelek na
+highend, posiedz nad tym trochę, przemyśl całe to odliczanie, sprawdź opcje." Zamiast
+zgadywać trzeci raz z rzędu — zamockowałem 3 kierunki dla "odliczań" i 2 dla "ile dni temu" w
+osobnym Artifact (Design canvas, dark theme 1:1 z apki — kolory z `colors.ts`, Archivo
+Black/Oswald z Google Fonts jako zamiennik bundlowanych TTF-ów). User wybrał **pierścień**
+(odliczania) i **poświatę pod całym kafelkiem** (ile dni temu, z jedną poprawką: gradient miał
+być pod CAŁYM wierszem, nie tylko za liczbą — poprawione w mockupie przed wdrożeniem).
+
+**Odliczania — nowy `src/components/counters/RingCountdown.tsx`** zastąpił `DonationBar.tsx`
+(usunięty — gruby pasek z tekstem wpisanym w środek, jedyny konsument). Kołowy progress
+(react-native-svg `Circle` + `strokeDasharray`/`strokeDashoffset`, animowane przez
+`Animated.timing` — `useNativeDriver: false`, bo `strokeDashoffset` nie jest transform/opacity,
+ten sam kompromis co DonationBar miał dla `width`), liczba dni w środku (Archivo Black),
+gradient na obwodzie (LinearGradient 65%→100% opacity tego samego koloru, nie wymyślony nowy
+odcień). Podpięty we wszystkich 3 miejscach (żeby nie zostawić dead-enda): `CountdownsCard.tsx`
+(widget dashboardu, wiersz: pierścień | nazwa+status+cel | —), `app/counters.tsx` (pełna
+lista, wiersz: pierścień | nazwa+status+meta | edycja/usuń), `app/counters/[id].tsx` (ekran
+szczegółów, większy pierścień 72px). Formularz dodawania/edycji: "Kolor paska"/"Wypełnianie
+paska" → "Kolor pierścienia"/"Wypełnianie pierścienia" (sam mechanizm `barColor`/`fillStyle`
+w `countersStore.ts` bez zmian — to wciąż te same pola, zmienia się tylko jak są
+zwizualizowane).
+
+**Ile dni temu — `SinceCountersCard.tsx` runda 2**: mała ikonka-chip płomienia zdjęta, liczba
+dni jest teraz hero-elementem (30px Archivo Black) po lewej, z delikatną poświatą tierowego
+koloru rozlaną z lewej strony CAŁEGO wiersza (reużyty `RadialGlow` z `battle-layout-lab.tsx` —
+SVG radial-gradient trick, nie CSS/View, bo RN nie ma natywnego radial gradientu) zamiast
+localised za samą liczbą. Meta zmieniona z gołej jednostki ("dni") na kontekstową informację
+o progu (`"Pomarańcz · próg za N dni"`, z `streakTier().next`) — więcej sensu niż powtarzanie
+oczywistego "dni" obok liczby, która i tak ma jednostkę w kontekście. Najdłuższy licznik nadal
+dostaje bogatą `StreakCard` bez zmian (user to pochwalił wcześniej, nieadresowane).
+
+**Testy**: brak nowych (czysto wizualna runda 2, logika `countersStore.ts`/`streakTiers.ts`
+bez zmian — oba już przetestowane w §170/istniejących testach). `tsc --noEmit` czyste, `jest`
+czysty (1105 testów, bez zmiany).
+
+**Wzorzec do zapamiętania**: przy subiektywnej/wizualnej pracy z HISTORIĄ nietrafionych prób
+na tym samym komponencie (2 nieudane rundy z rzędu) — zamockować kilka kierunków w Artifact
+(Design canvas typu, dark theme + fonty 1:1 z apką) i dać userowi wybrać, zamiast zgadywać
+kolejny raz "na ślepo" i ryzykować trzecią porażkę. User to docenił ("sprawdź opcje" było
+dosłowną prośbą o to).
+
+**Priorytet testu na urządzeniu — wysoki**: zobacz oba widgety na dashboardzie (Odliczania z
+pierścieniami, Liczniki z poświatą), i `/counters` pełną listę z tymi samymi pierścieniami.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
