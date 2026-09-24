@@ -3,6 +3,38 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Boss-fight: zły kolor pigułki energii + myląca atrapa dla nemesis (2026-09-24)
+
+Pełny opis w ARCHITECTURE.md §177. User (zrzutem): "w pomiń walkę nie zużywa energii, przez co
+przy DEMON SŁODYCZY mogę w nieskończoność walczyć... energia pokazuje się niebieska zamiast
+czerwonej." "Pomiń walkę" bez winy — wynik walki jest rozstrzygnięty przed animacją. Realna
+przyczyna: (1) nielimitowane próby dla nemesis to ŚWIADOMY design (jak raid), ale
+`boss-fight.tsx` pokazywało fałszywą pigułkę "1" energii zamiast schować ją/wyjaśnić jak robi
+`bosses.tsx` — teraz pokazuje "∞ prób"; (2) kolor pigułki był na sztywno niebieski dla
+wszystkich trybów, gdy `bosses.tsx` ma ustalony kod: kampania/MAD niebieski, raid/wydarzenie
+czerwony — teraz zgodne. `tsc`/`jest` czyste (1105 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: walka z Demon Słodyczy → "∞ prób" na czerwono;
+walka raid/wydarzenie sezonowe → czerwona pigułka energii.
+
+## 🆕 Legendarne dropy muszą być OP — ekonomia nagród do przemyślenia (2026-09-24)
+
+User (zrzutem ekranu ze Sklepu): "zapisz na potem że legendarne dropy muszą być OP bo są
+zupełnie rzadkie, a tutaj wychodzę na -5 xddd monet." Zrzut: otwarcie skrzynki dało wynik
+"LEGENDARNA +30 monety" — najwyższa rzadkość, a poniżej w tym samym Sklepie widoczne skrzynki
+za 35/90/200/450 monet. Jeśli ta skrzynka kosztowała >30 monet (user liczy że wyszedł na
+minusie), najrzadszy możliwy wynik jest GORSZY finansowo niż samo kupno — to psuje sens
+rzadkości (powinna być ZAWSZE odczuwalnie najlepsza, nie loteryjnym rozczarowaniem).
+
+**Nie naprawione jeszcze — tylko zanotowane na wyraźną prośbę usera** ("zapisz na potem", nie
+"napraw teraz"). Do zbadania przy podjęciu: `src/utils/crates.ts` (`rollCrate`, `legendary:
+0.25` inflation index, `{ tier: 'legendary', coins: 100 }` przy 2% roll — TA wartość nie
+zgadza się z 30 monet ze zrzutu, więc ekran ze zrzutu prawdopodobnie woła INNĄ funkcję, np.
+`src/utils/petBoxes.ts`'s coinsy z gold/iron/silver skrzynek — trzeba znaleźć KTÓRA dokładnie
+ścieżka dała +30 i porównać z ceną skrzynki, którą user faktycznie kupił) i ogólny przegląd:
+czy `legendary` payout skaluje się z ceną skrzynki (droższa skrzynka → proporcjonalnie większy
+możliwy legendary drop), czy jest sztywną stałą niezależną od tego ile user zapłacił.
+
 ## ✅ Liczniki runda 2 — pierścień zamiast paska + poświata (2026-09-24)
 
 Pełny opis w ARCHITECTURE.md §176. User: "te liczniki zjebałeś, pasek za gruby, tanio, stary

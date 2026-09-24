@@ -10824,6 +10824,42 @@ pierścieniami, Liczniki z poświatą), i `/counters` pełną listę z tymi samy
 
 ---
 
+## 177. Boss-fight: zły kolor pigułki energii + myląca atrapa energii dla nemesis (2026-09-24)
+
+User (zrzutem): "w pomiń walkę nie zużywa energii, przez co przy DEMON SŁODYCZY mogę w
+nieskończoność walczyć... energia tam pokazuje się niebieska zamiast czerwonej." Zbadane —
+"Pomiń walkę" jest bez winy (wynik walki jest w 100% rozstrzygnięty PRZED animacją, patrz
+komentarz przy `skipFightRef`, skip tylko przyspiesza kosmetykę, §127-ish). Prawdziwa
+przyczyna to DWA osobne, realne buggi w `app/boss-fight.tsx`:
+
+**(1) Nielimitowane próby dla nemesis to ŚWIADOMY design, nie bug** — `petStore.ts`'s
+`menaceAttack` komentarz: "bez energii... nielimitowane próby, jedynym hamulcem jest sama
+skala HP" (lustrzane wobec raidu). Ale `target.energy` dla nemesis to SZTYWNA atrapa `1`
+(`isMenace ? 1 : eventEnergy`) tylko po to, żeby przycisk WALCZ! nigdy się nie wygaszał —
+`bosses.tsx` (lista bossów) już to rozumie i CAŁKOWICIE chowa pigułkę energii dla nemesis
+("to już nie ma sensu jako ile mi zostało dziś", komentarz tam) — ale `boss-fight.tsx` (ekran
+samej walki) tej atrapy NIE chował, pokazując fałszywe "1", które user zasadnie odczytał jako
+"bug: nie zużywa energii". Fix: zamiast kopiować ukrycie z listy (na ekranie walki zniknięcie
+pigułki bez wyjaśnienia wyglądałoby na usterkę), pigułka dla nemesis pokazuje wprost "∞ prób".
+
+**(2) Zły kolor pigułki dla raid/wydarzenie** — `bosses.tsx` ma ustalony kod kolorów: kampania/
+MAD (`energy`) = niebieski `#38BDF8`, raid/wydarzenie (`eventEnergy`) = czerwony `#F87171`
+(świadomy wybór, osobne pule). `boss-fight.tsx`'s dokowana pigułka energii miała kolor na
+sztywno niebieski dla WSZYSTKICH trybów walki — raid i zwykłe (nie-nemesis) wydarzenie
+pokazywały złą, niespójną z listą bossów barwę. Nowy `energyColor` liczony z `kind`/`isMenace`,
+zastosowany do ikony/tekstu/tła/obwódki pigułki (ten sam wzorzec inline-override co
+`bosses.tsx` już stosuje).
+
+**Testy**: brak nowych (czysto wizualne/UI poprawki, logika `menaceAttack`/energii bez
+zmian). `tsc --noEmit` czyste, `jest` czysty (1105 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: otwórz walkę z Demon Słodyczy (nemesis) — pigułka
+powinna pokazywać "∞ prób" na czerwono, nie fałszywe "1" na niebiesko. Otwórz walkę raid i
+zwykłe wydarzenie sezonowe — pigułka energii powinna być czerwona, kampania/MAD nadal
+niebieska.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
