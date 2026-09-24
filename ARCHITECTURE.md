@@ -10860,6 +10860,64 @@ niebieska.
 
 ---
 
+## 178. Nemesis kosztuje TERAZ energię (cofnięty design z §177) + legendarne dropy x5 (2026-09-24)
+
+User na §177's "∞ prób": "Czemu tam niby jest infinity, przecież ma zużywać energię jak
+walczę xd" — jasne odrzucenie. §177 zdiagnozował "nielimitowane próby" jako ŚWIADOMY design
+(2026-08-18) i naprawił tylko myślącą UI (fałszywe "1" → "∞ prób"). User chce coś innego:
+prawdziwe zużycie energii, nie tylko czytelniejszą etykietę. Ten wpis COFA tę część designu.
+
+**Co się zmieniło (`app/boss-fight.tsx`, `petStore.ts`, `bosses.tsx`)**:
+- `target.energy` dla nemesis to już nie sztywna atrapa `1` — dzieli TERAZ prawdziwą
+  `eventEnergy` z raid/wydarzeniem (`energy: eventEnergy`, bez `isMenace` rozgałęzienia).
+- Bramka sprawdzania puli w `attackRoundBased()` nie ma już wyjątku dla `event && isMenace`
+  — nemesis przechodzi ten sam check co raid/event.
+- Win/loss spend-logic: obok `menaceAttack(...)` (który nadal śledzi TRWAŁĄ pulę HP bossa,
+  bez zmian) wołane jest teraz też `spendEventEnergy()` — każda próba realnie kosztuje.
+- Pigułka energii na ekranie walki: jeden, wspólny render (bez specjalnego przypadku dla
+  nemesis) — pokazuje `target.energy` jak reszta trybów. `energyColor` też bez wyjątku
+  `!isMenace` — nemesis czerwona jak reszta event/raid puli (inaczej po zmianie wyżej
+  renderowałaby się błędnie na niebiesko, odtwarzając wariant tego samego bugu z §177).
+- `bosses.tsx` (lista bossów): pigułka energii dla nemesis już nie jest chowana
+  (`{!isMenace && ...}` zdjęte) — pokazuje prawdziwy stan `eventEnergy`, spójnie z ekranem
+  walki. Przycisk WALCZ przygasza się też dla nemesis przy `eventEnergy <= 0` (dawniej
+  wyjątek `!isMenace` to wykluczał).
+- `petStore.ts`: komentarz przy `menaceEnsure`/`menaceAttack` zaktualizowany (dawny "bez
+  energii... nielimitowane próby" był fałszywy po tej zmianie) — funkcja `menaceAttack`
+  SAMA nie zmieniła logiki (nadal tylko odejmuje HP), zmienił się tylko WYWOŁUJĄCY w
+  `boss-fight.tsx`, który teraz obok niej woła `spendEventEnergy()`.
+- **Co ZOSTAJE bez zmian z designu 2026-08-18**: brak deadline'u (`eventDaysLeftN` = 0 dla
+  menace nadal, nemesis nie ma "kończy się za X dni") i TRWAŁY bank HP (nie resetuje się
+  między próbami, w przeciwieństwie do zwykłego wydarzenia).
+
+**Legendarne dropy x5** (`src/utils/petBoxes.ts`, `LOOT_BOXES[].coins.jackpot`) — user
+zrzutem (Sklep, box-reveal): "LEGENDARNA +30 monety" z ceną skrzynki 35 — dosłownie
+potwierdzone: najrzadszy możliwy drop z najtańszej skrzynki wychodził NA MINUS względem
+własnej ceny skrzynki. User: "legendarne dropy muszą byc op bo sa zupełnie rzadkie... dawaj
+te dropy coin zwiększ tak o 5x". Zmienione WYŁĄCZNIE `jackpot` (nie `min`/`max`/`jackpotChance`,
+nie `gearRarityWeight`) w `LOOT_BOXES` (płatne skrzynki Sklepu — dokładnie ten system, którego
+dotyczył zrzut):
+- sardine (koszt 35): 30 → 150
+- iron (koszt 90): 90 → 450
+- gold (koszt 200): 200 → 1000
+- divine (koszt 450): 900 → 4500
+
+Celowo NIE dotknięte: `DAILY_BOX` (darmowa, `petBoxes.ts`) i `crates.ts`'s `rollCrate()`
+(darmowe "sardynki" petting-crate) — obie darmowe, poza zakresem skargi (która dotyczyła
+konkretnie PŁATNEJ skrzynki Sklepu).
+
+**Testy**: `tsc --noEmit` czyste, `jest` czysty (1105 testów, bez regresji — `petBoxes.test.ts`
+i `menaceStats.test.ts` przeszły bez zmian w assercjach, bo nie asertują dokładnych wartości
+jackpot/energii).
+
+**Priorytet testu na urządzeniu — wysoki**: otwórz walkę z Demon Słodyczy (nemesis) — pigułka
+energii powinna być czerwona i realnie SPADAĆ z każdą próbą (dzieli pulę z raid/wydarzeniem —
+sprawdź, czy przy 0 energii przycisk WALCZ faktycznie się blokuje/przygasza). Otwórz kilka
+skrzynek Sklepu (dowolny tier) i sprawdź, czy trafienie LEGENDARNEJ pokazuje nową, wyższą
+kwotę monet (x5 względem starych wartości).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

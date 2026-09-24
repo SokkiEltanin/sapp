@@ -318,14 +318,13 @@ export default function Bosses() {
                   <Trophy size={9} color={c.text.muted} />
                   <Text style={s.miniKicker}>{eventWon.length}</Text>
                 </View>
-                {/* Nemesis (2026-08-18): nielimitowane próby — bez pigułki energii, to już nie
-                    ma sensu jako "ile mi zostało dziś". Sezonowe zostają przy energii. */}
-                {!isMenace && (
-                  <View style={s.miniEnergyRow}>
-                    <Zap size={10} color="#F87171" />
-                    <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
-                  </View>
-                )}
+                {/* Nemesis (2026-09-24, user: "ma zużywać energię jak walczę") dzieli TERAZ
+                    prawdziwą `eventEnergy` z sezonowymi — pigułka pokazywana zawsze, bez
+                    wyjątku dla menace (dawny "nielimitowane próby" wyjątek zdjęty). */}
+                <View style={s.miniEnergyRow}>
+                  <Zap size={10} color="#F87171" />
+                  <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
+                </View>
               </View>
               <View style={s.miniBody}>
                 <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={40} powered={isMenace} />
@@ -351,7 +350,7 @@ export default function Bosses() {
                 <Text style={s.miniDoneTxt}>Pokonany ✓</Text>
               ) : eventUnlocked ? (
                 <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=event' as any); }}>
-                  <View style={[s.miniBtn, !isMenace && eventEnergy <= 0 && { opacity: 0.5 }]}>
+                  <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
                     <Text style={s.miniBtnTxt}>WALCZ</Text>
                   </View>
                 </PressableScale>
