@@ -831,9 +831,9 @@ export const usePetStore = create<PetState>()(
         eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
         bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
-      // Nemesis (2026-08-18) — lustrzane raidEnsure/raidAttack, bez energii (spendEventEnergy
-      // NIE jest wołane dla menace, patrz boss-fight.tsx): nielimitowane próby, jedynym
-      // hamulcem jest sama skala HP.
+      // Nemesis (2026-08-18) — lustrzane raidEnsure/raidAttack: TRWAŁA pula HP (menaceHp),
+      // bez deadline'u. Energia (2026-09-24, user: "ma zużywać energię jak walczę") — próba
+      // ataku TERAZ realnie kosztuje: boss-fight.tsx woła spendEventEnergy() obok menaceAttack().
       menaceEnsure: (menaceId, hp) => set((s) => (s.menaceId === menaceId ? s : { menaceId, menaceHp: hp })),
       menaceAttack: (damage) => {
         const s = get();

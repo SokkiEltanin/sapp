@@ -110,7 +110,10 @@ export const LOOT_BOXES: LootBox[] = [
     // było 18-105 (51-300% kosztu), za dużo w połączeniu z niecapowaną wcześniej pulą itemów.
     gearChance: 0.40, combatItemChance: 0.02,
     gearRarityWeight: { common: 70, rare: 25, epic: 4, legendary: 0.9, mythic: 0.1 },
-    coins: { min: 12, max: 70, jackpot: 30, jackpotChance: 0.02 },
+    // jackpot x5 (2026-09-24, user zrzutem: "legendarne dropy muszą byc op bo sa zupełnie
+    // rzadkie, a tutaj wychodzę na -5 xddd monet" — dawne 30 przy koszcie 35 było GORSZE niż
+    // cena własnej skrzynki nawet przy najrzadszym możliwym trafieniu). 30→150.
+    coins: { min: 12, max: 70, jackpot: 150, jackpotChance: 0.02 },
   },
   {
     // Dawniej "silver"/"Srebrna skrzynka" — PRZEMIANOWANA (2026-09-08, user: "miała być ta
@@ -122,7 +125,7 @@ export const LOOT_BOXES: LootBox[] = [
     blurb: 'Lepsze szanse na item ekwipunku wyższej rzadkości',
     gearChance: 0.65, combatItemChance: 0.05,
     gearRarityWeight: { common: 40, rare: 35, epic: 18, legendary: 6, mythic: 1 },
-    coins: { min: 45, max: 270, jackpot: 90, jackpotChance: 0.04 },
+    coins: { min: 45, max: 270, jackpot: 450, jackpotChance: 0.04 }, // jackpot x5, patrz sardine
   },
   {
     // `gearChance` PRZYCIĘTE 0.96→0.70 (2026-09-22) — realny BUG: 0.96+combatItemChance(0.08)
@@ -132,7 +135,7 @@ export const LOOT_BOXES: LootBox[] = [
     blurb: 'Bardzo dobre szanse — wysokiej rzadkości ekwipunek',
     gearChance: 0.70, combatItemChance: 0.08,
     gearRarityWeight: { common: 15, rare: 30, epic: 30, legendary: 18, mythic: 7 },
-    coins: { min: 100, max: 600, jackpot: 200, jackpotChance: 0.05 },
+    coins: { min: 100, max: 600, jackpot: 1000, jackpotChance: 0.05 }, // jackpot x5, patrz sardine
   },
   {
     // NOWY 4. tier (2026-09-08, user: "miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA")
@@ -146,7 +149,7 @@ export const LOOT_BOXES: LootBox[] = [
     blurb: 'Absolutny szczyt — mitycznej jakości ekwipunek i umiejętności bossów',
     gearChance: 0.65, combatItemChance: 0.16,
     gearRarityWeight: { common: 5, rare: 20, epic: 30, legendary: 30, mythic: 15 },
-    coins: { min: 225, max: 1350, jackpot: 900, jackpotChance: 0.07 },
+    coins: { min: 225, max: 1350, jackpot: 4500, jackpotChance: 0.07 }, // jackpot x5, patrz sardine
   },
 ];
 

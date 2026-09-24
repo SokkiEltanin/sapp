@@ -319,9 +319,12 @@ export default function BossFight() {
   } else if (kind === 'raid') {
     target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: eventEnergy, energyCost: RAID_ENERGY_COST, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
-    // Nemesis (2026-08-18): maxHp = TRWAŁA pula (menaceMaxHp, jak raid), energy = stała 1
-    // (zawsze "ma próbę" — nielimitowane ataki, patrz komentarz przy `pool` w attackRoundBased).
-    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: isMenace ? menaceMaxHp : eventMaxHp, energy: isMenace ? 1 : eventEnergy, energyCost: 1, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
+    // Nemesis (2026-08-18): maxHp = TRWAŁA pula (menaceMaxHp, jak raid). Energia (2026-09-24,
+    // user: "czemu tam niby jest infinity, przecież ma zużywać energię jak walczę" — dawna
+    // stała atrapa "1" ZDJĘTA, nemesis dzieli TERAZ prawdziwą `eventEnergy` z raid/wydarzeniem,
+    // patrz `pool` w attackRoundBased) — bez deadline'u (`eventDaysLeftN`=0 dla menace, to
+    // ZOSTAJE), ale KAŻDA próba realnie kosztuje energię jak reszta trybów.
+    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: isMenace ? menaceMaxHp : eventMaxHp, energy: eventEnergy, energyCost: 1, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
   } else if (kind === 'quest' && questBoss) {
     target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, energyCost: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed, attackKind: questBoss.attackKind };
   } else if (kind === 'mad' && madBoss && madBase) {
@@ -344,7 +347,9 @@ export default function BossFight() {
   // tam pokazuje się niebieska zamiast czerwonej") — tam raid/wydarzenie (`eventEnergy`) są
   // CZERWONE (#F87171), kampania/MAD (`energy`) BŁĘKITNE (#38BDF8); tu było na sztywno
   // niebieskie dla WSZYSTKICH trybów, więc raid/wydarzenie realnie miały zły kolor puli.
-  const energyColor = (kind === 'raid' || (kind === 'event' && !isMenace)) ? '#F87171' : '#38BDF8';
+  // Nemesis dzieli TERAZ prawdziwą `eventEnergy` z resztą wydarzeń (patrz `target` wyżej) —
+  // bez wyjątku `!isMenace`, kolor jak reszta puli event/raid.
+  const energyColor = (kind === 'raid' || kind === 'event') ? '#F87171' : '#38BDF8';
   // Tło CAŁEGO ekranu (2026-09-14, user: "dodałem Ci całoekranowe lokacje GORSKILAS oraz
   // JUNGLA, one są na cały ekran... trzeba je ładnie zrobić") — per-miniboss dla quest/misja
   // (`fightArenaBg` sprawdza `MISSION_LOCATION_BG[target.id]` NAJPIERW), per-kind fallback dla
@@ -490,9 +495,10 @@ export default function BossFight() {
     // osobny tor jak raid/event). Raid dzieli pulę z event (2026-08-22, patrz komentarz przy
     // raidWeek w petStore.ts), ale kosztuje 2 zamiast 1 (2026-08-25, user: "zmieńmy licznik
     // czerwonej energii na 2 zamiast 1" — dłuższa, prawdziwa walka niż dawna krótka sesja).
-    // Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany czas i próby podejścia")
-    // — bez sprawdzania puli, tak jak quest/misja.
-    if (kind !== 'quest' && kind !== 'mission' && !(kind === 'event' && isMenace)) {
+    // Nemesis (2026-09-24, user: "ma zużywać energię jak walczę") — dzieli teraz pulę
+    // sprawdzania z event/raid, jak wszystko poniżej. Bez deadline'u dalej (`eventDaysLeftN`),
+    // ale próba ataku KOSZTUJE, tak jak reszta trybów.
+    if (kind !== 'quest' && kind !== 'mission') {
       const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
       const cost = target?.energyCost ?? 1;
       if (pool < cost) {
@@ -529,7 +535,7 @@ export default function BossFight() {
     let raidOutcome: { remaining: number; defeated: boolean } | null = null;
     let menaceOutcome: { remaining: number; defeated: boolean } | null = null;
     if (kind === 'campaign' || kind === 'mad') spendEnergy();
-    else if (kind === 'event' && isMenace) menaceOutcome = menaceAttack(menaceSessionHp - result.bossHpLeft);
+    else if (kind === 'event' && isMenace) { menaceOutcome = menaceAttack(menaceSessionHp - result.bossHpLeft); spendEventEnergy(); }
     else if (kind === 'event') spendEventEnergy();
     else if (kind === 'raid') raidOutcome = raidAttack(raidRealStart - result.bossHpLeft);
     fightingRef.current = true;
@@ -993,24 +999,14 @@ export default function BossFight() {
                 {/* Pigułka energii — ta sama logika/format co dawny header (2026-09-07, "5/2...
                     jakby się przeładowywała" — SAM stan puli, nie ułamek), tylko teraz obok
                     przycisku zamiast osobno nad scrollem. Quest/misja bez puli → pomijana.
-                    Nemesis (menace) NIE MA prawdziwej puli — `target.energy` to sztywna
-                    atrapa "1" tylko po to, żeby przycisk WALCZ! nigdy się nie wygaszał
-                    (`nielimitowane próby, jedynym hamulcem jest sama skala HP`, patrz
-                    petStore.ts's `menaceAttack`). bosses.tsx (lista) już to wie i CAŁKOWICIE
-                    chowa pigułkę dla nemesis — tu pokazywała fałszywe "1", co user (zrzutem,
-                    2026-09-24) czytał jako bug "nieskończenie walczę bez zużycia energii".
-                    Zamiast kopiować to samo ukrycie (na ekranie WALKI zniknięcie pigułki bez
-                    wyjaśnienia wyglądałoby na usterkę), pokazujemy wprost "∞ prób". */}
+                    Nemesis (2026-09-24, user: "ma zużywać energię jak walczę") dzieli TERAZ
+                    prawdziwą `eventEnergy` z raid/wydarzeniem (dawna atrapa "1" zdjęta, patrz
+                    komentarz przy `target` konstrukcji wyżej) — jeden, wspólny render, bez
+                    specjalnego przypadku dla menace. */}
                 {kind !== 'quest' && kind !== 'mission' && (
-                  isMenace ? (
-                    <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
-                      <Text style={[s.energyTxt, { color: '#F87171' }]}>∞ prób</Text>
-                    </View>
-                  ) : (
-                    <View style={[s.energyPill, { backgroundColor: energyColor + '18', borderColor: energyColor + '40' }]}>
-                      <Zap size={13} color={energyColor} /><Text style={[s.energyTxt, { color: energyColor }]}>{target.energy}</Text>
-                    </View>
-                  )
+                  <View style={[s.energyPill, { backgroundColor: energyColor + '18', borderColor: energyColor + '40' }]}>
+                    <Zap size={13} color={energyColor} /><Text style={[s.energyTxt, { color: energyColor }]}>{target.energy}</Text>
+                  </View>
                 )}
                 <PressableScale onPress={attack} disabled={target.energy < target.energyCost || fighting} style={{ flex: 1 }}>
                   <View style={[s.attackBtn, (target.energy < target.energyCost || fighting) && { opacity: 0.5 }]}>

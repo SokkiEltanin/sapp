@@ -3,37 +3,35 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Nemesis kosztuje TERAZ energię (cofnięty §177 design) + legendarne dropy x5 (2026-09-24)
+
+Pełny opis w ARCHITECTURE.md §178 — SUPERSEDUJE poniższy §177 co do nemesis. User na "∞ prób"
+z §177: "Czemu tam niby jest infinity, przecież ma zużywać energię jak walczę xd" — jasne
+odrzucenie diagnozy "nielimitowane próby to świadomy design". Cofnięte: `target.energy` dla
+nemesis dzieli TERAZ prawdziwą `eventEnergy` z raid/wydarzeniem (nie sztywna atrapa), bramka
+sprawdzania puli i `spendEventEnergy()` wywoływane jak dla reszty trybów, pigułka na ekranie
+walki i liście bossów (`bosses.tsx`) pokazuje realny stan bez ukrywania/wyjątku dla nemesis.
+Co ZOSTAJE z oryginalnego designu: brak deadline'u i TRWAŁY bank HP (nie resetuje się).
+
+Też: "I dawaj te dropy coin zwiększ tak o 5x xddd dawaj" — `LOOT_BOXES[].coins.jackpot` w
+`src/utils/petBoxes.ts` pomnożone x5 (sardine 30→150, iron 90→450, gold 200→1000, divine
+900→4500) — dawna wartość (30 przy koszcie skrzynki 35) była GORSZA niż cena własnej skrzynki
+nawet przy najrzadszym trafieniu, potwierdzone zrzutem usera. `DAILY_BOX`/`crates.ts` (darmowe)
+celowo NIETKNIĘTE — poza zakresem skargi. `tsc`/`jest` czyste (1105 testów, bez regresji).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: walka z Demon Słodyczy (nemesis) — pigułka
+czerwona, realnie SPADA z każdą próbą, WALCZ blokuje się przy 0 energii. Otwórz kilka skrzynek
+Sklepu — trafienie LEGENDARNEJ pokazuje nową, 5x wyższą kwotę monet.
+
 ## ✅ Boss-fight: zły kolor pigułki energii + myląca atrapa dla nemesis (2026-09-24)
 
-Pełny opis w ARCHITECTURE.md §177. User (zrzutem): "w pomiń walkę nie zużywa energii, przez co
-przy DEMON SŁODYCZY mogę w nieskończoność walczyć... energia pokazuje się niebieska zamiast
-czerwonej." "Pomiń walkę" bez winy — wynik walki jest rozstrzygnięty przed animacją. Realna
-przyczyna: (1) nielimitowane próby dla nemesis to ŚWIADOMY design (jak raid), ale
-`boss-fight.tsx` pokazywało fałszywą pigułkę "1" energii zamiast schować ją/wyjaśnić jak robi
-`bosses.tsx` — teraz pokazuje "∞ prób"; (2) kolor pigułki był na sztywno niebieski dla
+Pełny opis w ARCHITECTURE.md §177 — **UWAGA: część o "nielimitowane próby to świadomy design"
+COFNIĘTA w §178 wyżej**, ten wpis zostaje tylko dla historii koloru pigułki. User (zrzutem):
+"w pomiń walkę nie zużywa energii, przez co przy DEMON SŁODYCZY mogę w nieskończoność
+walczyć... energia pokazuje się niebieska zamiast czerwonej." "Pomiń walkę" bez winy — wynik
+walki jest rozstrzygnięty przed animacją. Kolor pigułki był na sztywno niebieski dla
 wszystkich trybów, gdy `bosses.tsx` ma ustalony kod: kampania/MAD niebieski, raid/wydarzenie
-czerwony — teraz zgodne. `tsc`/`jest` czyste (1105 testów, bez zmiany).
-
-**🆕 Priorytet testu na urządzeniu — średni**: walka z Demon Słodyczy → "∞ prób" na czerwono;
-walka raid/wydarzenie sezonowe → czerwona pigułka energii.
-
-## 🆕 Legendarne dropy muszą być OP — ekonomia nagród do przemyślenia (2026-09-24)
-
-User (zrzutem ekranu ze Sklepu): "zapisz na potem że legendarne dropy muszą być OP bo są
-zupełnie rzadkie, a tutaj wychodzę na -5 xddd monet." Zrzut: otwarcie skrzynki dało wynik
-"LEGENDARNA +30 monety" — najwyższa rzadkość, a poniżej w tym samym Sklepie widoczne skrzynki
-za 35/90/200/450 monet. Jeśli ta skrzynka kosztowała >30 monet (user liczy że wyszedł na
-minusie), najrzadszy możliwy wynik jest GORSZY finansowo niż samo kupno — to psuje sens
-rzadkości (powinna być ZAWSZE odczuwalnie najlepsza, nie loteryjnym rozczarowaniem).
-
-**Nie naprawione jeszcze — tylko zanotowane na wyraźną prośbę usera** ("zapisz na potem", nie
-"napraw teraz"). Do zbadania przy podjęciu: `src/utils/crates.ts` (`rollCrate`, `legendary:
-0.25` inflation index, `{ tier: 'legendary', coins: 100 }` przy 2% roll — TA wartość nie
-zgadza się z 30 monet ze zrzutu, więc ekran ze zrzutu prawdopodobnie woła INNĄ funkcję, np.
-`src/utils/petBoxes.ts`'s coinsy z gold/iron/silver skrzynek — trzeba znaleźć KTÓRA dokładnie
-ścieżka dała +30 i porównać z ceną skrzynki, którą user faktycznie kupił) i ogólny przegląd:
-czy `legendary` payout skaluje się z ceną skrzynki (droższa skrzynka → proporcjonalnie większy
-możliwy legendary drop), czy jest sztywną stałą niezależną od tego ile user zapłacił.
+(w tym TERAZ nemesis, po §178) czerwony — teraz zgodne. `tsc`/`jest` czyste.
 
 ## ✅ Liczniki runda 2 — pierścień zamiast paska + poświata (2026-09-24)
 
