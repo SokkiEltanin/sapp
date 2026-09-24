@@ -340,6 +340,11 @@ export default function BossFight() {
     (liveBossHp ?? target.maxHp)
   ) : 0;
   const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? (isMenace ? 'Nemesis' : 'Wydarzenie') : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
+  // Kolor pigułki energii MUSI zgadzać się z bosses.tsx (2026-09-24, user zrzutem: "energia
+  // tam pokazuje się niebieska zamiast czerwonej") — tam raid/wydarzenie (`eventEnergy`) są
+  // CZERWONE (#F87171), kampania/MAD (`energy`) BŁĘKITNE (#38BDF8); tu było na sztywno
+  // niebieskie dla WSZYSTKICH trybów, więc raid/wydarzenie realnie miały zły kolor puli.
+  const energyColor = (kind === 'raid' || (kind === 'event' && !isMenace)) ? '#F87171' : '#38BDF8';
   // Tło CAŁEGO ekranu (2026-09-14, user: "dodałem Ci całoekranowe lokacje GORSKILAS oraz
   // JUNGLA, one są na cały ekran... trzeba je ładnie zrobić") — per-miniboss dla quest/misja
   // (`fightArenaBg` sprawdza `MISSION_LOCATION_BG[target.id]` NAJPIERW), per-kind fallback dla
@@ -987,9 +992,25 @@ export default function BossFight() {
               <View style={s.floatingBarRow}>
                 {/* Pigułka energii — ta sama logika/format co dawny header (2026-09-07, "5/2...
                     jakby się przeładowywała" — SAM stan puli, nie ułamek), tylko teraz obok
-                    przycisku zamiast osobno nad scrollem. Quest/misja bez puli → pomijana. */}
+                    przycisku zamiast osobno nad scrollem. Quest/misja bez puli → pomijana.
+                    Nemesis (menace) NIE MA prawdziwej puli — `target.energy` to sztywna
+                    atrapa "1" tylko po to, żeby przycisk WALCZ! nigdy się nie wygaszał
+                    (`nielimitowane próby, jedynym hamulcem jest sama skala HP`, patrz
+                    petStore.ts's `menaceAttack`). bosses.tsx (lista) już to wie i CAŁKOWICIE
+                    chowa pigułkę dla nemesis — tu pokazywała fałszywe "1", co user (zrzutem,
+                    2026-09-24) czytał jako bug "nieskończenie walczę bez zużycia energii".
+                    Zamiast kopiować to samo ukrycie (na ekranie WALKI zniknięcie pigułki bez
+                    wyjaśnienia wyglądałoby na usterkę), pokazujemy wprost "∞ prób". */}
                 {kind !== 'quest' && kind !== 'mission' && (
-                  <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target.energy}</Text></View>
+                  isMenace ? (
+                    <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
+                      <Text style={[s.energyTxt, { color: '#F87171' }]}>∞ prób</Text>
+                    </View>
+                  ) : (
+                    <View style={[s.energyPill, { backgroundColor: energyColor + '18', borderColor: energyColor + '40' }]}>
+                      <Zap size={13} color={energyColor} /><Text style={[s.energyTxt, { color: energyColor }]}>{target.energy}</Text>
+                    </View>
+                  )
                 )}
                 <PressableScale onPress={attack} disabled={target.energy < target.energyCost || fighting} style={{ flex: 1 }}>
                   <View style={[s.attackBtn, (target.energy < target.energyCost || fighting) && { opacity: 0.5 }]}>
