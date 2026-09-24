@@ -19,9 +19,8 @@ Też: "I dawaj te dropy coin zwiększ tak o 5x xddd dawaj" — `LOOT_BOXES[].coi
 nawet przy najrzadszym trafieniu, potwierdzone zrzutem usera. `DAILY_BOX`/`crates.ts` (darmowe)
 celowo NIETKNIĘTE — poza zakresem skargi. `tsc`/`jest` czyste (1105 testów, bez regresji).
 
-**🆕 Priorytet testu na urządzeniu — wysoki**: walka z Demon Słodyczy (nemesis) — pigułka
-czerwona, realnie SPADA z każdą próbą, WALCZ blokuje się przy 0 energii. Otwórz kilka skrzynek
-Sklepu — trafienie LEGENDARNEJ pokazuje nową, 5x wyższą kwotę monet.
+**✅ Potwierdzone na urządzeniu (2026-09-24)** — user blankietowo: "reszte tez odhaczone bedzie
+najwyżej pisane tutaj jak bedzie nie tak".
 
 ## ✅ Boss-fight: zły kolor pigułki energii + myląca atrapa dla nemesis (2026-09-24)
 
@@ -46,8 +45,8 @@ usunięty `DonationBar.tsx` we wszystkich 3 miejscach (dashboard/`counters.tsx`/
 meta pokazuje próg następnego tieru zamiast gołego "dni". `tsc`/`jest` czyste (1105 testów,
 bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — wysoki**: zobacz oba widgety na dashboardzie (Odliczania
-z pierścieniami, Liczniki z poświatą) i `/counters` pełną listę.
+**✅ Potwierdzone na urządzeniu (2026-09-24)** — user blankietowo, patrz notatka przy §"Nemesis
+kosztuje TERAZ energię" wyżej.
 
 ## ✅ Trzy nowe custom bossy podpięte + kaczka wywalona (2026-09-23)
 
@@ -166,9 +165,8 @@ x2/kanał powiadomień/widget-flush) — owinięte nowym helperem `afterInteract
 (`InteractionManager.runAfterInteractions`), więc nie walczą już o wątek JS z renderem.
 `tsc`/`jest` czyste (1105 testów, bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — wysoki**: kilka cold-startów → Diagnostyka → sprawdź czy
-`(N próbek)` jest teraz > 0, i czy dotyk zaraz po starcie realnie działa płynniej. Jeśli nadal
-0 próbek, kongestia jest gdzie indziej (np. natywny most) — wróć z nowym exportem.
+**✅ Potwierdzone na urządzeniu (2026-09-24)** — user blankietowo, patrz notatka przy §"Nemesis
+kosztuje TERAZ energię" wyżej.
 
 ## ✅ Dwie korekty po realnym teście: widget przestał się dodawać + zły kolor tasków (2026-09-23)
 
@@ -221,7 +219,7 @@ kupić". Pierwszy natywny bridge module w projekcie (własny Kotlin przez
 pierwszym razem, user **potwierdził zrzutem ekranu na S22 Ultra**: realne dane, kolory rodzaju,
 działa.
 
-## 🆕 Widget "Zadania" — resize mniejszy + przezroczyste tło, WYMAGA NOWEGO APK + re-dodania widgetu (2026-09-23)
+## ✅ Widget "Zadania" — resize mniejszy + przezroczyste tło (2026-09-23, potwierdzone 2026-09-24)
 
 Pełny opis w ARCHITECTURE.md §166. Dwie prośby po pierwszym teście: (1) mniejszy resize w
 pionie — dodane jawne `minResizeWidth/Height` (wcześniej brakowało, więc Android brał
@@ -234,10 +232,7 @@ widget z buildu #1045 NIE dostanie ekranu configu retroaktywnie. Po zainstalowan
 **usuń obecny widget z pulpitu i dodaj go ponownie** żeby zobaczyć ustawienia przezroczystości.
 Sam mniejszy resize działa na już umieszczonym widgecie bez re-dodawania.
 
-**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK + re-dodania widgetu**: sprawdź
-że widget daje się skurczyć mocniej niż poprzednio, że po ponownym dodaniu pokazuje się ekran
-"Widget — Zadania" z przełącznikiem, że włączenie przezroczystości realnie chowa ciemne tło
-(widać tapetę), i że reszta (dane/tap/kolory) nadal działa.
+**✅ Potwierdzone na urządzeniu (2026-09-24)** — user: "Widget git cały".
 
 ## ✅ Taski — kolor rodzaju z powrotem na każdej karcie, nie tylko w nagłówku grupy (2026-09-23)
 
