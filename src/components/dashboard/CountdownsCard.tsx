@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CalendarClock } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Counter, isDuringEvent, daysUntil, daysUntilEnd, eventProgress, untilProgress, untilProgressStepped } from '@/store/countersStore';
-import DonationBar from '@/components/counters/DonationBar';
+import RingCountdown from '@/components/counters/RingCountdown';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -14,10 +14,11 @@ import { haptic } from '@/utils/haptics';
 // Guard `.length > 0 &&` ZOSTAJE w `index.tsx` (edytor dashboardu czyta `nodes[id]`'s
 // truthiness, patrz ARCHITECTURE.md).
 //
-// DonationBar (2026-09-23, user: "gruby napis w pasku wypełniając się jak donate na twitch")
-// zastąpił WalkProgress — nazwa licznika teraz mały podpis NAD paskiem (jak tytuł celu
-// donacji), a "za X dni"/"dziś!" ląduje W ŚRODKU grubego paska zamiast osobnym tekstem obok
-// nazwy — `cdDays` (stary, osobny tekst liczby dni) już nieużywany, usunięty.
+// RingCountdown (2026-09-24, user: "ten pasek za gruby, tanio... przerób na highend" —
+// zamockowałem 3 kierunki, user wybrał pierścień) zastąpił DonationBar (gruby pasek z
+// tekstem wpisanym w środek, 2026-09-23 — user: "wygląda na za gruby, tanio, stary chujowy
+// look"). Wiersz teraz: pierścień po lewej (liczba dni w środku) + nazwa/status/cel po
+// prawej, zamiast nazwy nad paskiem na całą szerokość.
 export interface CountdownsCardProps {
   countdowns: Counter[];
   cardBg: string;
@@ -45,12 +46,18 @@ function CountdownsCard({ countdowns, cardBg, accentColor }: CountdownsCardProps
           const label = during
             ? (endLeft <= 0 ? 'ostatni dzień!' : endLeft === 1 ? 'koniec jutro' : `koniec za ${endLeft} dni`)
             : (left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`);
-          const barColor = during ? '#2AC68F' : (cn.barColor || accentColor);
+          const ringColor = during ? '#2AC68F' : (cn.barColor || accentColor);
           const progress = during ? eventProgress(cn) : (cn.fillStyle === 'stepped' ? untilProgressStepped(cn) : untilProgress(cn));
+          const ringDays = Math.max(0, during ? endLeft : left);
+          const dateShort = cn.date.slice(5).split('-').reverse().join('.');
           return (
-            <TouchableOpacity key={cn.id} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
-              <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
-              <DonationBar progress={progress} color={barColor} label={label} />
+            <TouchableOpacity key={cn.id} style={s.cdRow} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
+              <RingCountdown progress={progress} color={ringColor} days={ringDays} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
+                <Text style={[s.cdStatus, { color: ringColor }]} numberOfLines={1}>{label}</Text>
+                <Text style={s.cdMeta} numberOfLines={1}>cel {dateShort}</Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -71,7 +78,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
   workToggleText: { fontSize: 10, fontWeight: '700' },
-  cdName: { fontSize: 12, fontWeight: '700', color: c.text.secondary, marginBottom: 4 },
+  cdRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  cdName: { fontSize: 14, fontWeight: '700', color: c.text.primary },
+  cdStatus: { fontSize: 13, fontWeight: '800', marginTop: 2 },
+  cdMeta: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 1 },
 }));
 
 export default memo(CountdownsCard);

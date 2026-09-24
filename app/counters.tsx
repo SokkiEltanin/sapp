@@ -7,7 +7,7 @@ import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
-import DonationBar from '@/components/counters/DonationBar';
+import RingCountdown from '@/components/counters/RingCountdown';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import { WeekStrip } from '@/components/counters/StreakCard';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
@@ -26,7 +26,7 @@ const todayStr = () => {
 };
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const ON_ACCENT = '#12100F';   // ciemny tekst/ikona na białym akcencie
-// Kolory paska donation-bar (2026-09-23, user: "można też dodać kolor paska") — ta sama
+// Kolory pierścienia odliczania (2026-09-23, user: "można też dodać kolor paska") — ta sama
 // paleta co swatche w items.tsx, żeby nie wymyślać nowych kolorów.
 const BAR_COLORS = ['#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24', '#F472B6', '#FB923C', '#E43434'];
 
@@ -52,7 +52,7 @@ export default function Counters() {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
-  const [barColor, setBarColor] = useState<string | undefined>(undefined);   // until: DonationBar color
+  const [barColor, setBarColor] = useState<string | undefined>(undefined);   // until: pierścienia kolor
   const [fillStyle, setFillStyle] = useState<'smooth' | 'stepped'>('smooth'); // until: pasek płynny/co dzień
   const [keyword, setKeyword] = useState('');
   const [presetKey, setPresetKey] = useState<string | undefined>(undefined);
@@ -137,16 +137,22 @@ export default function Counters() {
           const meta = during ? `w trakcie · wróć ${cn.endDate}`
             : cn.endDate && !over ? `${cn.date} → ${cn.endDate}${left > 1 ? ` · start za ${left} dni` : ''}`
             : `${cn.date}${!over && left > 1 ? ` · ${Math.round(prog * 100)}% drogi za Tobą` : ''}`;
+          const ringDays = Math.max(0, during ? endLeft : left);
           return (
-            <TouchableOpacity key={cn.id} style={s.card} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.85}>
-              <View style={s.cardTop}>
-                {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
-                <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
+            <TouchableOpacity key={cn.id} style={[s.card, s.cardRing]} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.85}>
+              <RingCountdown progress={prog} color={during ? '#2AC68F' : (cn.barColor || ACCENT)} days={ringDays} size={56} strokeWidth={5} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={s.cardTop}>
+                  {during ? <Car size={14} color="#2AC68F" /> : <CalendarClock size={13} color={ACCENT} />}
+                  <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
+                </View>
+                <Text style={[s.cardBigLabel, { color: during ? '#2AC68F' : (cn.barColor || ACCENT) }]} numberOfLines={1}>{bigLabel}</Text>
+                <Text style={s.cardMeta}>{meta}</Text>
+              </View>
+              <View style={s.cardActions}>
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
-              <DonationBar progress={prog} color={during ? '#2AC68F' : (cn.barColor || ACCENT)} label={bigLabel} />
-              <Text style={s.cardMeta}>{meta}</Text>
             </TouchableOpacity>
           );
         })}
@@ -299,14 +305,14 @@ export default function Counters() {
 
             {uiKind === 'until' && (
               <>
-                <Text style={s.fieldLabel}>Kolor paska</Text>
+                <Text style={s.fieldLabel}>Kolor pierścienia</Text>
                 <View style={s.swatchRow}>
                   {BAR_COLORS.map(col => (
                     <TouchableOpacity key={col} style={[s.swatch, { backgroundColor: col }, barColor === col && s.swatchOn]}
                       onPress={() => { haptic.tap(); setBarColor(col); }} activeOpacity={0.8} />
                   ))}
                 </View>
-                <Text style={s.fieldLabel}>Wypełnianie paska</Text>
+                <Text style={s.fieldLabel}>Wypełnianie pierścienia</Text>
                 <View style={s.trackRow}>
                   {([['smooth', 'Płynnie', 'rośnie co sekundę'], ['stepped', 'Co dzień', 'skacze raz na dobę']] as const).map(([k, lbl, sub]) => {
                     const active = fillStyle === k;
@@ -361,10 +367,15 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   section: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[2] },
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[3] },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing[2] },
+  // Pierścień zamiast paska (2026-09-24, user: "przerób na highend") — wiersz: pierścień |
+  // nazwa+status+meta | akcje edycji, zamiast paska na całą szerokość pod nazwą.
+  cardRing: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  cardActions: { flexDirection: 'row', gap: 2 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardName: { flex: 1, fontSize: 14, fontWeight: '700', color: c.text.primary },
+  cardBigLabel: { fontSize: 13, fontWeight: '800', marginTop: 2 },
   iconBtn: { padding: 3 },
-  cardMeta: { fontSize: 11, color: c.text.muted, marginTop: 6 },
+  cardMeta: { fontSize: 11, color: c.text.muted, marginTop: 2 },
 
   sinceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
   sinceBig: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },

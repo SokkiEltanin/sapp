@@ -10,7 +10,7 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
-import DonationBar from '@/components/counters/DonationBar';
+import RingCountdown from '@/components/counters/RingCountdown';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import { WeekStrip } from '@/components/counters/StreakCard';
 import {
@@ -153,12 +153,17 @@ export default function CounterDetail() {
                 {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
                 <Text style={s.cardTopLabel}>{during ? 'w trakcie wyjazdu' : 'odliczanie'}</Text>
               </View>
-              <DonationBar progress={prog} color={during ? '#2AC68F' : (counter.barColor || ACCENT)} label={bigLabel} />
-              <Text style={s.cardMeta}>
-                {during ? `w trakcie · wróć ${counter.endDate}`
-                  : counter.endDate && !over ? `${counter.date} → ${counter.endDate}`
-                  : counter.date}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4], marginTop: spacing[3] }}>
+                <RingCountdown progress={prog} color={during ? '#2AC68F' : (counter.barColor || ACCENT)} days={Math.max(0, during ? endLeft : left)} size={72} strokeWidth={7} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.cardBig, { color: during ? '#2AC68F' : (counter.barColor || ACCENT) }]} numberOfLines={1}>{bigLabel}</Text>
+                  <Text style={s.cardMeta}>
+                    {during ? `w trakcie · wróć ${counter.endDate}`
+                      : counter.endDate && !over ? `${counter.date} → ${counter.endDate}`
+                      : counter.date}
+                  </Text>
+                </View>
+              </View>
             </>
           ) : (
             <>

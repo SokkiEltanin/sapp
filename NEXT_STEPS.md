@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Liczniki runda 2 — pierścień zamiast paska + poświata (2026-09-24)
+
+Pełny opis w ARCHITECTURE.md §176. User: "te liczniki zjebałeś, pasek za gruby, tanio, stary
+chujowy look, przerób na highend, sprawdź opcje". Zamockowałem 3+2 kierunki w osobnym
+Artifact (dark theme 1:1 z apką) zamiast zgadywać trzeci raz — user wybrał pierścień
+(odliczania) i poświatę pod całym wierszem (ile dni temu). Nowy
+`src/components/counters/RingCountdown.tsx` (kołowy progress, react-native-svg) zastąpił
+usunięty `DonationBar.tsx` we wszystkich 3 miejscach (dashboard/`counters.tsx`/`counters/
+[id].tsx`). `SinceCountersCard.tsx` runda 2 — ikonka-chip zdjęta, duża liczba + `RadialGlow`
+(reużyty z battle-layout-lab.tsx) rozlany z lewej po całym wierszu zamiast za samą liczbą,
+meta pokazuje próg następnego tieru zamiast gołego "dni". `tsc`/`jest` czyste (1105 testów,
+bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: zobacz oba widgety na dashboardzie (Odliczania
+z pierścieniami, Liczniki z poświatą) i `/counters` pełną listę.
+
 ## ✅ Trzy nowe custom bossy podpięte + kaczka wywalona (2026-09-23)
 
 Pełny opis w ARCHITECTURE.md §175. Druga część item #7: user wypchnął 3 pliki bezpośrednio
