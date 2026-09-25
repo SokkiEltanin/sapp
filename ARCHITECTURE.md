@@ -11042,6 +11042,42 @@ płomienia ani kalendarza dni tygodnia/miesiąca, tylko dużą liczbę + tekst p
 
 ---
 
+## 182. Serwis/wymiana pojazdu: powiadomienie i etykiety gubiły "za ile dni" (2026-09-25)
+
+User: "I tak samo jak jest serwis wymiana to niech powiadomi, musi mieć za ile dni wymiana".
+
+**Dwa realne, osobne bugi znalezione w `src/utils/vehicleMatch.ts`'s `maintenanceDueMonths()`
+konsumentach** (funkcja sama, licząca UŁAMEK miesięcy do terminu, jest poprawna — problem był
+we WSZYSTKICH trzech miejscach, które ją renderowały):
+
+**(1) `Math.round()` na miesiącach gubił bliskie terminy.** Serwis za 6 dni to `due≈0.2`
+miesiąca — `Math.round(0.2)` = 0, więc etykieta brzmiała dosłownie "za ~0 mies." (bez sensu,
+akurat gdy to najważniejsze). Dotyczyło TRZECH miejsc: dashboard (`maintReminders` w
+`index.tsx`), `/vehicles`'s listy przypomnień per-pojazd (`remindText`), i `/vehicles`'s pełnej
+listy serwisów (`mMeta`). Fix: nowy, jeden `maintenanceDueLabel(due)` w `vehicleMatch.ts` —
+przełącza się na precyzyjne DNI poniżej 1 miesiąca (`za 6 dni`), miesiące zostają dla
+dalszych terminów (`za ~11 mies.`) — wszystkie trzy miejsca wołają teraz TĘ SAMĄ funkcję,
+zamiast trzech kopii tej samej logiki (i tego samego buga) osobno.
+
+**(2) Prawdziwe powiadomienie push "Serwis / wymiana" (`notificationsService.ts`'s
+`refreshMaintenanceReminder`) NIGDY nie zawierało informacji "za ile dni".** Treść budowała
+się z `maintReminders.map(r => `${r.label}${r.overdue ? ' (zaległe)' : ''}`)` — WYŁĄCZNIE
+`r.label` (np. "Moje Auto: Wymiana oleju") + opcjonalny "(zaległe)", `r.sub` (gdzie faktycznie
+liczba dni/miesięcy siedziała, liczona dla dashboardu) nigdy nie trafiał do treści samego
+powiadomienia. User nie miał jak zobaczyć ile dni zostało bez otwierania apki — dokładnie to,
+o co prosił. Fix: `labels` w `index.tsx` budują się teraz z `${r.label} — ${r.sub}` (np. "Moje
+Auto: Wymiana oleju — za 6 dni").
+
+**Testy**: nowy `describe('vehicleMatch — maintenanceDueLabel')` w `vehicleMatch.test.ts` (3
+testy: zaległe/dni/miesiące). `tsc --noEmit` czyste, `jest` czysty (1108 testów, +3).
+
+**Priorytet testu na urządzeniu — średni**: dodaj/edytuj serwis pojazdu z terminem za kilka dni
+— sprawdź (a) dashboard/`/vehicles` pokazują "za N dni" zamiast "za ~0 mies.", (b) treść
+powiadomienia "Serwis / wymiana" (Ustawienia → wyślij testowe, albo poczekaj na naturalne
+odpalenie) zawiera "— za N dni"/"— zaległe", nie samą nazwę serwisu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

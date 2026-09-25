@@ -21,7 +21,7 @@ import { weatherService } from '@/services/weatherService';
 import { Vehicle, VehicleKind, VehicleMaintenance, Expense } from '@/types';
 import {
   summarizeVehicle, expenseMatchesVehicle, mainCarId,
-  maintenanceDueMonths, maintenancePresets, VehicleSummary,
+  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, VehicleSummary,
 } from '@/utils/vehicleMatch';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -247,7 +247,7 @@ export default function VehiclesScreen() {
                     <TouchableOpacity key={m.id} onPress={() => redoMaintenance(v, m)} style={[s.remindChip, (due! <= 0) ? s.remindBad : s.remindWarn]} activeOpacity={0.75}>
                       <Wrench size={11} color={due! <= 0 ? c.accent.red : c.accent.amber} />
                       <Text style={[s.remindText, { color: due! <= 0 ? c.accent.red : c.accent.amber }]}>
-                        {m.label}: {due! <= 0 ? 'zaległe' : `za ~${Math.round(due!)} mies.`} · zrobione
+                        {m.label}: {maintenanceDueLabel(due!)} · zrobione
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -299,7 +299,7 @@ export default function VehiclesScreen() {
                           <Text style={s.mMeta}>
                             {new Date(m.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: '2-digit' })}
                             {m.intervalMonths ? ` · co ${m.intervalMonths} mies.` : ''}
-                            {due != null ? (due <= 0 ? ' · zaległe' : ` · za ~${Math.round(due)} mies.`) : ''}
+                            {due != null ? ` · ${maintenanceDueLabel(due)}` : ''}
                             {linked ? ` · ${linked.amount.toFixed(0)} zł` : ''}
                           </Text>
                         </View>

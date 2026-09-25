@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Serwis/wymiana pojazdu: powiadomienie i etykiety gubiły "za ile dni" (2026-09-25)
+
+Pełny opis w ARCHITECTURE.md §182. User: "jak jest serwis wymiana to niech powiadomi, musi
+mieć za ile dni wymiana". Dwa osobne bugi w `maintenanceDueMonths()`'s trzech konsumentach:
+(1) `Math.round()` na ułamku miesięcy gubił bliskie terminy — serwis za 6 dni (`due≈0.2`)
+pokazywał się jako "za ~0 mies." na dashboardzie i w DWÓCH miejscach na `/vehicles` — nowy,
+jeden `maintenanceDueLabel()` w `vehicleMatch.ts` przełącza się na dni poniżej 1 miesiąca,
+wszystkie 3 miejsca wołają teraz TĘ SAMĄ funkcję; (2) prawdziwe powiadomienie push "Serwis /
+wymiana" NIGDY nie zawierało "za ile dni" — treść budowała się tylko z nazwy serwisu, licznik
+dni (`r.sub`) liczony dla dashboardu nigdy nie trafiał do samego powiadomienia — teraz trafia
+(`"Nazwa — za N dni"`). `tsc`/`jest` czyste (1108 testów, +3 nowe na `maintenanceDueLabel`).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dodaj/edytuj serwis pojazdu z terminem za kilka
+dni — dashboard/`/vehicles` mają pokazać "za N dni" (nie "za ~0 mies."), a treść powiadomienia
+"Serwis / wymiana" ma zawierać "— za N dni"/"— zaległe", nie samą nazwę serwisu.
+
 ## ✅ Ile dni temu: usunięty CAŁY "streak" look (flame+kalendarz) z 3 miejsc naraz (2026-09-25)
 
 Pełny opis w ARCHITECTURE.md §181 — dokończenie wpisu poniżej. User zrzutem po fixie ze
