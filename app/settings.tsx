@@ -44,8 +44,8 @@ import { ExpenseCategory, DEFAULT_WORK_SETTINGS, Employer } from '@/types';
 import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
-import { useWidgetSettingsStore } from '@/store/widgetSettingsStore';
-import { setWidgetTransparent } from '@/services/widgetSync';
+import { useWidgetSettingsStore, WidgetTextScale } from '@/store/widgetSettingsStore';
+import { setWidgetAppearance } from '@/services/widgetSync';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
@@ -143,6 +143,11 @@ function SettingsCategoryRow({ section, onPress }: { section: SettingsSectionDef
     </PressableScale>
   );
 }
+
+// Paleta koloru tła widgetu "Zadania" (2026-09-25, user: "koloru w razie czego") — domyślny
+// ciemny (dawny sztywny kolor widget_bg.xml) + ta sama paleta akcentów co swatche gdzie
+// indziej w apce (counters.tsx's BAR_COLORS), żeby nie wymyślać nowych kolorów.
+const WIDGET_BG_COLORS = ['#1A1C1C', '#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24', '#F472B6', '#FB923C', '#E43434'];
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -376,12 +381,22 @@ export default function SettingsScreen() {
   const [classPrefix, setClassPrefix] = useState(classPrefixStore);
   useEffect(() => { setClassPrefix(classPrefixStore); }, [classPrefixStore]);
   const saveClassPrefix = (prefix: string) => setClassPrefixStore(prefix.trim());
-  // Widget pulpitu "Zadania" (2026-09-23) — zwykły przełącznik zamiast osobnego natywnego
-  // ekranu configu (odrzucony po tym jak zgate'ował dodawanie widgetu, patrz
-  // widgetSettingsStore.ts). Zapisuje JS-side (do pokazania stanu przełącznika) I woła
-  // natywny most (rzeczywiste źródło prawdy dla renderowania widgetu).
-  const widgetTransparent = useWidgetSettingsStore(s => s.transparentBg);
-  const setWidgetTransparentStore = useWidgetSettingsStore(s => s.setTransparentBg);
+  // Widget pulpitu "Zadania" (2026-09-23, rozbudowane 2026-09-25: przezroczystość/kolor/
+  // wielkość tekstu) — zwykłe kontrolki zamiast osobnego natywnego ekranu configu (odrzucony
+  // po tym jak zgate'ował dodawanie widgetu, patrz widgetSettingsStore.ts). Zapisują JS-side
+  // (do pokazania stanu w Ustawieniach) I wołają natywny most (rzeczywiste źródło prawdy dla
+  // renderowania widgetu) — `applyWidgetAppearance()` robi oba na raz, jedno wywołanie zamiast
+  // trzech osobnych.
+  const widgetOpacity = useWidgetSettingsStore(s => s.bgOpacity);
+  const widgetColor = useWidgetSettingsStore(s => s.bgColor);
+  const widgetTextScale = useWidgetSettingsStore(s => s.textScale);
+  const setWidgetOpacityStore = useWidgetSettingsStore(s => s.setBgOpacity);
+  const setWidgetColorStore = useWidgetSettingsStore(s => s.setBgColor);
+  const setWidgetTextScaleStore = useWidgetSettingsStore(s => s.setTextScale);
+  const applyWidgetAppearance = (opacity: number, color: string, textScale: WidgetTextScale) => {
+    setWidgetOpacityStore(opacity); setWidgetColorStore(color); setWidgetTextScaleStore(textScale);
+    setWidgetAppearance(opacity, color, textScale);
+  };
   // Editable overrides for the two inputs the rate is built from. Empty = use the
   // value the app reads (previous-month calendar hours / last [JD] paycheck).
   const [hoursOvrField, setHoursOvrField]   = useState(workSettings.hoursOverride != null ? String(workSettings.hoursOverride) : '');
@@ -1345,21 +1360,107 @@ export default function SettingsScreen() {
       ],
     },
     {
-      // Widget pulpitu "Zadania" (2026-09-23) — na razie JEDNO ustawienie (przezroczyste
-      // tło). Zwykły przełącznik, nie gate'uje dodawania widgetu (patrz komentarz przy
-      // widgetTransparent wyżej).
+      // Widget pulpitu "Zadania" (2026-09-23, rozbudowane 2026-09-25, user: "slider
+      // przezroczystości, koloru w razie czego, wielkość tekstu") — trzy kontrolki, żadna nie
+      // gate'uje dodawania widgetu (patrz komentarz przy widgetOpacity wyżej). Stopniowany
+      // "slider" (5 kroków) zamiast prawdziwego przeciąganego suwaka — w projekcie nie ma
+      // jeszcze zależności na ciągły slider, a stopniowane przyciski to ten sam, już ustalony
+      // wzorzec co reszta Ustawień (np. "Płeć"/"Poziom treningowy" wyżej w pliku).
       id: 'widget-zadania', title: 'Widget pulpitu — Zadania', icon: LucideIcons.LayoutGrid, color: '#ECEEEE', defaultOpen: false,
-      keywords: ['widget', 'pulpit', 'zadania', 'ekran główny', 'przezroczyste'],
+      keywords: ['widget', 'pulpit', 'zadania', 'ekran główny', 'przezroczyste', 'kolor', 'tekst', 'czcionka'],
       items: [
         {
-          id: 'widget-transparent', title: 'Przezroczyste tło',
-          subtitle: 'Widget pokazuje Twoją tapetę zamiast ciemnej karty',
-          icon: LucideIcons.LayoutGrid, accentColor: '#ECEEEE',
-          keywords: ['widget', 'przezroczyste', 'tło', 'tapeta'],
-          control: {
-            kind: 'switch', value: widgetTransparent,
-            onChange: (v: boolean) => { haptic.tap(); setWidgetTransparentStore(v); setWidgetTransparent(v); },
-          },
+          id: 'widget-opacity', title: 'Przezroczystość tła',
+          subtitle: widgetOpacity === 0 ? 'Widget pokazuje Twoją tapetę zamiast karty' : `${widgetOpacity}% nieprzezroczyste`,
+          keywords: ['widget', 'przezroczyste', 'tło', 'tapeta', 'opacity'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#ECEEEE18' }]}>
+                  <LucideIcons.Contrast size={16} color="#ECEEEE" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Przezroczystość tła</Text>
+                  <Text style={styles.rowSub}>{widgetOpacity === 0 ? 'Widget pokazuje Twoją tapetę zamiast karty' : `${widgetOpacity}% nieprzezroczyste`}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {[0, 25, 50, 75, 100].map(pct => {
+                  const on = widgetOpacity === pct;
+                  return (
+                    <PressableScale key={pct} onPress={() => { haptic.tap(); applyWidgetAppearance(pct, widgetColor, widgetTextScale); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#ECEEEE22' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#ECEEEE' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#ECEEEE' : colors.text.secondary }}>{pct}%</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          ) },
+        },
+        {
+          id: 'widget-color', title: 'Kolor tła',
+          subtitle: 'Widoczny tylko gdy przezroczystość jest powyżej 0%',
+          keywords: ['widget', 'kolor', 'tło'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#ECEEEE18' }]}>
+                  <LucideIcons.Palette size={16} color="#ECEEEE" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Kolor tła</Text>
+                  <Text style={styles.rowSub}>Widoczny tylko gdy przezroczystość jest powyżej 0%</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
+                {WIDGET_BG_COLORS.map(col => (
+                  <PressableScale key={col} onPress={() => { haptic.tap(); applyWidgetAppearance(widgetOpacity, col, widgetTextScale); }}>
+                    <View style={[styles.widgetSwatch, { backgroundColor: col }, widgetColor === col && styles.widgetSwatchOn]} />
+                  </PressableScale>
+                ))}
+              </View>
+            </View>
+          ) },
+        },
+        {
+          id: 'widget-text-scale', title: 'Wielkość tekstu',
+          subtitle: widgetTextScale === 'small' ? 'Mały' : widgetTextScale === 'large' ? 'Duży' : 'Średni',
+          keywords: ['widget', 'tekst', 'czcionka', 'wielkość', 'rozmiar'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#ECEEEE18' }]}>
+                  <LucideIcons.Type size={16} color="#ECEEEE" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Wielkość tekstu</Text>
+                  <Text style={styles.rowSub}>Dostosuj do preferencji wyświetlania</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['small', 'Mały'], ['medium', 'Średni'], ['large', 'Duży']] as [WidgetTextScale, string][]).map(([scale, lbl]) => {
+                  const on = widgetTextScale === scale;
+                  return (
+                    <PressableScale key={scale} onPress={() => { haptic.tap(); applyWidgetAppearance(widgetOpacity, widgetColor, scale); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#ECEEEE22' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#ECEEEE' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#ECEEEE' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          ) },
         },
       ],
     },
@@ -2518,6 +2619,8 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   rowText: { flex: 1 },
   rowLabel: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
   rowSub: { ...typography.caption, color: c.text.muted, marginTop: 1 },
+  widgetSwatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  widgetSwatchOn: { borderColor: c.text.primary },
   diagBox: {
     paddingTop: spacing[3], paddingHorizontal: spacing[4], paddingBottom: spacing[4],
     borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2],

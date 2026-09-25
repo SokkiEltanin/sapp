@@ -38,8 +38,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.net.Uri
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -58,9 +63,20 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
     // per-instancja. Android wymaga żeby taki ekran zwrócił RESULT_OK zanim W OGÓLE dokończy
     // dodawanie widgetu — user zgłosił że po tej zmianie dodanie widgetu przestało działać
     // ("nic sie nie dodaje"), bo bez jawnego zapisu na tamtym ekranie Android po cichu
-    // anulował całe dodanie. Usunięty na rzecz zwykłego przełącznika w Ustawieniach (JS →
-    // TasksWidgetModule.setTransparent()), który niczego nie gate'uje.
-    const val PREF_TRANSPARENT = "transparent"
+    // anulował całe dodanie. Usunięty na rzecz zwykłych kontrolek w Ustawieniach (JS →
+    // TasksWidgetModule.setAppearance()), które niczego nie gate'ują.
+    //
+    // Runda 2 (2026-09-25, user: "slider przezroczystości, koloru w razie czego, wielkość
+    // tekstu") — binarny PREF_TRANSPARENT zastąpiony trzema wartościami: opacity 0-100 (nie
+    // sam on/off), dowolny kolor tła (nie tylko domyślny ciemny), i skala tekstu. Tło renderuje
+    // się TERAZ jako bitmapa (zaokrąglony prostokąt narysowany na Canvas, patrz bgBitmap())
+    // zamiast statycznego drawable/koloru na sztywno — to jedyny sposób połączyć DOWOLNY
+    // kolor+alpha z zachowanymi zaokrąglonymi rogami przez RemoteViews (który nie potrafi
+    // dynamicznie pokolorować drawable). widget_bg_image (ImageView, scaleType=fitXY) leży
+    // POD treścią w FrameLayout — patrz widgetLayoutXml() w tym pliku (JS, nie Kotlin).
+    const val PREF_BG_OPACITY = "bg_opacity"     // Int 0-100
+    const val PREF_BG_COLOR = "bg_color"         // String hex, np. "#1A1C1C"
+    const val PREF_TEXT_SCALE = "text_scale"     // String: "small" | "medium" | "large"
     private const val ROWS = ${ROWS}
     private val ROW_IDS = intArrayOf(${rowIds})
     private val DOT_IDS = intArrayOf(${dotIds})
@@ -80,15 +96,58 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
       } catch (e: Exception) {}
     }
 
+    // Zaokrąglony prostokąt (kolor+alpha+subtelna obwódka) narysowany na Canvas — stała
+    // wielkość "kafelka" w px, rozciągnięty przez fitXY na cały widget. Zniekształcenie rogów
+    // przy rozciąganiu jest w praktyce niezauważalne (promień 20dp jest mały względem
+    // typowych wymiarów widgetu, 250x140dp+). Jedyny sposób na dowolny kolor+przezroczystość
+    // BEZ tracenia zaokrąglonych rogów przez RemoteViews (patrz komentarz przy PREF_BG_OPACITY).
+    private fun bgBitmap(context: Context, argb: Int): Bitmap {
+      val d = context.resources.displayMetrics.density
+      val w = (300 * d).toInt().coerceAtLeast(1)
+      val h = (160 * d).toInt().coerceAtLeast(1)
+      val radius = 20f * d
+      val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(bmp)
+      val rect = RectF(1f, 1f, w - 1f, h - 1f)
+      val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = argb; style = Paint.Style.FILL }
+      canvas.drawRoundRect(rect, radius, radius, fill)
+      val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x1FFFFFFF; style = Paint.Style.STROKE; strokeWidth = d
+      }
+      canvas.drawRoundRect(rect, radius, radius, stroke)
+      return bmp
+    }
+
+    private fun applyTextScale(views: RemoteViews, scale: String) {
+      val mult = when (scale) { "small" -> 0.85f; "large" -> 1.2f; else -> 1f }
+      views.setTextViewTextSize(R.id.widget_header, TypedValue.COMPLEX_UNIT_SP, 10f * mult)
+      views.setTextViewTextSize(R.id.widget_empty, TypedValue.COMPLEX_UNIT_SP, 13f * mult)
+      for (i in 0 until ROWS) {
+        views.setTextViewTextSize(TITLE_IDS[i], TypedValue.COMPLEX_UNIT_SP, 13f * mult)
+        views.setTextViewTextSize(SUB_IDS[i], TypedValue.COMPLEX_UNIT_SP, 10f * mult)
+      }
+    }
+
     private fun buildViews(context: Context): RemoteViews {
       val views = RemoteViews(context.packageName, R.layout.tasks_widget)
+      val p = prefs(context)
 
-      val transparent = prefs(context).getBoolean(PREF_TRANSPARENT, false)
-      if (transparent) {
-        views.setInt(R.id.widget_root, "setBackgroundColor", Color.TRANSPARENT)
+      val opacity = p.getInt(PREF_BG_OPACITY, 100).coerceIn(0, 100)
+      if (opacity <= 0) {
+        views.setViewVisibility(R.id.widget_bg_image, View.GONE)
       } else {
-        views.setInt(R.id.widget_root, "setBackgroundResource", R.drawable.widget_bg)
+        views.setViewVisibility(R.id.widget_bg_image, View.VISIBLE)
+        val colorHex = p.getString(PREF_BG_COLOR, "#1A1C1C") ?: "#1A1C1C"
+        val alpha = (opacity * 255 / 100).coerceIn(0, 255)
+        try {
+          val rgb = Color.parseColor(colorHex) and 0x00FFFFFF
+          val argb = (alpha shl 24) or rgb
+          views.setImageViewBitmap(R.id.widget_bg_image, bgBitmap(context, argb))
+        } catch (e: Exception) {
+          views.setViewVisibility(R.id.widget_bg_image, View.GONE)
+        }
       }
+      applyTextScale(views, p.getString(PREF_TEXT_SCALE, "medium") ?: "medium")
 
       val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse("sapp://tasks")).apply {
         setPackage(context.packageName)
@@ -152,13 +211,17 @@ class ${MODULE_CLASS}(reactContext: ReactApplicationContext) : ReactContextBaseJ
     ${PROVIDER_CLASS}.updateAll(reactApplicationContext)
   }
 
-  // Ustawienia → przełącznik "Przezroczyste tło widgetu" (2026-09-23) — zwykły, nie-gate'ujący
-  // sposób na tę samą funkcję co odrzucony ekran "configure" (patrz komentarz w
-  // TasksWidgetProvider.kt).
+  // Ustawienia → sekcja "Widget pulpitu — Zadania" (2026-09-23, rozbudowane 2026-09-25, user:
+  // "slider przezroczystości, koloru w razie czego, wielkość tekstu") — zwykłe, nie-gate'ujące
+  // kontrolki, ten sam wzorzec co odrzucony ekran "configure" (patrz komentarz w
+  // TasksWidgetProvider.kt). Jedno wywołanie zamiast trzech osobnych — jeden zapis
+  // SharedPreferences + jedno przemalowanie zamiast trzech.
   @ReactMethod
-  fun setTransparent(value: Boolean) {
+  fun setAppearance(opacityPct: Double, color: String, textScale: String) {
     ${PROVIDER_CLASS}.prefs(reactApplicationContext).edit()
-      .putBoolean(${PROVIDER_CLASS}.PREF_TRANSPARENT, value)
+      .putInt(${PROVIDER_CLASS}.PREF_BG_OPACITY, opacityPct.toInt())
+      .putString(${PROVIDER_CLASS}.PREF_BG_COLOR, color)
+      .putString(${PROVIDER_CLASS}.PREF_TEXT_SCALE, textScale)
       .apply()
     ${PROVIDER_CLASS}.updateAll(reactApplicationContext)
   }
@@ -222,45 +285,52 @@ function widgetRowXml(i) {
 
 function widgetLayoutXml() {
   const rows = Array.from({ length: ROWS }, (_, i) => widgetRowXml(i)).join('\n');
+  // FrameLayout (2026-09-25, user: "slider przezroczystości, koloru w razie czego") —
+  // `widget_bg_image` (bitmapa narysowana w TasksWidgetProvider.kt's `bgBitmap()`, dowolny
+  // kolor+alpha z zachowanymi zaokrąglonymi rogami) leży POD treścią zamiast statycznego
+  // `android:background` na sztywno. `widget_root` (klik + tap target) przeniesiony na
+  // FrameLayout, treść ma teraz własne id `widget_content`.
   return `<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_bg"
-    android:padding="10dp">
+    android:layout_height="match_parent">
 
-    <TextView
+    <ImageView
+        android:id="@+id/widget_bg_image"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="ZADANIA"
-        android:textColor="#8A8F8F"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:paddingBottom="4dp" />
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
 
-    <TextView
-        android:id="@+id/widget_empty"
+    <LinearLayout
+        android:id="@+id/widget_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Brak zaległych zadań \u{1F389}"
-        android:textColor="#ECEEEE"
-        android:textSize="13sp"
-        android:visibility="gone" />
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/widget_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ZADANIA"
+            android:textColor="#8A8F8F"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Brak zaległych zadań \u{1F389}"
+            android:textColor="#ECEEEE"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
 ${rows}
-</LinearLayout>
-`;
-}
-
-function widgetBgXml() {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#1A1C1C" />
-    <corners android:radius="20dp" />
-    <stroke android:width="1dp" android:color="#1FFFFFFF" />
-</shape>
+    </LinearLayout>
+</FrameLayout>
 `;
 }
 
@@ -312,7 +382,6 @@ function withSources(config) {
     fs.mkdirSync(drawableDir, { recursive: true });
     fs.mkdirSync(xmlDir, { recursive: true });
     fs.writeFileSync(path.join(layoutDir, 'tasks_widget.xml'), widgetLayoutXml(), 'utf8');
-    fs.writeFileSync(path.join(drawableDir, 'widget_bg.xml'), widgetBgXml(), 'utf8');
     fs.writeFileSync(path.join(drawableDir, 'widget_dot_circle.xml'), widgetDotXml(), 'utf8');
     fs.writeFileSync(path.join(xmlDir, 'tasks_widget_info.xml'), widgetInfoXml(), 'utf8');
     return cfg;

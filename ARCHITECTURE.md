@@ -11078,6 +11078,56 @@ odpalenie) zawiera "— za N dni"/"— zaległe", nie samą nazwę serwisu.
 
 ---
 
+## 183. Widget "Zadania": przezroczystość-stopniowana + kolor tła + wielkość tekstu (2026-09-25)
+
+User: "Dodajmy modyfikacje tego widgetu. Slider przezroczystości może, koloru w razie czego.
+Dodajmy możliwość zmiany wielkości tekstu żeby dostosować sobie do preferencji wyświetlania".
+
+**Binarny `PREF_TRANSPARENT` (on/off) zastąpiony trzema wartościami** w
+`plugins/withTasksWidget.js` (natywny Kotlin, `TasksWidgetProvider`/`TasksWidgetModule`):
+`bg_opacity` (Int 0-100, nie sam wł/wył), `bg_color` (dowolny hex, nie tylko sztywny ciemny),
+`text_scale` (small/medium/large). Jedno wywołanie z JS (`setAppearance()`) zamiast trzech
+osobnych — jeden zapis SharedPreferences + jedno przemalowanie.
+
+**Tło renderuje się teraz jako BITMAPA** (`bgBitmap()` w `TasksWidgetProvider.kt`, Canvas +
+`drawRoundRect`, zaokrąglony prostokąt z subtelną obwódką jak dawny statyczny
+`widget_bg.xml` — TEN plik teraz usunięty, nieużywany) zamiast statycznego drawable/koloru na
+sztywno — jedyny sposób połączyć DOWOLNY kolor+alpha z zachowanymi zaokrąglonymi rogami przez
+RemoteViews (który nie potrafi dynamicznie pokolorować zasobu-drawable). Layout przebudowany z
+płaskiego `LinearLayout` na `FrameLayout` (`widget_bg_image` ImageView pod treścią,
+`widget_content` LinearLayout na wierzchu) — `widget_root` (klik + tap target) teraz na samym
+FrameLayout. Wielkość tekstu: `applyTextScale()` woła `RemoteViews.setTextViewTextSize()` na
+nagłówku/pustym-stanie/każdym z 6 wierszy, mnożnik 0.85x/1x/1.2x względem bazowych rozmiarów
+(10sp/13sp).
+
+**Ustawienia** (`app/settings.tsx`'s sekcja "Widget pulpitu — Zadania"): switch zastąpiony
+TRZEMA kontrolkami tego samego "stopniowany wybór" wzorca co reszta pliku (np. "Płeć"/"Poziom
+treningowy") — stopniowany 5-krokowy "slider" przezroczystości (0/25/50/75/100%, nie
+prawdziwy przeciągany suwak — w projekcie brak zależności na ciągły slider, stopniowane
+przyciski to świadomy, spójny z resztą apki wybór), swatche koloru (8: domyślny ciemny +
+paleta z `counters.tsx`'s `BAR_COLORS`), segmentowany wybór wielkości tekstu (Mały/Średni/
+Duży).
+
+**`widgetSettingsStore.ts`**: `transparentBg: boolean` → `bgOpacity`/`bgColor`/`textScale`, z
+migracją `version: 2` (stary `transparentBg: true` → `bgOpacity: 0`, zachowuje wybór usera
+zamiast go ciche resetować).
+
+**Testy**: brak nowych (czysto UI/natywna zmiana wyglądu, bez nowej logiki do testowania w
+Jest). `tsc --noEmit` czyste, `jest` czysty (1108 testów, bez zmiany).
+
+**WYMAGA NOWEGO APK** (natywny Kotlin/layout) — ale, w przeciwieństwie do §166 (przezroczystość
+runda 1), NIE wymaga re-dodania widgetu: mechanizm SharedPreferences-czytanych-przy-update jest
+ten sam co dawny `PREF_TRANSPARENT`, tylko bogatszy — istniejący, już umieszczony widget
+podchwyci nowe wartości przy najbliższym `updateAll()` (np. po otwarciu Ustawień i zmianie
+którejkolwiek kontrolki).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → Widget pulpitu — Zadania → przetestuj
+wszystkie 3 kontrolki (przezroczystość 0/25/50/75/100%, kilka kolorów, 3 wielkości tekstu) i
+sprawdź że widget na pulpicie faktycznie się zmienia po każdej — zaokrąglone rogi/obwódka mają
+zostać widoczne przy każdej kombinacji koloru+przezroczystości (nie kwadratowe rogi).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
