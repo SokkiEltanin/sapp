@@ -31,10 +31,11 @@ export async function syncTasksWidget(tasks: Task[]): Promise<void> {
   } catch {}
 }
 
-// Ustawienia → przełącznik "Przezroczyste tło widgetu" (2026-09-23) — pisze do natywnego
+// Ustawienia → sekcja "Widget pulpitu — Zadania" (2026-09-23, rozbudowane 2026-09-25:
+// przezroczystość/kolor/wielkość tekstu, patrz widgetSettingsStore.ts) — pisze do natywnego
 // SharedPreferences (jedna GLOBALNA wartość, nie per-instancja — po odrzuceniu osobnego
-// ekranu configu, patrz widgetSettingsStore.ts) i budzi widget, żeby przemalował się od razu.
-export function setWidgetTransparent(value: boolean): void {
+// ekranu configu) i budzi widget, żeby przemalował się od razu.
+export function setWidgetAppearance(opacity: number, color: string, textScale: string): void {
   if (Platform.OS !== 'android') return;
-  NativeModules.TasksWidget?.setTransparent?.(value);
+  NativeModules.TasksWidget?.setAppearance?.(opacity, color, textScale);
 }

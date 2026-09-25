@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Widget "Zadania": przezroczystość-stopniowana + kolor + wielkość tekstu, WYMAGA NOWEGO APK (2026-09-25)
+
+Pełny opis w ARCHITECTURE.md §183. User: "Slider przezroczystości może, koloru w razie czego.
+Dodajmy możliwość zmiany wielkości tekstu". Binarny przełącznik przezroczystości zastąpiony
+trzema kontrolkami w Ustawieniach → Widget pulpitu — Zadania: stopniowana przezroczystość
+(0/25/50/75/100%), 8 kolorów tła, 3 wielkości tekstu (Mały/Średni/Duży). Tło widgetu renderuje
+się teraz jako bitmapa (Canvas+drawRoundRect) zamiast statycznego drawable — jedyny sposób na
+dowolny kolor+alpha z zachowanymi zaokrąglonymi rogami przez RemoteViews. `tsc`/`jest` czyste
+(1108 testów, bez zmiany — czysto wizualna/natywna zmiana).
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK (BEZ re-dodania widgetu — patrz
+§183)**: przetestuj wszystkie 3 kontrolki i sprawdź że widget na pulpicie się zmienia po
+każdej, z zachowanymi zaokrąglonymi rogami/obwódką przy każdej kombinacji.
+
 ## ✅ Serwis/wymiana pojazdu: powiadomienie i etykiety gubiły "za ile dni" (2026-09-25)
 
 Pełny opis w ARCHITECTURE.md §182. User: "jak jest serwis wymiana to niech powiadomi, musi
