@@ -11006,6 +11006,42 @@ kafelku "Liczniki" (ten z pierścieniem/poświatą) niżej na dashboardzie.
 
 ---
 
+## 181. Ile dni temu: usunięty CAŁY "streak" look (flame+kalendarz) z 3 miejsc naraz (2026-09-25)
+
+User zrzutem po §180 (kafelek "Liczniki" na dashboardzie): "to ma być ile dni temu coś
+robiłem, a to wygląda i teraz pokazuje jak seria jakaś, i jak klikam tez pokazuje jak serię...
+weź to przemyśl i napraw raz a dobrze".
+
+**Root cause namierzony precyzyjnie**: `SinceCountersCard.tsx`'s runda 2 (§176/§178) przerobiła
+TYLKO wiersze `since.slice(1,7)` na duża-liczba+poświata — ale PIERWSZY (najdłuższy) wpis
+zawsze renderował się przez `<StreakCard>` (flame-chip + pasek dni tygodnia/miesiąca,
+dosłowny komponent "streak"). Z JEDNYM licznikiem na koncie (typowy start) ten wpis to
+ZAWSZE "najdłuższy" — user nigdy nie widział nowego designu, tylko starą, dosłowną "serię".
+To samo `StreakFlame`+`WeekStrip` (kalendarz dni tygodnia/miesiąca) siedziało jeszcze w DWÓCH
+innych miejscach dla TEGO SAMEGO typu licznika: `/counters` (lista, sekcja "Ile dni temu/
+bez…") i `/counters/[id]` (ekran szczegółów, do którego prowadzi tap z dashboardu — stąd
+"jak klikam też pokazuje jak serię").
+
+**Fix — wszystkie 3 miejsca naraz, jednolity wygląd**: `StreakCard`/`StreakFlame`/`WeekStrip`
+usunięte z `SinceCountersCard.tsx`, `app/counters.tsx`, `app/counters/[id].tsx` — zastąpione
+wszędzie tym samym wzorcem: duża kolorowana liczba (`fonts.display`, kolor z `streakColor()`)
++ tekst progu tieru (`streakTier()`, "TIER · próg za N dni"), bez ikony płomienia i bez
+kalendarza-paska dni. `StreakCard.tsx` (plik) USUNIĘTY całkowicie — po tej zmianie nic go już
+nie importowało (`StreakStrip`/`WeekStrip`/default `StreakCard` — martwy kod). `StreakFlame`/
+`streakColor`/`streakTier` (z `StreakFlame.tsx`) ZOSTAJĄ — używane w `StreakWallCard.tsx`
+("Twoje Serie"), gdzie flame+kalendarz jest właściwym designem dla PRAWDZIWYCH auto-streaków
+(Woda/Bez Słodyczy), których to zgłoszenie NIE dotyczyło.
+
+**Testy**: `tsc --noEmit` czyste, `jest` czysty (1105 testów, bez zmiany — czysto wizualna
+zmiana, brak testów renderujących te komponenty w izolacji).
+
+**Priorytet testu na urządzeniu — wysoki**: "Jadłem jeżyki" (albo dowolny ręczny licznik "ile
+dni temu") — sprawdź WSZĘDZIE naraz: kafelek "Liczniki" na dashboardzie, `/counters` lista,
+i ekran szczegółów po tapnięciu — żadne z tych trzech miejsc nie powinno już pokazywać ikony
+płomienia ani kalendarza dni tygodnia/miesiąca, tylko dużą liczbę + tekst progu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -11,8 +11,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import RingCountdown from '@/components/counters/RingCountdown';
-import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
-import { WeekStrip } from '@/components/counters/StreakCard';
+import { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import {
   useCounters, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout,
   isDuringEvent, daysUntilEnd, isOver, eventProgress,
@@ -21,7 +20,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
 import { useTasks } from '@/hooks/useTasks';
 import { Note, getAllNotes, createNote, updateNote } from '@/utils/notesStorage';
-import { spacing, radius, typography } from '@/theme';
+import { spacing, radius, typography, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -171,11 +170,18 @@ export default function CounterDetail() {
                 {counter.mode === 'auto' ? <Ban size={15} color={ACCENT} /> : <RotateCcw size={15} color={ACCENT} />}
                 <Text style={s.cardBig}>{counter.mode === 'auto' ? `bez ${counter.name}` : 'ostatnio zrobione'}</Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: spacing[1] }}>
-                <StreakFlame days={sinceN} size={42} />
+              {/* Runda 3 (2026-09-25, user: "to ma być ile dni temu coś robiłem, a to wygląda...
+                  jak klikam też pokazuje jak serię" — StreakFlame+WeekStrip usunięte stąd,
+                  ten sam "wygląda jak habit-streak" problem co dashboard, patrz
+                  SinceCountersCard.tsx) — duża liczba + próg tieru, ten sam wzorzec co wiersz
+                  na dashboardzie, bez ikony płomienia i paska dni tygodnia/miesiąca. */}
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], marginTop: spacing[1] }}>
+                <Text style={[s.sinceHeroNum, { color: streakColor(sinceN) }]}>{sinceN}</Text>
                 <Text style={s.sinceUnit}>{sinceN === 1 ? 'dzień' : 'dni'}</Text>
               </View>
-              <View style={{ marginTop: spacing[3] }}><WeekStrip days={sinceN} color={streakColor(sinceN)} /></View>
+              <Text style={s.cardMeta}>
+                {streakTier(sinceN).next != null ? `${streakTier(sinceN).name} · próg za ${streakTier(sinceN).next! - sinceN} dni` : `${streakTier(sinceN).name} · najwyższy próg`}
+              </Text>
             </>
           )}
         </View>
@@ -306,6 +312,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardBig: { fontSize: 15, fontWeight: '800', color: c.text.primary },
   cardTopLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   cardMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 6 },
+  sinceHeroNum: { fontFamily: fonts.display, fontSize: 44, letterSpacing: -1.5 },
   sinceUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[2] },
