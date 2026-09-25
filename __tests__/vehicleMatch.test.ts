@@ -1,6 +1,6 @@
 import {
   looksLikeFuel, expenseMatchesVehicle, mainCarId, summarizeVehicle,
-  maintenanceDueMonths, maintenancePresets,
+  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets,
 } from '@/utils/vehicleMatch';
 import { Expense, Vehicle, VehicleMaintenance } from '@/types';
 
@@ -147,6 +147,24 @@ describe('vehicleMatch — maintenanceDueMonths (Date.now() wewnętrznie, bez ws
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('vehicleMatch — maintenanceDueLabel', () => {
+  // 2026-09-25, user: "jak jest serwis wymiana to niech powiadomi, musi mieć za ile dni
+  // wymiana" — `Math.round()` na ułamku miesięcy rundowało cokolwiek poniżej ~2 tygodni do
+  // "za ~0 mies.", bez sensu akurat wtedy gdy to najbardziej istotne.
+  test('przeterminowane (due <= 0) → "zaległe"', () => {
+    expect(maintenanceDueLabel(0)).toBe('zaległe');
+    expect(maintenanceDueLabel(-0.5)).toBe('zaległe');
+  });
+  test('due < 1 miesiąc → dni, NIE "za ~0 mies."', () => {
+    expect(maintenanceDueLabel(0.2)).toBe('za 6 dni');
+    expect(maintenanceDueLabel(0.03)).toBe('za 1 dzień');
+  });
+  test('due >= 1 miesiąc → miesiące jak dotychczas', () => {
+    expect(maintenanceDueLabel(1)).toBe('za ~1 mies.');
+    expect(maintenanceDueLabel(11.4)).toBe('za ~11 mies.');
   });
 });
 

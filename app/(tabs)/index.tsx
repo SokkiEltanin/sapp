@@ -126,7 +126,7 @@ import { StreakFlameGlow, streakColor } from '@/components/counters/StreakFlame'
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
-import { maintenanceDueMonths } from '@/utils/vehicleMatch';
+import { maintenanceDueMonths, maintenanceDueLabel } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, isAutoSection, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers, PIXEL_METRICS } from '@/utils/statWidgets';
@@ -840,7 +840,7 @@ export default function DashboardScreen() {
       for (const m of (v.maintenance ?? [])) {
         const due = maintenanceDueMonths(m);
         if (due == null || due > 1) continue;
-        out.push({ key: `v-${v.id}-${m.id}`, label: `${v.name}: ${m.label}`, sub: due <= 0 ? 'zaległe' : `za ~${Math.round(due)} mies.`, overdue: due <= 0, route: '/vehicles' });
+        out.push({ key: `v-${v.id}-${m.id}`, label: `${v.name}: ${m.label}`, sub: maintenanceDueLabel(due), overdue: due <= 0, route: '/vehicles' });
       }
     }
     for (const it of maintItems) {
@@ -852,8 +852,12 @@ export default function DashboardScreen() {
   }, [vehicles, maintItems]);
 
   // Re-arm a real notification for due maintenance (so it nudges with the app closed).
+  // (2026-09-25, user: "jak jest serwis wymiana to niech powiadomi, musi mieć za ile dni
+  // wymiana" — treść powiadomienia budowała się TYLKO z `r.label` (np. "Auto: Wymiana oleju"),
+  // `r.sub` (który już ma "za N dni"/"zaległe") był liczony na dashboard, ale nigdy nie trafiał
+  // do samego powiadomienia — user nie miał jak zobaczyć ile dni zostało bez otwierania apki.
   useEffect(() => {
-    const labels = maintReminders.map(r => `${r.label}${r.overdue ? ' (zaległe)' : ''}`);
+    const labels = maintReminders.map(r => `${r.label} — ${r.sub}`);
     import('@/services/notificationsService')
       .then(({ notificationsService }) => notificationsService.refreshMaintenanceReminder(labels))
       .catch(() => {});

@@ -1,6 +1,7 @@
 import { addMonths } from 'date-fns';
 import { Expense, Vehicle, VehicleMaintenance } from '@/types';
 import { monthISO } from '@/utils/date';
+import { plPlural } from '@/utils/plural';
 
 // What "fuel" looks like (Transport + a fuel-ish tag/word). Only the MAIN car
 // catches it; everything else is matched strictly by tag.
@@ -76,6 +77,21 @@ export function maintenanceDueMonths(m: VehicleMaintenance): number | null {
   if (!m.intervalMonths) return null;
   const due = addMonths(new Date(m.date), m.intervalMonths);
   return (due.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44);
+}
+
+// Human label for `maintenanceDueMonths()`'s result (2026-09-25, user: "jak jest serwis
+// wymiana to niech powiadomi, musi mieć za ile dni wymiana") — `Math.round()` on a fractional
+// MONTHS value rounds anything under ~2 weeks down to "za ~0 mies.", which is meaningless
+// right when it matters most (a service due in a few days). Switches to a precise day count
+// once under a month out; months stay for anything further away, so the label never reads
+// "0" of anything.
+export function maintenanceDueLabel(due: number): string {
+  if (due <= 0) return 'zaległe';
+  if (due < 1) {
+    const days = Math.max(1, Math.round(due * 30.44));
+    return `za ${days} ${plPlural(days, 'dzień', 'dni', 'dni')}`;
+  }
+  return `za ~${Math.round(due)} mies.`;
 }
 
 // Kind-aware service presets (label + default interval in months).
