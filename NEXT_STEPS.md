@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Ściana serii: ręczne "ile dni temu" liczniki wypchnięte ze streaków (2026-09-25)
+
+Pełny opis w ARCHITECTURE.md §180. User zgłosił, że nowe odliczanie nie pokazuje się na
+dashboardzie mimo zaznaczonego "Pokaż na dashboardzie" — po zrzucie dashboardu okazało się, że
+odliczanie DZIAŁAŁO poprawnie (false alarm), ale po drodze znaleziony i naprawiony realny,
+osobny dead-end bug: checkbox "Pokaż na dashboardzie" nie miał żadnego efektu dla liczników
+typu Odliczanie (`activeCountdowns` w `index.tsx` go nie czytał — teraz czyta). Prawdziwa
+skarga po zrzucie: ręczny licznik "Jadłem jeżyki" pokazywał się w "Twoje Serie" razem z Wodą/
+Bez Słodyczy — user: "bez sensu ile dni temu jadłem tam się pojawia". `streakWall` mieszał
+auto-śledzone avoid-liczniki (prawdziwe streaki) z ręcznymi since-licznikami (mają WŁASNY
+kafelek niżej, `counters-since`/`SinceCountersCard`). Filtr zawężony do `mode==='auto'`. `tsc`/
+`jest` czyste (1105 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: "Twoje Serie" ma pokazywać TYLKO Wodę/Bez
+Słodyczy (auto-streaki) — "Jadłem jeżyki" znika stamtąd, widoczne tylko w kafelku "Liczniki"
+(pierścień/poświata) niżej na dashboardzie.
+
 ## ✅ Nemesis kosztuje TERAZ energię (cofnięty §177 design) + legendarne dropy x5 (2026-09-24)
 
 Pełny opis w ARCHITECTURE.md §178 — SUPERSEDUJE poniższy §177 co do nemesis. User na "∞ prób"

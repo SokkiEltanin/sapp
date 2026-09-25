@@ -10968,6 +10968,44 @@ exportem.
 
 ---
 
+---
+
+## 180. Ściana serii: ręczne liczniki "ile dni temu" wpadały tam razem z auto-streakami (2026-09-25)
+
+User: "Nie pokazuje mi się teraz jak mam odliczanie, jak dodaje kolejne, mimo że mam zaznaczone
+pokaż na dashboardzie" — po śledztwie (zrzut dashboardu) okazało się, że odliczanie ("Wracasz
+na Uniwersytet") **pokazywało się poprawnie** w sekcji "Odliczania" — false alarm co do samego
+zniknięcia. Po drodze znaleziony i naprawiony REALNY, osobny bug (rule #7, dead-end):
+`activeCountdowns` w `app/(tabs)/index.tsx` sprawdzał TYLKO `kind==='until' && !isOver &&
+daysUntil>=0` — checkbox "Pokaż na dashboardzie" z formularza (`app/counters.tsx`) był
+ZAPISYWANY, ale nigdy nie czytany dla liczników typu Odliczanie (dla `dashSince`/"ile dni temu"
+ten sam checkbox DZIAŁAŁ poprawnie — asymetria). Naprawione: dodany identyczny warunek do
+`activeCountdowns`.
+
+**Prawdziwa skarga, po zrzucie dashboardu**: "Jadłem jeżyki" (ręczny licznik "ile dni temu",
+`kind==='since'` BEZ `mode:'auto'`) pokazywał się w widgecie "Twoje Serie" (`streak-wall`)
+RAZEM z Wodą i "Bez Słodyczy" — user: "słodycze spoko i woda ale bez sensu ile dni temu jadłem
+tam się pojawia". Root cause: `streakWall` w `index.tsx` zbierał WSZYSTKIE liczniki
+`kind==='since'` bez rozróżnienia trybu — auto-śledzone avoid-liczniki (np. "bez słodyczy",
+`mode:'auto'`, faktycznie są streakiem: dni bez zakupu czegoś) i ręczne "ile dni temu"
+liczniki (user tapuje "Zrobione dziś" ręcznie) trafiały do TEGO SAMEGO flame-tile widgetu.
+Ręczne liczniki mają WŁASNY, dedykowany kafelek niżej na dashboardzie (`counters-since` /
+`SinceCountersCard.tsx`, §176/§178's redesign pierścień+poświata) — duplikat w "Twoje Serie"
+mylił, bo wyglądał jak stary, nieredesignowany flame-tile zamiast nowego looku.
+
+**Fix**: `streakWall`'s `fromCounters` filtruje teraz `cn.kind === 'since' && cn.mode ===
+'auto'` (tylko avoid-liczniki) — ręczne since-liczniki zostają WYŁĄCZNIE w
+`counters-since`/`SinceCountersCard`, nie duplikują się już w "Twoje Serie".
+
+**Testy**: `tsc --noEmit` czyste, `jest` czysty (1105 testów, bez zmiany — czysto filtrująca
+zmiana, brak testu na `streakWall` w izolacji).
+
+**Priorytet testu na urządzeniu — wysoki**: sprawdź "Twoje Serie" — powinny zostać tylko
+Woda/Bez Słodyczy (auto-streaki), "Jadłem jeżyki" ma zniknąć stamtąd i pokazywać się TYLKO w
+kafelku "Liczniki" (ten z pierścieniem/poświatą) niżej na dashboardzie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

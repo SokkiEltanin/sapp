@@ -526,8 +526,11 @@ export default function DashboardScreen() {
   // they're over: a no-end event the day after its date, an end-dated event the day
   // after its endDate (isOver), while staying visible during a multi-day event.
   const counters = useCounters(st => st.counters);
+  // `onDashboard` NIE było tu sprawdzane (2026-09-24, user: "nie pokazuje mi się jak dodaje
+  // kolejne mimo że mam zaznaczone pokaż na dashboardzie") — dead-end: checkbox działał tylko
+  // dla `dashSince` (liczników "ile dni temu"), dla odliczań (`until`) nie miał ŻADNEGO efektu.
   const activeCountdowns = useMemo(
-    () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
+    () => counters.filter(cn => cn.kind === 'until' && cn.onDashboard !== false && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
     [counters, dayKey],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
@@ -571,12 +574,17 @@ export default function DashboardScreen() {
     })();
   }, [records]);
 
-  // "Ściana serii" widget — every active streak: habit streaks + "dni bez"/since counters.
+  // "Ściana serii" widget — habit streaks + AUTO "dni bez" liczniki (avoid-type, śledzone
+  // same z zakupów, np. "bez słodyczy"). RĘCZNE liczniki "ile dni temu" (kind='since' BEZ
+  // mode='auto', np. user: "Jadłem jeżyki") NIE wchodzą tutaj (2026-09-25, user zrzutem: "bez
+  // sensu, słodycze spoko i woda ale bez sensu ile dni temu jadłem tam się pojawia") — mają
+  // WŁASNY kafelek niżej (`counters-since`/`SinceCountersCard.tsx`, `dashSince`), mieszanie
+  // auto-śledzonych streaków z ręcznie tapanymi licznikami w JEDNYM widgecie myliło.
   const streakWall = useMemo<StreakItem[]>(() => {
     const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id) }));
     const fromCounters = counters
-      .filter(cn => cn.kind === 'since')
-      .map(cn => ({ key: `c:${cn.id}`, name: cn.mode === 'auto' ? `bez ${cn.name}` : cn.name, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals, foodProducts) : daysSince(cn) }));
+      .filter(cn => cn.kind === 'since' && cn.mode === 'auto')
+      .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
     return [...fromHabits, ...fromCounters];
   }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey]);
 
