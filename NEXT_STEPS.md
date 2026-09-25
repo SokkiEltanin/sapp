@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Ile dni temu: usunięty CAŁY "streak" look (flame+kalendarz) z 3 miejsc naraz (2026-09-25)
+
+Pełny opis w ARCHITECTURE.md §181 — dokończenie wpisu poniżej. User zrzutem po fixie ze
+"Ściana serii": "to ma być ile dni temu coś robiłem, a to wygląda i pokazuje jak seria
+jakaś, i jak klikam też pokazuje jak serię... napraw raz a dobrze". Root cause: kafelek
+"Liczniki" na dashboardzie renderował PIERWSZY (najdłuższy) wpis przez `<StreakCard>` (flame-
+chip + kalendarz dni tygodnia/miesiąca) — z jednym licznikiem na koncie ZAWSZE ten wpis, więc
+user nigdy nie widział nowego designu z §176/§178/§180. To samo `StreakFlame`+`WeekStrip`
+siedziało jeszcze w `/counters` (lista) i `/counters/[id]` (ekran po tapnięciu). Usunięte z
+wszystkich 3 miejsc naraz, zastąpione jednolicie dużą liczbą + tekstem progu tieru (bez
+płomienia/kalendarza). `StreakCard.tsx` (plik) usunięty — po zmianie nic go już nie
+importowało. `StreakFlame`/`StreakWallCard` ("Twoje Serie", prawdziwe auto-streaki) BEZ
+zmian — flame+kalendarz tam zostaje, to właściwy design dla Wody/Bez Słodyczy. `tsc`/`jest`
+czyste (1105 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: "Jadłem jeżyki" (albo dowolny ręczny licznik)
+sprawdź WSZĘDZIE: kafelek "Liczniki" na dashboardzie, `/counters` lista, ekran szczegółów po
+tapnięciu — żadne z tych trzech miejsc nie powinno pokazywać płomienia/kalendarza, tylko dużą
+liczbę + próg tieru.
+
 ## ✅ Ściana serii: ręczne "ile dni temu" liczniki wypchnięte ze streaków (2026-09-25)
 
 Pełny opis w ARCHITECTURE.md §180. User zgłosił, że nowe odliczanie nie pokazuje się na

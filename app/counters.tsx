@@ -8,14 +8,13 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import RingCountdown from '@/components/counters/RingCountdown';
-import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
-import { WeekStrip } from '@/components/counters/StreakCard';
+import { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
 import { WIDGET_TAGS } from '@/utils/statWidgets';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
-import { spacing, radius, typography } from '@/theme';
+import { spacing, radius, typography, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -171,9 +170,14 @@ export default function Counters() {
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
+              {/* Runda 3 (2026-09-25, user: "to ma być ile dni temu coś robiłem, a to wygląda...
+                  jak klikam też pokazuje jak serię" — StreakFlame+WeekStrip usunięte stąd, ten
+                  sam "wygląda jak habit-streak" problem co dashboard/detail, patrz
+                  SinceCountersCard.tsx i counters/[id].tsx) — duża liczba + próg tieru,
+                  bez ikony płomienia i paska dni tygodnia/miesiąca. */}
               <View style={s.sinceRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <StreakFlame days={n} size={42} />
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] }}>
+                  <Text style={[s.sinceHeroNum, { color: streakColor(n) }]}>{n}</Text>
                   <Text style={s.sinceUnit}>{n === 1 ? 'dzień' : 'dni'}</Text>
                 </View>
                 {!auto && (
@@ -182,8 +186,10 @@ export default function Counters() {
                   </TouchableOpacity>
                 )}
               </View>
-              <View style={{ marginTop: spacing[3] }}><WeekStrip days={n} color={streakColor(n)} /></View>
-              <Text style={s.cardMeta}>{auto ? 'liczy się automatycznie z paragonów' : `ostatnio: ${cn.date}`}</Text>
+              <Text style={s.cardMeta}>
+                {auto ? 'liczy się automatycznie z paragonów' : `ostatnio: ${cn.date}`} ·{' '}
+                {streakTier(n).next != null ? `${streakTier(n).name}, próg za ${streakTier(n).next! - n} dni` : `${streakTier(n).name}, najwyższy próg`}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -378,7 +384,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardMeta: { fontSize: 11, color: c.text.muted, marginTop: 2 },
 
   sinceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  sinceBig: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
+  sinceHeroNum: { fontFamily: fonts.display, fontSize: 34, letterSpacing: -1.5 },
   sinceUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
   doneBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: '#46B0DE55', backgroundColor: '#46B0DE14' },
   doneBtnText: { fontSize: 12.5, fontWeight: '700' },

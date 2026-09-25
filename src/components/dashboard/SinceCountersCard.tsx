@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Hourglass } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Counter } from '@/store/countersStore';
-import StreakCard from '@/components/counters/StreakCard';
 import { streakTier } from '@/components/counters/StreakFlame';
 import RadialGlow from '@/components/ui/RadialGlow';
 import { useColors } from '@/theme/useColors';
@@ -17,12 +16,18 @@ import { haptic } from '@/utils/haptics';
 // `nodes[id]`'s truthiness). Style `card`/`cardHeader`/`cardTitle`/`workToggleText`
 // skopiowane verbatim (współdzielone z innymi sekcjami).
 //
-// Runda 2 (2026-09-24, user: "tak samo kiedy ostatnio coś było, też słabo wygląda, stary
-// chujowy look... przerób na highend" — zamockowałem, user zaakceptował z jedną poprawką:
-// poświata pod całym kafelkiem, nie tylko pod liczbą). Ikonka-chip zdjęta, `RadialGlow`
-// (reużyty z battle-layout-lab.tsx, ten sam SVG radial-gradient trick) daje delikatną,
-// tierowo kolorowaną poświatę rozlaną z lewej strony całego wiersza — liczba dni jest teraz
-// hero elementem, nie mały tekst obok ikonki.
+// Runda 3 (2026-09-25, user zrzutem: "to ma być ile dni temu coś robiłem, a to wygląda i
+// pokazuje jak seria jakaś... napraw raz a dobrze") — runda 2 (2026-09-24, "przerób na
+// highend") przerobiła TYLKO wiersze `since.slice(1,7)` na duża-liczba+poświata, ale
+// zostawiła PIERWSZY (najdłuższy) wpis renderowany przez `<StreakCard>` (flame-chip + pasek
+// dni tygodnia/miesiąca) — dokładnie komponent "Ściana serii" z osobnego widgetu. Z JEDNYM
+// licznikiem na koncie (typowy przypadek na start) TEN wpis to ZAWSZE "najdłuższy", więc user
+// nigdy nie widział nowego designu, tylko starą, dosłowną "serię" — to dokładnie to, czego
+// user NIE chciał (ręczny licznik "ile dni temu X" nie jest habitem do "utrzymania passy").
+// Fix: WSZYSTKIE wpisy (włącznie z pierwszym) renderują się TERAZ jednolicie przez ten sam
+// wiersz duża-liczba+poświata — żadnego specjalnego "hero" traktowania dla najdłuższego,
+// `StreakCard` (import usunięty stąd) zostaje wyłącznie w §widget "Ściana serii"
+// (`nodes['streak-wall']`/`StreakWallCard`), gdzie faktyczne auto-streaki należą.
 export interface SinceCounterEntry { cn: Counter; days: number }
 
 export interface SinceCountersCardProps {
@@ -35,8 +40,6 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
   const c = useColors();
   const s = makeS(c);
   if (since.length === 0) return null;
-  const top = since[0];
-  const topName = top.cn.mode === 'auto' ? `bez ${top.cn.name}` : top.cn.name;
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.cardHeader}>
@@ -46,32 +49,27 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
           <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
         </TouchableOpacity>
       </View>
-      {/* The longest streak gets the rich card (flame + Mon–Sun strip); the rest stay in
-          the compact flame grid below it. */}
-      <StreakCard name={topName} days={top.days} />
-      {since.length > 1 && (
-        <View style={{ gap: spacing[2], marginTop: spacing[3] }}>
-          {since.slice(1, 7).map(({ cn, days }) => {
-            const tier = streakTier(days);
-            const tc = tier.color;
-            const label = cn.mode === 'auto' ? `bez ${cn.name}` : cn.name;
-            const metaTxt = tier.next != null ? `${tier.name} · próg za ${tier.next - days} dni` : `${tier.name} · najwyższy próg`;
-            return (
-              <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26' }]}
-                onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.75}>
-                <View style={s.sinceGlowWrap} pointerEvents="none">
-                  <RadialGlow size={110} color={tc} opacity={0.18} />
-                </View>
-                <Text style={[s.sinceNum, { color: tc }]}>{days}</Text>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
-                  <Text style={s.sinceMeta} numberOfLines={1}>{metaTxt}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+      <View style={{ gap: spacing[2] }}>
+        {since.slice(0, 7).map(({ cn, days }) => {
+          const tier = streakTier(days);
+          const tc = tier.color;
+          const label = cn.mode === 'auto' ? `bez ${cn.name}` : cn.name;
+          const metaTxt = tier.next != null ? `${tier.name} · próg za ${tier.next - days} dni` : `${tier.name} · najwyższy próg`;
+          return (
+            <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26' }]}
+              onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.75}>
+              <View style={s.sinceGlowWrap} pointerEvents="none">
+                <RadialGlow size={110} color={tc} opacity={0.18} />
+              </View>
+              <Text style={[s.sinceNum, { color: tc }]}>{days}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
+                <Text style={s.sinceMeta} numberOfLines={1}>{metaTxt}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
