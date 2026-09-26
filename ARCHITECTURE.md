@@ -11179,6 +11179,31 @@ rendery `usePetStore`, efekty cząsteczek/pocisków, coś w samym ekranie walki)
 
 ---
 
+## 185. Plan zajęć: ta sama poświata co kafelek "Liczniki" (2026-09-26)
+
+User zrzutem kafelka "Liczniki" ("16 Jadłem jeżyki", pomarańczowa poświata z lewej —
+`SinceCountersCard.tsx`'s `RadialGlow`, §176): "zrób identyczny gradient jak na kafelku z
+licznikiem ile dni temu, podoba mi się taki" — doprecyzowane po dopytaniu: chodziło o kafelek
+"Plan zajęć" (`ClassScheduleCard.tsx`, fioletowy akcent `#A78BFA`), nie o inny kafelek
+odliczania.
+
+**Fix**: dodany `RadialGlow` (`size=170`, `color="#A78BFA"`, `opacity=0.18` — TE SAME wartości
+co `SinceCountersCard.tsx`'s wiersze, tylko w kolorze akcentu tej karty zamiast koloru tieru
+streaka) jako PIERWSZE dziecko karty (renderuje się POD resztą treści), pozycjonowany
+`position:'absolute', left:-40, top:'50%', marginTop:-85` — ten sam przepis co
+`sinceGlowWrap` w `SinceCountersCard.tsx`, przeskalowany pod wyższą, wielowierszową kartę
+planu zajęć zamiast kompaktowego wiersza. Karta już miała `overflow:'hidden'` (z poprzedniej
+rundy kolorystycznej, §167) — poświata bleedująca poza lewą krawędź jest więc czysto
+przycinana przez zaokrąglone rogi, bez dodatkowych zmian.
+
+**Testy**: brak nowych (czysto wizualna zmiana). `tsc --noEmit` czyste, `jest` czysty (1108
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: sprawdź kafelek "Plan zajęć" na dashboardzie —
+fioletowa poświata z lewej strony, w tym samym stylu co kafelek "Liczniki" (ile dni temu).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

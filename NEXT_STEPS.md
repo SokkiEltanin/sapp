@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Plan zajęć: ta sama poświata co kafelek "Liczniki" (2026-09-26)
+
+Pełny opis w ARCHITECTURE.md §185. User zrzutem: "zrób identyczny gradient jak na kafelku z
+licznikiem ile dni temu, podoba mi się taki" — po dopytaniu chodziło o kafelek "Plan zajęć".
+Dodany `RadialGlow` (te same wartości co `SinceCountersCard.tsx`, kolor `#A78BFA` zamiast
+koloru tieru) bleedujący z lewej strony karty. `tsc`/`jest` czyste (1108 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski**: kafelek "Plan zajęć" na dashboardzie — fioletowa
+poświata z lewej, w tym samym stylu co "Liczniki".
+
 ## 🆕 Kotek w walkach: naprawdę statyczny bliźniak CatArt (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §184. User: "Dlaczego nadal w walkach nie bierze udziału
