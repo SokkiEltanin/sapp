@@ -534,11 +534,15 @@ export default function DashboardScreen() {
     [counters, dayKey],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
+  // 2026-09-26, audyt dashboardu — `mode==='auto'` liczniki (np. "bez słodyczy") pokazywały
+  // się TU *i* w `streakWall`/"Twoje Serie" naraz (streakWall filtruje `mode==='auto'`, ten
+  // filtr tego nie wykluczał) — dokładnie ta duplikacja, którą §180/§181 miały wyeliminować
+  // (patrz komentarz przy streakWall niżej: auto-liczniki mają być WYŁĄCZNIE w Twoje Serie).
   const dashSince = useMemo(
-    () => counters.filter(cn => cn.kind === 'since' && cn.onDashboard !== false)
-      .map(cn => ({ cn, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals, foodProducts) : daysSince(cn) }))
+    () => counters.filter(cn => cn.kind === 'since' && cn.mode !== 'auto' && cn.onDashboard !== false)
+      .map(cn => ({ cn, days: daysSince(cn) }))
       .sort((a, b) => b.days - a.days),
-    [counters, expenses, foodMeals, foodProducts, dayKey],
+    [counters, dayKey],
   );
 
   // "Rekordy życiowe" widget — all-time bests from the data already loaded.
@@ -583,7 +587,7 @@ export default function DashboardScreen() {
   const streakWall = useMemo<StreakItem[]>(() => {
     const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id) }));
     const fromCounters = counters
-      .filter(cn => cn.kind === 'since' && cn.mode === 'auto')
+      .filter(cn => cn.kind === 'since' && cn.mode === 'auto' && cn.onDashboard !== false)
       .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
     return [...fromHabits, ...fromCounters];
   }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey]);
@@ -1323,15 +1327,27 @@ export default function DashboardScreen() {
     );
   };
 
-  const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
+  // 2026-09-26, audyt dashboardu — `t.status !== 'done'` łapało też `'snoozed'`, więc
+  // odłożone zadanie dalej liczyło się jako ZALEGŁE/dzisiejsze (hero "Masz N zadań po
+  // terminie", karta today-tasks, tasks-work-row) mimo że zakładka Zadania (tasks.tsx:210)
+  // jawnie wyklucza snoozed z tej samej etykiety — dashboard i zakładka pokazywały różne
+  // liczby dla tego samego zadania.
+  const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed'), [tasks]);
   const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
   const todayTasks     = useMemo(() => pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today), [pendingTasks, today]);
   const doneToday      = useMemo(() => tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length, [tasks, today]);
 
+  // 2026-09-26, audyt dashboardu — deps `[]` zamrażały "jutro" NA STAŁE od pierwszego
+  // mountu karty; po realnej zmianie dnia (apka trzymana otwarta przez północ, dashboard się
+  // nie odmontowuje) `tomorrow` dalej wskazywało na WCZORAJSZE "jutro" = DZISIAJ, więc
+  // gcal/plan zajęć pokazywały dzisiejsze eventy jeszcze raz pod etykietą "Jutro". `dayKey`
+  // (stan tickujący raz na minutę/przy powrocie z tła, patrz wyżej) to już ustalony wzorzec
+  // na dokładnie ten problem — reszta memo niżej (`activeCountdowns`/`dashSince`/`streakWall`)
+  // już go używa.
   const tomorrow = useMemo(() => {
     const t = new Date(); t.setDate(t.getDate() + 1);
     return `${t.getFullYear()}-${pad(t.getMonth()+1).padStart(2,'0')}-${pad(t.getDate()).padStart(2,'0')}`;
-  }, []);
+  }, [dayKey]);
 
   // Today's events, but DROP ones that have already ended (an event 10–21 stops
   // showing as "today" after 21:00). All-day events (no time) always stay.
@@ -1373,8 +1389,11 @@ export default function DashboardScreen() {
     if (classToday.length > 0 || classTomorrow.length > 0) return null;
     const from = new Date(); from.setDate(from.getDate() + 2);
     const fromYMD = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+    // 2026-09-26, audyt dashboardu — `>` (nie `>=`) wykluczało SAM dzień pojutrza, mimo że
+    // komentarz wyżej mówi "od pojutrza" — w sobotę/niedzielę bez zajęć poniedziałek (pojutrze
+    // względem soboty) był pomijany, kafelek od razu skakał na wtorek.
     const future = gcalEvents
-      .filter(e => e.date > fromYMD && isClassEvent(e.title, classPrefix))
+      .filter(e => e.date >= fromYMD && isClassEvent(e.title, classPrefix))
       .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''));
     if (future.length === 0) return null;
     const nextDate = future[0].date;
@@ -1406,13 +1425,17 @@ export default function DashboardScreen() {
   }, [moodEntries]);
 
   // ── Finance data ──────────────────────────────────────────────────────────
-  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
+  // `dayKey` w deps (2026-09-26, audyt dashboardu) — bez tego, po zmianie dnia/miesiąca (bez
+  // remountu ekranu) `getWeekDates`/miesiąc liczony z `new Date()` nie przeliczał się na nowo,
+  // więc Finanse pokazywały łatkę nagłówka z nową datą, ale sumy z poprzedniego tygodnia/
+  // miesiąca — patrz ten sam fix dla `tomorrow` wyżej.
+  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset, dayKey]);
 
   const monthDates = useMemo(() => {
     const d = new Date(), year = d.getFullYear(), month = d.getMonth();
     const days = new Date(year, month + 1, 0).getDate();
     return Array.from({ length: days }, (_, i) => `${year}-${pad(month + 1)}-${pad(i + 1)}`);
-  }, []);
+  }, [dayKey]);
 
   const activeDates = finPeriod === 'week' ? weekDates : monthDates;
   const weekTotal  = useMemo(() => allSpend(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
@@ -1778,10 +1801,16 @@ export default function DashboardScreen() {
 
   // ── Tag limit bars (e.g. #słodycze) — ALWAYS shown with current % ───────────
   const tagLimits = useMemo(() => {
+    // `getWeekDates(0)` (2026-09-26, audyt dashboardu) — NIE `weekDates`, który śledzi
+    // `weekOffset` (nawigację "‹ ›" karty Finanse). Limit tagowy (np. #słodycze) ma pokazywać
+    // BIEŻĄCY tydzień zawsze, niezależnie od tego, który tydzień user właśnie przegląda w
+    // Finansach — inaczej odsunięcie się o tydzień w Finansach potajemnie przełącza też %
+    // limitu tagowego na inny (stary/przyszły) tydzień.
+    const curWeekDates = getWeekDates(0);
     const inPeriod = (date: string, period: 'week' | 'month') => {
       const d = date.slice(0, 10);
       if (period === 'month') return d.slice(0, 7) === today.slice(0, 7);
-      return weekDates.includes(d);
+      return curWeekDates.includes(d);
     };
     return tagRules
       .filter(r => r.limit > 0)
@@ -1820,7 +1849,7 @@ export default function DashboardScreen() {
         return { ...rule, spend, pct: spend / rule.limit, label: ruleLabel(rule), items, lastName: items[0]?.name ?? null };
       })
       .sort((a, b) => b.pct - a.pct);
-  }, [tagRules, scopedExpenses, today, weekDates, payers]);
+  }, [tagRules, scopedExpenses, today, dayKey, payers]);
 
   // Multi-month history for the open tag-limit (how much each month vs the limit).
   const MON_SHORT = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
@@ -2274,17 +2303,22 @@ export default function DashboardScreen() {
   const calorieBalance = useMemo(() => {
     const p = (n: number) => String(n).padStart(2, '0');
     const now = new Date();
-    const days: { key: string; label: string; eaten: number; burn: number; balance: number }[] = [];
+    const days: { key: string; label: string; eaten: number; burn: number; burnKnown: boolean; balance: number }[] = [];
     const dow = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
       const eaten = foodMeals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
+      // `burnKnown` (2026-09-26, audyt dashboardu) — brak synchronizacji zegarka danego dnia
+      // dawał `burn ?? 0`, czyli licznik dopisywał CAŁE zjedzone kalorie jako "deficyt" (balance
+      // = 0 - eaten), zamiast pokazać "brak danych". Rozróżniamy TERAZ "spalono 0" (nierealne,
+      // ale techniczne 0) od "nie wiemy" — patrz filtr `logged`/render `—` niżej.
+      const burnKnown = healthDays[key]?.burn != null;
       const burn = healthDays[key]?.burn ?? 0;
-      days.push({ key, label: dow[d.getDay()], eaten, burn, balance: burn - eaten });
+      days.push({ key, label: dow[d.getDay()], eaten, burn, burnKnown, balance: burn - eaten });
     }
     const todayCell = days[days.length - 1];
-    const logged = days.filter(x => x.eaten > 0);
+    const logged = days.filter(x => x.eaten > 0 && x.burnKnown);
     const cumDeficit = logged.reduce((s, x) => s + x.balance, 0);
     const target = targetIntake(todayCell.burn, foodGoalMode, foodManualGoal);
     return { days, today: todayCell, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700, target, hasData: logged.length > 0 };
@@ -2592,7 +2626,11 @@ export default function DashboardScreen() {
                 <MonthWrappedCard card={featuredCard} compact pace={monthPace} onPress={() => router.navigate('/month-cards' as any)} />
               );
 
-              nodes['tag-limits'] = tagLimits.map(t => {
+              // `.length > 0 &&` (2026-09-26, audyt dashboardu) — bez tego `nodes['tag-limits']`
+              // był ZAWSZE tablicą (pustą, gdy user nie ma limitów tagowych), a tablica jest
+              // zawsze "prawdziwa" w JS, więc edytor dashboardu (`empty={!nodes[id]}`, patrz
+              // komentarz niżej przy tym gate) nigdy nie oznaczał tej sekcji jako "brak danych".
+              nodes['tag-limits'] = tagLimits.length > 0 && tagLimits.map(t => {
               const pctClamped = Math.min(100, Math.round(t.pct * 100));
               const over = t.pct >= 1;
               return (
@@ -2627,6 +2665,12 @@ export default function DashboardScreen() {
               );
             });
 
+            // 2026-09-26, audyt dashboardu — karta pokazuje się już od pct>=0.70 (patrz filtr w
+            // budgetAlertCard wyżej), ale tekst/kolor ZAWSZE mówił "zbliżasz się" (i domyślny
+            // akcent), nawet gdy limit jest już przekroczony (pct>=1) — dokładnie to samo
+            // rozróżnienie (tekst + czerwień) ma sąsiednia karta limitów tagowych (`over`/
+            // `tagLimitMsg` w nodes['tag-limits'] wyżej).
+            const budgetWarnOver = !!budgetAlertCard && budgetAlertCard.pct >= 1;
             nodes['budget-warning'] = budgetAlertCard && (
               <TouchableOpacity
                 style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
@@ -2634,15 +2678,15 @@ export default function DashboardScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={s.budgetWarnText}>
-                  {'Zbliżasz się do limitu wydatków '}
+                  {budgetWarnOver ? 'Przekroczyłeś limit wydatków ' : 'Zbliżasz się do limitu wydatków '}
                   <Text style={s.budgetWarnBold}>#{budgetAlertCard.cat}</Text>
                   {'   '}
-                  <Text style={s.budgetWarnPct}>{Math.round(budgetAlertCard.pct * 100)}%</Text>
+                  <Text style={[s.budgetWarnPct, budgetWarnOver && { color: colors.accent.red }]}>{Math.round(budgetAlertCard.pct * 100)}%</Text>
                 </Text>
                 <View style={s.budgetWarnTrack}>
                   <View style={[s.budgetWarnFill, {
                     width: `${Math.min(100, budgetAlertCard.pct * 100)}%` as any,
-                    backgroundColor: accentColor,
+                    backgroundColor: budgetWarnOver ? colors.accent.red : accentColor,
                   }]} />
                 </View>
               </TouchableOpacity>
@@ -2838,7 +2882,12 @@ export default function DashboardScreen() {
               <SinceCountersCard since={dashSince} cardBg={cardBgDark} accentColor={accentColor} />
             );
 
-            nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
+            // `.length > 0` (2026-09-26, audyt dashboardu), NIE `.some(x => x.days > 0)` — sam
+            // StreakWallCard (patrz jego komentarz przy `rows`) jest zaprojektowany, by pokazywać
+            // ZŁAMANE serie jako 0 (motywacyjnie, styl Duolingo), ale zewnętrzny guard tutaj
+            // chował całą kartę, gdy WSZYSTKIE serie akurat spadły na 0 (np. dzień po zjedzeniu
+            // słodycza z jedynym licznikiem na koncie) — dokładnie odwrotność intencji karty.
+            nodes['streak-wall'] = streakWall.length > 0 && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
@@ -3293,7 +3342,12 @@ export default function DashboardScreen() {
                         <View style={{ marginTop: spacing[3] }}>
                           <View style={s.workSplitBar}>
                             <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
-                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT }} />
+                            {/* opacity, nie drugi odcień (2026-09-26, audyt dashboardu) — user
+                                jednym kolorem chciał, żeby Praca kojarzyła się z żółtym logo
+                                (patrz komentarz przy WORK_ACCENT wyżej w pliku), ale pasek
+                                "do teraz vs zaplanowane" wyszedł z tym jednolity, nie do
+                                odróżnienia bez czytania liczb. */}
+                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT, opacity: 0.35 }} />
                           </View>
                           <Text style={s.workSplitText}>
                             <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
