@@ -8,6 +8,7 @@ import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
+import RadialGlow from '@/components/ui/RadialGlow';
 
 // "Plan zajęć" dashboard card (2026-09-22) — TEN SAM wzorzec/rozmiar co `GCalCard.tsx`
 // (dziś/jutro, kropka+godzina+tytuł), rozszerzony o odznakę typu (W/C/L/P) i salę, bo to
@@ -62,6 +63,12 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
       onPress={() => { haptic.tap(); router.push('/class-schedule' as any); }}
       style={s.card}
     >
+      {/* Poświata (2026-09-26, user zrzutem kafelka "Liczniki": "O taki [gradient]... podoba
+          mi się taki" — ten sam `RadialGlow` przepis co `SinceCountersCard.tsx`'s wiersze,
+          tu w fioletowym akcencie karty zamiast koloru tieru streaka). */}
+      <View style={s.glowWrap} pointerEvents="none">
+        <RadialGlow size={170} color="#A78BFA" opacity={0.18} />
+      </View>
       <View style={s.accentBar} />
       <View style={s.cardHeader}>
         <GraduationCap size={13} color="#A78BFA" />
@@ -100,6 +107,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     overflow: 'hidden',
   },
   accentBar: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3.5, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: '#A78BFA' },
+  glowWrap: { position: 'absolute', left: -40, top: '50%', marginTop: -85 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
   dayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
