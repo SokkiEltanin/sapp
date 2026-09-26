@@ -3,12 +3,13 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Hourglass } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Counter } from '@/store/countersStore';
-import { streakTier } from '@/components/counters/StreakFlame';
+import { streakTier, streakColor } from '@/components/counters/StreakFlame';
 import RadialGlow from '@/components/ui/RadialGlow';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['counters-since']` (2026-08-26, kolejny
 // mały krok rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i
@@ -51,10 +52,23 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
       </View>
       <View style={{ gap: spacing[2] }}>
         {since.slice(0, 7).map(({ cn, days }) => {
+          // 2026-09-26, audyt dashboardu — `streakTier(days).color` dawał Bordo (czerwień) NA
+          // ZERZE (streakTier() domyślnie zwraca indeks 0 gdy ŻADEN próg nie jest spełniony —
+          // ten sam bug co StreakWallCard.tsx już naprawił, patrz komentarz tam), więc świeżo
+          // zresetowany licznik ("Zrobione dziś") świecił się na czerwono zamiast wyglądać na
+          // "zimny"/neutralny. `streakColor()` ma poprawny fallback (szary) dla days<1.
+          const isZero = days < 1;
           const tier = streakTier(days);
-          const tc = tier.color;
-          const label = cn.mode === 'auto' ? `bez ${cn.name}` : cn.name;
-          const metaTxt = tier.next != null ? `${tier.name} · próg za ${tier.next - days} dni` : `${tier.name} · najwyższy próg`;
+          const tc = streakColor(days);
+          // `index.tsx`'s `dashSince` filtruje TERAZ `mode !== 'auto'` (2026-09-26, audyt —
+          // auto-liczniki mają być WYŁĄCZNIE w "Twoje Serie") — ten wiersz zawsze dostaje
+          // ręczny licznik, `bez ${name}` byłoby tu martwą gałęzią.
+          const label = cn.name;
+          const metaTxt = isZero
+            ? `${streakTier(1).name} · próg za 1 dzień`
+            : tier.next != null
+              ? `${tier.name} · próg za ${tier.next - days} ${plPlural(tier.next - days, 'dzień', 'dni', 'dni')}`
+              : `${tier.name} · najwyższy próg`;
           return (
             <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26' }]}
               onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.75}>

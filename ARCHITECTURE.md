@@ -11231,6 +11231,94 @@ dziesiętne, flatHp zostaje całkowite, staty % bez zmian). `tsc --noEmit` czyst
 
 ---
 
+## 187. Agent-audyt całego dashboardu — 10 realnych bugów w `index.tsx` (2026-09-26)
+
+User (po §186): "sprawdz apkę żeby nie było błędów jak ostatnio z tymi licznikami, sprawdz inne
+widgety jak się wyswietlają czy mają dane lub czy możemy je ulepszyć lub czy nie mają błędów
+czy coś" — szerokie zamówienie audytu, po wzorcu poprzednich rund tej sesji (§130-ish
+agent-audyt, §132, §178+ seria). Explore-subagent przeszedł `app/(tabs)/index.tsx` +
+komponenty dashboardu; każde znalezisko zweryfikowane osobiście w kodzie przed poprawką (nie
+wszystkie zgłoszenia subagenta okazały się realne — patrz "pominięte" niżej).
+
+**Naprawione (10):**
+1. `pendingTasks` liczyło `status === 'snoozed'` jako zaległe — dodany wyjątek, tak jak
+   `app/(tabs)/tasks.tsx`'s `overdue` już robi (linia 210 tam).
+2. Karta "Plan zajęć" fallback "pojutrze" — `e.date > fromYMD` (off-by-one, gubił wydarzenie
+   DOKŁADNIE pojutrze) → `>=`.
+3. `SinceCountersCard` — `streakTier(days).color` dawał Bordo (czerwień) NA ZERZE (ten sam bug
+   co `StreakWallCard.tsx` już raz naprawił, patrz komentarz tam); świeżo zresetowany licznik
+   świecił się na czerwono. Fix: `streakColor(days)` do koloru (ma poprawny fallback szary).
+4. `dashSince` (karta "Liczniki") NIE filtrowała `mode !== 'auto'` — auto-liczniki (np. "bez
+   słodyczy") pokazywały się ZARAZ TAM I w "Twoje Serie", duplikacja. `streakWall`'s
+   `fromCounters` NIE filtrował `onDashboard !== false` — trzecie miejsce w sesji z tym samym
+   brakującym filtrem (poprzednio naprawione w `activeCountdowns`).
+5. `tomorrow`, `weekDates`, `monthDates` (`useMemo`) miały deps `[]`/`[weekOffset]` bez
+   `dayKey` — po zmianie dnia/tygodnia/miesiąca (bez remountu ekranu, np. appka trzymana
+   otwarta przez noc) nagłówek pokazywał nową datę, ale liczby z poprzedniego okresu. Fix:
+   `dayKey` dodane do deps wszystkich trzech (obok `weekOffset` w `weekDates`, nie zamiast).
+6. `tagLimits`'s `inPeriod('week')` liczyło `weekDates` — ten sam stan co nawigacja "‹ ›" karty
+   Finanse (`weekOffset`), więc przewinięcie Finansów o tydzień w tył potajemnie przełączało %
+   limitu tagowego (#słodycze itp.) na inny tydzień. Fix: osobne `getWeekDates(0)` (zawsze
+   bieżący tydzień), niezależne od nawigacji UI.
+7. Karta "budget-warning" (przekroczenie ≥70% budżetu kategorii) ZAWSZE mówiła "Zbliżasz się do
+   limitu" i domyślnym akcentem, nawet gdy `pct >= 1` (już przekroczony) — sąsiednia karta
+   limitów tagowych (`tagLimitMsg`) już rozróżnia. Fix: tekst "Przekroczyłeś limit" + czerwień
+   przy `pct >= 1`, ten sam wzorzec co `nodes['tag-limits']`'s `over`.
+8. `calorieBalance` liczyło `burn ?? 0` gdy zegarek nie zsynchronizował danego dnia — dzień bez
+   danych o spalaniu wyglądał jak PEŁNY deficyt (balance = 0 − zjedzone), fałszywie zawyżając
+   `cumDeficit`/kg. Fix: nowe pole `burnKnown`; dni bez `burnKnown` wykluczone z `logged`/
+   `cumDeficit`, komponent (`CalorieBalanceSection.tsx`) pokazuje "—" zamiast liczby dla
+   dzisiejszego/wykresowego słupka, gdy `burnKnown` jest false.
+9. `nodes['streak-wall']`'s guard `streakWall.some(x => x.days > 0)` chował CAŁĄ kartę "Twoje
+   Serie", gdy wszystkie serie akurat spadły na 0 — dokładne zaprzeczenie deklarowanej intencji
+   samego `StreakWallCard.tsx` (`rows.length === 0`, komentarz: "user: jak nie ma streaku pisze
+   zero na dniach"). Fix: `streakWall.length > 0`.
+10. `nodes['tag-limits'] = tagLimits.map(...)` — tablica jest ZAWSZE "prawdziwa" w JS (nawet
+    pusta `[]`), więc edytor dashboardu (`empty={!nodes[id]}`) nigdy nie oznaczał tej sekcji
+    jako "brak danych", gdy user nie ma żadnych limitów tagowych. Fix: `tagLimits.length > 0 &&`
+    przed `.map`.
+
+**Naprawione (niski priorytet, kosmetyka):**
+11. Pasek "Praca" (do teraz vs zaplanowane) — oba segmenty tym samym kolorem, nie do
+    odróżnienia bez czytania liczb. Fix: `opacity: 0.35` na segmencie "zaplanowane" (NIE drugi
+    odcień — jednokolorowy żółty był świadomą decyzją usera z wcześniejszej rundy, patrz
+    komentarz przy `WORK_ACCENT`).
+
+**Pominięte / uznane za nie-bugi po weryfikacji:**
+- Niespójność "Wszyscy / Tylko ja" między `budgetRemaining`/daily-rings/Finanse/`funFacts` —
+  `budgetRemaining` i `budgetAlertCard` liczą się z `stats.monthExpenses`/
+  `stats.monthCategorySpend` (NIEskopowane, całe gospodarstwo), podczas gdy Finanse/`funFacts`
+  używają `scopedExpenses`. Sprawdzone: budżety kategorii (`budgets`) to limity NA
+  GOSPODARSTWO, nie per-osoba — brak koncepcji "budżetu tylko mojego" w ustawieniach, więc
+  liczenie ich z pełnych wydatków jest zgodne z tym, jak są zdefiniowane, nie bugiem. Zostawione
+  bez zmian.
+
+**Sprawdzone i czyste** (subagent, potwierdzone): countdowns (po fixie #4 wcześniej w tej
+sesji), kafel pet/login, habits-today, habits-nudge, daily-rings, komponenty karty
+gcal/Plan-zajęć, PinnedNotes, YearAgo, MoodMiniCal, FixedVariable, TopProducts, Correlations,
+Reflection, Trivia, widok compact MonthWrapped — brak analogicznych bugów snapshot-vs-żywy-store
+w żadnym z nich.
+
+**Testy**: `tsc --noEmit` czyste, `jest` czysty (86/86 suite, 1111/1111 testów — bez zmiany
+liczby, te poprawki są w `index.tsx`/`CalorieBalanceSection.tsx`, bez nowych plików testowych;
+logika jest zbyt spleciona z resztą ekranu, by łatwo wyizolować do unit-testu, w przeciwieństwie
+do §186's `fmtGearStat`).
+
+**Priorytet testu na urządzeniu**:
+- Dashboard, karta "Liczniki" — licznik "Zrobione dziś" (0 dni) powinien wyglądać SZARO, nie
+  czerwono.
+- Dashboard, "Twoje Serie" — jeśli WSZYSTKIE serie akurat są na 0, karta ma się nadal pokazywać
+  (kwadraty przerywaną ramką), nie zniknąć.
+- Finanse, limit tagowy (np. #słodycze) — przewiń tydzień "‹" w Finansach, % limitu tagowego NIE
+  powinien się zmienić (ma zostać przy bieżącym tygodniu).
+- Bilans kalorii — dzień bez zsynchronizowanego zegarka (spalone = "—") ma pokazać "—" w
+  słupku/nagłówku dnia, a nie zaliczyć się jako deficyt.
+- Trzymaj appkę otwartą przez zmianę dnia/tygodnia/miesiąca (albo zmień datę systemową) —
+  "pojutrze"/tydzień/miesiąc w Finansach mają przeliczyć się na nowo, nie zostać przy starych
+  liczbach ze starą etykietą daty.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

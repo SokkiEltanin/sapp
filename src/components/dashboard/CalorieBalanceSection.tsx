@@ -13,14 +13,21 @@ function CalorieBalanceSection(
       <View style={s.cardHeader}>
         <Flame size={13} color={accentColor} />
         <Text style={s.cardTitle}>Bilans kalorii</Text>
-        <Text style={[s.foodTotal, { color: t.balance >= 0 ? colors.accent.green : colors.accent.red }]}>
-          {t.balance >= 0 ? '−' : '+'}{Math.abs(t.balance).toLocaleString('pl-PL')} kcal
-        </Text>
+        {/* 2026-09-26, audyt dashboardu — bez `t.burnKnown` kafel liczył "deficyt" = całe
+            zjedzone kalorie w dniu bez synchronizacji zegarka (burn=0 domyślnie), zamiast
+            pokazać "brak danych" (patrz `burnKnown` w calorieBalance w index.tsx). */}
+        {t.burnKnown ? (
+          <Text style={[s.foodTotal, { color: t.balance >= 0 ? colors.accent.green : colors.accent.red }]}>
+            {t.balance >= 0 ? '−' : '+'}{Math.abs(t.balance).toLocaleString('pl-PL')} kcal
+          </Text>
+        ) : (
+          <Text style={[s.foodTotal, { color: colors.text.muted }]}>—</Text>
+        )}
       </View>
-      <Text style={s.statSub}>Dziś: zjedzone {t.eaten.toLocaleString('pl-PL')} · spalone {t.burn > 0 ? t.burn.toLocaleString('pl-PL') : '—'} · cel {cb.target.toLocaleString('pl-PL')}</Text>
+      <Text style={s.statSub}>Dziś: zjedzone {t.eaten.toLocaleString('pl-PL')} · spalone {t.burnKnown ? t.burn.toLocaleString('pl-PL') : '—'} · cel {cb.target.toLocaleString('pl-PL')}</Text>
       <View style={{ flexDirection: 'row', gap: 6, height: 50, alignItems: 'flex-end', marginTop: spacing[2] }}>
         {cb.days.map((d: any) => {
-          const has = d.eaten > 0;
+          const has = d.eaten > 0 && d.burnKnown;
           const mag = Math.min(1, Math.abs(d.balance) / bmax);
           const col = !has ? 'rgba(255,255,255,0.10)' : d.balance >= 0 ? colors.accent.green : colors.accent.red;
           return (

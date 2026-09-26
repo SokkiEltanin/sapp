@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Agent-audyt całego dashboardu — 10 realnych bugów naprawionych (2026-09-26)
+
+Pełny opis w ARCHITECTURE.md §187. User: "sprawdz apkę żeby nie było błędów jak ostatnio z
+tymi licznikami, sprawdz inne widgety jak się wyswietlają czy mają dane lub czy możemy je
+ulepszyć lub czy nie mają błędów czy coś" — szeroki audyt przez Explore-subagent + osobista
+weryfikacja każdego znaleziska przed poprawką. Naprawione: zaległe zadania liczyły `snoozed`
+jako zaległe; "Plan zajęć" gubiło wydarzenie dokładnie pojutrze (off-by-one); karta "Liczniki"
+świeciła się czerwono na 0 dni (zamiast szaro) i duplikowała auto-liczniki z "Twoje Serie";
+`tomorrow`/`weekDates`/`monthDates` nie przeliczały się po zmianie dnia/tygodnia/miesiąca bez
+remountu ekranu; limit tagowy (#słodycze) podglądał tydzień z nawigacji Finansów zamiast
+zawsze bieżącego; karta ostrzeżenia budżetowego nie rozróżniała "zbliżasz się" od "przekroczono";
+Bilans kalorii liczył dni bez danych zegarka jako pełny deficyt; "Twoje Serie" chowało się
+całkowicie gdy wszystkie serie na 0 (odwrotność zamierzonego designu); karta limitów tagowych
+nie miała `.length > 0` guard (edytor dashboardu nie widział że jest "pusta"); pasek "Praca"
+(do teraz/zaplanowane) nie do odróżnienia bez czytania liczb (dodana opacity). `tsc`/`jest`
+czyste (86/86 suite, 1111 testów, bez zmiany liczby).
+
+**🆕 Priorytet testu na urządzeniu**:
+- Karta "Liczniki" — licznik "Zrobione dziś" (0 dni) ma być SZARY, nie czerwony.
+- "Twoje Serie" — jeśli wszystkie serie na 0, karta ma się nadal pokazać (nie zniknąć).
+- Finanse — przewiń tydzień "‹", % limitu tagowego NIE ma się zmienić.
+- Bilans kalorii — dzień bez zegarka ma pokazać "—", nie zaliczyć się jako deficyt.
+- Trzymaj appkę otwartą przez zmianę dnia/miesiąca — liczby w Finansach mają się przeliczyć.
+
 ## ✅ Ekwipunek: `atkFlat` gubił się do "+0" przy małych wartościach (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §186. User zrzutem: "Sznurkowa Obroża... pokazuje że +0, o co
