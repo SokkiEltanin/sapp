@@ -1,7 +1,7 @@
 import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
   gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots, gearSellValue,
-  gearCombatBonuses, gearFlatHp, gearCoinsMult, gearAtkFlat,
+  gearCombatBonuses, gearFlatHp, gearCoinsMult, gearAtkFlat, fmtGearStat,
 } from '@/utils/gear';
 import { atkPower } from '@/utils/bosses';
 
@@ -248,5 +248,24 @@ describe('gear — gearAtkFlat (obroża, 2026-09-22 — flat zamiast %, patrz ge
       // starego zachowania (9%→4.4%→1.2% malejąco z poziomem).
       expect(boostPct).toBeCloseTo(flatAtk / 40, 5);
     }
+  });
+});
+
+// 2026-09-26, user zrzutem: "Sznurkowa Obroża... pokazuje że +0, o co chodzi, to bez sensu" —
+// obroża (atkFlat) ma baseValue rzędu 0.08, więc common/rare realna wartość kopii (patrz
+// GEAR_ROLL_SPREAD) ląduje CAŁA poniżej 1 — Math.round() ją zerowała mimo że item realnie coś
+// dawał (surowa wartość, nie zaokrąglona, idzie do gearAtkFlat/atkMultiplier).
+describe('gear — fmtGearStat (2026-09-26 fix: atkFlat nie ma już +0 dla małych wartości)', () => {
+  test('atkFlat < 1 pokazuje jeden miejsce po przecinku, NIE zaokrągla do +0', () => {
+    expect(fmtGearStat('atkFlat', 0.4)).toBe('+0.4');
+    expect(fmtGearStat('atkFlat', 0.28)).toBe('+0.3');
+    expect(fmtGearStat('atkFlat', 0.056)).toBe('+0.1');
+  });
+  test('flatHp zostaje przy pełnych liczbach (baseValue nigdy nie schodzi blisko zera)', () => {
+    expect(fmtGearStat('flatHp', 1.4)).toBe('+1');
+    expect(fmtGearStat('flatHp', 49.5)).toBe('+50');
+  });
+  test('staty procentowe bez zmian — jedno miejsce po przecinku, %', () => {
+    expect(fmtGearStat('critPct', 0.12)).toBe('+12.0%');
   });
 });

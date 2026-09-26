@@ -11204,6 +11204,33 @@ fioletowa poświata z lewej strony, w tym samym stylu co kafelek "Liczniki" (ile
 
 ---
 
+## 186. Ekwipunek: `atkFlat` gubił się do "+0" przy małych wartościach (2026-09-26)
+
+User zrzutem Ekwipunku: "Sznurkowa Obroża... niektóre pokazują że +0, o co chodzi, to bez
+sensu". Root cause w `gear.ts`'s `fmtGearStat()`: obroża (`atkFlat`, przebudowana z % na FLAT
+2026-09-22) ma `baseValue` rzędu 0.08 (Sznurkowa Obroża, T1) — przy common/rare rzadkości
+realna wartość WYLOSOWANEJ kopii (`GEAR_ROLL_SPREAD` ±30% wokół środka) ląduje CAŁA poniżej 1
+(np. rare: 0.28-0.52). `fmtGearStat` używała `Math.round()` dla `atkFlat` (ten sam kod co
+`flatHp`) — zerowało to wyświetlaną wartość, mimo że item REALNIE coś dawał w walce (surowa,
+nie zaokrąglona wartość idzie do `atkMultiplier`/`gearAtkFlat`, samo `Math.round()` było tylko
+w warstwie WYŚWIETLANIA).
+
+**Fix**: `fmtGearStat('atkFlat', v)` pokazuje teraz jedno miejsce po przecinku (`+0.4` zamiast
+`+0`) zamiast pełnej liczby. `flatHp` BEZ ZMIAN — jego `baseValue` (1-3.3 × mnożnik rzadkości)
+nigdy nie schodzi blisko zera, całkowite HP ma sens jako jednostka wyświetlania. Delta
+("▲ +0.2 vs założony") była już liczona z SUROWYCH wartości (`inst.value - equippedVal`), nie
+z zaokrąglonych — ten fix jest czysto kosmetyczny/informacyjny, żadna logika porównania się
+nie zmieniła.
+
+**Testy**: nowy `describe('gear — fmtGearStat')` w `gear.test.ts` (3 testy: atkFlat<1 pokazuje
+dziesiętne, flatHp zostaje całkowite, staty % bez zmian). `tsc --noEmit` czyste, `jest` czysty
+(1111 testów, +3).
+
+**Priorytet testu na urządzeniu — niski**: Ekwipunek → obroża niskiej rzadkości (common/rare)
+— staty mają pokazywać ułamkową wartość ataku (np. "+0.4") zamiast "+0".
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
