@@ -24,6 +24,7 @@ import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useDayKey } from '@/hooks/useDayKey';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
@@ -82,6 +83,12 @@ export default function FinancesScreen() {
   const { timeOfDay } = useTimeAccent();
   const { grouped, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
+  // `dayKey` (2026-09-26, agent-audyt logiki) — `monthTotals`/`monthPulse`/`recentCutoff`
+  // niżej liczą granice dziś/miesiąc z `new Date()`, ale memoizowały się bez zależności od
+  // czasu — ekran "Finanse" trzymany otwarty przez zmianę dnia/miesiąca (bez mutacji
+  // `expenses`) pokazywałby "TEN MIESIĄC" ze starymi granicami i "Ostatnie 31 dni" z
+  // przesuwającym się do przodu (nigdy odświeżanym) oknem.
+  const dayKey = useDayKey();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   // Filtr po "rachunkach" (prąd/czynsz/internet…), niezależny od zwykłego tagu — user:
   // "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za prąd". Zwykły tag
@@ -217,7 +224,7 @@ export default function FinancesScreen() {
       }
     }
     return { exp, expVar, inc, allExp, allInc, cashExp, cashInc, food, sweets };
-  }, [expenses, scope]);
+  }, [expenses, scope, dayKey]);
 
   // Everything the "TEN MIESIĄC" card needs to actually MEAN something: how this
   // month is pacing vs the SAME point last month, where it's heading (forecast from
@@ -266,7 +273,7 @@ export default function FinancesScreen() {
       topCat, topCatAmt, dailyRate, forecast, paceVsPrevPct, perDayLeft,
       cats, catTotal,
     };
-  }, [expenses, monthTotals.inc]);
+  }, [expenses, monthTotals.inc, dayKey]);
 
   // Card and cash are independent pots; the total is their sum. Each = its offset
   // (money there before tracking) + its own net flow (all-time).
@@ -294,7 +301,7 @@ export default function FinancesScreen() {
   const recentCutoff = useMemo(() => {
     const c = new Date(); c.setDate(c.getDate() - RECENT_TX_DAYS);
     return `${c.getFullYear()}-${pad(c.getMonth() + 1)}-${pad(c.getDate())}`;
-  }, []);
+  }, [dayKey]);
   const capTx = !showAllTx && activeFilterCount === 0;
   const hasOlderTx = useMemo(
     () => activeFilterCount === 0 && grouped.some(([date]) => date < recentCutoff),

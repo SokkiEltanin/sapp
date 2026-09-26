@@ -4,11 +4,19 @@ import { expensesService } from '@/services/expensesService';
 import { Expense, ExpenseCategory } from '@/types';
 import { CATEGORY_META } from '@/utils/categories';
 import { isSelfTransfer } from '@/utils/statWidgets';
+import { useDayKey } from '@/hooks/useDayKey';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 export function useExpenses() {
   const { expenses, isLoading, error, setExpenses, setLoading, setError, addExpense, deleteExpense } =
     useExpensesStore();
+  // `dayKey` (2026-09-26, agent-audyt logiki) — `stats` poniżej liczy granice
+  // tydzień/miesiąc z `new Date()`, ale memoizowała się TYLKO na `[expenses]`. Ekran, który
+  // trzyma ten hook zamontowany przez zmianę dnia/tygodnia/miesiąca (bez żadnej mutacji
+  // `expenses`) pokazywał stare `thisWeek`/`monthExpenses`/`monthCategorySpend` — a to źródło,
+  // z którego dashboard's `budgetRemaining`/`budgetAlertCard` już raz zostały poprawione, by
+  // czytać JAKO "jedno źródło prawdy" (patrz `index.tsx` komentarz przy `budgetAlertCard`).
+  const dayKey = useDayKey();
 
   useEffect(() => { loadExpenses(); }, []);
 
@@ -73,7 +81,7 @@ export function useExpenses() {
       }, {});
 
     return { thisWeek, lastWeek, monthExpenses, monthIncome, topCategory, monthCategorySpend };
-  }, [expenses]);
+  }, [expenses, dayKey]);
 
   const grouped = useMemo(() => {
     const map: Record<string, Expense[]> = {};

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
@@ -208,7 +208,13 @@ export default function ProductsScreen() {
   // Likely OCR duplicates: highly-similar product names that aren't yet merged
   // (e.g. "HAŁWA STOŁECZNA" ≈ "HAŁWA SŁONECZNA"). High band so we don't nag on
   // genuinely-different products; the user confirms each. Merge = alias loser→winner.
-  const duplicatePairs = useMemo(() => {
+  // Rozdzielone na dwa `useMemo` (2026-09-26, agent-audyt optymalizacji) — pełny O(n²)
+  // trigram-scan katalogu (setki produktów u aktywnego usera) był kluczowany razem z
+  // `dismissedDup`, więc każde jedno odrzucenie duplikatu na arkuszu ("to nie duplikat")
+  // przeliczało CAŁY skan od nowa, mimo że odrzucenie zmienia tylko to, co jest WIDOCZNE, nie
+  // to, co jest PODOBNE. Teraz `allDuplicatePairs` liczy się tylko gdy zmienia się sam katalog
+  // (`products`), a filtr odrzuceń jest tanim O(n) przejściem osobno.
+  const allDuplicatePairs = useMemo(() => {
     const out: { a: Product; b: Product; id: string }[] = [];
     for (let i = 0; i < products.length; i++) {
       for (let j = i + 1; j < products.length; j++) {
@@ -217,12 +223,16 @@ export default function ProductsScreen() {
           // higher count is the "winner" the other folds into
           const [a, b] = products[i].count >= products[j].count ? [products[i], products[j]] : [products[j], products[i]];
           const id = [a.key, b.key].sort().join('|');   // order-stable so a dismissal sticks
-          if (!dismissedDup.has(id)) out.push({ a, b, id });
+          out.push({ a, b, id });
         }
       }
     }
-    return out.slice(0, 40);
-  }, [products, dismissedDup]);
+    return out;
+  }, [products]);
+  const duplicatePairs = useMemo(
+    () => allDuplicatePairs.filter(p => !dismissedDup.has(p.id)).slice(0, 40),
+    [allDuplicatePairs, dismissedDup],
+  );
 
   const mergePair = async (a: Product, b: Product, id: string) => {
     haptic.success();
@@ -251,7 +261,11 @@ export default function ProductsScreen() {
   };
 
 
-  const openEdit = (p: Product) => {
+  // `useCallback` (2026-09-26, agent-audyt optymalizacji) — bez tego ta funkcja miała nową
+  // referencję przy KAŻDYM renderze ekranu, co przekazywane jako `onPress` do `ProductRow`
+  // (teraz `memo()`-owany, patrz komentarz tam) unieważniało memo na WSZYSTKICH wierszach
+  // katalogu naraz — nowy prop = memo zawsze widzi "zmianę".
+  const openEdit = useCallback((p: Product) => {
     haptic.tap();
     setEditName(p.name);
     const w = weightFor(p.name, weightMem);
@@ -260,7 +274,7 @@ export default function ProductsScreen() {
     setEditCat((p.category as ExpenseCategory) || 'groceries');
     setEditSubTag(p.subTag ?? '');
     setEditing(p);
-  };
+  }, [weightMem]);
 
   // Gdzie i kiedy ten produkt się pojawił — user: "muszę mieć tam odnośnik gdzie w
   // finansach jest ten produkt i kiedy do paragonu" (2026-09-17). Tap → prosto do tego
@@ -372,7 +386,7 @@ export default function ProductsScreen() {
           <Text style={s.empty}>{products.length === 0 ? 'Brak produktów — zeskanuj paragony, by je tu zobaczyć.' : 'Nic nie pasuje.'}</Text>
         ) : query ? (
           // Szukanie: płaska lista jak dotąd — szybko, bez sekcji do rozwijania.
-          sorted.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)
+          sorted.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={openEdit} s={s} c={c} />)
         ) : (
           // Przeglądanie: grupowane sekcje top-level tag → (opcjonalnie) podtag.
           grouped.map(({ topKey, totalCount, flatOnly, subEntries }) => {
@@ -385,11 +399,11 @@ export default function ProductsScreen() {
                   <Text style={s.groupCount}>{totalCount}</Text>
                 </TouchableOpacity>
                 {!isCollapsed && (flatOnly
-                  ? subEntries[0][1].map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)
+                  ? subEntries[0][1].map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={openEdit} s={s} c={c} />)
                   : subEntries.map(([subKey, items]) => (
                       <View key={subKey} style={s.subGroupBlock}>
                         <Text style={s.subGroupTitle}>{subKey}</Text>
-                        {items.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={() => openEdit(p)} s={s} c={c} />)}
+                        {items.map(p => <ProductRow key={p.key} p={p} sortMode={sortMode} onPress={openEdit} s={s} c={c} />)}
                       </View>
                     )))}
               </View>
@@ -551,15 +565,19 @@ export default function ProductsScreen() {
 
 // Jeden wiersz produktu — współdzielony przez płaską listę (szukanie) i grupowany widok
 // (przeglądanie), żeby wygląd wiersza nie rozjechał się między dwoma trybami.
-function ProductRow({ p, sortMode, onPress, s, c }: {
-  p: Product; sortMode: 'count' | 'recent'; onPress: () => void; s: any; c: any;
+// `memo()` (2026-09-26, agent-audyt optymalizacji) — katalog produktów renderuje się przez
+// zwykły `ScrollView`+`.map()` (bez wirtualizacji, osobna, większa zmiana — patrz NEXT_STEPS.md),
+// więc bez memo KAŻDA zmiana stanu ekranu (query, sortMode, otwarcie arkusza duplikatów)
+// re-renderowała wszystkie wiersze katalogu naraz, nie tylko dotknięty.
+const ProductRow = memo(function ProductRow({ p, sortMode, onPress, s, c }: {
+  p: Product; sortMode: 'count' | 'recent'; onPress: (p: Product) => void; s: any; c: any;
 }) {
   const metaParts: string[] = [`×${p.count}`];
   if (sortMode === 'recent' && p.lastPurchasedAt) metaParts.push(fmtHistoryDate(p.lastPurchasedAt));
   if (p.subTag) metaParts.push(p.subTag);
   if (p.tags.length > 0) metaParts.push(p.tags.slice(0, 3).join(', '));
   return (
-    <TouchableOpacity style={s.row} activeOpacity={0.8} onPress={onPress}>
+    <TouchableOpacity style={s.row} activeOpacity={0.8} onPress={() => onPress(p)}>
       <View style={{ flex: 1 }}>
         <Text style={s.rowName} numberOfLines={1}>{p.name}</Text>
         <Text style={s.rowMeta} numberOfLines={1}>{metaParts.join(' · ')}</Text>
@@ -567,7 +585,7 @@ function ProductRow({ p, sortMode, onPress, s, c }: {
       <ChevronLeft size={15} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
     </TouchableOpacity>
   );
-}
+});
 
 function PressableBack({ onPress, color }: { onPress: () => void; color: string }) {
   return (

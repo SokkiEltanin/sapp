@@ -16,6 +16,7 @@ import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL } from '@/utils/classSchedule';
 import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -311,8 +312,12 @@ export default function TopPill() {
     // przez wszystkie, ta sama motywacja co "4" wyżej.
     // These fall between "overdue (<today)" and "near deadline (>today)", so
     // without this the pill would vanish on a day full of today-tasks.
+    // `!== 'snoozed'` (2026-09-26, agent-audyt logiki) — brakowało tu, mimo że reszta apki
+    // (tasks.tsx, focus.tsx, widgetTasks.ts, priorytet "4" wyżej) już wyklucza odłożone
+    // zadania. `snooze()` (useTasks.ts) nie czyści deadline/scheduledDate, więc odłożone
+    // zadanie z terminem "dziś" wracało tu jako "DZIŚ" — dokładna odwrotność odkładania.
     const todayTasks = calTasks.filter(t =>
-      t.status !== 'done' &&
+      t.status !== 'done' && t.status !== 'snoozed' &&
       ((t.deadline && t.deadline.split('T')[0] === today) || t.scheduledDate === today)
     );
     if (todayTasks.length > 0) {
@@ -327,9 +332,15 @@ export default function TopPill() {
     }
 
     // 5 — Budget ≥85% of monthly limit
+    // `isSelfTransfer` (2026-09-26, agent-audyt logiki) — brakowało tu, mimo że `index.tsx`'s
+    // `budgetAlertCard` miało DOKŁADNIE ten sam bug (2026-09-18, patrz komentarz tam) i już raz
+    // został naprawiony przez przejście na `stats.monthCategorySpend` — ten pill ma TRZECIĄ,
+    // niezależną kopię tego samego liczenia, wciąż bez wykluczenia przelewu własnego (może
+    // nosić dowolną kategorię, nie tylko `'transfer'` — wykrywany tagiem, nie polem kategorii).
     const monthlySpend: Record<string, number> = {};
     for (const e of expenses) {
       if (e.type && e.type !== 'expense') continue;
+      if (isSelfTransfer(e)) continue;
       if (e.date.slice(0, 7) !== today.slice(0, 7)) continue;
       monthlySpend[e.category] = (monthlySpend[e.category] ?? 0) + e.amount;
     }
@@ -378,9 +389,10 @@ export default function TopPill() {
     }
 
     // 7 — Nearest task deadline within 7 days (countdown)
+    // `!== 'snoozed'` (2026-09-26, agent-audyt logiki) — ten sam brakujący filtr co "4b" wyżej.
     const nearDeadline = calTasks
       .filter(t =>
-        t.status !== 'done' &&
+        t.status !== 'done' && t.status !== 'snoozed' &&
         t.deadline &&
         t.deadline.split('T')[0] > today &&
         t.deadline.split('T')[0] <= weekEnd
@@ -465,7 +477,9 @@ export default function TopPill() {
     // kandydat ISTNIAŁ WIECZNIE w puli rotacji (nigdy nie znika, bo nic go nie "rozwiązuje"),
     // więc pojawiał się co CALM_ROTATE_MS bez końca. Priorytety 4/4b/7 wyżej już wymagają
     // terminu z tego samego powodu — ten fallback teraz jest spójny z resztą pliku.
-    const pending = calTasks.filter(t => t.status !== 'done' && (t.deadline || t.scheduledDate)).length;
+    // `!== 'snoozed'` (2026-09-26, agent-audyt logiki) — ten sam brakujący filtr co "4b"/"7"
+    // wyżej: bez niego odłożone zadanie wciąż zasilało "N zadań w toku", defeat purpose snoozu.
+    const pending = calTasks.filter(t => t.status !== 'done' && t.status !== 'snoozed' && (t.deadline || t.scheduledDate)).length;
     if (pending > 0) {
       calmCandidates.push({
         badge: `${pending}`,

@@ -28,6 +28,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useDayKey } from '@/hooks/useDayKey';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useTasks } from '@/hooks/useTasks';
 import { useHabits } from '@/hooks/useHabits';
@@ -513,14 +514,9 @@ export default function DashboardScreen() {
   // on every foreground). The dashboard stays mounted, so the countdown memos below —
   // whose freshness depends on "now" — would otherwise keep a stale day and let a passed
   // event linger. Feeding dayKey into their deps makes them re-filter the moment the day
-  // turns. setDayKey only fires a real re-render when the string actually changes.
-  const [dayKey, setDayKey] = useState(todayStr());
-  useEffect(() => {
-    const tick = () => setDayKey(todayStr());
-    const id = setInterval(tick, 60_000);
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') tick(); });
-    return () => { clearInterval(id); sub.remove(); };
-  }, []);
+  // turns. Extracted to `useDayKey()` (2026-09-26, agent-audyt logiki) — the same pattern was
+  // independently missing/reinvented in `useExpenses.ts`/`habits.tsx`/`finances.tsx`/`mood.tsx`.
+  const dayKey = useDayKey();
 
   // Countdowns (event "walk" tiles) — nearest upcoming first. Events disappear once
   // they're over: a no-end event the day after its date, an end-dated event the day

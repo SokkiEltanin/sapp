@@ -16,10 +16,7 @@ import { haptic } from '@/utils/haptics';
 import { useMoodStore } from '@/store/moodStore';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import { MOOD_COLORS, Expense, Habit } from '@/types';
-import { expensesService } from '@/services/expensesService';
-import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
-import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
+import { MOOD_COLORS, Habit } from '@/types';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, formatWaterDiagnostic, probeSleep, sleepProbeVerdict } from '@/services/healthConnectService';
@@ -130,7 +127,6 @@ export default function HealthScreen() {
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
-  const [weekBurn, setWeekBurn]         = useState<number[]>(Array(7).fill(0)); // kcal burned per day (from cache)
   const [weekFat, setWeekFat]           = useState<number[]>(Array(7).fill(0)); // body fat % per day (from cache)
   const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
   const [monthData, setMonthData]       = useState<HealthDayPoint[]>([]); // 30-day from watch
@@ -311,7 +307,6 @@ export default function HealthScreen() {
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
   const [sleepRange, setSleepRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep' | 'body'>(null);
-  const [energyOpen, setEnergyOpen] = useState(false); // calorie card is collapsed by default (de-emphasised)
   const [bodyEdit, setBodyEdit] = useState(false); // manual body-composition entry open in the body sheet
   // Manually set a body-composition field; '' / invalid clears it. Persisted via the
   // today-cache save effect, and preserved across watch syncs (sync uses ?? prev).
@@ -319,45 +314,6 @@ export default function HealthScreen() {
     const v = parseFloat(raw.replace(',', '.'));
     setHcExtra(prev => ({ ...prev, [key]: !raw.trim() || isNaN(v) || v <= 0 ? null : v }));
   };
-  const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
-  const [kcalMem, setKcalMem] = useState<KcalMemory>({});
-  useFocusEffect(useCallback(() => {
-    expensesService.getAll().then(setExpenses).catch(() => {});
-    loadKcalMemory().then(setKcalMem).catch(() => {});
-  }, []));
-
-  // ── Energy balance (estimate) ───────────────────────────────────────────────
-  // OUT = the watch's burn (total, or BMR + active). IN = estimated food energy
-  // bought (from receipts) — a 7-day average smooths the buy≠eat noise.
-  const energy = useMemo(() => {
-    const bmr = (hcExtra.bmr as number) || 0;
-    const active = (hcExtra.activeCalories as number) || 0;
-    const totalC = (hcExtra.totalCalories as number) || 0;
-    // A full-day burn is ~1500–3500 kcal. Samsung Health often shares only the
-    // EXERCISE calories (a few hundred) as "total" — using that as the whole day's
-    // burn produces a nonsense balance, so only trust totalC when it's plausible.
-    const burned = totalC >= 1200 ? totalC : (bmr > 0 ? bmr + active : 0);
-    const intakeAvg = avgFoodKcal(expenses, 7, kcalMem);
-    // This week's weight change (first → last logged) to sanity-check the balance.
-    let first = 0, last = 0;
-    for (const w of weekWeight) { if (w > 0) { if (first === 0) first = w; last = w; } }
-    const weightDelta = (first > 0 && last > 0 && first !== last) ? +(last - first).toFixed(1) : null;
-    // 7-day burn (cache) vs estimated food intake per day.
-    const td = new Date();
-    const tIdx = td.getDay() === 0 ? 6 : td.getDay() - 1;
-    const week = weekBurn.map((burn, i) => {
-      const d = new Date(td.getFullYear(), td.getMonth(), td.getDate() - (tIdx - i));
-      const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const intake = i <= tIdx ? foodKcalForDate(expenses, ds, kcalMem) : 0;
-      return { burn, intake, balance: burn - intake };
-    });
-    // TDEE ≈ average daily burn over logged days → maintenance + a cut target.
-    const burnDays = weekBurn.filter(b => b > 0);
-    const avgBurn = burnDays.length ? Math.round(burnDays.reduce((a, b) => a + b, 0) / burnDays.length) : burned;
-    const maintain = avgBurn;
-    const cut = maintain > 1200 ? maintain - 500 : 0; // ~0.5 kg/tydz. deficyt
-    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta, week, maintain, cut };
-  }, [hcExtra, expenses, weekWeight, weekBurn, kcalMem]);
 
   useEffect(() => {
     const load = async () => {
@@ -385,7 +341,6 @@ export default function HealthScreen() {
         const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
         const wSteps  = Array(7).fill(0);
         const wWeight = Array(7).fill(0);
-        const wBurn   = Array(7).fill(0);
         const wFat    = Array(7).fill(0);
         const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
 
@@ -399,7 +354,6 @@ export default function HealthScreen() {
             if (parsed.weight != null) wWeight[i] = parsed.weight;
             if (parsed.hc) {
               const hc = parsed.hc;
-              wBurn[i] = (hc.totalCalories > 0 ? hc.totalCalories : ((hc.bmr || 0) + (hc.activeCalories || 0)));
               if (hc.bodyFatPct > 0) wFat[i] = hc.bodyFatPct;
             }
             wSleep[i] = {
@@ -412,7 +366,6 @@ export default function HealthScreen() {
         setWeekSteps(wSteps);
         setWeekSleep(wSleep);
         setWeekWeight(wWeight);
-        setWeekBurn(wBurn);
         setWeekFat(wFat);
         // Water week is loaded from the habit in loadWater(), not this blob.
 
