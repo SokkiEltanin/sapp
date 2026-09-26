@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import { ChevronLeft, RotateCcw, Share2, Move } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import CatArt from '@/components/pet/CatArt';
+import CatArtStatic from '@/components/pet/CatArtStatic';
 import BossArt from '@/components/bosses/BossArt';
 import RadialGlow from '@/components/ui/RadialGlow';
 import GroundShadow from '@/components/ui/GroundShadow';
@@ -27,7 +27,7 @@ import { haptic } from '@/utils/haptics';
 // Edytor układu areny walki (2026-09-17, user: "Daj mi mozliwosc zmienic sam obrazek tla
 // walk żebym dostosował i moze tez wielkość i pozycje pupila, bossa i ich pasków HP, wtedy
 // wyeksportować i zrobisz dla wszystkich"). Cel: dać userowi WIZUALNY podgląd DOKŁADNIE tego
-// co widzi w prawdziwej walce (te same komponenty CatArt/BossArt/RadialGlow/GroundShadow, ta
+// co widzi w prawdziwej walce (te same komponenty CatArtStatic/BossArt/RadialGlow/GroundShadow, ta
 // sama grafika tła+scrim+mgiełka co app/boss-fight.tsx), z możliwością:
 //  1. wyboru tła areny (jedno z istniejących LOKALIZACJA_*/LOKACJA_KAMPANIA),
 //  2. przeciągnięcia pupila/bossa/paska HP pupila/paska HP bossa NIEZALEŻNIE (dziś w realnej
@@ -187,7 +187,7 @@ export default function BattleLayoutLab() {
                     <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateY: draft.catShadowOffsetY }] }]}>
                       <GroundShadow width={draft.catSize * draft.catShadowScaleX} height={draft.catSize * draft.catShadowScaleY} opacity={0.5} />
                     </View>
-                    <CatArt size={draft.catSize} expression="content" animate={false} palette={palette} stripes={catStripes}
+                    <CatArtStatic size={draft.catSize} expression="content" palette={palette} stripes={catStripes}
                       eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </View>
                 </Draggable>

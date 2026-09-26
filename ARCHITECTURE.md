@@ -11128,6 +11128,57 @@ zostać widoczne przy każdej kombinacji koloru+przezroczystości (nie kwadratow
 
 ---
 
+---
+
+## 184. Kotek w walkach: naprawdę statyczny bliźniak CatArt, nie tylko `animate={false}` (2026-09-26)
+
+User: "Dlaczego nadal w walkach nie bierze udziału wyeksportować statyczna wersja kotka (bez
+animacji głaskania itp jak bossy) żeby nie lagowały tak walki" — po §"kotek żeby był
+statyczny" (2026-08-30) user doprecyzował: "miał być mój kotek, tylko jego svg 1:1 z kolorami,
+tyle że statyczny/nieanimowany bez animacji w walce — nie możesz zapisać wersji svg bez
+animacji i po prostu zmieniać mu kolor adekwatnie do naszego jak mu zmieniam?".
+
+**Co było nie tak z 2026-08-30's `animate={false}`**: ten prop na `CatArt` wyłączał TYLKO
+pętle bezczynności (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie) — ale `CatArt.tsx` samo w
+sobie NADAL alokowało przy każdym mouncie/renderze 8 `Animated.Value` (breathe/hop/wiggle/
+shake/arm/swat/earL/earR), kilka `useState` (blink/look/petting/angry/battleFace/licking/
+swatting/particles) i cały mechanizm ataku/swata (który celowo NIE był gaszony przez
+`!animate`, tylko przez `asleep` — żeby cios w walce dalej działał). To NIE jest to samo co
+"statyczny SVG" — to animowany komponent z wyłączonymi TYLKO niektórymi animacjami.
+
+**Fix — nowy `src/components/pet/CatArtStatic.tsx`**: osobny komponent, ZERO
+`Animated.Value`/`useState`/`useEffect` — czysta funkcja koloru/wyglądu. Bierze TE SAME propsy
+personalizacji (`palette`/`stripes`/`eyeColor`/`noseColor`/`whiskers`/`legStripes`/
+`expression`) co `CatArt`, renderuje WYŁĄCZNIE spoczynkową pozę (obie łapki na ziemi, oczy
+otwarte wg `expression`, uszy w stałej pozycji bez overlay'a-do-flutteru, ogon bez wrappera
+Animated) — 1:1 wygląd/kolor, zero maszynerii animacji. Duplikuje TYLKO markup, nie logikę:
+stałe/funkcje pomocnicze (`mouthFor`, `Paw`, `LX`/`RX`/`EYY`/`CHEEK_L` z `CatArt.tsx`,
+`TAIL_D`/`TAIL_AXIS_DEG` z `CatTail.tsx`) są WYEKSPORTOWANE i zaimportowane, nie przepisane —
+zmiana kształtu w oryginale nie może po cichu rozjechać wyglądu bliźniaka.
+
+**Atak/swat NIE ma odpowiednika w CatArtStatic** — świadomie pominięty (nie tylko "za trudne do
+przeniesienia"): `boss-fight.tsx` ma już OSOBNY, niezależny sygnał trafienia (latająca łapa-
+pocisk `pawTravel` + `playBossHitFx` flash bossa) — kotek dublujący to własnym swatem był
+zbędny. Martwy po tej zmianie `attackPulse` (stan istniejący TYLKO po to, żeby przekazać
+`attack` do `CatArt`) USUNIĘTY z `boss-fight.tsx` — nic już go nie czytało.
+
+**Podłączone WSZĘDZIE, nie zostawione dead-endem**: `app/boss-fight.tsx` (prawdziwa walka —
+campaign/raid/event/quest/mission/mad, WSZYSTKIE przez jeden ekran) ORAZ `app/battle-layout-
+lab.tsx` (edytor układu areny, który z założenia ma pokazywać DOKŁADNIE to co realna walka —
+zostawienie tam starego animowanego `CatArt` rozjechałoby podgląd edytora względem
+rzeczywistości).
+
+**Testy**: brak nowych (czysto wizualna/strukturalna zmiana, bez nowej logiki policzalnej w
+Jest). `tsc --noEmit` czyste, `jest` czysty (1108 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: stocz walkę (dowolny typ) — kotek ma wyglądać
+identycznie jak wcześniej (te same kolory/pręgi/oczy/wąsy z Twojej personalizacji), ale bez
+ŻADNEGO ruchu — brak oddechu/mrugania/spoglądania/machania uszami/swata na trafienie. Subiektywnie
+oceń czy walki realnie mniej lagują — jeśli NIE, lag ma inne źródło (profilować głębiej: re-
+rendery `usePetStore`, efekty cząsteczek/pocisków, coś w samym ekranie walki), nie kotka.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
