@@ -254,8 +254,17 @@ export function parseGearInstanceId(id: string): { itemId: string; seq: number }
 export const GEAR_STAT_LABEL: Record<GearStat, string> = {
   critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkFlat: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
 };
+// (2026-09-26, user zrzutem: "Sznurkowa Obroża... pokazuje że +0, o co chodzi, to bez sensu")
+// — `atkFlat` startuje z baseValue rzędu 0.08 (obroża, przebudowana na FLAT 2026-09-22, patrz
+// komentarz przy GEAR_ITEMS) i przy common/rare rzadkości realna wartość kopii (0.056-0.68,
+// patrz GEAR_ROLL_SPREAD) jest cała PONIŻEJ 1 — `Math.round()` je zerował, mimo że item
+// realnie coś dawał w walce (surowa, nie zaokrąglona wartość idzie do atkMultiplier). `flatHp`
+// zostaje przy pełnych liczbach — jego baseValue (1-3.3 × mnożnik rzadkości) nigdy nie schodzi
+// blisko zera, całkowite HP ma sens jako jednostka.
 export function fmtGearStat(stat: GearStat, v: number): string {
-  return (stat === 'flatHp' || stat === 'atkFlat') ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
+  if (stat === 'flatHp') return `+${Math.round(v)}`;
+  if (stat === 'atkFlat') return `+${v.toFixed(1)}`;
+  return `+${(v * 100).toFixed(1)}%`;
 }
 
 // Itemy odblokowane (możliwe do wylosowania) dla danego poziomu pupila, per slot.

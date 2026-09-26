@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Ekwipunek: `atkFlat` gubił się do "+0" przy małych wartościach (2026-09-26)
+
+Pełny opis w ARCHITECTURE.md §186. User zrzutem: "Sznurkowa Obroża... pokazuje że +0, o co
+chodzi, to bez sensu". Obroża ma bardzo małe `baseValue` (0.08 na T1) — przy common/rare
+realna wartość kopii ląduje CAŁA poniżej 1, a `fmtGearStat()` zaokrąglała `atkFlat` do pełnej
+liczby jak `flatHp`, więc pokazywała "+0" mimo że item realnie coś dawał (surowa wartość szła
+do walki, zaokrąglenie było tylko kosmetyczne). Fix: `atkFlat` pokazuje teraz 1 miejsce po
+przecinku ("+0.4"), `flatHp` bez zmian. `tsc`/`jest` czyste (1111 testów, +3 nowe).
+
+**🆕 Priorytet testu na urządzeniu — niski**: Ekwipunek → obroża common/rare — ma pokazywać
+ułamkową wartość ataku zamiast "+0".
+
 ## ✅ Plan zajęć: ta sama poświata co kafelek "Liczniki" (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §185. User zrzutem: "zrób identyczny gradient jak na kafelku z
