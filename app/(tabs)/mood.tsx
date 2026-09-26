@@ -27,6 +27,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
 import { useHabits } from '@/hooks/useHabits';
+import { useDayKey } from '@/hooks/useDayKey';
 import { useExpensesStore } from '@/store/expensesStore';
 import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
@@ -210,6 +211,10 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
   const ins = useMemo(() => makeIns(colors, P), [colors, P]);
   // Patrz komentarz przy `KeywordInsights` — ten sam re-render storm z load(), tu dodatkowo
   // dwie pełne pętle po `entries` (dowData + tag-counts).
+  // `dayKey` w deps (2026-09-26, agent-audyt logiki) — `thisMonthStart`/`lastMonthStart` liczą
+  // się z `new Date()`, ale memo trzymało się TYLKO `[entries]`; bez nowego wpisu po zmianie
+  // miesiąca porównanie "ten miesiąc vs zeszły" wciąż liczyłoby względem starej granicy.
+  const dayKey = useDayKey();
   const calc = useMemo(() => {
     if (entries.length < 5) return null;
 
@@ -258,7 +263,7 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
 
     if (!hasTrend && !hasBestDow && !hasTagInsights) return null;
     return { thisAvg, bestDow, topGoodTags, topBadTags, hasTrend, trendDiff, trendUp, hasBestDow, hasTagInsights };
-  }, [entries]);
+  }, [entries, dayKey]);
   if (!calc) return null;
   const { thisAvg, bestDow, topGoodTags, topBadTags, hasTrend, trendDiff, trendUp, hasBestDow, hasTagInsights } = calc;
 

@@ -3,6 +3,40 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Agent-audyt optymalizacji + logiki (reszta appki) — 8 fixów (2026-09-26)
+
+Pełny opis w ARCHITECTURE.md §188. User: "Zrób kolejne audyty optymalizacji i logiki" — dwa
+równoległe Explore-subagenty poza dashboardem (który dostał własny audyt w §187). Optymalizacja:
+`tasks.tsx`'s `TaskCard`/`SwipeRow` miały ten sam ANR-owy wzorzec stylu-w-renderze co paragon
+kiedyś (teraz przez `themedStyles`); skan paragonu przeliczał fuzzy-match nazw/cen dla
+WSZYSTKICH wierszy przy każdym renderze ekranu, nie tylko przy edycji (teraz memoizowane);
+katalog produktów przeliczał cały O(n²) skan duplikatów przy każdym odrzuceniu ("to nie
+duplikat") — rozdzielone; `ProductRow` w katalogu bez `memo()`. Logika: nowy wspólny hook
+`useDayKey()` (`src/hooks/useDayKey.ts`) naprawia TĘ SAMĄ "stale po zmianie dnia/tygodnia/
+miesiąca" bugową klasę z §187, znalezioną niezależnie w `useExpenses.ts`'s `stats`,
+`habits.tsx`'s 30-dniowy nagłówek, `finances.tsx`'s "TEN MIESIĄC"/"Ostatnie 31 dni",
+`mood.tsx`'s trend miesięczny; pill na dole ekranu liczył odłożone ("snooze") zadania jako
+"DZIŚ"/w countdownie/w liczniku "N zadań" (3 miejsca); pill miał trzecią, niezależną kopię
+bugu z przelewem własnym w karcie budżetowej (już raz naprawionego w dashboardzie); martwy
+podsystem "bilans energii" w Zdrowiu usunięty (wynik nigdzie się nie renderował od dawna —
+kalorie przeniesione do Jedzenia). `tsc`/`jest` czyste (86/86, 1111 testów, bez zmiany liczby).
+
+**🆕 Priorytet testu na urządzeniu**:
+- Zadania — przewiń długą listę (kilkadziesiąt+) — gładko, bez jąkania.
+- Skan paragonu — edytuj jeden produkt na paragonie z 15+ pozycjami — reszta wierszy nie
+  "mruga" przy każdym znaku.
+- Produkty — arkusz "Duplikaty" — odrzuć jeden, reszta listy ma zostać bez przeliczania.
+- Pill na dole ekranu — odłóż zadanie z terminem na dziś — nie ma wracać jako "DZIŚ" w pillu.
+- Zdrowie — potwierdź że karta "bilans energii"/kalorii nigdzie się nie pojawia (nie było jej
+  już wcześniej, tylko upewnienie że usunięcie martwego kodu nic nie urwało).
+
+**Odłożone** (świadomie NIE zrobione teraz, worth revisiting): pełne przejście fuzzy-matchingu
+w `scan.tsx` na per-wiersz memoizację (wymaga przeniesienia logiki do wnętrza `ProductRow`,
+większy refaktor propsów) i wirtualizacja katalogu produktów (`FlatList` zamiast
+`ScrollView`+`.map()` w `products.tsx`, potencjalnie duży katalog bez limitu) — obie zrobione
+tylko częściowo (memoizacja na poziomie ekranu / `memo()` na wierszu), bo pełne rozwiązanie
+niosło więcej ryzyka regresji niż uzasadniał ten audyt.
+
 ## 🆕 Agent-audyt całego dashboardu — 10 realnych bugów naprawionych (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §187. User: "sprawdz apkę żeby nie było błędów jak ostatnio z

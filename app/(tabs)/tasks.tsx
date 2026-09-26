@@ -21,6 +21,7 @@ import { Task, TaskKind } from '@/types';
 import { KIND_META, KIND_ORDER, resolveKind, inferKind } from '@/utils/taskKind';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { notificationsService } from '@/services/notificationsService';
 import { useUiActions } from '@/store/uiActions';
 
@@ -206,7 +207,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
 }) {
   const colors = useColors();
   const G = useMemo(() => gFor(colors), [colors]);
-  const s = useMemo(() => makeS(colors, G), [colors, G]);
+  const s = useMemo(() => makeS(colors), [colors]);
   const overdue  = task.status !== 'done' && task.status !== 'snoozed' && !!task.deadline && task.deadline.split('T')[0] < todayStr();
   const isDone   = task.status === 'done';
   const subtitle = taskSubtitle(task, pomodoroTaskId);
@@ -525,7 +526,7 @@ const SwipeRow = memo(function SwipeRow({ task, pomodoroTaskId, onComplete, onEd
 }) {
   const colors = useColors();
   const G = useMemo(() => gFor(colors), [colors]);
-  const sw = useMemo(() => makeSw(colors, G), [colors, G]);
+  const sw = useMemo(() => makeSw(colors), [colors]);
   const swRef = useRef<SwipeableMethods>(null);
   const isDone = task.status === 'done';
   return (
@@ -554,12 +555,23 @@ const SwipeRow = memo(function SwipeRow({ task, pomodoroTaskId, onComplete, onEd
   );
 });
 
-const makeSw = (c: any, g: any) => StyleSheet.create({
-  leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: g.accent, borderRadius: 18 },
-  leftRevealDone: { backgroundColor: g.accentDim },
-  rightReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 20, gap: 8, backgroundColor: c.accent.amber, borderRadius: 18 },
-  revealText: { fontSize: 10, fontWeight: '800', color: g.card, letterSpacing: 0.8 },
-  revealTextDone: { color: g.accent },
+// `themedStyles` (2026-09-26, agent-audyt optymalizacji) — było gołe `(c, g) =>
+// StyleSheet.create(...)` wywoływane per-instancja `useMemo(() => makeSw(colors, G), ...)` w
+// KAŻDYM wierszu listy zadań (`SwipeRow`, memo() ale to nie chroni WNĘTRZA — memo tylko
+// pomija re-render przy niezmienionych propsach, a mount N wierszy i tak budował N kopii tego
+// samego arkusza stylów). Dokładnie ten sam ANR-owy wzorzec co opisany w nagłówku
+// `themedStyles.ts` (i już raz naprawiony w `ExpenseItem.tsx`/`habits.tsx`), tylko w tym pliku
+// przeoczony. `g = gFor(c)` jest czystą funkcją `c`, więc bezpiecznie zwinięta do wnętrza —
+// cache key zostaje tym samym obiektem `Colors`.
+const makeSw = themedStyles((c: any) => {
+  const g = gFor(c);
+  return StyleSheet.create({
+    leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: g.accent, borderRadius: 18 },
+    leftRevealDone: { backgroundColor: g.accentDim },
+    rightReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 20, gap: 8, backgroundColor: c.accent.amber, borderRadius: 18 },
+    revealText: { fontSize: 10, fontWeight: '800', color: g.card, letterSpacing: 0.8 },
+    revealTextDone: { color: g.accent },
+  });
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -568,7 +580,7 @@ export default function TasksScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const G = useMemo(() => gFor(colors), [colors]);
-  const s = useMemo(() => makeS(colors, G), [colors, G]);
+  const s = useMemo(() => makeS(colors), [colors]);
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
   const startPomodoro  = usePomodoroStore(s => s.startFor);
@@ -748,7 +760,12 @@ export default function TasksScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeS = (c: any, g: any) => StyleSheet.create({
+// `themedStyles` (2026-09-26, agent-audyt optymalizacji) — ten sam fix co `makeSw` wyżej:
+// gołe `(c, g) => StyleSheet.create(...)` wywoływane per-instancja w KAŻDYM wierszu listy
+// (`TaskCard`) budowało N (~86-key) kopii tego samego arkusza, N = liczba wierszy zadań.
+const makeS = themedStyles((c: any) => {
+  const g = gFor(c);
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
@@ -860,4 +877,5 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700', color: c.text.secondary },
   emptySub:   { fontSize: 13, color: c.text.muted },
 
+  });
 });

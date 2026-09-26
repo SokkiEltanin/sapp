@@ -201,6 +201,38 @@ export default function ScanReceiptModal() {
     return priceAnomaly(unit, priceFor(getProductName(i), priceMemory));
   };
 
+  // Memoizacja per-wiersz (2026-09-26, agent-audyt optymalizacji) — `priceFlagFor`/
+  // `getMergeSuggestion`/`isWeighable`/`getWeightG` robią fuzzy-match (trigram) po CAŁEJ
+  // historii nazw/cen/wag produktów (`suggestSimilarName`/`priceFor`/`weightFor` w
+  // `productMemory.ts`). Wywoływane wcześniej BEZPOŚREDNIO w JSX per-wiersz, przeliczały się
+  // dla WSZYSTKICH widocznych wierszy przy KAŻDYM renderze tego ekranu — czyli przy dowolnej
+  // zmianie stanu (otwarcie pickera tagów, zmiana sortMode, wpisanie nazwy nowego płatnika),
+  // nie tylko przy realnej edycji nazwy/ceny. `ProductRow` jest już `memo()`-owany (patrz
+  // `productRowPropsEqual` niżej), ale to chroni tylko przed zbędnym RE-RENDEREM wiersza — nie
+  // przed tym, że RODZIC i tak przeliczał fuzzy-match dla wszystkich wierszy przed przekazaniem
+  // propsów. Zawężenie do jednego `useMemo` na pełnej liście, kluczowanego DOKŁADNIE tym co te
+  // funkcje realnie czytają, ogranicza przeliczanie do sytuacji gdy któraś z tych zależności
+  // faktycznie się zmieniła (nie na każdy niezwiązany re-render), a przy realnej edycji wciąż
+  // liczy WSZYSTKIE wiersze naraz — świadomy kompromis: pełne przejście na per-wiersz
+  // memoizację wymagałoby przeniesienia tej logiki do wnętrza `ProductRow` (większy refaktor
+  // propsów), tu ograniczono się do najczęstszego, najtańszego do naprawienia przypadku.
+  const productCount = receipt?.products.length ?? 0;
+  const rowDerived = useMemo(() => {
+    const map = new Map<number, { priceFlag: PriceFlag; mergeSuggestion: string | null; weighable: boolean; weight: string }>();
+    for (let i = 0; i < productCount; i++) {
+      map.set(i, {
+        priceFlag: priceFlagFor(i),
+        mergeSuggestion: getMergeSuggestion(i),
+        weighable: isWeighable(i),
+        weight: getWeightG(i),
+      });
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productCount, receipt, editedPrices, editedNames, editedQty, editedWeight, editedTags, knownNames, priceMemory, weightMemory, dismissedSug]);
+  const DERIVED_FALLBACK = { priceFlag: null as PriceFlag, mergeSuggestion: null, weighable: false, weight: '' };
+  const derivedFor = (i: number) => rowDerived.get(i) ?? DERIVED_FALLBACK;
+
   const addCustomProduct = () => {
     setCustomProducts(prev => [...prev, { name: '', price: '0.00', quantity: '1', category: 'groceries', tags: [] }]);
     setCustomCatPickerFor(null);
@@ -836,10 +868,10 @@ export default function ScanReceiptModal() {
                         onCategoryChange={changeCategory}
                         priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                         onPriceChange={onPriceChange}
-                        priceFlag={priceFlagFor(i)}
+                        priceFlag={derivedFor(i).priceFlag}
                         productName={getProductName(i)}
                         onNameChange={onNameChange}
-                        mergeSuggestion={getMergeSuggestion(i)}
+                        mergeSuggestion={derivedFor(i).mergeSuggestion}
                         onMerge={onMerge}
                         onDismissMerge={onDismissMerge}
                         productTags={getProductTags(i)}
@@ -850,8 +882,8 @@ export default function ScanReceiptModal() {
                         onNewCustomTag={onNewCustomTag}
                         excluded={!!editedExcluded[i]}
                         onToggleExcluded={onToggleExcluded}
-                        weighable={isWeighable(i)}
-                        weight={getWeightG(i)}
+                        weighable={derivedFor(i).weighable}
+                        weight={derivedFor(i).weight}
                         quantity={getQuantity(i)}
                         onQuantityChange={onQuantityChange}
                         onWeightChange={onWeightChange}
@@ -877,10 +909,10 @@ export default function ScanReceiptModal() {
                   onCategoryChange={changeCategory}
                   priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                   onPriceChange={onPriceChange}
-                  priceFlag={priceFlagFor(i)}
+                  priceFlag={derivedFor(i).priceFlag}
                   productName={getProductName(i)}
                   onNameChange={onNameChange}
-                  mergeSuggestion={getMergeSuggestion(i)}
+                  mergeSuggestion={derivedFor(i).mergeSuggestion}
                   onMerge={onMerge}
                   onDismissMerge={onDismissMerge}
                   productTags={getProductTags(i)}
@@ -891,8 +923,8 @@ export default function ScanReceiptModal() {
                   onNewCustomTag={onNewCustomTag}
                   excluded={!!editedExcluded[i]}
                   onToggleExcluded={onToggleExcluded}
-                  weighable={isWeighable(i)}
-                  weight={getWeightG(i)}
+                  weighable={derivedFor(i).weighable}
+                  weight={derivedFor(i).weight}
                   quantity={getQuantity(i)}
                   onQuantityChange={onQuantityChange}
                   onWeightChange={onWeightChange}

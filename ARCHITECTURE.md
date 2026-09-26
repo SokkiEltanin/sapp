@@ -11319,6 +11319,98 @@ do §186's `fmtGearStat`).
 
 ---
 
+## 188. Agent-audyt optymalizacji + logiki (reszta appki, poza dashboardem) — 2026-09-26
+
+User: "Zrób kolejne audyty optymalizacji i logiki" — po §187 (audyt samego dashboardu), dwa
+równoległe Explore-subagenty przeszły RESZTĘ appki (stores, hooki, ekrany poza `index.tsx`)
+osobno dla optymalizacji i dla logiki; każde znalezisko zweryfikowane osobiście przed poprawką.
+
+### Optymalizacja
+
+1. **`app/(tabs)/tasks.tsx` — `makeS`/`makeSw` gołe `StyleSheet.create` per-wiersz.** Dokładnie
+   ten sam ANR-owy wzorzec z nagłówka `themedStyles.ts` (paragon → 30s zwiecha), tu przeoczony
+   mimo że sąsiedzi (`ExpenseItem.tsx`, `habits.tsx`) już go mieli naprawionego. `TaskCard`/
+   `SwipeRow` (per-wiersz listy zadań) budowały osobny arkusz stylów PRZY KAŻDYM wierszu. Fix:
+   owinięte w `themedStyles(...)`, `gFor(c)` (czysta funkcja `c`) zwinięte do wnętrza budera.
+2. **`app/expenses/scan.tsx` — fuzzy-match (trigram) po całej historii nazw/cen/wag liczony
+   per-wiersz PRZY KAŻDYM renderze ekranu**, nie tylko przy edycji — `priceFlagFor`/
+   `getMergeSuggestion`/`isWeighable`/`getWeightG` wywoływane bezpośrednio w JSX, więc dowolna
+   zmiana stanu ekranu (otwarcie pickera, zmiana sortu) przeliczała fuzzy-match dla WSZYSTKICH
+   widocznych produktów. Fix: jeden `useMemo`-owany `rowDerived` (Map po indeksie), kluczowany
+   dokładnie tym co te funkcje realnie czytają — ogranicza przeliczanie do sytuacji gdy któraś
+   z tych zależności faktycznie się zmieniła (pełne przejście na per-wiersz memoizację
+   wymagałoby przeniesienia logiki do wnętrza `ProductRow`, świadomie odłożone — patrz
+   NEXT_STEPS.md).
+3. **`app/products.tsx` — `duplicatePairs` (O(n²) trigram-scan całego katalogu) kluczowany razem
+   z `dismissedDup`**, więc każde odrzucenie duplikatu na arkuszu przeliczało CAŁY skan od nowa.
+   Fix: rozdzielone na `allDuplicatePairs` (tylko `[products]`) + tani O(n) filtr odrzuceń.
+4. **`app/products.tsx` — `ProductRow` bez `memo()`, `onPress` inline arrow per-wiersz** (katalog
+   renderuje się przez zwykły `ScrollView`+`.map()`, bez wirtualizacji — większa, odłożona
+   zmiana). Fix: `memo()` + `openEdit` przeniesiony na `useCallback`, `ProductRow` przyjmuje
+   `onPress: (p: Product) => void` i woła `onPress(p)` wewnątrz, żeby prop zostawał referencyjnie
+   stabilny między renderami rodzica.
+
+Sprawdzone i czyste: wszystkie `setInterval`/`setTimeout`/`AppState`/`Animated.loop` mają
+poprawny cleanup (poza jednym negligible — `CrateModal.tsx`'s coin-count interval, ≤720ms,
+nie wart poprawki); żadnych innych `makeStyles`-w-renderze; `TaskItem.tsx`/`HabitRow` bez memo,
+ale listy realnie małe (<20 elementów) — pominięte.
+
+### Logika
+
+5. **Wspólny hook `useDayKey()`** (nowy plik `src/hooks/useDayKey.ts`) — wyciągnięty z
+   `index.tsx`'s lokalnego `dayKey` (dzień zmieniający się co minutę + na powrót z tła), bo TA
+   SAMA "stale useMemo po granicy dnia/tygodnia/miesiąca" bugowa klasa (patrz §187 pkt 5)
+   znalazła się NIEZALEŻNIE w czterech miejscach:
+   - `src/hooks/useExpenses.ts`'s `stats` (memo `[expenses]` bez rollover) — konsument:
+     dashboard's `budgetRemaining`/`budgetAlertCard`, już raz "naprawione" przez przejście na
+     to źródło jako "jedno źródło prawdy" — samo źródło wciąż było stare.
+   - `app/habits.tsx`'s `MonthGrid` — nagłówek "OSTATNIE 30 DNI" (numery dni + kolumna "dziś")
+     zamrożony na dniu montażu ekranu, mimo że same dane kolumn liczą się na żywo.
+   - `app/(tabs)/finances.tsx`'s `recentCutoff`/`monthTotals`/`monthPulse` — okno "Ostatnie 31
+     dni" i karta "TEN MIESIĄC" bez świeżości po zmianie dnia/miesiąca.
+   - `app/(tabs)/mood.tsx`'s `MoodInsights`'s `calc` — porównanie "ten miesiąc vs zeszły" stałe
+     względem granicy miesiąca z momentu montażu.
+   `index.tsx`'s własny `dayKey` też przepisany na ten hook (usunięta duplikacja).
+6. **`src/components/ui/TopPill.tsx` — zadania `snoozed` wciąż liczyły się w 3 z 4 pul** ("DZIŚ",
+   7-dniowy countdown, fallback "N zadań w toku") — tylko priorytet "zaległe" wykluczał
+   `snoozed`, mimo że `snooze()` (`useTasks.ts`) nie czyści `deadline`/`scheduledDate`. Fix:
+   `t.status !== 'snoozed'` dodane we wszystkich trzech, spójnie z resztą apki.
+7. **`TopPill.tsx`'s karta ostrzeżenia budżetowego — trzecia, niezależna kopia liczenia
+   `monthlySpend` bez wykluczenia przelewu własnego** (ten sam bug co dashboard's
+   `budgetAlertCard` miał i już raz naprawił, 2026-09-18). Fix: `isSelfTransfer(e)` dodane.
+8. **`app/(tabs)/health.tsx` — martwy podsystem "bilans energii"** (`energy` useMemo,
+   `energyOpen`, `expenses`/`kcalMem` state + fetch, `weekBurn`) — miał TEN SAM bug co
+   `CalorieBalanceSection` przed §187 (brak danych zegarka liczony jako pełny deficyt), ale
+   wynik nigdzie się nie renderuje (kalorie/bilans przeniesione do zakładki Jedzenie, zostawiony
+   tylko tekst-notatka o migracji). Fix: usunięty w całości (zero konsumentów w JSX), nie
+   naprawiony — naprawianie martwego kodu byłoby czystym marnotrawstwem.
+
+Sprawdzone i czyste: żadnych mutacji-w-miejscu store'ów Zustand, żadnych stale-closure race
+condition (wszystkie handlery piszące dane derywowane wołają `.getState()` albo store-owe
+akcje); `useHabits.ts`/`useWaterTracker.ts`/`usePetHealthSync.ts`/`useMoodCheckIn.ts`/
+`useSubscriptions.ts`/`useTasks.ts`/`useWorkEarnings.ts` — bez nowych instancji znanych klas
+bugów (już mają własne fixy z tej sesji); `monthCards.ts`'s tier ladder ma poprawny fallback
+"none of the above" (NIE ten sam bug co `streakTiers.ts` przed fixem).
+
+**Testy**: `tsc --noEmit` i `jest` czyste (86/86 suite, 1111/1111 testów — bez zmiany liczby,
+te poprawki nie miały własnych jednostkowych testów do napisania — logika zbyt spleciona z
+resztą ekranów/hooków, żeby łatwo wyizolować, w przeciwieństwie do §186's `fmtGearStat`).
+
+**Priorytet testu na urządzeniu**:
+- Zadania — przewiń długą listę zadań (kilkadziesiąt+) — ma przewijać się gładko, bez
+  zauważalnego jąkania (zwłaszcza po zmianie motywu).
+- Skan paragonu — edytuj nazwę/cenę JEDNEGO produktu na paragonie z 15+ pozycjami — reszta
+  wierszy nie powinna "mrugnąć"/zresetować się przy każdym znaku.
+- Produkty — arkusz "Duplikaty": odrzuć jeden duplikat ("to nie duplikat") — reszta listy
+  duplikatów ma zostać bez przeliczania/przeskakiwania.
+- Zadania w pillu na dole ekranu — odłóż ("snooze") zadanie z terminem na dziś — NIE powinno
+  wracać jako "DZIŚ" w pillu, dopóki odłożenie trwa.
+- Zdrowie — karta "bilans energii"/kalorii NIE powinna się już nigdzie pojawiać (przeniesiona
+  do zakładki Jedzenie od dawna) — potwierdź że jej brak nie jest zauważalny/nie ma po niej
+  śladu w UI.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

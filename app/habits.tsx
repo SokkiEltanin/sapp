@@ -14,6 +14,7 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useHabits, DayState } from '@/hooks/useHabits';
+import { useDayKey } from '@/hooks/useDayKey';
 
 const ICE = '#7DD3FC';   // dzień uratowany zamrożeniem serii = niebieski
 import { stepFor } from '@/utils/habits';
@@ -292,6 +293,11 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
   const mg = useMemo(() => makeMg(colors), [colors]);
   const scrollRef = useRef<ScrollView>(null);
   const data = useMemo(() => habits.map((h) => getLast30(h.id)), [habits, getLast30]);
+  // `dayKey` w deps (2026-09-26, agent-audyt logiki) — bez tego nagłówek "OSTATNIE 30 DNI"
+  // (numery dni + kolumna "dziś") zamrażał się na dniu montażu ekranu, podczas gdy same dane
+  // (`data`, przez `getLast30`) i tak liczą się na żywo — po zmianie dnia bez remountu ekranu
+  // Habits nagłówek pokazywałby błędne numery/przesunięte "dziś" względem kolumn z danymi.
+  const dayKey = useDayKey();
   const days = useMemo(() => {
     const today = new Date();
     return Array.from({ length: 30 }, (_, i) => {
@@ -299,7 +305,7 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
       d.setDate(today.getDate() - (29 - i));
       return { num: d.getDate(), isToday: i === 29, isWeekend: d.getDay() === 0 || d.getDay() === 6 };
     });
-  }, []);
+  }, [dayKey]);
 
   useEffect(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
