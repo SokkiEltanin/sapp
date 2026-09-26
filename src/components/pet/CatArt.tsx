@@ -19,12 +19,12 @@ import CatTail from '@/components/pet/CatTail';
 //  • Layer order is a feature. The raised paw draws AFTER the head (it looked like it
 //    never reached the muzzle because the head covered it).
 
-const LX = 794, RX = 1107, EYY = 762;
+export const LX = 794, RX = 1107, EYY = 762;
 
 // cheek shapes — used ONLY as mask geometry, never painted
-const CHEEK_L = 'M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z';
+export const CHEEK_L = 'M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z';
 
-function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: string): React.ReactNode {
+export function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: string): React.ReactNode {
   // angry = mouth SHUT. Tighter + deeper than the sad droop so the two never blur.
   if (angry) return <Path d="M932 920 Q985 882 1038 920" fill="none" stroke={ink} strokeWidth={16} strokeLinecap="round" />;
   if (soft) return <Path d="M934 896 Q985 929 1036 896" fill="none" stroke={ink} strokeWidth={12} strokeLinecap="round" />;
@@ -691,7 +691,7 @@ function Ear({ side, anim, size, coat, inner }: {
   );
 }
 
-function Paw({ cx, p }: { cx: number; p: CatPalette }) {
+export function Paw({ cx, p }: { cx: number; p: CatPalette }) {
   return (
     <G>
       <Ellipse cx={cx} cy={1541} rx={76} ry={48} fill={p.coat} />

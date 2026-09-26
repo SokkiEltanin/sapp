@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kotek w walkach: naprawdę statyczny bliźniak CatArt (2026-09-26)
+
+Pełny opis w ARCHITECTURE.md §184. User: "Dlaczego nadal w walkach nie bierze udziału
+wyeksportować statyczna wersja kotka... żeby nie lagowały tak walki" — po §"animate=false"
+(2026-08-30) doprecyzował: chciał genuinie statyczny SVG (kolor 1:1 z personalizacji), nie tylko
+wyłączone niektóre animacje. `animate={false}` gasiło TYLKO idle-pętle — `CatArt.tsx` nadal
+alokowało 8 `Animated.Value`+kilka `useState`/`useEffect` (w tym atak/swat) przy każdym
+mouncie. Nowy `CatArtStatic.tsx` — zero animacji/stanu, czysta funkcja koloru/wyglądu,
+podłączony w `boss-fight.tsx` (WSZYSTKIE typy walk) i `battle-layout-lab.tsx` (edytor, ma być
+1:1 z realną walką). `tsc`/`jest` czyste (1108 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: stocz walkę — kotek wygląda identycznie
+kolorystycznie, ale bez ŻADNEGO ruchu (brak oddechu/mrugania/swata na trafienie). Kluczowe:
+**czy walki subiektywnie mniej lagują teraz?** Jeśli nie — lag ma inne źródło, nie kotka,
+trzeba profilować głębiej (re-rendery store'a, efekty pocisków/cząsteczek, coś innego).
+
 ## 🆕 Widget "Zadania": przezroczystość-stopniowana + kolor + wielkość tekstu, WYMAGA NOWEGO APK (2026-09-25)
 
 Pełny opis w ARCHITECTURE.md §183. User: "Slider przezroczystości może, koloru w razie czego.

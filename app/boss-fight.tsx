@@ -8,7 +8,7 @@ import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Tr
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import CatArt from '@/components/pet/CatArt';
+import CatArtStatic from '@/components/pet/CatArtStatic';
 import RadialGlow from '@/components/ui/RadialGlow';
 import GroundShadow from '@/components/ui/GroundShadow';
 import { paletteById } from '@/utils/catPalettes';
@@ -188,7 +188,6 @@ export default function BossFight() {
   const [missionCancelConfirm, setMissionCancelConfirm] = useState(false);
   const [fighting, setFighting] = useState(false);
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null);
-  const [attackPulse, setAttackPulse] = useState(0);
   // Krok 8 (NEXT_STEPS.md "SYSTEM EKWIPUNKU") — gear dokłada się DO bonusów z lootu
   // kampanii, ten sam { atk, dodge, crit, energyMult } kształt (patrz gearCombatBonuses
   // w gear.ts, przebalansowane żeby jeden mityczny item nie przebijał całej kampanii).
@@ -664,7 +663,6 @@ export default function BossFight() {
         haptic.medium();
         setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed, thornDmg: round.thornDmg });
         playBossHitFx(round.playerCrit);
-        setAttackPulse(n => n + 1);
         // Raid (2026-08-25): `roundBoss.hp` to TERAZ wprost realna, pozostała pula
         // (`raidAsBoss(raid, raidRealStart, ...)` wyżej) — `round.bossHpAfter` jest więc już
         // na realnej skali, żadnego przeliczania. Nemesis NADAL liczy wobec małej, bezpiecznie
@@ -819,13 +817,19 @@ export default function BossFight() {
                     <RadialGlow size={CAT_PORTRAIT_SIZE * 1.5} color={palette.coat} opacity={0.22} />
                     <GroundShadow width={CAT_PORTRAIT_SIZE * CAT_SHADOW_SCALE_X} height={CAT_PORTRAIT_SIZE * CAT_SHADOW_SCALE_Y} opacity={0.5} />
                     <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
-                      {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
-                          statyczny bez animacji, bo teraz jest w pełni z głaskaniem
-                          animacjami lizania co pewnie laguje") — wyłącza WSZYSTKIE idle-pętle
-                          (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie, patrz CatArt.tsx),
-                          cios (`attack={attackPulse}`) dalej działa — CatArt.tsx celowo NIE
-                          blokuje efektu ataku pod `!animate`, tylko pod `asleep`. */}
-                      <CatArt size={CAT_PORTRAIT_SIZE} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
+                      {/* CatArtStatic (2026-09-26, user: "zapisać wersję svg bez animacji i po
+                          prostu zmieniać mu kolor adekwatnie jak mu zmieniam") — cofnięcie
+                          §"animate=false" (2026-08-30): TEN prop tylko gasił idle-pętle, ale
+                          CatArt.tsx nadal alokował 8 Animated.Value + kilka useState/useEffect
+                          (w tym atak/swat) przy KAŻDYM mouncie/renderze, niezależnie od
+                          `animate`. `CatArtStatic` to osobny komponent — zero Animated.Value,
+                          zero useState/useEffect, czysta funkcja koloru/wyglądu (paleta/pręgi/
+                          oczy/nosek/wąsy) renderująca WYŁĄCZNIE spoczynkową pozę. Bez ataku/
+                          swata na trafienie — fight ma już osobny sygnał (latająca łapa +
+                          flash bossa, `pawTravel`/`playBossHitFx` niżej), kotek nie musi tego
+                          dublować. Dawny `attackPulse` (licznik tylko po to, żeby przekazać
+                          `attack` do CatArt) USUNIĘTY — nic już go nie czyta. */}
+                      <CatArtStatic size={CAT_PORTRAIT_SIZE} expression="content" palette={palette} stripes={catStripes}
                         eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                     </Animated.View>
                     {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
