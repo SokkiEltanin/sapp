@@ -18,6 +18,11 @@ Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
   co już istniejący `matchSubscriptionForPayment` w `subscriptionAuto.ts` (tam dopasowuje
   tylko NAJNOWSZĄ płatność — tu potrzebne dopasowanie WSZYSTKICH, nie tylko jednej). Wyświetlić
   w `SubItem` (subscriptions.tsx), np. "od {startDate}: X zł zapłacone".
+- **Przypomnienie do notatki** (user zaakceptował pomysł 2026-09-27) — `Note` (notesStorage.ts)
+  ma tagi/foldery/pin/link do licznika, ale brak pola z datą przypomnienia (jak w Google Keep).
+  Dodać opcjonalne `reminderAt?: string` w `Note`, pole w edytorze (reuse `DatePickerField`/
+  `TimePickerField`), nowy `scheduleNoteReminder`/`cancelNoteReminder` w
+  `notificationsService.ts` (ten sam wzorzec co kapsuła czasu/dług) — tap otwiera notatkę.
 
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
