@@ -11515,6 +11515,51 @@ wygląda sensownie i że usunięcie odczytu poprawnie przelicza/chowa wynik przy
 
 ---
 
+## 191. Przypomnienie o kończącym się evencie sezonowym bez medalu (2026-09-27)
+
+User (trzeci z listy zaakceptowanych pomysłów): "przypomnienie o kończącym się evencie
+sezonowym w którym jeszcze nie brałeś udziału".
+
+**Zakres zwężony do sezonowych** (Mikołaj/Wielkanoc/Wakacje/4 pory roku), NIE nemesis
+miesiąca — sezonowy jest rzadki i naprawdę przepada na dobre po swoim oknie; nemesis wraca co
+miesiąc niezależnie, więc "przegapienie" nie jest tak nieodwracalne, a policzenie jego
+kontekstu (`menaceCtx` — godziny pracy/słodycze vs własna średnia, patrz `bosses.tsx`) w
+`index.tsx` tylko dla tego drugiego przypadku nie było warte duplikacji. **"Bez udziału"
+doprecyzowane na "bez MEDALU"** (`eventWon` w `petStore.ts`) — to jedyny stan jaki faktycznie
+śledzimy (nie ma osobnej flagi "czy próbowałem walczyć"), i trafniejszy sygnał niż "czy
+tknąłem" — nieważne czy user próbował, liczy się czy zdążył zdobyć nagrodę przed końcem okna.
+
+**Rozwiązanie — ten sam refresh-na-żywym-stanie wzorzec co `refreshBossReminder`/
+`refreshDailyHabitReminder`** (patrz ARCHITECTURE dla historii tego wzorca — cancel + jeśli
+warunek spełniony, zaplanuj DATE-trigger na dziś o ustalonej godzinie, wołane reaktywnie na
+każdą zmianę stanu):
+- `app/(tabs)/index.tsx` — nowy `useEffect` (obok istniejącego "Boss czeka"): liczy
+  `activeSeasonalEvent(now)` (`seasonalEvents.ts`, już istniejący), sprawdza `petEventWon`
+  (`usePetStore`) i `eventDaysLeft(seasonal, now)` (już istniejąca funkcja — koniec okna
+  aktywności, policzony wcześniej dla countdown-UI). Deps `[petEventWon, dayKey]` — `dayKey`
+  (wspólny hook z §188), bo dashboard zostaje zamontowany, `daysLeft` musi przeliczać się co
+  dzień, nie tylko gdy zmieni się lista zdobytych medali.
+- `notificationsService.ts` — nowa `refreshEventEndingReminder(opts)`: cancel identyfikatora
+  `'event-ending'`, potem zaplanuj TYLKO gdy `active && !won && 0 < daysLeft <= 2` — "ostatnia
+  szansa" ma się odpalić w ostatniej odsłonie, nie codziennie przez cały (często
+  wielotygodniowy, np. Wakacje ~2.5 mies.) okres eventu. Godzina na sztywno 18:30 (ten sam
+  fallback co `refreshBossReminder`) — zbyt rzadka (parę dni w roku) funkcja, żeby uzasadniać
+  osobną kontrolkę w Ustawieniach na tym etapie.
+
+**Testy**: brak nowych — logika sprowadza się do wołania już-testowanych czystych funkcji
+(`activeSeasonalEvent`/`eventDaysLeft`/`eventPeriodKey`, testowane w `seasonalEvents.test.ts`)
++ samo planowanie powiadomienia (side-effect na `expo-notifications`, ten sam brak testów co
+`refreshBossReminder`/inne `refresh*Reminder` w tym pliku). `tsc --noEmit`/`jest` czyste
+(86/86 suite, 1115 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski** (rzadka okazja, max parę razy w roku): gdy zbliża
+się koniec okna sezonowego eventu (Mikołaj/Wielkanoc/Wakacje/4 pory roku) i medal jeszcze nie
+zdobyty, o 18:30 na 2 dni przed końcem powinno przyjść powiadomienie "X kończy się za N dni".
+Najłatwiej sprawdzić przy Wielkanocy/porach roku (krótsze, częściej nadchodzące okna) niż
+czekać na Mikołaja.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

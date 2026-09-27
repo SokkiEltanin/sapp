@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Przypomnienie o kończącym się evencie sezonowym bez medalu (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §191. Trzeci z listy zaakceptowanych pomysłów tej sesji. Zakres
+zwężony do sezonowych (Mikołaj/Wielkanoc/Wakacje/4 pory roku) — nemesis miesiąca wraca
+niezależnie co miesiąc, mniej "nieodwracalne" przegapienie. Nowy `useEffect` w `index.tsx`
+(ten sam refresh-na-żywym-stanie wzorzec co "Boss czeka") + `refreshEventEndingReminder()` w
+`notificationsService.ts` — odpala TYLKO w ostatniej odsłonie (≤2 dni do końca), o 18:30,
+jeśli medal (`eventWon`) jeszcze nie zdobyty. `tsc`/`jest` czyste (1115 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski** (rzadka okazja): gdy kończy się okno sezonowego
+eventu bez zdobytego medalu, na 2 dni przed końcem o 18:30 powinno przyjść powiadomienie.
+Najłatwiej sprawdzić przy najbliższym krótkim oknie (Wielkanoc/pory roku), nie czekać na
+Mikołaja.
+
 ## 🆕 Koszt/km pojazdu (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §190. Drugi z listy zaakceptowanych pomysłów tej sesji. Nowe pole
@@ -5346,13 +5360,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Przypomnienie o kończącym się evencie sezonowym bez udziału** (user zaakceptował pomysł
-  2026-09-27) — `src/utils/seasonalEvents.ts` ma harmonogram (Mikołaj/Wielkanoc/etc.), system
-  powiadomień już obsługuje event-based scheduling (`notificationsService.ts`, patrz
-  `event-${eventId}` cancel wyżej), ale nic nie ostrzega "zostały N dni, jeszcze nie
-  walczyłeś z tym bossem". Deterministyczne: data końca eventu + flaga czy user w ogóle
-  odwiedził/walczył (już musi być jakiś stan per-event w `petStore`/bosses, sprawdzić przy
-  budowie) → jedno zaplanowane powiadomienie X dni przed końcem, jeśli flaga nie jest ustawiona.
 - **Wykrywanie podwyżki subskrypcji** (user zaakceptował pomysł 2026-09-27) —
   `expenses/subscriptions.tsx` przechowuje jedną statyczną kwotę (`amount`) per subskrypcja,
   bez historii. Powiadomienia bankowe już automatycznie dopasowują cykliczne płatności do
