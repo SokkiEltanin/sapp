@@ -5312,6 +5312,13 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
+- **Interaktywny widget "Zadania"** (user zaakceptował pomysł 2026-09-27) — teraz widget na
+  pulpicie tylko WYŚWIETLA listę (patrz §183 w ARCHITECTURE.md, `plugins/withTasksWidget.js`).
+  Dodać przycisk "zrobione" prosto z widgetu (bez otwierania appki) — RemoteViews
+  `PendingIntent` → `TasksWidgetProvider.kt`/`TasksWidgetModule.kt` obsługujący akcję toggle,
+  zapis przez ten sam `widgetSync.ts`/`useTasks`'s `toggle()`, i wymuszenie odświeżenia
+  widgetu po zmianie (już istnieje mechanizm sync z appki → widget, potrzebny odwrotny:
+  widget → appka/store). Wymaga nowego APK (natywny kod), nie OTA.
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
