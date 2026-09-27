@@ -6,7 +6,7 @@ import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
 import { useSubscriptionsStore } from '@/store/subscriptionsStore';
 import { subscriptionsService } from '@/services/subscriptionsService';
-import { matchSubscriptionForPayment, isConfidentSubMatch, queueSubConfirm } from '@/utils/subscriptionAuto';
+import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged, queueSubConfirm } from '@/utils/subscriptionAuto';
 import { advanceNextBillingDate } from '@/utils/recurringBills';
 import { rememberPaycheckSender } from '@/utils/paycheckSenders';
 
@@ -22,6 +22,17 @@ async function maybeAutoPaySubscription(p: PendingBankTx): Promise<void> {
     const sub = matchSubscriptionForPayment({ store: p.store, amount: p.amount, dateISO: p.dateISO }, subs);
     if (!sub) return;
     if (isConfidentSubMatch({ store: p.store, amount: p.amount, dateISO: p.dateISO, currency: p.currency }, sub)) {
+      // Wykrywanie podwyżki (2026-09-27, user zaakceptował pomysł) — kolejkowane do TEJ SAMEJ
+      // karty na dashboardzie co "czy to Twoja subskrypcja" (currency mismatch), tylko z
+      // `kind: 'priceChange'`. Nie ZAMIAST auto-advance niżej — obok, płatność wciąż liczy się
+      // jako opłacona, tylko user dostaje pytanie czy zaktualizować zapisaną kwotę.
+      if (subscriptionPriceChanged({ store: p.store, amount: p.amount, dateISO: p.dateISO, currency: p.currency }, sub)) {
+        await queueSubConfirm({
+          subId: sub.id, subName: sub.name, merchant: p.store || sub.name,
+          amount: p.amount, currency: p.currency || 'PLN', date: p.dateISO.slice(0, 10),
+          kind: 'priceChange', oldAmount: sub.amount,
+        });
+      }
       const next = advanceNextBillingDate(sub.nextBillingDate, sub.billingCycle);
       if (next === sub.nextBillingDate) return;
       useSubscriptionsStore.getState().updateSubscription(sub.id, { nextBillingDate: next });

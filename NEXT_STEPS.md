@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Wykrywanie podwyżki subskrypcji (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §192. Czwarty z listy zaakceptowanych pomysłów tej sesji. Nowa
+czysta funkcja `subscriptionPriceChanged()` w `subscriptionAuto.ts` (próg >5%/>2zł) + w
+`bankCommit.ts`'s CONFIDENT-match gałęzi, obok istniejącego auto-advance terminu. Reużyta w
+100% istniejąca karta dashboardu ("czy to Twoja subskrypcja") — nowy `kind: 'priceChange'`,
+inny tekst/akcja, zero nowego UI/store'u. `tsc`/`jest` czyste (1121 testów, +6).
+
+**🆕 Priorytet testu na urządzeniu — niski** (zależny od realnej podwyżki, nie da się wywołać
+na żądanie): gdy bank złapie płatność w innej kwocie niż zapisana, karta "Zmieniła się cena
+subskrypcji?" powinna się pokazać na dashboardzie.
+
 ## 🆕 Przypomnienie o kończącym się evencie sezonowym bez medalu (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §191. Trzeci z listy zaakceptowanych pomysłów tej sesji. Zakres
@@ -5360,12 +5372,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Wykrywanie podwyżki subskrypcji** (user zaakceptował pomysł 2026-09-27) —
-  `expenses/subscriptions.tsx` przechowuje jedną statyczną kwotę (`amount`) per subskrypcja,
-  bez historii. Powiadomienia bankowe już automatycznie dopasowują cykliczne płatności do
-  subskrypcji — przy dopasowaniu porównać kwotę z banku vs zapisaną `amount` i jeśli się różni
-  (próg np. >5%), pokazać alert/toast "X zwykle Y zł, teraz naliczyło Z zł" + zaproponować
-  aktualizację zapisanej kwoty. Czysty diff dwóch liczb, żadnej heurystyki/AI.
 - **Udostępnij TEKST prosto do parsera paragonów** (user zaakceptował pomysł 2026-09-27, po
   dopytaniu: chodzi o skopiowany TEKST, nie zdjęcie) — `scan.tsx`'s pole "wklej tekst"
   (`pastedText` → `parseReceiptText()`, linia ~330) już istnieje i już to parsuje, brakuje

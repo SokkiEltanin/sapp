@@ -1,4 +1,4 @@
-import { matchSubscriptionForPayment, isConfidentSubMatch } from '@/utils/subscriptionAuto';
+import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged } from '@/utils/subscriptionAuto';
 import { Subscription } from '@/types';
 
 const sub = (o: any): Subscription => ({ active: true, name: 'X', amount: 0, currency: 'PLN', nextBillingDate: '2026-08-01', ...o } as any);
@@ -36,5 +36,29 @@ describe('subscriptionAuto — isConfidentSubMatch', () => {
   });
   test('kwota za daleko → false', () => {
     expect(isConfidentSubMatch({ amount: 100, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(false);
+  });
+});
+
+describe('subscriptionAuto — subscriptionPriceChanged', () => {
+  test('ta sama kwota → false', () => {
+    expect(subscriptionPriceChanged({ amount: 43, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(false);
+  });
+  test('drobne zaokrąglenie (poniżej progu 5%/2zł) → false, NIE alarmuj', () => {
+    expect(subscriptionPriceChanged({ amount: 43.5, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(false);
+  });
+  test('realna podwyżka (>5% i >2zł) → true', () => {
+    expect(subscriptionPriceChanged({ amount: 52, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(true);
+  });
+  test('podwyżka na małej kwocie — próg absolutny (2 zł) chroni przed szumem na groszach', () => {
+    // 10% z 10zł = 1zł, poniżej absolutnego progu 2zł → NIE alarmuj mimo że isConfidentSubMatch
+    // (próg 15%) i tak by to przepuściło jako "tę samą" subskrypcję.
+    expect(subscriptionPriceChanged({ amount: 11, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 10 }))).toBe(false);
+    expect(subscriptionPriceChanged({ amount: 13, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 10 }))).toBe(true);
+  });
+  test('inna waluta → false (kwota pływa z kursem, nie da się porównać wprost)', () => {
+    expect(subscriptionPriceChanged({ amount: 52, currency: 'EUR', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(false);
+  });
+  test('cena spadła (obniżka) też jest wykrywana — |diff|, nie tylko podwyżka w górę', () => {
+    expect(subscriptionPriceChanged({ amount: 30, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(true);
   });
 });
