@@ -11599,6 +11599,65 @@ subskrypcji?" z opcją "Zaktualizuj"/"Zignoruj", zamiast dotychczasowej ciszy.
 
 ---
 
+## 193. Udostępnij tekst prosto do parsera paragonów (2026-09-27)
+
+User (piąty z listy zaakceptowanych pomysłów, po dopytaniu): "da się skopiowany tekst
+udostępnić do parsera od razu?" — `scan.tsx`'s pole "wklej tekst" (`pastedText` →
+`parseReceiptText()`) już istniało i już to parsowało, brakowało wyłącznie WEJŚCIA przez
+Android Share Sheet. Dedup z powiadomieniem bankowym (żeby nie dublować) sprawdzony i
+POTWIERDZONY jako już działający (`scan.tsx`'s `existingBank` auto-merge po kwocie+dniu) —
+nic tu nie trzeba było dodawać.
+
+**Nowy plugin `plugins/withReceiptShareIntent.js`** — TEN SAM wzorzec co
+`withBankNotificationListener.js`/`withTasksWidget.js` (mała samodzielna natywna klasa + wpis
+w manifeście, ZERO dotykania `MainActivity.kt` — inny plugin, `react-native-health-connect`,
+już modyfikuje jej `onCreate` przez własny `mergeContents`, więc osobna "trampolina" unika
+ryzyka kolizji, zamiast próbować dopisać się do tamtego pliku):
+- `ShareReceiverActivity` (`android:theme="@android:style/Theme.NoDisplay"`,
+  `excludeFromRecents="true"` — nigdy nie renderuje UI, tylko zapisuje i przekierowuje, więc
+  bez tego pojawiłby się na chwilę goły, pusty ekran) — intent-filter `ACTION_SEND` +
+  `text/plain`. Łapie `Intent.EXTRA_TEXT`, zapisuje do `shared_receipt_text.json` w
+  `filesDir` (ten sam plik-jako-most wzorzec co `bank_notifications.json`/
+  `widget_toggle_queue.json` — natywny kod PISZE, JS CZYTA), potem `startActivity` z
+  `Intent.ACTION_VIEW` na `sapp://expenses/scan` (już zarejestrowany deep-link scheme,
+  `MainActivity`'s istniejący intent-filter dla `sapp://` bez ograniczenia hosta łapie
+  KAŻDY host/path pod tym scheme — ten sam mechanizm co `sapp://tasks` w widgecie) i `finish()`.
+- JS: nowy `src/services/shareTextDrain.ts` (`drainSharedReceiptText()`) — czyta+usuwa plik.
+  Wołany na MOUNT w `scan.tsx` (nie AppState/foreground listener jak inne drenaże w
+  `app/_layout.tsx` — ten ekran jest ZAWSZE świeżo otwierany przez deep link, nigdy
+  zamontowany-od-dawna, więc mount-time jest wystarczający).
+- `scan.tsx`'s `processText()` dostał opcjonalny `overrideText` parametr — bez niego
+  `setPastedText(text)` + `processText()` w tym samym ticku czytałoby STARE (puste)
+  `pastedText` z domknięcia (React batchuje update stanu asynchronicznie). Zwykłe, ręczne
+  wklejenie (przycisk UI) nie przekazuje argumentu — zero zmiany zachowania tamtej ścieżki.
+- **Znaleziony i naprawiony przy tej okazji drobny, ukryty bug**: `<AnimatedButton
+  onPress={processText}>` — `AnimatedButton`'s `Pressable` przekazuje natywny event jako
+  pierwszy argument swojego `onPress` w RUNTIME, niezależnie od zadeklarowanego typu `() =>
+  void` (TypeScript nie dodaje żadnej faktycznej ochrony w runtime). Zwykły tap na przycisku
+  "Analizuj paragon" wywoływałby teraz `processText(event)` — `event` jest truthy, więc
+  `overrideText ?? pastedText` wybrałoby event OBJECT, a `.trim()` na nim by się wywalił.
+  Naprawione na `onPress={() => processText()}` — jawne wywołanie bez argumentu.
+
+**Weryfikacja bez urządzenia**: `npx expo prebuild --platform android` odpalony LOKALNIE (ten
+sam sposób co przy §189, interaktywny widget) — wygenerowany `ShareReceiverActivity.kt` i
+wpis w manifeście ręcznie sprawdzone, plugin przechodzi bez wyjątków. Pełny `gradle build`
+niemożliwy w tym środowisku (brak Android SDK) — prawdziwa kompilacja czeka na `build.yml`
+po mergu.
+
+**Testy**: `tsc --noEmit`/`jest` czyste (86/86 suite, 1121 testów, bez zmiany — natywny kod +
+plik-jako-most zbyt spleciony z RemoteViews/filesystem, żeby sensownie unit-testować, ten sam
+brak testów co inne natywne pluginy tej sesji).
+
+**Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**: skopiuj/zaznacz jakikolwiek
+tekst (np. treść SMS-a czy powiadomienia wyglądającą jak paragon, albo cokolwiek na próbę) →
+"Udostępnij" → appka powinna być na liście aplikacji docelowych → wybór appki ma otworzyć
+prosto ekran skanowania paragonu z tym tekstem WSTAWIONYM i ROZPARSOWANYM (widok recenzji
+produktów), bez żadnego dodatkowego dotknięcia. Sprawdź też że zwykłe, ręczne wklejenie
+tekstu w tym polu (bez udziału Share Sheet) wciąż działa identycznie jak dotąd — przycisk
+"Analizuj paragon" jest teraz `() => processText()`, nie gołe `processText`.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

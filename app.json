@@ -84,6 +84,7 @@
       "./plugins/withNativeCrashCatcher",
       "./plugins/withResizeConfig",
       "./plugins/withTasksWidget",
+      "./plugins/withReceiptShareIntent",
       [
         "expo-build-properties",
         {

@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Udostępnij tekst prosto do parsera paragonów, WYMAGA NOWEGO APK (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §193. Piąty z listy zaakceptowanych pomysłów tej sesji. Nowy
+plugin `withReceiptShareIntent.js` — mała natywna `ShareReceiverActivity` (Android Share
+Sheet, `ACTION_SEND`/`text/plain`) zapisuje tekst do pliku i przekierowuje przez
+`sapp://expenses/scan` do już istniejącego parsera. Przy tej okazji naprawiony też drobny,
+utajony bug: `<AnimatedButton onPress={processText}>` przekazywałby event jako argument w
+runtime (mimo typu `() => void`), co by wywaliło `.trim()` po wprowadzeniu `overrideText` —
+naprawione na `() => processText()`. Zweryfikowane lokalnym `expo prebuild` (jak przy
+interaktywnym widgecie). `tsc`/`jest` czyste (1121 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**: skopiuj/zaznacz jakikolwiek
+tekst → "Udostępnij" → appka na liście → wybór ma otworzyć prosto ekran skanu z tekstem już
+wstawionym I rozparsowanym. Sprawdź też że zwykłe ręczne wklejenie + przycisk "Analizuj
+paragon" wciąż działa jak dotąd.
+
 ## 🆕 Wykrywanie podwyżki subskrypcji (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §192. Czwarty z listy zaakceptowanych pomysłów tej sesji. Nowa
@@ -5372,17 +5388,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Udostępnij TEKST prosto do parsera paragonów** (user zaakceptował pomysł 2026-09-27, po
-  dopytaniu: chodzi o skopiowany TEKST, nie zdjęcie) — `scan.tsx`'s pole "wklej tekst"
-  (`pastedText` → `parseReceiptText()`, linia ~330) już istnieje i już to parsuje, brakuje
-  tylko WEJŚCIA: Android Share Sheet intent-filter dla `text/plain` (`ACTION_SEND`) w
-  `app.json`, złapany w `app/_layout.tsx`/deep-linku, który otwiera `scan.tsx` z tym tekstem
-  już wstawionym do `pastedText` (i opcjonalnie auto-odpala parse). Zero zmian w samym
-  parserze. Dedup z powiadomieniem bankowym (żeby nie dublować) — TO JUŻ DZIAŁA, patrz
-  `scan.tsx:628-635` (`existingBank` auto-merge po kwocie+dniu, usuwa goły wpis z banku i
-  zastępuje paragonem, toast "Połączono z płatnością z banku — bez duplikatu"); nic tu nie
-  trzeba dodawać, tylko upewnić się że ta sama logika `existingBank`-match działa też gdy
-  ekran jest otwarty PRZEZ share-intent (nie tylko przez normalne wejście z listy wydatków).
 - **Powiadomienie o odblokowaniu kapsuły czasu** (user zaakceptował pomysł 2026-09-27) —
   `src/store/timeCapsuleStore.ts` ("listy do przyszłego siebie") ma `unlockAt` (ms), ale nic
   nie powiadamia gdy list się odblokuje — trzeba pamiętać samemu zajrzeć. Zaplanować lokalne
