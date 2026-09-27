@@ -5337,6 +5337,17 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   subskrypcji — przy dopasowaniu porównać kwotę z banku vs zapisaną `amount` i jeśli się różni
   (próg np. >5%), pokazać alert/toast "X zwykle Y zł, teraz naliczyło Z zł" + zaproponować
   aktualizację zapisanej kwoty. Czysty diff dwóch liczb, żadnej heurystyki/AI.
+- **Udostępnij TEKST prosto do parsera paragonów** (user zaakceptował pomysł 2026-09-27, po
+  dopytaniu: chodzi o skopiowany TEKST, nie zdjęcie) — `scan.tsx`'s pole "wklej tekst"
+  (`pastedText` → `parseReceiptText()`, linia ~330) już istnieje i już to parsuje, brakuje
+  tylko WEJŚCIA: Android Share Sheet intent-filter dla `text/plain` (`ACTION_SEND`) w
+  `app.json`, złapany w `app/_layout.tsx`/deep-linku, który otwiera `scan.tsx` z tym tekstem
+  już wstawionym do `pastedText` (i opcjonalnie auto-odpala parse). Zero zmian w samym
+  parserze. Dedup z powiadomieniem bankowym (żeby nie dublować) — TO JUŻ DZIAŁA, patrz
+  `scan.tsx:628-635` (`existingBank` auto-merge po kwocie+dniu, usuwa goły wpis z banku i
+  zastępuje paragonem, toast "Połączono z płatnością z banku — bez duplikatu"); nic tu nie
+  trzeba dodawać, tylko upewnić się że ta sama logika `existingBank`-match działa też gdy
+  ekran jest otwarty PRZEZ share-intent (nie tylko przez normalne wejście z listy wydatków).
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
