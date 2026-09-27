@@ -18,11 +18,12 @@ import { vehiclesService } from '@/services/vehiclesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { weatherService } from '@/services/weatherService';
-import { Vehicle, VehicleKind, VehicleMaintenance, Expense } from '@/types';
+import { Vehicle, VehicleKind, VehicleMaintenance, OdometerReading, Expense } from '@/types';
 import {
   summarizeVehicle, expenseMatchesVehicle, mainCarId,
-  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, VehicleSummary,
+  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, VehicleSummary, costPerKm,
 } from '@/utils/vehicleMatch';
+import { Gauge } from 'lucide-react-native';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { todayISO } from '@/utils/date';
@@ -74,6 +75,9 @@ export default function VehiclesScreen() {
   // Maintenance add/edit (for a specific vehicle)
   const [mFor, setMFor] = useState<Vehicle | null>(null);
   const [mForm, setMForm] = useState<MForm>({ label: '', date: todayISO(), intervalMonths: '' });
+  // Odometer reading add (2026-09-27, koszt/km pojazdu — user zaakceptował pomysł)
+  const [oFor, setOFor] = useState<Vehicle | null>(null);
+  const [oForm, setOForm] = useState<{ km: string; date: string }>({ km: '', date: todayISO() });
   // Expense picker — target is either { vehicle } (attach) or { maintenance } (link)
   const [picker, setPicker] = useState<{ mode: 'attach' | 'link'; vehicle: Vehicle } | null>(null);
 
@@ -97,6 +101,11 @@ export default function VehiclesScreen() {
   const summaries = useMemo(() => {
     const m: Record<string, VehicleSummary> = {};
     for (const v of vehicles) m[v.id] = summarizeVehicle(v, expenses, mainId);
+    return m;
+  }, [vehicles, expenses, mainId]);
+  const costs = useMemo(() => {
+    const m: Record<string, ReturnType<typeof costPerKm>> = {};
+    for (const v of vehicles) m[v.id] = costPerKm(v, expenses, mainId);
     return m;
   }, [vehicles, expenses, mainId]);
   const setVF = <K extends keyof VForm>(k: K, v: VForm[K]) => setVForm(f => ({ ...f, [k]: v }));
@@ -170,6 +179,27 @@ export default function VehiclesScreen() {
   const deleteMaintenance = async (v: Vehicle, m: VehicleMaintenance) => {
     haptic.medium();
     await persistMaintenance(v, (v.maintenance ?? []).filter(x => x.id !== m.id));
+  };
+
+  // ── Odometer readings (koszt/km) ────────────────────────────────────────────
+  const persistOdometerLog = async (v: Vehicle, list: OdometerReading[]) => {
+    setVehicles(prev => prev.map(x => x.id === v.id ? { ...x, odometerLog: list } : x));
+    await vehiclesService.update(v.id, { odometerLog: list }).catch(() => toast.error('Nie zapisano przebiegu'));
+  };
+  const openOdometer = (v: Vehicle) => { setOFor(v); setOForm({ km: '', date: todayISO() }); };
+  const saveOdometerReading = async () => {
+    if (!oFor) return;
+    const km = parseInt(oForm.km.replace(/[^0-9]/g, ''), 10);
+    if (!km || km <= 0) { Alert.alert('Błąd', 'Podaj przebieg w km'); return; }
+    const entry: OdometerReading = { id: uid(), date: oForm.date || todayISO(), km };
+    haptic.success();
+    await persistOdometerLog(oFor, [...(oFor.odometerLog ?? []), entry]);
+    setOFor(null);
+    toast.success('Zapisano odczyt licznika');
+  };
+  const deleteOdometerReading = async (v: Vehicle, id: string) => {
+    haptic.medium();
+    await persistOdometerLog(v, (v.odometerLog ?? []).filter(x => x.id !== id));
   };
 
   // ── Expense linking ───────────────────────────────────────────────────────
@@ -309,6 +339,26 @@ export default function VehiclesScreen() {
                     );
                   })}
 
+                  {/* Przebieg / koszt na km (2026-09-27) */}
+                  <View style={s.detailLabelRow}>
+                    <Text style={s.detailLabel}>Przebieg</Text>
+                    {costs[v.id] && (
+                      <Text style={s.costPerKm}>≈{costs[v.id]!.value.toFixed(2)} zł/km ({costs[v.id]!.kmDelta} km)</Text>
+                    )}
+                  </View>
+                  {(v.odometerLog ?? []).length > 0 && [...v.odometerLog!].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(o => (
+                    <View key={o.id} style={s.mRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.mLabel}>{o.km.toLocaleString('pl-PL')} km</Text>
+                        <Text style={s.mMeta}>{new Date(o.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: '2-digit' })}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => deleteOdometerReading(v, o.id)} style={s.mIcon} hitSlop={6}><Trash2 size={14} color={c.accent.red} /></TouchableOpacity>
+                    </View>
+                  ))}
+                  <TouchableOpacity onPress={() => openOdometer(v)} style={s.presetChip} activeOpacity={0.75}>
+                    <Gauge size={10} color={ACCENT} /><Text style={s.presetText}>Dodaj odczyt licznika</Text>
+                  </TouchableOpacity>
+
                   {/* Expenses */}
                   <View style={s.detailActions}>
                     <TouchableOpacity onPress={() => setPicker({ mode: 'attach', vehicle: v })} style={s.detailBtn} activeOpacity={0.75}>
@@ -445,6 +495,26 @@ export default function VehiclesScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Odometer reading add modal (2026-09-27, koszt/km pojazdu) */}
+      <Modal visible={!!oFor} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setOFor(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalWrap}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <View style={s.sheetHead}>
+              <Text style={s.sheetTitle}>Przebieg — {oFor?.name}</Text>
+              <TouchableOpacity onPress={() => setOFor(null)} hitSlop={10}><X size={20} color={c.text.muted} /></TouchableOpacity>
+            </View>
+            <Text style={s.fLabel}>Stan licznika (km)</Text>
+            <TextInput value={oForm.km} onChangeText={t => setOForm(f => ({ ...f, km: t.replace(/[^0-9]/g, '') }))} keyboardType="number-pad" placeholder="np. 12300" placeholderTextColor={c.text.muted} style={s.fInput} />
+            <Text style={s.fLabel}>Kiedy</Text>
+            <DatePickerField value={oForm.date} onChange={d => setOForm(f => ({ ...f, date: d }))} placeholder="Data" />
+            <View style={{ height: spacing[3] }} />
+            <AnimatedButton onPress={saveOdometerReading} label="Zapisz odczyt" icon={<Check size={16} color={c.bg.primary} />} size="md" />
+            <View style={{ height: 20 }} />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Expense picker */}
       <Modal visible={!!picker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicker(null)}>
         <View style={s.pickerOverlay}>
@@ -522,6 +592,8 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
 
   detail: { gap: spacing[1], borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[2] },
   detailLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  detailLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
+  costPerKm: { fontSize: 11, fontWeight: '700', color: ACCENT },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginBottom: spacing[1] },
   presetChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   presetText: { fontSize: 11, fontWeight: '700', color: ACCENT },

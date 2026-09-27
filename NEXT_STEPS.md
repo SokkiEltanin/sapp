@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Koszt/km pojazdu (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §190. Drugi z listy zaakceptowanych pomysłów tej sesji. Nowe pole
+`Vehicle.odometerLog` (odczyty licznika, opcjonalne) + `costPerKm()` w `vehicleMatch.ts` (bierze
+pierwszy+ostatni odczyt, sumuje wydatki pojazdu w tym oknie dat). UI: sekcja "Przebieg" w
+`vehicles.tsx`, ten sam wzorzec co "Serwis". `tsc`/`jest` czyste (1115 testów, +4).
+
+**🆕 Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd → "Przebieg" → dodaj dwa
+odczyty licznika z wydatkami między nimi → sprawdź że "≈X zł/km" wygląda sensownie.
+
 ## 🆕 Interaktywny widget "Zadania" — przycisk "zrobione" bez otwierania appki, WYMAGA NOWEGO APK (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §189. Pierwszy z listy zaakceptowanych pomysłów tej sesji —
@@ -5336,11 +5346,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Koszt/km pojazdu** (user zaakceptował pomysł 2026-09-27) — `vehicles.tsx`/`vehicleMatch.ts`
-  łapie paliwo z tagów wydatków (`FUEL_TAGS`), ale nie ma pola przebiegu, więc nie da się
-  policzyć koszt/km. Dodać opcjonalne pole "przebieg" przy tankowaniu (albo osobny log
-  odczytów licznika), policzyć koszt/km z różnicy przebiegu między tankowaniami × sumy paliwa
-  w tym okresie.
 - **Przypomnienie o kończącym się evencie sezonowym bez udziału** (user zaakceptował pomysł
   2026-09-27) — `src/utils/seasonalEvents.ts` ma harmonogram (Mikołaj/Wielkanoc/etc.), system
   powiadomień już obsługuje event-based scheduling (`notificationsService.ts`, patrz

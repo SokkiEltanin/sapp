@@ -11484,6 +11484,37 @@ mockowania całego expo-file-system/RemoteViews).
 
 ---
 
+## 190. Koszt/km pojazdu (2026-09-27)
+
+User (drugi z listy zaakceptowanych pomysłów): "koszt/km pojazdu... wydatki łapią paliwo z
+tagów, ale nie ma przebiegu, więc nie da się policzyć koszt/km."
+
+**Rozwiązanie**: nowe pole `Vehicle.odometerLog?: OdometerReading[]` (`{id, date, km}`) —
+manualne odczyty licznika, dodawane opcjonalnie (np. przy tankowaniu), niezależne od wydatków.
+`costPerKm(v, expenses, mainId)` w `vehicleMatch.ts` — czysta funkcja, bierze PIERWSZY i
+OSTATNI odczyt (nie każdą parę po kolei — prostsza, stabilniejsza "średnia od kiedy zacząłem
+śledzić" niż seria krótkich, hałaśliwych odcinków), różnicę km, sumuje WSZYSTKIE wydatki tego
+pojazdu (paliwo + części, te same zasady dopasowania co `summarizeVehicle`) w tym samym oknie
+dat. `null` gdy <2 odczyty albo km się nie zmienił/spadł (błędny wpis/przekręcony licznik —
+nie pokazuje bezsensownego wyniku zamiast dzielenia przez ujemną/zerową liczbę).
+
+UI w `vehicles.tsx`: nowa sekcja "Przebieg" w rozwiniętej karcie pojazdu (ten sam wzorzec co
+"Serwis" — `persistOdometerLog`/`openOdometer`/`saveOdometerReading`/`deleteOdometerReading`
+kalkujące `persistMaintenance`/`openMaintenance`/`saveMaintenance`/`deleteMaintenance` 1:1),
+ostatnie 3 odczyty + przycisk "Dodaj odczyt licznika" (mini-modal: km + data), wynik
+`≈X zł/km` widoczny od razu przy nagłówku sekcji gdy jest ≥2 odczyty.
+
+**Testy**: nowy `describe('vehicleMatch — costPerKm')` w `vehicleMatch.test.ts` (4 testy: <2
+odczyty → null, licznik nie zmieniony/przekręcony → null, liczy z pierwszego+ostatniego
+odczytu niezależnie od kolejności w tablicy i z oknem dat wykluczającym wydatki PO ostatnim
+odczycie, sumuje paliwo+części). `tsc --noEmit`/`jest` czyste (86/86 suite, 1115 testów, +4).
+
+**Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń auto/rower → "Przebieg" → dodaj
+dwa odczyty licznika w różnych datach z jakimiś wydatkami między nimi → sprawdź że "≈X zł/km"
+wygląda sensownie i że usunięcie odczytu poprawnie przelicza/chowa wynik przy <2 odczytach.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
