@@ -5348,6 +5348,17 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   zastępuje paragonem, toast "Połączono z płatnością z banku — bez duplikatu"); nic tu nie
   trzeba dodawać, tylko upewnić się że ta sama logika `existingBank`-match działa też gdy
   ekran jest otwarty PRZEZ share-intent (nie tylko przez normalne wejście z listy wydatków).
+- **Powiadomienie o odblokowaniu kapsuły czasu** (user zaakceptował pomysł 2026-09-27) —
+  `src/store/timeCapsuleStore.ts` ("listy do przyszłego siebie") ma `unlockAt` (ms), ale nic
+  nie powiadamia gdy list się odblokuje — trzeba pamiętać samemu zajrzeć. Zaplanować lokalne
+  powiadomienie na `unlockAt` przy `add()` (ten sam wzorzec co inne zaplanowane powiadomienia w
+  `notificationsService.ts` — cancel przy `remove()`).
+- **Log sesji Pomodoro** (user zaakceptował pomysł 2026-09-27 — z zastrzeżeniem: jeszcze nie
+  używał Pomodoro w praktyce, sprawdzi najpierw czy się przyda przy studiach, więc NIE
+  zaczynać budowy dopóki nie potwierdzi że faktycznie z tego korzysta) — `pomodoroStore.ts`
+  liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
+  (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
+  tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
