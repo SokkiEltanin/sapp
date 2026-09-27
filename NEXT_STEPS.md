@@ -23,6 +23,12 @@ Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
   Dodać opcjonalne `reminderAt?: string` w `Note`, pole w edytorze (reuse `DatePickerField`/
   `TimePickerField`), nowy `scheduleNoteReminder`/`cancelNoteReminder` w
   `notificationsService.ts` (ten sam wzorzec co kapsuła czasu/dług) — tap otwiera notatkę.
+- **Blokada appki biometrią** (user zaakceptował pomysł 2026-09-27, ALE NISKI PRIORYTET —
+  "na razie nie róbmy i tak nikt nie ma telefonu oprócz mnie", nie zaczynać budowy bez
+  wyraźnego sygnału że to teraz potrzebne) — appka trzyma dane finansowe, długi, prywatny
+  dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
+  jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
+  `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
 
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
