@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Interaktywny widget "Zadania" — przycisk "zrobione" bez otwierania appki, WYMAGA NOWEGO APK (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §189. Pierwszy z listy zaakceptowanych pomysłów tej sesji —
+user: "Interaktywny widget - spoko to możemy ogarnąć" → "Dawaj po kolie". Każdy wiersz
+widgetu dostał osobny tappable checkbox (pusty okrąg); tap woła natywny broadcast, który
+optymistycznie usuwa wiersz z widgetu OD RAZU i zakolejkowuje id zadania do nowego pliku
+(`widget_toggle_queue.json`, ten sam plik-jako-most wzorzec co powiadomienia bankowe, tylko w
+drugą stronę); JS (`widgetToggleDrain.ts`) przetwarza kolejkę na najbliższym foregroundzie —
+faktyczny zapis statusu/nagród/Firestore/regeneracji cyklicznej przez nową `markTaskDone()`
+(wyciągnięta z `useTasks.ts`'s `toggle()`, wywoływalna poza komponentem Reacta). Zweryfikowane
+lokalnym `expo prebuild` (wygenerowany Kotlin/manifest/XML ręcznie sprawdzone, plugin
+przechodzi bez wyjątków) — pełny `gradle build` niemożliwy bez Android SDK w tym środowisku,
+prawdziwa kompilacja czeka na `build.yml` po mergu. `tsc`/`jest` czyste (1111 testów, bez
+zmiany — logika zbyt spleciona z natywnym plikiem/store'em do sensownego unit-testu).
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**:
+- Dodaj widget na pulpit (jeśli już jest — usuń i dodaj ponownie po nowym buildzie, żeby
+  załapać nowy layout z checkboxami).
+- Stuknij checkbox przy zadaniu — wiersz ma zniknąć OD RAZU, bez otwierania appki.
+- Otwórz appkę — zadanie ma być odznaczone jako zrobione (Zadania → "Gotowe"), z monetami/XP
+  pupila jak przy zwykłym odznaczeniu.
+- Tap gdziekolwiek INDZIEJ na wierszu (nie na checkboxie) — appka ma się otworzyć jak dawniej.
+- Zadanie cykliczne odhaczone z widgetu — nowe wystąpienie ma się faktycznie utworzyć.
+
 ## 🆕 Agent-audyt optymalizacji + logiki (reszta appki) — 8 fixów (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §188. User: "Zrób kolejne audyty optymalizacji i logiki" — dwa
@@ -5312,13 +5336,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Interaktywny widget "Zadania"** (user zaakceptował pomysł 2026-09-27) — teraz widget na
-  pulpicie tylko WYŚWIETLA listę (patrz §183 w ARCHITECTURE.md, `plugins/withTasksWidget.js`).
-  Dodać przycisk "zrobione" prosto z widgetu (bez otwierania appki) — RemoteViews
-  `PendingIntent` → `TasksWidgetProvider.kt`/`TasksWidgetModule.kt` obsługujący akcję toggle,
-  zapis przez ten sam `widgetSync.ts`/`useTasks`'s `toggle()`, i wymuszenie odświeżenia
-  widgetu po zmianie (już istnieje mechanizm sync z appki → widget, potrzebny odwrotny:
-  widget → appka/store). Wymaga nowego APK (natywny kod), nie OTA.
 - **Koszt/km pojazdu** (user zaakceptował pomysł 2026-09-27) — `vehicles.tsx`/`vehicleMatch.ts`
   łapie paliwo z tagów wydatków (`FUEL_TAGS`), ale nie ma pola przebiegu, więc nie da się
   policzyć koszt/km. Dodać opcjonalne pole "przebieg" przy tankowaniu (albo osobny log

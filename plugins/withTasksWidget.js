@@ -29,6 +29,7 @@ function providerKotlin(pkg) {
   const dotIds = Array.from({ length: ROWS }, (_, i) => `R.id.widget_dot${i}`).join(', ');
   const titleIds = Array.from({ length: ROWS }, (_, i) => `R.id.widget_title${i}`).join(', ');
   const subIds = Array.from({ length: ROWS }, (_, i) => `R.id.widget_sub${i}`).join(', ');
+  const checkIds = Array.from({ length: ROWS }, (_, i) => `R.id.widget_check${i}`).join(', ');
   return `package ${pkg}
 
 import android.app.PendingIntent
@@ -56,6 +57,19 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
     updateAll(context)
   }
 
+  // Interaktywny "zrobione" (2026-09-27, user zaakceptował pomysł: "przycisk zrobione bez
+  // otwierania appki") — AppWidgetProvider JEST BroadcastReceiverem, więc łapie tu też własny
+  // custom broadcast wysłany przez PendingIntent per-wiersz (patrz CHECK_IDS w buildViews()),
+  // nie tylko system'owy APPWIDGET_UPDATE. super.onReceive() zostaje, żeby normalne
+  // zdarzenia widgetu (update/enabled/disabled) wciąż trafiały do domyślnej obsługi.
+  override fun onReceive(context: Context, intent: Intent) {
+    super.onReceive(context, intent)
+    if (intent.action == ACTION_TOGGLE) {
+      val taskId = intent.getStringExtra(EXTRA_TASK_ID)
+      if (!taskId.isNullOrEmpty()) handleToggle(context, taskId)
+    }
+  }
+
   companion object {
     const val PREFS_NAME = "TasksWidgetPrefs"
     // Jedna GLOBALNA wartość, nie per-instancja widgetu (2026-09-23) — poprzednia wersja miała
@@ -77,11 +91,24 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
     const val PREF_BG_OPACITY = "bg_opacity"     // Int 0-100
     const val PREF_BG_COLOR = "bg_color"         // String hex, np. "#1A1C1C"
     const val PREF_TEXT_SCALE = "text_scale"     // String: "small" | "medium" | "large"
+    // Broadcast per-wiersz "zrobione" (2026-09-27) — jawnie skierowany do TEGO providera
+    // (Intent(context, ${PROVIDER_CLASS}::class.java)), więc exported=false w manifeście
+    // nie blokuje dostarczenia (to nasz własny PendingIntent, nie cudzy, więc OS i tak by go
+    // przepuścił, ale action i tak zadeklarowany w manifeście dla jasności/dokumentacji).
+    const val ACTION_TOGGLE = "${pkg}.WIDGET_TASK_TOGGLE"
+    const val EXTRA_TASK_ID = "task_id"
+    const val TASKS_FILE = "widget_tasks.json"
+    // TEN SAM wzorzec plik-jako-most co bank_notifications.json
+    // (plugins/withBankNotificationListener.js) — natywny kod TU pisze id zadania, JS
+    // (widgetToggleDrain.ts) czyta i PRZETWARZA (kasuje kolejkę → toggleuje w prawdziwym
+    // store'ze + Firestore + nagrody + powiadomienia) na najbliższym foregroundzie appki.
+    const val QUEUE_FILE = "widget_toggle_queue.json"
     private const val ROWS = ${ROWS}
     private val ROW_IDS = intArrayOf(${rowIds})
     private val DOT_IDS = intArrayOf(${dotIds})
     private val TITLE_IDS = intArrayOf(${titleIds})
     private val SUB_IDS = intArrayOf(${subIds})
+    private val CHECK_IDS = intArrayOf(${checkIds})
 
     fun prefs(context: Context): SharedPreferences =
       context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -176,6 +203,22 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
           try {
             views.setInt(DOT_IDS[i], "setColorFilter", Color.parseColor(row.optString("color", "#ECEEEE")))
           } catch (e: Exception) {}
+          // Checkbox per wiersz — requestCode 1000+i (stały PER SLOT, nie per zadanie) +
+          // FLAG_UPDATE_CURRENT: to samo intencjonalne id sloty pozwala Androidowi
+          // ZASTĄPIĆ poprzedni PendingIntent świeżymi extras (nowe task_id) przy każdym
+          // odmalowaniu, zamiast mnożyć osobne PendingIntenty per zadanie w nieskończoność.
+          val taskId = row.optString("id", "")
+          if (taskId.isNotEmpty()) {
+            val toggleIntent = Intent(context, ${PROVIDER_CLASS}::class.java).apply {
+              action = ACTION_TOGGLE
+              putExtra(EXTRA_TASK_ID, taskId)
+            }
+            val togglePending = PendingIntent.getBroadcast(
+              context, 1000 + i, toggleIntent,
+              PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            views.setOnClickPendingIntent(CHECK_IDS[i], togglePending)
+          }
         } else {
           views.setViewVisibility(ROW_IDS[i], View.GONE)
         }
@@ -185,10 +228,42 @@ class ${PROVIDER_CLASS} : AppWidgetProvider() {
 
     private fun readRows(context: Context): JSONArray {
       return try {
-        val file = File(context.filesDir, "widget_tasks.json")
+        val file = File(context.filesDir, TASKS_FILE)
         if (!file.exists()) return JSONArray()
         JSONArray(file.readText())
       } catch (e: Exception) { JSONArray() }
+    }
+
+    // Tap na checkboxie wiersza: zakolejkuj id do QUEUE_FILE (JS przetworzy na najbliższym
+    // foregroundzie — patrz komentarz przy QUEUE_FILE) I optymistycznie usuń ten wiersz z
+    // TASKS_FILE + przemaluj TERAZ, żeby widget zareagował od razu, bez czekania na appkę.
+    // Jeśli appka się nie otworzy szybko, JS i tak skoryguje listę (syncTasksWidget) na
+    // podstawie prawdziwego stanu przy najbliższym otwarciu — ten sam "docelowo zgodne,
+    // natychmiast responsywne" kompromis co bank_notifications.json.
+    @Synchronized
+    private fun handleToggle(context: Context, taskId: String) {
+      try {
+        val qFile = File(context.filesDir, QUEUE_FILE)
+        val qArr = if (qFile.exists()) {
+          try { JSONArray(qFile.readText()) } catch (e: Exception) { JSONArray() }
+        } else JSONArray()
+        var already = false
+        for (i in 0 until qArr.length()) if (qArr.optString(i) == taskId) { already = true; break }
+        if (!already) qArr.put(taskId)
+        qFile.writeText(qArr.toString())
+
+        val tFile = File(context.filesDir, TASKS_FILE)
+        if (tFile.exists()) {
+          val tArr = try { JSONArray(tFile.readText()) } catch (e: Exception) { JSONArray() }
+          val next = JSONArray()
+          for (i in 0 until tArr.length()) {
+            val o = tArr.optJSONObject(i)
+            if (o != null && o.optString("id") != taskId) next.put(o)
+          }
+          tFile.writeText(next.toString())
+        }
+      } catch (e: Exception) {}
+      updateAll(context)
     }
   }
 }
@@ -249,6 +324,12 @@ class ${PACKAGE_CLASS} : ReactPackage {
 }
 
 function widgetRowXml(i) {
+  // `widget_check{i}` (2026-09-27, interaktywny widget) — osobny tappable element PRZED
+  // kolorowym punktem. RemoteViews poprawnie routuje dotyk do NAJBARDZIEJ zagnieżdżonego
+  // view z własnym `setOnClickPendingIntent` — tap tutaj woła broadcast "zrobione"
+  // (patrz TasksWidgetProvider.kt), tap gdziekolwiej indziej w wierszu wciąż otwiera appkę
+  // (PendingIntent na `widget_root`, ustawiony w buildViews()). 22dp — mały, ale bezpiecznie
+  // tappable, nie rozwala kompaktowego layoutu 6 wierszy.
   return `    <LinearLayout
         android:id="@+id/widget_row${i}"
         android:layout_width="match_parent"
@@ -257,6 +338,13 @@ function widgetRowXml(i) {
         android:gravity="center_vertical"
         android:paddingTop="3dp"
         android:paddingBottom="3dp">
+        <ImageView
+            android:id="@+id/widget_check${i}"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="8dp"
+            android:padding="3dp"
+            android:src="@drawable/widget_check_ring" />
         <ImageView
             android:id="@+id/widget_dot${i}"
             android:layout_width="8dp"
@@ -342,6 +430,18 @@ function widgetDotXml() {
 `;
 }
 
+// Checkbox-pusty (2026-09-27, interaktywny widget) — sam obrys, żeby wizualnie różnił się od
+// wypełnionego `widget_dot_circle` (który koduje KOLOR rodzaju zadania, nie akcję). `<shape>`
+// nie umie narysować "ptaszka" bez wektora — pusty okrąg wystarcza jako czytelny "tap tu, by
+// zaznaczyć zrobione", zero ryzyka błędnej pathData wektora.
+function widgetCheckRingXml() {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <stroke android:width="1.5dp" android:color="#8A8F8F" />
+</shape>
+`;
+}
+
 function widgetInfoXml() {
   // minWidth/minHeight = rozmiar POCZĄTKOWY przy dodaniu; minResizeWidth/Height = jak bardzo
   // user może go PÓŹNIEJ zmniejszyć przeciągając uchwyty (2026-09-23, user na S22 Ultra: "żeby
@@ -383,6 +483,7 @@ function withSources(config) {
     fs.mkdirSync(xmlDir, { recursive: true });
     fs.writeFileSync(path.join(layoutDir, 'tasks_widget.xml'), widgetLayoutXml(), 'utf8');
     fs.writeFileSync(path.join(drawableDir, 'widget_dot_circle.xml'), widgetDotXml(), 'utf8');
+    fs.writeFileSync(path.join(drawableDir, 'widget_check_ring.xml'), widgetCheckRingXml(), 'utf8');
     fs.writeFileSync(path.join(xmlDir, 'tasks_widget_info.xml'), widgetInfoXml(), 'utf8');
     return cfg;
   }]);
@@ -394,10 +495,20 @@ function withManifest(config) {
     if (!Array.isArray(app.receiver)) app.receiver = [];
     const receiverName = `.${PROVIDER_CLASS}`;
     if (!app.receiver.some((r) => r.$ && r.$['android:name'] === receiverName)) {
+      const pkg = (cfg.android && cfg.android.package) || 'com.sokki.sapp';
       app.receiver.push({
         $: { 'android:name': receiverName, 'android:exported': 'false' },
         'intent-filter': [
-          { action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }] },
+          {
+            action: [
+              { $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } },
+              // Broadcast per-wiersz "zrobione" (2026-09-27) — jawnie skierowany (Intent z
+              // ComponentName), więc deklaracja tu jest dokumentacyjna, nie wymagana do
+              // dostarczenia (exported=false blokuje tylko OBCE aplikacje, nie własne
+              // PendingIntenty targetujące ten sam komponent).
+              { $: { 'android:name': `${pkg}.WIDGET_TASK_TOGGLE` } },
+            ],
+          },
         ],
         'meta-data': [
           { $: { 'android:name': 'android.appwidget.provider', 'android:resource': '@xml/tasks_widget_info' } },
