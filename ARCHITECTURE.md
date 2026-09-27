@@ -11560,6 +11560,45 @@ czekać na Mikołaja.
 
 ---
 
+## 192. Wykrywanie podwyżki subskrypcji (2026-09-27)
+
+User (czwarty z listy zaakceptowanych pomysłów): "wykrywanie podwyżki subskrypcji" —
+powiadomienia bankowe już automatycznie dopasowują cykliczne płatności do subskrypcji, ale
+nic nie porównuje kwoty z banku do zapisanej `amount`.
+
+**Rozwiązanie — reużyta w 100% istniejąca infrastruktura, zero nowego systemu**:
+- Nowa czysta funkcja `subscriptionPriceChanged(p, sub)` w `subscriptionAuto.ts` — próg
+  WĘŻSZY niż `isConfidentSubMatch` (>5% lub >2 zł, nie >15%): tu pytamy "czy cena się
+  zmieniła", nie "czy to nadal ta subskrypcja" — zwykłe zaokrąglenie nie ma alarmować, realna
+  podwyżka ma. Oba progi mogą być prawdą naraz (mieści się bezpiecznie w paśmie w którym
+  `isConfidentSubMatch` wciąż uznaje płatność za "tę samą" subskrypcję) — cichy auto-advance
+  terminu płatności I alert o nowej cenie dzieją się OBOK siebie, nie jedno zamiast drugiego.
+  Próg absolutny (2 zł) chroni małe subskrypcje przed szumem — 10% z 10 zł to 1 zł, poniżej
+  progu, nie alarmuje.
+- `bankCommit.ts`'s `maybeAutoPaySubscription` — w gałęzi CONFIDENT match, obok istniejącego
+  auto-advance terminu, dodane wywołanie `subscriptionPriceChanged` → jeśli true, `queueSubConfirm`
+  z nowym `kind: 'priceChange'` (obok istniejącego `kind: 'currency'`/undefined dla starego
+  przepływu "czy to Twoja subskrypcja").
+- **Reużyta w 100% karta dashboardu** (`nodes['sub-confirm']` w `index.tsx`) — TA SAMA
+  kolejka/karta co "czy to Twoja subskrypcja" (currency mismatch), teraz rozgałęziona po
+  `c.kind`: dla `priceChange` inny tekst ("dotąd płaciłeś X zł, zaktualizować?") i inna akcja
+  (`acceptSubPriceChange` — patchuje `sub.amount` przez już istniejący `updateSub`, zamiast
+  `confirmSub`'s "oznacz jako opłacone"). Zero nowego UI, zero nowego store'u — jedna kolejka,
+  jedna karta, jeden branch.
+
+**Testy**: nowy `describe('subscriptionAuto — subscriptionPriceChanged')` w
+`subscriptionAuto.test.ts` (6 testów: bez zmiany → false, drobne zaokrąglenie pod progiem →
+false, realna podwyżka → true, próg absolutny chroni małe kwoty, inna waluta → false,
+obniżka też wykrywana — `|diff|`, nie tylko podwyżka w górę). `tsc --noEmit`/`jest` czyste
+(86/86 suite, 1121 testów, +6).
+
+**Priorytet testu na urządzeniu — niski** (zależny od realnej podwyżki jakiejś
+subskrypcji — nie da się wywołać na żądanie): gdy bank złapie płatność za subskrypcję w innej
+kwocie niż zapisana (>5%/>2zł), na dashboardzie ma się pokazać karta "Zmieniła się cena
+subskrypcji?" z opcją "Zaktualizuj"/"Zignoruj", zamiast dotychczasowej ciszy.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

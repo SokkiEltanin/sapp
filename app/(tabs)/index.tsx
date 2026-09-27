@@ -670,6 +670,15 @@ export default function DashboardScreen() {
     setSubConfirms(list => list.filter(x => x.id !== c.id));
     removeSubConfirm(c.id).catch(() => {});
   }, []);
+  // Podwyżka subskrypcji (2026-09-27) — user potwierdza nową cenę, zapisujemy ją jako
+  // aktualną `amount` subskrypcji, żeby przyszłe dopasowania/alerty liczyły się od NIEJ.
+  const acceptSubPriceChange = useCallback(async (c: PendingSubConfirm) => {
+    haptic.success();
+    setSubConfirms(list => list.filter(x => x.id !== c.id));
+    removeSubConfirm(c.id).catch(() => {});
+    try { await updateSub(c.subId, { amount: c.amount }); } catch {}
+    toast.success(`Zaktualizowano cenę „${c.subName}"`);
+  }, [updateSub]);
 
   // First open, due, not-yet-dismissed debt → the dashboard asks about it.
   const dueDebt = useMemo(() => {
@@ -2580,21 +2589,26 @@ export default function DashboardScreen() {
 
               nodes['sub-confirm'] = subConfirms.length > 0 && (() => {
                 const c = subConfirms[0];
+                const isPriceChange = c.kind === 'priceChange';
                 return (
                   <View style={[s.card, { backgroundColor: cardBgDark }]}>
                     <View style={s.cardHeader}>
                       <Wallet size={13} color={colors.accent.amber} />
-                      <Text style={s.cardTitle}>Płatność za subskrypcję?</Text>
+                      <Text style={s.cardTitle}>{isPriceChange ? 'Zmieniła się cena subskrypcji?' : 'Płatność za subskrypcję?'}</Text>
                     </View>
                     <Text style={[s.factText, { marginTop: spacing[1] }]}>
-                      Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> w „{c.merchant}". Wygląda na Twoją subskrypcję <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> (kwota w innej walucie zależy od kursu). Oznaczyć jako opłaconą za ten okres?
+                      {isPriceChange ? (
+                        <>Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> za <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> — dotąd płaciłeś {c.oldAmount?.toFixed(2)} {c.currency}. Zaktualizować zapisaną kwotę?</>
+                      ) : (
+                        <>Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> w „{c.merchant}". Wygląda na Twoją subskrypcję <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> (kwota w innej walucie zależy od kursu). Oznaczyć jako opłaconą za ten okres?</>
+                      )}
                     </Text>
                     <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
-                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => confirmSub(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak, opłacona</Text>
+                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => isPriceChange ? acceptSubPriceChange(c) : confirmSub(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>{isPriceChange ? 'Zaktualizuj' : 'Tak, opłacona'}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => dismissSub(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie</Text>
+                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>{isPriceChange ? 'Zignoruj' : 'Nie'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

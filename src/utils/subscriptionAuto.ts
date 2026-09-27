@@ -66,11 +66,28 @@ export function isConfidentSubMatch(p: PaymentLite & { currency?: string }, sub:
   return sameCur && close;
 }
 
+// Podwyżka subskrypcji (2026-09-27, user zaakceptował pomysł) — próg WĘŻSZY niż
+// `isConfidentSubMatch` (>5% lub >2 zł, nie >15%): tu pytamy "czy cena się zmieniła", nie
+// "czy to nadal ta subskrypcja" — zwykłe zaokrąglenie nie powinno alarmować, realna podwyżka
+// powinna, i mieści się bezpiecznie w paśmie w którym `isConfidentSubMatch` wciąż uznaje
+// płatność za "tę samą" subskrypcję (więc oba mogą być prawdą naraz — cichy auto-advance +
+// alert o nowej cenie, nie jedno ZAMIAST drugiego).
+export function subscriptionPriceChanged(p: PaymentLite & { currency?: string }, sub: Subscription): boolean {
+  if ((p.currency ?? 'PLN') !== (sub.currency ?? 'PLN')) return false;
+  return Math.abs(p.amount - sub.amount) > Math.max(2, sub.amount * 0.05);
+}
+
 // ── Pending "is this your subscription?" confirmations (surfaced on the dashboard) ──
+// `kind`/`oldAmount` (2026-09-27, user zaakceptował pomysł: wykrywanie podwyżki subskrypcji)
+// — reużywa DOKŁADNIE tę samą kolejkę/kartę na dashboardzie co "czy to Twoja subskrypcja"
+// (currency mismatch), zamiast osobnego systemu — jedyna różnica to treść/akcja karty.
+// `kind` brak/'currency' = stary przepływ (kwota w innej walucie, dopasowanie po nazwie).
 const CONFIRM_KEY = 'pending_sub_confirm';
 export interface PendingSubConfirm {
   id: string; subId: string; subName: string; merchant: string;
   amount: number; currency: string; date: string; // YYYY-MM-DD
+  kind?: 'currency' | 'priceChange';
+  oldAmount?: number; // tylko dla kind: 'priceChange' — zapisana kwota subskrypcji PRZED tą płatnością
 }
 
 export async function loadSubConfirms(): Promise<PendingSubConfirm[]> {
