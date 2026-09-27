@@ -3,6 +3,15 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
+
+- **Powiadomienie push o terminie długu** (user zaakceptował pomysł 2026-09-27) —
+  `debts.tsx`'s pole "Kiedy przypomnieć / pytać" (`askDate`) dziś TYLKO pokazuje kartę na
+  dashboardzie (`index.tsx` linia ~686, gdy `askDate <= today`) — działa jedynie jeśli
+  akurat otworzysz appkę w tym dniu. Dodać `scheduleDebtReminder`/`cancelDebtReminder` w
+  `notificationsService.ts` (ten sam wzorzec co `scheduleCapsuleUnlockReminder`/
+  `scheduleEventReminder`), wywoływane z `debts.tsx` przy dodaniu/rozliczeniu/usunięciu długu.
+
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
