@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
+zaakceptowanych pomysłów tej sesji. `app/search.tsx` przeszukiwał tylko `calendarStore`
+(zadania/eventy), `expensesStore`, `useHabits` i notatki (`getAllNotes`) — dopisane
+`reflectionsStore.ts` (dziennik impulsów, sekcja "Zapiski") i `debtsService`/`debts.tsx`
+(sekcja "Długi") wg już istniejącego wzorca `matchedX` + osobna sekcja w liście wyników.
+Kapsuła czasu (`timeCapsuleStore`) ŚWIADOMIE pominięta — z definicji nie chcesz widzieć
+treści przed odblokowaniem, wyszukiwanie by to obeszło. Bez nowej logiki poza filtrem po
+tekście, tylko dwa kolejne źródła podpięte do istniejącego UI. `tsc`/`jest` czyste (1121
+testów, bez zmiany — plik UI-only, bez dedykowanych testów jak resztę `search.tsx`).
+
+**🆕 Priorytet testu na urządzeniu — niski, łatwy do zweryfikowania na żądanie** — wpisz w
+szukajkę fragment tekstu z jakiegoś zapisku (dziennik impulsów) lub imię osoby/kwotę z
+istniejącego długu, sprawdź że nowe sekcje "Zapiski"/"Długi" się pojawiają i że tap
+przenosi w odpowiednie miejsce.
+
 ## 🆕 Powiadomienie o odblokowaniu kapsuły czasu (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §194. Szósty z listy zaakceptowanych pomysłów tej sesji. Nowa
@@ -5407,12 +5424,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
   (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
   tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
-- **Wyszukiwanie bez zapisków/refleksji i długów** (user zaakceptował pomysł 2026-09-27) —
-  `app/search.tsx` przeszukuje `calendarStore` (zadania/eventy), `expensesStore`, `useHabits`,
-  notatki (`getAllNotes`), ale NIE `reflectionsStore.ts` (dziennik impulsów) ani
-  `debtsService`/`debts.tsx`. Dopisać obie do już istniejącego wzorca `matchedX` + sekcja w
-  liście wyników — bez nowej logiki, tylko dwa kolejne źródła. Kapsuła czasu (`timeCapsuleStore`)
-  ŚWIADOMIE pominięta — z definicji nie chcesz widzieć treści przed odblokowaniem.
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.

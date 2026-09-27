@@ -5,17 +5,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText, Clock, Flame } from 'lucide-react-native';
+import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText, Clock, Flame, Quote, HandCoins } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useHabits } from '@/hooks/useHabits';
+import { useReflections } from '@/store/reflectionsStore';
 import { getCategoryMeta } from '@/utils/categories';
 import { Note, getAllNotes } from '@/utils/notesStorage';
 import { blocksToPlainText, deserializeBlocks } from '@/utils/richText';
 import { expensesService } from '@/services/expensesService';
 import { calendarService, tasksService } from '@/services/calendarService';
+import { debtsService } from '@/services/debtsService';
+import { Debt } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -55,11 +58,17 @@ export default function SearchScreen() {
   const hl = useMemo(() => makeHl(colors), [colors]);
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { tasks, events, setTasks, setEvents } = useCalendarStore();
   const { expenses, setExpenses } = useExpensesStore();
   const { habits } = useHabits();
+  // Zapiski/refleksje (2026-09-27, wyszukiwanie obejmujące zapiski/refleksje i długi — user
+  // zaakceptował pomysł) — `useReflections` jest już hydrowany globalnie przez `persist`
+  // middleware (jak wszystkie inne stores tego typu w apce), więc bez osobnego load-efektu,
+  // w przeciwieństwie do notatek/długów niżej (async serwisy, nie Zustand+persist).
+  const reflections = useReflections(st => st.reflections);
 
   // Load data into stores if not already loaded
   useEffect(() => {
@@ -77,6 +86,7 @@ export default function SearchScreen() {
           ? calendarService.getAllEvents().then(d => { if (active) setEvents(d); }).catch(() => {})
           : Promise.resolve(),
         getAllNotes().then(d => { if (active) setNotes(d); }),
+        debtsService.getAll().then(d => { if (active) setDebts(d); }).catch(() => {}),
       ]);
       if (active) setLoading(false);
     };
@@ -147,6 +157,24 @@ export default function SearchScreen() {
       .slice(0, 5);
   }, [notes, q]);
 
+  const matchedReflections = useMemo(() => {
+    if (!q) return [];
+    const lower = q.toLowerCase();
+    return reflections.filter(r => r.text.toLowerCase().includes(lower)).slice(0, 5);
+  }, [reflections, q]);
+
+  const matchedDebts = useMemo(() => {
+    if (!q) return [];
+    const lower = q.toLowerCase();
+    return debts
+      .filter(d =>
+        d.person.toLowerCase().includes(lower) ||
+        d.note?.toLowerCase().includes(lower) ||
+        String(d.amount).includes(lower)
+      )
+      .slice(0, 5);
+  }, [debts, q]);
+
   // Recent items for empty state
   const recentExpenses = useMemo(() =>
     [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
@@ -155,8 +183,8 @@ export default function SearchScreen() {
     tasks.filter(t => t.status === 'pending').slice(0, 4),
   [tasks]);
 
-  const hasResults = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length > 0;
-  const total = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length;
+  const hasResults = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length + matchedReflections.length + matchedDebts.length > 0;
+  const total = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length + matchedReflections.length + matchedDebts.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -264,7 +292,7 @@ export default function SearchScreen() {
                 <View style={styles.empty}>
                   <Search size={36} color={colors.text.muted} strokeWidth={1.2} />
                   <Text style={styles.emptyTitle}>Szukaj w całej aplikacji</Text>
-                  <Text style={styles.emptySub}>Zadania, wydarzenia, transakcje, notatki</Text>
+                  <Text style={styles.emptySub}>Zadania, wydarzenia, transakcje, notatki, zapiski, długi</Text>
                 </View>
               )}
             </>
@@ -403,6 +431,61 @@ export default function SearchScreen() {
                       <Text style={styles.rowMeta} numberOfLines={1}>{note.body.slice(0, 60)}</Text>
                     )}
                   </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Zapiski/refleksje */}
+          {matchedReflections.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionRow}>
+                <Quote size={12} color={colors.accent.blue} />
+                <Text style={[styles.sectionTitle, { color: colors.accent.blue }]}>Zapiski</Text>
+                <Text style={styles.sectionCount}>{matchedReflections.length}</Text>
+              </View>
+              {matchedReflections.map(r => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={styles.row}
+                  onPress={() => { haptic.tap(); router.push('/(tabs)' as any); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.rowIcon, { backgroundColor: colors.accent.blue + '18' }]}>
+                    <Quote size={14} color={colors.accent.blue} />
+                  </View>
+                  <View style={styles.rowInfo}>
+                    <Highlighted text={r.text} query={q} />
+                    <Text style={styles.rowMeta}>{new Date(r.ts).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: '2-digit' })}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Długi */}
+          {matchedDebts.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionRow}>
+                <HandCoins size={12} color={colors.accent.green} />
+                <Text style={[styles.sectionTitle, { color: colors.accent.green }]}>Długi</Text>
+                <Text style={styles.sectionCount}>{matchedDebts.length}</Text>
+              </View>
+              {matchedDebts.map(d => (
+                <TouchableOpacity
+                  key={d.id}
+                  style={styles.row}
+                  onPress={() => { haptic.tap(); router.push('/debts' as any); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.rowIcon, { backgroundColor: colors.accent.green + '18' }]}>
+                    <HandCoins size={14} color={colors.accent.green} />
+                  </View>
+                  <View style={styles.rowInfo}>
+                    <Highlighted text={d.person} query={q} />
+                    <Text style={styles.rowMeta} numberOfLines={1}>{(d.kind ?? 'theyOwe') === 'iOwe' ? 'jesteś winny' : 'winny Tobie'}{d.note ? ` · ${d.note}` : ''}</Text>
+                  </View>
+                  <Text style={styles.rowAmount}>{d.amount.toFixed(2)} {d.currency ?? 'PLN'}</Text>
                 </TouchableOpacity>
               ))}
             </View>

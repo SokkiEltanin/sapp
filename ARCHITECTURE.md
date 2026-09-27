@@ -11693,6 +11693,40 @@ telefonu. Jeśli akurat masz stary list bliski odblokowaniu — dobra okazja do 
 
 ---
 
+## 195. Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
+
+User (siódmy, ostatni z listy zaakceptowanych pomysłów tej rundy): "wyszukiwanie obejmujące
+zapiski/refleksje i długi" — `search.tsx` przeszukiwało zadania, kalendarz, wydatki, notatki,
+nawyki, ale NIE `reflectionsStore.ts` (dziennik impulsów) ani `debtsService`/`debts.tsx`.
+Kapsuła czasu (`timeCapsuleStore.ts`) ŚWIADOMIE pominięta — z definicji nie chcesz widzieć
+treści przed odblokowaniem, wyszukiwanie by to obeszło.
+
+**Rozwiązanie — czysta ekstensja już istniejącego wzorca `matchedX` + sekcja renderu, zero
+nowej logiki**:
+- `reflections` (`useReflections`, Zustand+`persist`, hydrowany globalnie — bez osobnego
+  load-efektu, w przeciwieństwie do `notes`/`debts` niżej, które są async serwisami) +
+  `matchedReflections` (filtr po `text`).
+- `debts` (nowy `useState` + `debtsService.getAll()` dopisany do istniejącego
+  `Promise.all([...])` w load-efekcie) + `matchedDebts` (filtr po `person`/`note`/`amount`).
+- Dwie nowe sekcje renderu ("Zapiski" — ikona `Quote`, ta sama co `ReflectionCard.tsx` na
+  dashboardzie; "Długi" — ikona `HandCoins`, ta sama co `debts.tsx`) w TYM SAMYM miejscu
+  między "Notatki" i "Nawyki". Tap na zapisku → `/(tabs)` (refleksje nie mają własnego ekranu,
+  żyją tylko na dashboardowej karcie); tap na długu → `/debts` (ogólny ekran listy, ten sam
+  wzorzec co `matchedHabits` → `/habits` — te elementy nie mają per-item deep-linku w UI).
+- `hasResults`/`total` i tekst pustego stanu ("Zadania, wydarzenia, transakcje, notatki,
+  zapiski, długi") zaktualizowane, żeby uwzględniały nowe źródła.
+
+**Testy**: brak nowych — czysta ekstensja UI/filtrowania string-match, ten sam brak
+dedykowanych testów co pozostałe sekcje tego ekranu (`matchedTasks`/`matchedNotes`/itd.
+nigdy nie miały własnych testów jednostkowych — logika jest zbyt spleciona z komponentem).
+`tsc --noEmit`/`jest` czyste (86/86 suite, 1121 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Szukaj → wpisz fragment tekstu z jakiegoś zapisku
+(Zapiski/refleksje) i fragment nazwy osoby z długu — obie nowe sekcje powinny się pojawić z
+poprawnym podświetleniem dopasowania i prowadzić tam gdzie powinny po tapie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
