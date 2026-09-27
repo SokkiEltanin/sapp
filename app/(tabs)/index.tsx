@@ -101,6 +101,7 @@ import FunFactsSection from '@/components/dashboard/FunFactsSection';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
 import { buildRecords } from '@/utils/personalRecords';
 import { BOSSES } from '@/utils/bosses';
+import { activeSeasonalEvent, eventPeriodKey, eventDaysLeft } from '@/utils/seasonalEvents';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
 import { usePetStore, levelFromXp, loginBonusCoins } from '@/store/petStore';
@@ -1651,6 +1652,7 @@ export default function DashboardScreen() {
   const petEnergy = usePetStore(st => st.energy);
   const petDefeated = usePetStore(st => st.defeatedBosses);
   const petBossHp = usePetStore(st => st.bossHp);
+  const petEventWon = usePetStore(st => st.eventWon);
   const petHydrated = usePetStore(st => st._hydrated);
   const petLoginStreak = usePetStore(st => st.loginStreak);
   const registerLogin = usePetStore(st => st.registerLogin);
@@ -1725,6 +1727,26 @@ export default function DashboardScreen() {
       .then(({ notificationsService }) => notificationsService.refreshBossReminder({ fightable, energy: petEnergy }))
       .catch(() => {});
   }, [petLevel, petDefeated, petBossHp, petEnergy]);
+  // Event sezonowy kończy się bez medalu (2026-09-27, user zaakceptował pomysł: "przypomnienie
+  // o kończącym się evencie sezonowym bez udziału") — TYLKO sezonowe (Mikołaj/Wielkanoc/
+  // Wakacje/4 pory roku), NIE nemesis miesiąca: sezonowy jest rzadki i naprawdę przepada na
+  // dobre, nemesis wraca co miesiąc niezależnie, więc "przegapienie" nie jest tak nieodwracalne
+  // — nie warto duplikować całego liczenia `menaceCtx` (godziny pracy/słodycze vs średnia,
+  // patrz `bosses.tsx`) tylko dla tego drugiego przypadku. "Bez udziału" doprecyzowane na "bez
+  // MEDALU" (eventWon) — jedyny stan jaki faktycznie śledzimy (nie ma osobnej flagi "czy
+  // próbowałem"), i to trafniejszy sygnał: nieważne czy user próbował, liczy się czy zdążył
+  // zdobyć nagrodę. `dayKey` w deps — dashboard zostaje zamontowany, `daysLeft` musi się
+  // przeliczać co dzień, nie tylko gdy `petEventWon` się zmieni.
+  useEffect(() => {
+    const now = new Date();
+    const seasonal = activeSeasonalEvent(now);
+    const opts = seasonal
+      ? { active: true as const, name: seasonal.name, won: (petEventWon ?? []).includes(eventPeriodKey(seasonal, now)), daysLeft: eventDaysLeft(seasonal, now) }
+      : { active: false as const };
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshEventEndingReminder(opts))
+      .catch(() => {});
+  }, [petEventWon, dayKey]);
   // Passive daily care XP (once/day), scaled by how well you're doing.
   const petTicked = useRef(false);
   useEffect(() => {

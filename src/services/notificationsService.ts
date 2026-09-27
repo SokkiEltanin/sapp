@@ -343,6 +343,29 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Event sezonowy kończy się bez medalu (2026-09-27, user zaakceptował pomysł) — ten sam
+  // refresh-na-żywym-stanie wzorzec co refreshBossReminder wyżej. Odpala TYLKO w ostatniej
+  // odsłonie (≤2 dni), żeby nie zanudzać przez cały, często wielotygodniowy okres eventu
+  // (Wakacje trwają ~2.5 miesiąca) — to ma być "ostatnia szansa", nie codzienny nag.
+  async refreshEventEndingReminder(
+    opts: { active: false } | { active: true; name: string; won: boolean; daysLeft: number },
+  ): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('event-ending').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      if (!opts.active || opts.won || opts.daysLeft <= 0 || opts.daysLeft > 2) return;
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'event-ending',
+        content: {
+          title: `${opts.name} kończy się za ${opts.daysLeft} ${plPlural(opts.daysLeft, 'dzień', 'dni', 'dni')}`,
+          body: 'Jeszcze nie zdobyłeś medalu tego wydarzenia — ostatnia szansa.',
+          data: { screen: 'bosses' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(18, 30, false) },
+      });
+    } catch {}
+  },
+
   // Nie DAILY (na sztywno o godzinie, bez względu na stan) — jak scheduleDailyMoodReminder,
   // one-off DATE trigger, żeby móc być stanowe: `allDoneToday` (2026-09-20, "inteligentne
   // powiadomienia" — dotąd trąbiło "nie odhaczyłeś nawyków" nawet gdy user WŁAŚNIE je
