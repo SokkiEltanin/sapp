@@ -5434,12 +5434,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Log sesji Pomodoro** (user zaakceptował pomysł 2026-09-27 — z zastrzeżeniem: jeszcze nie
-  używał Pomodoro w praktyce, sprawdzi najpierw czy się przyda przy studiach, więc NIE
-  zaczynać budowy dopóki nie potwierdzi że faktycznie z tego korzysta) — `pomodoroStore.ts`
-  liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
-  (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
-  tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
