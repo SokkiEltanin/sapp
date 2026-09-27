@@ -5359,6 +5359,12 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
   (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
   tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
+- **Wyszukiwanie bez zapisków/refleksji i długów** (user zaakceptował pomysł 2026-09-27) —
+  `app/search.tsx` przeszukuje `calendarStore` (zadania/eventy), `expensesStore`, `useHabits`,
+  notatki (`getAllNotes`), ale NIE `reflectionsStore.ts` (dziennik impulsów) ani
+  `debtsService`/`debts.tsx`. Dopisać obie do już istniejącego wzorca `matchedX` + sekcja w
+  liście wyników — bez nowej logiki, tylko dwa kolejne źródła. Kapsuła czasu (`timeCapsuleStore`)
+  ŚWIADOMIE pominięta — z definicji nie chcesz widzieć treści przed odblokowaniem.
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
