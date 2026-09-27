@@ -11,6 +11,13 @@ Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
   akurat otworzysz appkę w tym dniu. Dodać `scheduleDebtReminder`/`cancelDebtReminder` w
   `notificationsService.ts` (ten sam wzorzec co `scheduleCapsuleUnlockReminder`/
   `scheduleEventReminder`), wywoływane z `debts.tsx` przy dodaniu/rozliczeniu/usunięciu długu.
+- **Łączny koszt subskrypcji "od zawsze"** (user zaakceptował pomysł 2026-09-27) —
+  `subscriptions.tsx` pokazuje tylko koszt miesięczny/roczny, nie ile już realnie wydano na
+  daną usługę. Dorzucić derived stat w `useSubscriptions.ts` (zero nowego store'u): zsumować
+  WSZYSTKIE historyczne wydatki dopasowane do subskrypcji po nazwie, tym samym fuzzy-matchem
+  co już istniejący `matchSubscriptionForPayment` w `subscriptionAuto.ts` (tam dopasowuje
+  tylko NAJNOWSZĄ płatność — tu potrzebne dopasowanie WSZYSTKICH, nie tylko jednej). Wyświetlić
+  w `SubItem` (subscriptions.tsx), np. "od {startDate}: X zł zapłacone".
 
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
