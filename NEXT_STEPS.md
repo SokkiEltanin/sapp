@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Powiadomienie o odblokowaniu kapsuły czasu (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §194. Szósty z listy zaakceptowanych pomysłów tej sesji. Nowa
+`scheduleCapsuleUnlockReminder()`/`cancelCapsuleUnlockReminder()` w `notificationsService.ts`
++ `timeCapsuleStore.ts`'s `add()` teraz zwraca nowo utworzony list (był `void`), żeby
+`index.tsx`'s "Zapieczętuj" mogło zaplanować powiadomienie tym samym id. `remove()` nie jest
+dziś wywoływane z żadnego UI, więc `cancel*` dodany dla symetrii, ale świadomie nigdzie
+niewpięty. `tsc`/`jest` czyste (1121 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski, trudny do zweryfikowania na żądanie** (najkrótszy
+termin w UI to 1 miesiąc) — jeśli masz stary list bliski odblokowaniu, dobra okazja do
+sprawdzenia że powiadomienie faktycznie przychodzi.
+
 ## 🆕 Udostępnij tekst prosto do parsera paragonów, WYMAGA NOWEGO APK (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §193. Piąty z listy zaakceptowanych pomysłów tej sesji. Nowy
@@ -5388,11 +5401,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Powiadomienie o odblokowaniu kapsuły czasu** (user zaakceptował pomysł 2026-09-27) —
-  `src/store/timeCapsuleStore.ts` ("listy do przyszłego siebie") ma `unlockAt` (ms), ale nic
-  nie powiadamia gdy list się odblokuje — trzeba pamiętać samemu zajrzeć. Zaplanować lokalne
-  powiadomienie na `unlockAt` przy `add()` (ten sam wzorzec co inne zaplanowane powiadomienia w
-  `notificationsService.ts` — cancel przy `remove()`).
 - **Log sesji Pomodoro** (user zaakceptował pomysł 2026-09-27 — z zastrzeżeniem: jeszcze nie
   używał Pomodoro w praktyce, sprawdzi najpierw czy się przyda przy studiach, więc NIE
   zaczynać budowy dopóki nie potwierdzi że faktycznie z tego korzysta) — `pomodoroStore.ts`

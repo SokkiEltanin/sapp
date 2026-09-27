@@ -723,6 +723,35 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`snooze-${taskId}`).catch(() => {});
   },
 
+  // Kapsuła czasu — "list do przyszłego siebie" (2026-09-27, user zaakceptował pomysł:
+  // powiadomienie o odblokowaniu) — bez tego user musiał pamiętać samemu, żeby zajrzeć.
+  // Direct consequence of a user action (pieczętowanie listu), więc bez `notif_enabled`
+  // gate — ta sama logika co scheduleSnoozeReminder/scheduleMissionReady wyżej. `remove()` w
+  // `timeCapsuleStore.ts` nie jest dziś wywoływane z żadnego UI (sprawdzone — brak przycisku
+  // usuwania listu przed odblokowaniem), więc cancel na tym etapie nie ma czego chronić; jeśli
+  // taki przycisk kiedyś powstanie, powinien wołać `cancelCapsuleUnlockReminder(id)` tym samym
+  // identyfikatorem.
+  async scheduleCapsuleUnlockReminder(id: string, unlockAtMs: number): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(`capsule-${id}`).catch(() => {});
+      const fire = new Date(unlockAtMs);
+      if (fire <= new Date()) return;
+      await Notifications.scheduleNotificationAsync({
+        identifier: `capsule-${id}`,
+        content: {
+          title: 'List z kapsuły czasu się odblokował',
+          body: 'Możesz teraz przeczytać to, co napisałeś do siebie.',
+          data: { screen: 'index' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+      });
+    } catch {}
+  },
+
+  async cancelCapsuleUnlockReminder(id: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`capsule-${id}`).catch(() => {});
+  },
+
   // Pupil mission (petStore.startMission, 2026-08-15) — direct consequence of a user action
   // (sending the pet off), not a passive daily nag, so no `notif_enabled` gate — same reasoning
   // as scheduleSnoozeReminder above. Fires once the mission's real-time duration has elapsed,
