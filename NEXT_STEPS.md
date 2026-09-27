@@ -5319,6 +5319,24 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   zapis przez ten sam `widgetSync.ts`/`useTasks`'s `toggle()`, i wymuszenie odświeżenia
   widgetu po zmianie (już istnieje mechanizm sync z appki → widget, potrzebny odwrotny:
   widget → appka/store). Wymaga nowego APK (natywny kod), nie OTA.
+- **Koszt/km pojazdu** (user zaakceptował pomysł 2026-09-27) — `vehicles.tsx`/`vehicleMatch.ts`
+  łapie paliwo z tagów wydatków (`FUEL_TAGS`), ale nie ma pola przebiegu, więc nie da się
+  policzyć koszt/km. Dodać opcjonalne pole "przebieg" przy tankowaniu (albo osobny log
+  odczytów licznika), policzyć koszt/km z różnicy przebiegu między tankowaniami × sumy paliwa
+  w tym okresie.
+- **Przypomnienie o kończącym się evencie sezonowym bez udziału** (user zaakceptował pomysł
+  2026-09-27) — `src/utils/seasonalEvents.ts` ma harmonogram (Mikołaj/Wielkanoc/etc.), system
+  powiadomień już obsługuje event-based scheduling (`notificationsService.ts`, patrz
+  `event-${eventId}` cancel wyżej), ale nic nie ostrzega "zostały N dni, jeszcze nie
+  walczyłeś z tym bossem". Deterministyczne: data końca eventu + flaga czy user w ogóle
+  odwiedził/walczył (już musi być jakiś stan per-event w `petStore`/bosses, sprawdzić przy
+  budowie) → jedno zaplanowane powiadomienie X dni przed końcem, jeśli flaga nie jest ustawiona.
+- **Wykrywanie podwyżki subskrypcji** (user zaakceptował pomysł 2026-09-27) —
+  `expenses/subscriptions.tsx` przechowuje jedną statyczną kwotę (`amount`) per subskrypcja,
+  bez historii. Powiadomienia bankowe już automatycznie dopasowują cykliczne płatności do
+  subskrypcji — przy dopasowaniu porównać kwotę z banku vs zapisaną `amount` i jeśli się różni
+  (próg np. >5%), pokazać alert/toast "X zwykle Y zł, teraz naliczyło Z zł" + zaproponować
+  aktualizację zapisanej kwoty. Czysty diff dwóch liczb, żadnej heurystyki/AI.
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
