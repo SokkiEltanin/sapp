@@ -86,6 +86,15 @@ export interface VehicleMaintenance {
   expenseId?: string;       // linked transaction (optional)
 }
 
+// One odometer reading (2026-09-27, user zaakceptował pomysł: koszt/km pojazdu) — a manual
+// "km" log the user adds occasionally (e.g. at each fill-up), used to compute cost/km between
+// the FIRST and LAST reading (see `costPerKm()` in vehicleMatch.ts). Not tied to any expense.
+export interface OdometerReading {
+  id: string;
+  date: string;   // ISO date the reading was taken
+  km: number;      // odometer value at that date
+}
+
 export interface Vehicle {
   id: string;
   name: string;             // "Mój rower", "Octavia"
@@ -95,6 +104,7 @@ export interface Vehicle {
   isMainCar?: boolean;      // the car that catches fuel expenses
   tireSeason?: 'summer' | 'winter' | 'allseason'; // what's mounted now (drives the weather reminder)
   maintenance?: VehicleMaintenance[]; // service log + reminders
+  odometerLog?: OdometerReading[]; // manual km readings — feeds costPerKm()
   notes?: string;
   // legacy (pre-maintenance-log) — kept so old docs still read
   oilChangeDate?: string;

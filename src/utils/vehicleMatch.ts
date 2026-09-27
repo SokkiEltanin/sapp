@@ -3,6 +3,34 @@ import { Expense, Vehicle, VehicleMaintenance } from '@/types';
 import { monthISO } from '@/utils/date';
 import { plPlural } from '@/utils/plural';
 
+export interface CostPerKm {
+  value: number;      // zł per km
+  kmDelta: number;
+  spendDelta: number;
+  fromDate: string;
+  toDate: string;
+}
+
+// Koszt/km (2026-09-27, user zaakceptował pomysł) — pojazd łapie paliwo z tagów wydatków, ale
+// bez przebiegu nie da się policzyć koszt/km. User dodaje odczyty licznika (opcjonalnie, np.
+// przy tankowaniu) — bierzemy PIERWSZY i OSTATNI odczyt (nie każdą parę po kolei — prostsza,
+// bardziej stabilna "średnia od kiedy zacząłem śledzić" niż seria krótkich, hałaśliwych
+// odcinków), różnicę km, i sumę WSZYSTKICH wydatków tego pojazdu (paliwo + części) w tym samym
+// oknie dat (te same zasady dopasowania co `summarizeVehicle` — `expenseMatchesVehicle`).
+// `null` gdy <2 odczyty albo km się nie zmienił/spadł (licznik przekręcony/błędny wpis — nie
+// pokazuj bezsensownego wyniku).
+export function costPerKm(v: Vehicle, expenses: Expense[], mainId?: string): CostPerKm | null {
+  const log = [...(v.odometerLog ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  if (log.length < 2) return null;
+  const first = log[0], last = log[log.length - 1];
+  const kmDelta = last.km - first.km;
+  if (kmDelta <= 0) return null;
+  const spendDelta = expenses
+    .filter(e => expenseMatchesVehicle(e, v, mainId) && e.date >= first.date && e.date <= last.date)
+    .reduce((s, e) => s + e.amount, 0);
+  return { value: spendDelta / kmDelta, kmDelta, spendDelta, fromDate: first.date, toDate: last.date };
+}
+
 // What "fuel" looks like (Transport + a fuel-ish tag/word). Only the MAIN car
 // catches it; everything else is matched strictly by tag.
 const FUEL_TAGS = ['paliwo', 'tankowanie', 'benzyna', 'diesel', 'lpg', 'olej napędowy'];

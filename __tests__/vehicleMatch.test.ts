@@ -1,8 +1,8 @@
 import {
   looksLikeFuel, expenseMatchesVehicle, mainCarId, summarizeVehicle,
-  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets,
+  maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, costPerKm,
 } from '@/utils/vehicleMatch';
-import { Expense, Vehicle, VehicleMaintenance } from '@/types';
+import { Expense, Vehicle, VehicleMaintenance, OdometerReading } from '@/types';
 
 const e = (o: Partial<Expense>): Expense => ({
   id: 'x', amount: 0, currency: 'PLN', category: 'transport', tags: [], note: '',
@@ -177,5 +177,53 @@ describe('vehicleMatch — maintenancePresets', () => {
   });
   test('inny rodzaj pojazdu dostaje generyczny fallback', () => {
     expect(maintenancePresets('other').map(p => p.label)).toContain('Serwis');
+  });
+});
+
+describe('vehicleMatch — costPerKm', () => {
+  const odo = (o: Partial<OdometerReading>): OdometerReading => ({ id: 'o', date: '2026-08-01', km: 0, ...o });
+
+  test('< 2 odczyty → null (nie da się policzyć różnicy)', () => {
+    expect(costPerKm(v({}), [])).toBeNull();
+    expect(costPerKm(v({ odometerLog: [odo({ km: 100 })] }), [])).toBeNull();
+  });
+
+  test('licznik się nie zmienił albo spadł (błędny wpis) → null, nie ujemny/NaN koszt', () => {
+    const car = v({ odometerLog: [odo({ date: '2026-08-01', km: 500 }), odo({ date: '2026-08-15', km: 500 })] });
+    expect(costPerKm(car, [])).toBeNull();
+    const backwards = v({ odometerLog: [odo({ date: '2026-08-01', km: 500 }), odo({ date: '2026-08-15', km: 480 })] });
+    expect(costPerKm(backwards, [])).toBeNull();
+  });
+
+  test('liczy z PIERWSZEGO i OSTATNIEGO odczytu, nie z kolejnych par (odczyty nieposortowane)', () => {
+    const car = v({
+      tag: 'auto',
+      odometerLog: [
+        odo({ id: 'a', date: '2026-08-20', km: 12300 }), // ostatni, ale dodany jako pierwszy w tablicy
+        odo({ id: 'b', date: '2026-08-01', km: 12000 }), // pierwszy chronologicznie
+      ],
+    });
+    const expenses = [
+      e({ date: '2026-08-05T10:00:00', amount: 150, tags: ['auto'] }), // w oknie 08-01..08-20
+      e({ date: '2026-08-25T10:00:00', amount: 999, tags: ['auto'] }), // PO oknie — nie liczy się
+    ];
+    const r = costPerKm(car, expenses);
+    expect(r).not.toBeNull();
+    expect(r!.kmDelta).toBe(300);
+    expect(r!.spendDelta).toBe(150);
+    expect(r!.value).toBeCloseTo(0.5);
+    expect(r!.fromDate).toBe('2026-08-01');
+    expect(r!.toDate).toBe('2026-08-20');
+  });
+
+  test('sumuje paliwo I części (te same zasady dopasowania co summarizeVehicle)', () => {
+    const bike = v({ kind: 'bike', tag: 'rower', odometerLog: [odo({ date: '2026-08-01', km: 0 }), odo({ date: '2026-08-31', km: 100 })] });
+    const expenses = [
+      e({ date: '2026-08-10T10:00:00', amount: 40, tags: ['rower'] }),
+      e({ date: '2026-08-20T10:00:00', amount: 60, tags: ['rower'] }),
+    ];
+    const r = costPerKm(bike, expenses);
+    expect(r!.spendDelta).toBe(100);
+    expect(r!.value).toBeCloseTo(1);
   });
 });
