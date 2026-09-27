@@ -16,7 +16,11 @@ export interface CapsuleLetter {
 
 interface State {
   letters: CapsuleLetter[];
-  add: (text: string, unlockAt: number) => void;
+  // Zwraca nowo utworzony list (2026-09-27, powiadomienie o odblokowaniu) — caller (index.tsx)
+  // potrzebuje `id`/`unlockAt`, żeby zaplanować `scheduleCapsuleUnlockReminder` tym samym
+  // identyfikatorem; store zostaje jedynym miejscem generującym `id`, więc nie ma szansy na
+  // rozjazd między tym co zapisane a tym co zaplanowane.
+  add: (text: string, unlockAt: number) => CapsuleLetter;
   markRead: (id: string) => void;
   remove: (id: string) => void;
 }
@@ -25,9 +29,11 @@ export const useTimeCapsule = create<State>()(
   persist(
     (set) => ({
       letters: [],
-      add: (text, unlockAt) => set((s) => ({
-        letters: [...s.letters, { id: `cap-${Date.now()}`, text: text.trim(), createdAt: Date.now(), unlockAt }],
-      })),
+      add: (text, unlockAt) => {
+        const letter: CapsuleLetter = { id: `cap-${Date.now()}`, text: text.trim(), createdAt: Date.now(), unlockAt };
+        set((s) => ({ letters: [...s.letters, letter] }));
+        return letter;
+      },
       markRead: (id) => set((s) => ({ letters: s.letters.map((l) => (l.id === id ? { ...l, read: true } : l)) })),
       remove: (id) => set((s) => ({ letters: s.letters.filter((l) => l.id !== id) })),
     }),

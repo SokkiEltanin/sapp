@@ -4278,7 +4278,10 @@ export default function DashboardScreen() {
                 disabled={!capsuleText.trim()}
                 onPress={() => {
                   const d = new Date(); d.setMonth(d.getMonth() + capsuleMonths);
-                  addCapsule(capsuleText, d.getTime());
+                  const letter = addCapsule(capsuleText, d.getTime());
+                  import('@/services/notificationsService')
+                    .then(({ notificationsService }) => notificationsService.scheduleCapsuleUnlockReminder(letter.id, letter.unlockAt))
+                    .catch(() => {});
                   haptic.success(); toast.success('Zapieczętowano — do zobaczenia w przyszłości');
                   setCapsuleModal(false); setCapsuleText('');
                 }}

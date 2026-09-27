@@ -11658,6 +11658,41 @@ tekstu w tym polu (bez udziału Share Sheet) wciąż działa identycznie jak dot
 
 ---
 
+## 194. Powiadomienie o odblokowaniu kapsuły czasu (2026-09-27)
+
+User (szósty z listy zaakceptowanych pomysłów): "powiadomienie o odblokowaniu listu z
+kapsuły czasu" — "listy do przyszłego siebie" (`timeCapsuleStore.ts`) miały `unlockAt`, ale
+nic nie powiadamiało gdy list się odblokuje; trzeba było pamiętać samemu zajrzeć.
+
+**Rozwiązanie — ten sam schedule/cancel-po-identyfikatorze wzorzec co
+`scheduleEventReminder`/`scheduleSnoozeReminder`** (bez `notif_enabled` gate — bezpośrednia
+konsekwencja akcji usera, pieczętowanie listu, ta sama logika co snooze/misja pupila, nie
+pasywny codzienny nag):
+- `notificationsService.ts` — nowa `scheduleCapsuleUnlockReminder(id, unlockAtMs)` +
+  `cancelCapsuleUnlockReminder(id)`. Identyfikator `capsule-${id}`.
+- `timeCapsuleStore.ts`'s `add()` — zmieniona żeby ZWRACAĆ nowo utworzony `CapsuleLetter`
+  (był `void`) — caller potrzebuje `id`/`unlockAt`, żeby zaplanować powiadomienie tym samym
+  identyfikatorem co store wygenerował; store zostaje jedynym miejscem generującym `id`, więc
+  nie ma szansy na rozjazd między tym co zapisane a tym co zaplanowane.
+- `index.tsx`'s "Zapieczętuj" (jedyne miejsce wołające `add()`, sprawdzone grepem) — po
+  zapisaniu listu, `scheduleCapsuleUnlockReminder(letter.id, letter.unlockAt)`.
+- **`remove()` w store'ze NIE jest dziś wywoływane z żadnego UI** (sprawdzone — brak przycisku
+  usuwania listu przed odblokowaniem) — `cancelCapsuleUnlockReminder` dodana dla symetrii
+  (każdy `schedule*` w tym pliku ma parę `cancel*`), ale świadomie NIEwpięta nigdzie, bo nie
+  ma czego chronić. Jeśli kiedyś powstanie przycisk usuwania niedoczytanego listu, powinien
+  wołać `cancelCapsuleUnlockReminder(id)` tym samym identyfikatorem.
+
+**Testy**: brak nowych — logika sprowadza się do planowania powiadomienia (side-effect na
+`expo-notifications`), ten sam brak dedykowanych testów co inne `schedule*Reminder` w tym
+pliku. `tsc --noEmit`/`jest` czyste (86/86 suite, 1121 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski, trudny do zweryfikowania na żądanie**: najkrótszy
+dostępny termin w UI to 1 miesiąc (chip `[1, 3, 6, 12]`), więc realnego sprawdzenia "przyszło
+powiadomienie w momencie odblokowania" nie da się przyspieszyć bez zmiany daty systemowej
+telefonu. Jeśli akurat masz stary list bliski odblokowaniu — dobra okazja do sprawdzenia.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
