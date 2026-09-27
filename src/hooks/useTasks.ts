@@ -26,6 +26,56 @@ function taskXp(difficulty?: number): number {
 }
 const MILESTONE_XP = 4;
 
+// Wyciągnięte z `toggle()`'s branchu pending→done (2026-09-27, interaktywny widget "Zadania" —
+// user zaakceptował pomysł: "przycisk zrobione bez otwierania appki") — `toggle()` w hooku
+// niżej jest wywoływalny TYLKO z komponentu Reacta (zamyka się na `tasks`/`update` z
+// `useTasks()`), a `widgetToggleDrain.ts` musi oznaczyć zadanie zrobionym z ZWYKŁEGO modułu
+// (na foregroundzie appki, poza jakimkolwiek komponentem). Ta funkcja robi TO SAMO co
+// `toggle()` robiło dla przejścia pending→done, ale czyta/pisze przez `useCalendarStore.
+// getState()` zamiast domknięcia hooka — jedno źródło logiki, wywoływalne z obu miejsc.
+// Idempotentna: zadanie już `done` (albo usunięte) → no-op, bezpieczne na powtórne wywołanie
+// (kolejka widgetu może zawierać ten sam id więcej niż raz, patrz dedup w handleToggle.kt,
+// ale i tak lepiej być odpornym tutaj też).
+export async function markTaskDone(id: string): Promise<void> {
+  const { tasks, updateTask, addTask } = useCalendarStore.getState();
+  const task = tasks.find((t) => t.id === id);
+  if (!task || task.status === 'done') return;
+  haptic.success();
+  const coins = taskCoins(task.difficulty);
+  const pet = usePetStore.getState();
+  pet.addCoins(coins);
+  pet.addXp(taskXp(task.difficulty));
+  toast.success(`Ukończono!  +${coins} 🪙`);
+  updateTask(id, { status: 'done' });
+  try {
+    await tasksService.updateTask(id, { status: 'done' });
+  } catch {
+    haptic.error();
+    toast.error(SAVE_FAIL);
+  }
+  notificationsService.cancelTaskReminder(id).catch(() => {});
+  if (task.recurring && task.recurring !== 'none' && task.deadline) {
+    const newDeadline = nextDeadline(task.deadline, task.recurring);
+    try {
+      const newTask = await tasksService.addTask({
+        title: task.title,
+        description: task.description,
+        deadline: newDeadline,
+        status: 'pending',
+        priority: task.priority,
+        difficulty: task.difficulty,
+        estimatedPomodoros: task.estimatedPomodoros,
+        tags: task.tags ?? [],
+        recurring: task.recurring,
+      });
+      addTask(newTask);
+      if (newTask.deadline) {
+        notificationsService.scheduleTaskDeadlineReminder(newTask.id, newTask.title, newTask.deadline).catch(() => {});
+      }
+    } catch {}
+  }
+}
+
 export function useTasks() {
   const { tasks, isLoading, setTasks, addTask, updateTask, deleteTask, setLoading } =
     useCalendarStore();
@@ -101,33 +151,9 @@ export function useTasks() {
   const toggle = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
-    const next = task.status === 'done' ? 'pending' : 'done';
-    if (next === 'done') {
-      haptic.success();
-      const coins = taskCoins(task.difficulty);
-      const pet = usePetStore.getState();
-      pet.addCoins(coins);
-      pet.addXp(taskXp(task.difficulty));
-      toast.success(`Ukończono!  +${coins} 🪙`);
-    } else haptic.tap();
-    await update(id, { status: next });
-    if (next === 'done') {
-      notificationsService.cancelTaskReminder(id).catch(() => {});
-      if (task.recurring && task.recurring !== 'none' && task.deadline) {
-        const newDeadline = nextDeadline(task.deadline, task.recurring);
-        await create({
-          title: task.title,
-          description: task.description,
-          deadline: newDeadline,
-          status: 'pending',
-          priority: task.priority,
-          difficulty: task.difficulty,
-          estimatedPomodoros: task.estimatedPomodoros,
-          tags: task.tags ?? [],
-          recurring: task.recurring,
-        });
-      }
-    }
+    if (task.status !== 'done') { await markTaskDone(id); return; }
+    haptic.tap();
+    await update(id, { status: 'pending' });
   };
 
   const snooze = async (id: string, until: Date) => {

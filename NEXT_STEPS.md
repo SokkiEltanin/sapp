@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Interaktywny widget "Zadania" — przycisk "zrobione" bez otwierania appki, WYMAGA NOWEGO APK (2026-09-27)
+
+Pełny opis w ARCHITECTURE.md §189. Pierwszy z listy zaakceptowanych pomysłów tej sesji —
+user: "Interaktywny widget - spoko to możemy ogarnąć" → "Dawaj po kolie". Każdy wiersz
+widgetu dostał osobny tappable checkbox (pusty okrąg); tap woła natywny broadcast, który
+optymistycznie usuwa wiersz z widgetu OD RAZU i zakolejkowuje id zadania do nowego pliku
+(`widget_toggle_queue.json`, ten sam plik-jako-most wzorzec co powiadomienia bankowe, tylko w
+drugą stronę); JS (`widgetToggleDrain.ts`) przetwarza kolejkę na najbliższym foregroundzie —
+faktyczny zapis statusu/nagród/Firestore/regeneracji cyklicznej przez nową `markTaskDone()`
+(wyciągnięta z `useTasks.ts`'s `toggle()`, wywoływalna poza komponentem Reacta). Zweryfikowane
+lokalnym `expo prebuild` (wygenerowany Kotlin/manifest/XML ręcznie sprawdzone, plugin
+przechodzi bez wyjątków) — pełny `gradle build` niemożliwy bez Android SDK w tym środowisku,
+prawdziwa kompilacja czeka na `build.yml` po mergu. `tsc`/`jest` czyste (1111 testów, bez
+zmiany — logika zbyt spleciona z natywnym plikiem/store'em do sensownego unit-testu).
+
+**🆕 Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**:
+- Dodaj widget na pulpit (jeśli już jest — usuń i dodaj ponownie po nowym buildzie, żeby
+  załapać nowy layout z checkboxami).
+- Stuknij checkbox przy zadaniu — wiersz ma zniknąć OD RAZU, bez otwierania appki.
+- Otwórz appkę — zadanie ma być odznaczone jako zrobione (Zadania → "Gotowe"), z monetami/XP
+  pupila jak przy zwykłym odznaczeniu.
+- Tap gdziekolwiek INDZIEJ na wierszu (nie na checkboxie) — appka ma się otworzyć jak dawniej.
+- Zadanie cykliczne odhaczone z widgetu — nowe wystąpienie ma się faktycznie utworzyć.
+
 ## 🆕 Agent-audyt optymalizacji + logiki (reszta appki) — 8 fixów (2026-09-26)
 
 Pełny opis w ARCHITECTURE.md §188. User: "Zrób kolejne audyty optymalizacji i logiki" — dwa
@@ -5312,6 +5336,52 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
+- **Koszt/km pojazdu** (user zaakceptował pomysł 2026-09-27) — `vehicles.tsx`/`vehicleMatch.ts`
+  łapie paliwo z tagów wydatków (`FUEL_TAGS`), ale nie ma pola przebiegu, więc nie da się
+  policzyć koszt/km. Dodać opcjonalne pole "przebieg" przy tankowaniu (albo osobny log
+  odczytów licznika), policzyć koszt/km z różnicy przebiegu między tankowaniami × sumy paliwa
+  w tym okresie.
+- **Przypomnienie o kończącym się evencie sezonowym bez udziału** (user zaakceptował pomysł
+  2026-09-27) — `src/utils/seasonalEvents.ts` ma harmonogram (Mikołaj/Wielkanoc/etc.), system
+  powiadomień już obsługuje event-based scheduling (`notificationsService.ts`, patrz
+  `event-${eventId}` cancel wyżej), ale nic nie ostrzega "zostały N dni, jeszcze nie
+  walczyłeś z tym bossem". Deterministyczne: data końca eventu + flaga czy user w ogóle
+  odwiedził/walczył (już musi być jakiś stan per-event w `petStore`/bosses, sprawdzić przy
+  budowie) → jedno zaplanowane powiadomienie X dni przed końcem, jeśli flaga nie jest ustawiona.
+- **Wykrywanie podwyżki subskrypcji** (user zaakceptował pomysł 2026-09-27) —
+  `expenses/subscriptions.tsx` przechowuje jedną statyczną kwotę (`amount`) per subskrypcja,
+  bez historii. Powiadomienia bankowe już automatycznie dopasowują cykliczne płatności do
+  subskrypcji — przy dopasowaniu porównać kwotę z banku vs zapisaną `amount` i jeśli się różni
+  (próg np. >5%), pokazać alert/toast "X zwykle Y zł, teraz naliczyło Z zł" + zaproponować
+  aktualizację zapisanej kwoty. Czysty diff dwóch liczb, żadnej heurystyki/AI.
+- **Udostępnij TEKST prosto do parsera paragonów** (user zaakceptował pomysł 2026-09-27, po
+  dopytaniu: chodzi o skopiowany TEKST, nie zdjęcie) — `scan.tsx`'s pole "wklej tekst"
+  (`pastedText` → `parseReceiptText()`, linia ~330) już istnieje i już to parsuje, brakuje
+  tylko WEJŚCIA: Android Share Sheet intent-filter dla `text/plain` (`ACTION_SEND`) w
+  `app.json`, złapany w `app/_layout.tsx`/deep-linku, który otwiera `scan.tsx` z tym tekstem
+  już wstawionym do `pastedText` (i opcjonalnie auto-odpala parse). Zero zmian w samym
+  parserze. Dedup z powiadomieniem bankowym (żeby nie dublować) — TO JUŻ DZIAŁA, patrz
+  `scan.tsx:628-635` (`existingBank` auto-merge po kwocie+dniu, usuwa goły wpis z banku i
+  zastępuje paragonem, toast "Połączono z płatnością z banku — bez duplikatu"); nic tu nie
+  trzeba dodawać, tylko upewnić się że ta sama logika `existingBank`-match działa też gdy
+  ekran jest otwarty PRZEZ share-intent (nie tylko przez normalne wejście z listy wydatków).
+- **Powiadomienie o odblokowaniu kapsuły czasu** (user zaakceptował pomysł 2026-09-27) —
+  `src/store/timeCapsuleStore.ts` ("listy do przyszłego siebie") ma `unlockAt` (ms), ale nic
+  nie powiadamia gdy list się odblokuje — trzeba pamiętać samemu zajrzeć. Zaplanować lokalne
+  powiadomienie na `unlockAt` przy `add()` (ten sam wzorzec co inne zaplanowane powiadomienia w
+  `notificationsService.ts` — cancel przy `remove()`).
+- **Log sesji Pomodoro** (user zaakceptował pomysł 2026-09-27 — z zastrzeżeniem: jeszcze nie
+  używał Pomodoro w praktyce, sprawdzi najpierw czy się przyda przy studiach, więc NIE
+  zaczynać budowy dopóki nie potwierdzi że faktycznie z tego korzysta) — `pomodoroStore.ts`
+  liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
+  (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
+  tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
+- **Wyszukiwanie bez zapisków/refleksji i długów** (user zaakceptował pomysł 2026-09-27) —
+  `app/search.tsx` przeszukuje `calendarStore` (zadania/eventy), `expensesStore`, `useHabits`,
+  notatki (`getAllNotes`), ale NIE `reflectionsStore.ts` (dziennik impulsów) ani
+  `debtsService`/`debts.tsx`. Dopisać obie do już istniejącego wzorca `matchedX` + sekcja w
+  liście wyników — bez nowej logiki, tylko dwa kolejne źródła. Kapsuła czasu (`timeCapsuleStore`)
+  ŚWIADOMIE pominięta — z definicji nie chcesz widzieć treści przed odblokowaniem.
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.

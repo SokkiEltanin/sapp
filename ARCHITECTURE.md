@@ -11411,6 +11411,79 @@ resztą ekranów/hooków, żeby łatwo wyizolować, w przeciwieństwie do §186'
 
 ---
 
+## 189. Interaktywny widget "Zadania" — przycisk "zrobione" bez otwierania appki (2026-09-27)
+
+User (po serii propozycji ficzerów tej sesji): "1. Interaktywny widget - spoko to możemy
+ogarnąć" → "Dawaj po kolie [kolei]" — pierwszy z zaakceptowanej listy pomysłów (patrz
+NEXT_STEPS.md), zrobiony jako pierwszy bo już był na liście przed resztą.
+
+**Problem**: widget na pulpicie (§183) tylko WYŚWIETLAŁ listę zadań — jedyna interakcja to tap
+gdziekolwiek na widgecie, który otwierał appkę (`sapp://tasks`). Żeby odznaczyć zadanie jako
+zrobione, trzeba było zawsze wejść do appki.
+
+**Rozwiązanie — ten sam plik-jako-most wzorzec co `bank_notifications.json`
+(`withBankNotificationListener.js`), tylko w DRUGĄ stronę na dwóch osobnych plikach jednocześnie**:
+- Każdy wiersz widgetu dostał osobny tappable checkbox (`widget_check{i}`, pusty okrąg —
+  `widget_check_ring.xml` — żeby wizualnie różnił się od wypełnionego `widget_dot_circle`,
+  który koduje kolor RODZAJU zadania, nie akcję). RemoteViews poprawnie routuje dotyk do
+  najbardziej zagnieżdżonego view z własnym `setOnClickPendingIntent` — tap na checkboxie woła
+  broadcast, tap gdziekolwiek indziej w wierszu wciąż otwiera appkę (PendingIntent na
+  `widget_root` bez zmian).
+- `TasksWidgetProvider` (który już JEST BroadcastReceiverem, bo `AppWidgetProvider` dziedziczy
+  po nim) dostał `onReceive()` override łapiący nowy custom action
+  (`<pkg>.WIDGET_TASK_TOGGLE`, jawnie skierowany przez `Intent(context,
+  TasksWidgetProvider::class.java)`, więc `exported=false` nie blokuje dostarczenia — to nasz
+  własny PendingIntent, nie cudzy).
+- `handleToggle()` (natywny, w `companion object`): (1) dopisuje id zadania do NOWEGO pliku
+  `widget_toggle_queue.json` w `filesDir` (dedup — sprawdza czy już tam jest), (2)
+  OPTYMISTYCZNIE usuwa ten wiersz z `widget_tasks.json` i wywołuje `updateAll()` — widget
+  reaguje natychmiast, bez czekania na appkę. requestCode PendingIntenta to `1000+i` (per
+  SLOT, nie per zadanie) + `FLAG_UPDATE_CURRENT`, żeby Android podmieniał tylko `extras`
+  (świeże task_id) na tym samym slocie przy każdym przemalowaniu, zamiast mnożyć osobne
+  PendingIntenty w nieskończoność.
+- JS: nowy `src/services/widgetToggleDrain.ts` — DOKŁADNIE ten sam odczyt→wyczyść→przetwórz
+  wzorzec co `bankNotificationDrain.ts` (czytaj plik, natychmiast wyczyść żeby nie
+  reprocessować, przetwórz każdy wpis, downstream idempotentne jako backstop). Wpięty w
+  `app/_layout.tsx` na cold start + każdy foreground (ten sam `AppState`+`setTimeout`
+  wzorzec co drenaż powiadomień bankowych).
+- **Wyciągnięte z `useTasks.ts`'s `toggle()`**: nowa eksportowana `markTaskDone(id)` — robi
+  DOKŁADNIE to co robił branch pending→done `toggle()`a (nagroda coins/xp, toast, zapis
+  statusu do store'u + Firestore, cancel przypomnienia, regeneracja zadania cyklicznego), ale
+  czyta/pisze przez `useCalendarStore.getState()` zamiast domknięcia hooka — więc jest
+  wywoływalna z ZWYKŁEGO modułu (drenaż), nie tylko z komponentu Reacta. Idempotentna
+  (zadanie już `done`/usunięte → no-op — istotne, bo drenaż mógłby dostać ten sam id
+  dwukrotnie, mimo dedup po natywnej stronie). `toggle()` w hooku teraz tylko deleguje do niej
+  dla przejścia pending→done; przejście done→pending bez zmian (`update()`).
+- Drenaż na koniec woła `syncTasksWidget()` z ŚWIEŻEJ listy zadań ze store'u — koryguje
+  wszystko co się rozjechało (np. zadanie było już zrobione/usunięte w appce zanim tap z
+  widgetu zdążył się przetworzyć), niezależnie od optymistycznego usunięcia po stronie
+  natywnej.
+
+**Weryfikacja bez urządzenia**: `npx expo prebuild --platform android` odpalony LOKALNIE (nie
+tylko statyczny przegląd kodu) — wygenerowany `TasksWidgetProvider.kt`/manifest/layout XML
+ręcznie sprawdzone, plugin przeszedł bez rzucania wyjątków. Brakowało escape'owania
+backticków w kilku nowych komentarzach Kotlina (JS template literal traktował je jak koniec
+stringa) — złapane właśnie przez to prebuildowe uruchomienie, nie samą lekturą kodu. Pełny
+`gradle build` niemożliwy w tym środowisku (brak Android SDK) — prawdziwa weryfikacja
+kompilacji Kotlina i tak czeka na `build.yml` (GitHub Actions) po mergu, jak zawsze przy
+zmianach natywnych.
+
+**Testy**: `tsc --noEmit`/`jest` czyste (86/86 suite, 1111 testów — logika drenażu/toggle zbyt
+spleciona z natywnym plikiem-mostem i store'em, żeby sensownie wyizolować do unit-testu bez
+mockowania całego expo-file-system/RemoteViews).
+
+**Priorytet testu na urządzeniu — wysoki, wymaga nowego APK**:
+- Dodaj widget "Zadania" na pulpit, upewnij się że ma jakieś zadania z terminem.
+- Stuknij pusty okrąg (checkbox) przy jednym z zadań — wiersz ma zniknąć z widgetu OD RAZU
+  (bez otwierania appki).
+- Otwórz appkę — to zadanie ma być oznaczone jako zrobione (Zadania → sekcja "Gotowe"), z
+  naliczonymi monetami/XP pupila jak przy zwykłym odznaczeniu w appce.
+- Sprawdź że tap gdziekolwiek INDZIEJ na wierszu (nie na checkboxie) wciąż otwiera appkę.
+- Zadanie cykliczne odhaczone z widgetu — sprawdź że nowe wystąpienie faktycznie się tworzy
+  (tak jak przy odhaczeniu w appce).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

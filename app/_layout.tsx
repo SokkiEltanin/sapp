@@ -31,6 +31,7 @@ import { flushThrottledStorage } from '@/utils/throttledStorage';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { flushPendingMoodWrites } from '@/services/moodSync';
 import { syncTasksWidget } from '@/services/widgetSync';
+import { drainWidgetToggleQueue } from '@/services/widgetToggleDrain';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
@@ -450,6 +451,20 @@ export default function RootLayout() {
     });
     const cancelInitial = afterInteractions(flush);
     return () => { if (t) clearTimeout(t); unsub(); sub.remove(); cancelInitial(); };
+  }, []);
+
+  // Interaktywny widget "Zadania" (2026-09-27, user zaakceptował pomysł: "przycisk zrobione
+  // bez otwierania appki") — TEN SAM wzorzec co drainBankNotifications() wyżej: natywny kod
+  // (TasksWidgetProvider.kt's handleToggle()) pisze zakolejkowane id do widget_toggle_queue.
+  // json na tap checkboxa; ten efekt odczytuje/przetwarza na cold start + na każdym
+  // foregroundzie (markTaskDone() faktycznie zapisuje status done do store'u/Firestore +
+  // nagrody/powiadomienia — na natywnej stronie był tylko optymistyczny zapis kolejki +
+  // usunięcie wiersza z podglądu). Cichy no-op na iOS/przed nowym buildem APK (plik po prostu
+  // nie istnieje).
+  useEffect(() => {
+    const t = setTimeout(() => { drainWidgetToggleQueue().catch(() => {}); }, 1500);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') drainWidgetToggleQueue().catch(() => {}); });
+    return () => { clearTimeout(t); sub.remove(); };
   }, []);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),
