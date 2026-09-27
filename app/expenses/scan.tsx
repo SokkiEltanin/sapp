@@ -33,6 +33,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { getPayers, addPayer } from '@/utils/payers';
+import { drainSharedReceiptText } from '@/services/shareTextDrain';
 import * as LucideIcons from 'lucide-react-native';
 
 // Give THIS route its own error boundary (expo-router wraps each route separately).
@@ -119,6 +120,19 @@ export default function ScanReceiptModal() {
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useEffect(() => { loadPriceMemory().then(setPriceMemory).catch(() => {}); }, []);
   useEffect(() => { loadNameAliases().then(a => setKnownNames([...new Set(Object.values(a))])).catch(() => {}); }, []);
+  // Udostępnij tekst prosto do parsera (2026-09-27) — natywny `ShareReceiverActivity.kt`
+  // zapisuje udostępniony tekst do pliku i przekierowuje TU przez `sapp://expenses/scan` deep
+  // link. Ten ekran jest ZAWSZE świeżo otwierany przy takim przekierowaniu (nie zamontowany od
+  // dawna), więc odczyt na mount jest wystarczający — bez potrzeby AppState/foreground
+  // listenera jak przy drenażach w `app/_layout.tsx`. `overrideText` w `processText()`
+  // (patrz komentarz tam) — bez tego `setPastedText` + `processText()` w tym samym ticku
+  // czytałoby stare, puste `pastedText` z domknięcia (React batchuje update stanu).
+  useEffect(() => {
+    drainSharedReceiptText().then(text => {
+      if (text) { setPastedText(text); processText(text); }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // When attaching to an existing payment, default the date + payer to it so the
   // receipt lines up with the bank charge (the receipt's own parsed date still wins
   // if it has one — applyParsedReceipt runs later and overrides).
@@ -326,8 +340,13 @@ export default function ScanReceiptModal() {
     setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, tags } : p));
   }, []);
 
-  const processText = () => {
-    const text = pastedText.trim();
+  // `overrideText` (2026-09-27, share-intent — patrz useEffect przy montowaniu niżej) — bez
+  // tego, ustawienie `pastedText` przez `setPastedText()` i wywołanie `processText()` w tym
+  // samym ticku czytałoby STARE (puste) `pastedText` z domknięcia, bo React batchuje update
+  // stanu asynchronicznie. Zwykłe, ręczne wklejenie (przycisk w UI) nie przekazuje argumentu,
+  // więc dalej czyta bieżący `pastedText` — zero zmiany zachowania dla tamtej ścieżki.
+  const processText = (overrideText?: string) => {
+    const text = (overrideText ?? pastedText).trim();
     if (!text) { Alert.alert('Brak tekstu', 'Wklej tekst paragonu'); return; }
     const parsed = parseReceiptText(text);
     if (parsed.products.length === 0) {
@@ -757,7 +776,7 @@ export default function ScanReceiptModal() {
             autoFocus
           />
           <AnimatedButton
-            onPress={processText}
+            onPress={() => processText()}
             label="Analizuj paragon"
             icon={<Check size={18} color={colors.bg.primary} />}
             size="lg"
