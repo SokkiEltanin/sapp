@@ -113,6 +113,13 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
   `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
 
+- **Miesięczne porównanie miesiąc-do-miesiąca** (user zaakceptował 2026-09-28, do zbudowania)
+  — jednorazowy auto-push na koniec miesiąca: "Wrzesień: wydałeś X zł, to Y% mniej/więcej niż
+  w sierpniu" — czysto pochodna z już zebranych `expenses` (agregacja po miesiącu
+  kalendarzowym), zero nowego store'u, zero ręcznego wpisywania. Zaplanować przez istniejący
+  `notificationsService` wzorzec (scheduled notification na 1. dzień miesiąca o ustalonej
+  godzinie, czyta poprzedni miesiąc z `useExpensesStore.getState().expenses`).
+
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
