@@ -12078,6 +12078,50 @@ na czystej funkcji. `tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, bez
 dowolne zadanie (`/tasks/[id]`), usuń je (ikona kosza → potwierdź) → appka powinna wrócić
 do listy zadań BEZ crash-screena "Coś się wykrzaczyło".
 
+## 204. Statystyki apki: czytelne liczby na wykresach + zakładki zamiast infinity scroll (2026-09-28)
+
+User (screenshot ekranu "Statystyki apki"): "ciągle tam nie ma szczegółowych wykresów ja
+mam co odczytać z tego xdd, popraw te zeby tam byly realnie widoczne szczegółowe dane,
+najczęstsze pulpitu i poukładane a nie infinity scroll" — trzy osobne skargi na
+`app/usage-stats.tsx` (§102, rozbudowany §~143 o trendy/przejścia/odbicia).
+
+**1. "Nie ma co odczytać z tego"** — słupki (dzienny wykres 14 dni, godzinowy 24h) miały
+TYLKO wysokość, żadnej liczby przy nich. Fix: dzienny wykres dostał etykietę liczby NAD
+każdym słupkiem (`barWrap` 68→78px wysokości, max wysokość słupka 64→52px żeby zrobić
+miejsce), plus zdanie "Najaktywniejszy dzień: 26 — 56 otwarć" pod wykresem. Godzinowy
+wykres ma 24 CIENKIE słupki — za wąsko na liczbę przy każdym — dostał tylko analogiczne
+zdanie "Najaktywniejsza godzina: 6:00 — 87 otwarć" (`peakDay`/`peakHour` = `reduce` po już
+istniejących `dayBuckets`/`hourBuckets` z `usageStatsAnalysis.ts`, bez nowej logiki
+agregującej).
+
+**2. "Najczęstsze pulpitu"** — zinterpretowane jako "najczęściej używane ekrany appki mają
+być widoczne od razu, nie zakopane w rankingu do przescrollowania" (nie osobna
+instrumentacja per-widget dashboardu — `usageStatsStore` liczy otwarcia PER ROUTE, "Dashboard"
+to i tak jeden wpis routingu, rozbicie NA CZĘŚCI dashboardu wymagałoby nowej instrumentacji
+klik-po-kliku w ~20 miejscach index.tsx, poza zakresem zgłoszenia "popraw ekran"). Nowa
+karta "Najczęściej używane" (🥇🥈🥉 + procent udziału w łącznej liczbie otwarć) ZAWSZE
+widoczna nad zakładkami, niezależnie którą masz otwartą — to bezpośrednia odpowiedź "co
+najczęściej" bez klikania w Ranking. Istniejący pełny "Ranking ekranów" (w zakładce
+Ranking) też dostał % obok surowej liczby (`rankPct` — "336× 20%" zamiast gołego "336×").
+
+**3. "Poukładane a nie infinity scroll"** — 7 kart jedna pod drugą (Otwarcia, Aktywność
+dzienna, O której porze, Ranking, Trendy, Kolejność, Na przemian) wymagało scrollowania
+przez wszystko żeby dotrzeć do czegokolwiek. Nowe 3 zakładki (pill-row, ten sam wzorzec co
+`RECURRING_OPTIONS` w `tasks/[id].tsx`) grupują je tematycznie: **Przegląd** (Otwarcia,
+Aktywność dzienna, O której porze — "kiedy używam"), **Ranking** (Ranking ekranów, Trendy —
+"co używam"), **Wzorce** (Kolejność, Na przemian — "jak się poruszam"). Podsumowanie (3
+kafelki) + "Najczęściej używane" zostają NAD zakładkami, zawsze widoczne — to one odpowiadają
+na pytanie z (2), reszta jest podzielona. `useState<Tab>` lokalny, żadnej nowej trasy/store'u.
+
+**Testy**: brak nowych — czysta reorganizacja UI + czyste `reduce` nad już przetestowanymi
+`dayBuckets`/`hourBuckets` (`usageStatsAnalysis.test.ts` niezmieniony, bo `bucketByDay`/
+`bucketByHour` same się nie zmieniły). `tsc --noEmit`/`jest` czyste (87/87 suite, 1140
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: wejdź w Ustawienia → Statystyki apki → sprawdź
+że karta "Najczęściej używane" i zakładki się wyświetlają, liczby nad słupkami dziennego
+wykresu są czytelne, przełączanie zakładek działa i pokazuje właściwe karty.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

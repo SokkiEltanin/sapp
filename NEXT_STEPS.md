@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Statystyki apki: czytelne liczby + zakładki zamiast infinity scroll (2026-09-28)
+
+User: screenshot ekranu "Statystyki apki" — "nie ma co odczytać z tego, popraw żeby były
+realnie widoczne szczegóły, najczęstsze pulpitu i poukładane a nie infinity scroll". Pełny
+opis w ARCHITECTURE.md §204. Dzienny wykres dostał liczby nad słupkami + zdanie
+"Najaktywniejszy dzień: X — Y otwarć", godzinowy dostał analogiczne zdanie (za wąsko na
+liczby przy 24 cienkich słupkach). Nowa karta "Najczęściej używane" (medale + %) zawsze
+widoczna nad zakładkami. 7 kart pod sobą podzielone na 3 zakładki: Przegląd/Ranking/Wzorce.
+`tsc`/`jest` czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: Ustawienia → Statystyki apki → sprawdź liczby
+nad słupkami, kartę "Najczęściej używane" i przełączanie zakładek.
+
 ## ✅ Fix: crash "Rendered fewer hooks than expected" po usunięciu zadania (2026-09-28)
 
 User: screenshot crash-screena "jak usunąłem zadanie to tak wywaliło". Pełny opis w
