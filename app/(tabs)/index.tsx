@@ -1202,6 +1202,14 @@ export default function DashboardScreen() {
   );
   const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {
+    // Nie synchronizuj na COLD-STARCIE zanim finanse/zadania (najciężej ważone wejścia do
+    // achCtx) się wczytają — `expenses`/`tasks` startują puste (rehydratacja z AsyncStorage/
+    // Firestore jest async), więc `achStates` z PIERWSZEGO renderu potrafi być policzony na
+    // niekompletnych danych. `syncEarned` PISZE TRWALE (raz zapisane w `earned` nigdy się nie
+    // cofa, patrz `applyEarnedFloor`), więc jeden zły zapis na starcie zostaje na zawsze —
+    // user zgłosił dokładnie ten objaw (2026-09-28): "odblokowuje się mimo błędu, a potem nie
+    // sprawdza tego". Ten sam guard co `pixelDayCache`'s efekt wyżej w tym pliku.
+    if (isLoading) return;
     (async () => {
       const firstEver = Object.keys(await getEarned()).length === 0;
       const fresh = await syncEarned(achStates);
@@ -1211,7 +1219,7 @@ export default function DashboardScreen() {
       if (fresh.length && !firstEver && fresh.length <= 3) celebrate(fresh);
       if (fresh.length) setEarnedMap(await getEarned());
     })().catch(() => {});
-  }, [achStates]);
+  }, [achStates, isLoading]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
   // Smart, qualitative notes only — the raw per-metric numbers now live in the

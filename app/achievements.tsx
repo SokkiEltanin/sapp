@@ -60,7 +60,7 @@ export default function Achievements() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { expenses } = useExpensesStore();
+  const { expenses, isLoading: expensesLoading } = useExpensesStore();
   const { entries: moodEntries } = useMoodStore();
   const { events, gcalEvents, tasks } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
@@ -114,12 +114,17 @@ export default function Achievements() {
   const celebrate = useCelebration(st => st.celebrate);
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);
   useEffect(() => {
+    // Ten sam guard co index.tsx (2026-09-28, zgłoszenie usera: odznaka odblokowuje się
+    // mimo niespełnionego warunku, i potem tego nie sprawdza) — `expenses` startuje puste
+    // (persist rehydratacja jest async), a `syncEarned` PISZE TRWALE, więc sync na
+    // niekompletnym pierwszym renderze mógłby na zawsze zablokować fałszywie zdobytą odznakę.
+    if (expensesLoading) return;
     (async () => {
       const firstEver = Object.keys(await getEarned()).length === 0;
       const fresh = await syncEarned(states);
       if (fresh.length) { if (!firstEver && fresh.length <= 3) celebrate(fresh); setEarnedMap(await getEarned()); }
     })().catch(() => {});
-  }, [states]);
+  }, [states, expensesLoading]);
 
   // Podłoga z `earned` (2026-09-18, patrz `applyEarnedFloor` w achievements.ts) — WSZYSTKIE
   // poniższe (siatka, licznik, sortowanie) czytają TO, nie surowe `states`, żeby raz zdobyta
