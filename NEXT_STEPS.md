@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Zawieszony "Zapisuję..." — withTimeout rozszerzony na 8 serwisów (2026-09-28)
+
+User: screenshot ekranu "Nowe zadanie" zawieszonego na "Zapis.../Zapisuję..." (podejrzewał
+słabe łącze — miał rację). Pełny opis w ARCHITECTURE.md §198. To DOKŁADNIE ten sam bug co
+`withTimeout` naprawił raz w mood check-in (2026-09-21) — ale fix wtedy trafił TYLKO do
+`moodService.ts`, reszta serwisów z takim samym `await addDoc/updateDoc/deleteDoc` (bez
+timeoutu, więc wisi bez końca na słabym/braku łącza) nigdy go nie dostała. Rozszerzone na:
+`calendarService.ts` (tasks+events), `expensesService.ts`, `debtsService.ts`,
+`subscriptionsService.ts`, `vehiclesService.ts`, `templatesService.ts`,
+`maintenanceService.ts`, `workService.ts` (Firestore shift-y, nie AsyncStorage ustawienia).
+`tsc`/`jest` czyste (87/87 suite, 1135 testów, bez zmiany).
+
+**Świadomie NIEZROBIONE — `backupService.ts`** (writeBatch/multi-chunk backup/restore) —
+inna, bardziej złożona ścieżka (atomowość batcha) niż proste CRUD reszty; do osobnego
+przemyślenia, nie mechanicznego wrapu.
+
 ## 🆕 Odznaki: fix wyścigu przy synchronizacji na cold-starcie (2026-09-28, NIEPOTWIERDZONE)
 
 Pełny opis w ARCHITECTURE.md §197. User zgłosił "czasami się buguje i odblokowuje mimo

@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy } from 'firebase/firestore';
-import { userCol, userDoc } from './firebase';
+import { userCol, userDoc, withTimeout } from './firebase';
 import { MaintenanceItem } from '@/types';
 
 const COL = 'maintenanceItems';
@@ -17,16 +17,16 @@ export const maintenanceService = {
   async add(it: Omit<MaintenanceItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<MaintenanceItem> {
     const now = new Date().toISOString();
     const data = strip({ ...it, createdAt: now, updatedAt: now });
-    const ref = await addDoc(await userCol(COL), data);
+    const ref = await withTimeout(addDoc(await userCol(COL), data));
     return { ...it, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async update(id: string, updates: Partial<MaintenanceItem>): Promise<void> {
-    await updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await withTimeout(updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() })));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(await userDoc(COL, id));
+    await withTimeout(deleteDoc(await userDoc(COL, id)));
   },
 };
 

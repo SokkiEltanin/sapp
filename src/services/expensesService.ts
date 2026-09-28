@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, setDoc, doc, collection } from 'firebase/firestore';
-import { userCol, userDoc, db } from './firebase';
+import { userCol, userDoc, db, withTimeout } from './firebase';
 import { Expense } from '@/types';
 
 const COL = 'expenses';
@@ -23,7 +23,7 @@ export const expensesService = {
   async add(expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<Expense> {
     const now = new Date().toISOString();
     const data = strip({ ...expense, createdAt: now, updatedAt: now });
-    const docRef = await addDoc(await userCol(COL), data);
+    const docRef = await withTimeout(addDoc(await userCol(COL), data));
     return { ...expense, id: docRef.id, createdAt: now, updatedAt: now };
   },
 
@@ -44,17 +44,17 @@ export const expensesService = {
   // Write with a client-generated id. Call it fire-and-forget (`.catch(() => {})`)
   // right after the local-store update so the UI never blocks on the cloud write.
   async addWithId(id: string, expense: Omit<Expense, 'id'>): Promise<void> {
-    await setDoc(await userDoc(COL, id), strip({ ...(expense as any) }));
+    await withTimeout(setDoc(await userDoc(COL, id), strip({ ...(expense as any) })));
   },
 
   async update(id: string, updates: Partial<Expense>): Promise<void> {
-    await updateDoc(await userDoc(COL, id), strip({
+    await withTimeout(updateDoc(await userDoc(COL, id), strip({
       ...updates,
       updatedAt: new Date().toISOString(),
-    }));
+    })));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(await userDoc(COL, id));
+    await withTimeout(deleteDoc(await userDoc(COL, id)));
   },
 };

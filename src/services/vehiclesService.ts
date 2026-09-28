@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy } from 'firebase/firestore';
-import { userCol, userDoc } from './firebase';
+import { userCol, userDoc, withTimeout } from './firebase';
 import { Vehicle } from '@/types';
 
 const COL = 'vehicles';
@@ -17,15 +17,15 @@ export const vehiclesService = {
   async add(v: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vehicle> {
     const now = new Date().toISOString();
     const data = strip({ ...v, createdAt: now, updatedAt: now });
-    const ref = await addDoc(await userCol(COL), data);
+    const ref = await withTimeout(addDoc(await userCol(COL), data));
     return { ...v, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async update(id: string, updates: Partial<Vehicle>): Promise<void> {
-    await updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await withTimeout(updateDoc(await userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() })));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(await userDoc(COL, id));
+    await withTimeout(deleteDoc(await userDoc(COL, id)));
   },
 };
