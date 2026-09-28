@@ -12,6 +12,7 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'bank-queue',
   'bill-suggest',
   'sub-confirm',
+  'reimbursement-confirm',
   'pet',
   'month-summary',
   'weekly-insights',
@@ -61,6 +62,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'debt-prompt':    'Pytanie o dług (zwrot)',
   'bill-suggest':   'Propozycja stałego rachunku',
   'sub-confirm':    'Potwierdź subskrypcję z banku',
+  'reimbursement-confirm': 'Potwierdź zwrot za zakup',
   'pet':            'Pupil (blob)',
   'month-summary':  'Karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku (do zatwierdzenia)',
@@ -110,6 +112,7 @@ export const SECTION_DESC: Record<string, string> = {
   'debt-prompt':    'Pyta o zwrot pożyczonych pieniędzy',
   'bill-suggest':   'Wykrywa powtarzalny wydatek → stały rachunek',
   'sub-confirm':    'Płatność z banku pasuje do subskrypcji (inna waluta) — potwierdź',
+  'reimbursement-confirm': 'Przychodzący przelew pasuje do wcześniejszego wydatku — połącz jako zwrot',
   'pet':            'Twój pupil — nastrój zależny od tego, jak dbasz o siebie',
   'month-summary':  'Kolekcjonerska karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku do zatwierdzenia',
@@ -155,6 +158,7 @@ export const SECTION_DESC: Record<string, string> = {
 // Category for grouping the "add section" pool in the editor.
 export const SECTION_GROUP: Record<string, string> = {
   'payday-prompt': 'Przypomnienia', 'debt-prompt': 'Przypomnienia', 'bill-suggest': 'Przypomnienia', 'sub-confirm': 'Przypomnienia',
+  'reimbursement-confirm': 'Przypomnienia',
   'bank-queue': 'Przypomnienia', 'maintenance-reminders': 'Przypomnienia', 'budget-warning': 'Przypomnienia',
   'tag-limits': 'Przypomnienia', 'habits-nudge': 'Przypomnienia',
   'tasks-work-row': 'Zadania i nawyki', 'today-tasks': 'Zadania i nawyki', 'month-tasks': 'Zadania i nawyki',
@@ -190,7 +194,7 @@ export const SECTION_GROUP_ORDER = ['Zadania i nawyki', 'Finanse', 'Przegląd i 
 // "brak danych" rows you can drag around was pure confusion. They still render in the
 // dashboard whenever they're relevant; the user just doesn't manage them by hand.
 export const AUTO_SECTIONS = new Set<string>([
-  'payday-prompt', 'debt-prompt', 'bill-suggest', 'sub-confirm', 'bank-queue',
+  'payday-prompt', 'debt-prompt', 'bill-suggest', 'sub-confirm', 'reimbursement-confirm', 'bank-queue',
   'budget-warning', 'habits-nudge',
 ]);
 export const isAutoSection = (id: string) => AUTO_SECTIONS.has(id);

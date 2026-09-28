@@ -67,6 +67,13 @@ export interface Expense {
   fvOverride?: 'fixed' | 'variable' | 'food' | null;
   paymentMethod?: PaymentMethod; // cash vs card; undefined treated as 'card'
   viaScan?: boolean;        // added by pasting+parsing a receipt (expenses/scan.tsx), not typed
+  // Auto-dopasowanie zwrotu (2026-09-28, user zaakceptował pomysł: "dziewczyna oddaje mi
+  // część za zakupy") — suma przychodów (zwrot od sklepu, zwrot od współlokatora/partnera za
+  // wspólny zakup) dopasowanych do TEJ transakcji przez `findReimbursementCandidate`
+  // (reimbursementMatch.ts) i zatwierdzonych na dashboardzie. Czysto informacyjne: NIE zmienia
+  // `amount` ani żadnych sum/statystyk (świadomy, wąski zakres — netowanie wydatków to inna,
+  // znacznie większa zmiana) — tylko pokazuje efektywny koszt na ekranie szczegółów.
+  reimbursedAmount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,6 +177,12 @@ export interface Subscription {
   note?: string;
   durationMonths?: number; // 0 = forever, N = auto-deactivate after N months
   startDate?: string; // ISO date YYYY-MM-DD, set on creation when durationMonths > 0
+  // Wykrywanie martwej subskrypcji (2026-09-28, user zaakceptował pomysł) — liczy kolejne
+  // cykle rozliczeniowe, które minęły BEZ złapanej płatności z banku (patrz
+  // `rollOverdueSubscription` w recurringBills.ts). Zerowane, gdy bankCommit.ts faktycznie
+  // złapie płatność (isConfidentSubMatch) — więc >=2 znaczy "od dwóch okresów nikt tego nie
+  // opłacał", silny sygnał że subskrypcja została odwołana gdzie indziej, a tu wciąż "aktywna".
+  missedCycles?: number;
   createdAt: string;
   updatedAt: string;
 }

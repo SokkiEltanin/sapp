@@ -1,4 +1,4 @@
-import { advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
+import { advanceNextBillingDate, isDurationExpired, rollOverdueSubscription } from '@/utils/recurringBills';
 
 // 2026-09-20, audyt logika/optymalizacja — `setMonth`/`setFullYear` na dzień nieistniejący w
 // docelowym miesiącu PRZEWIJA (day overflow), nie przycina. Subskrypcja z `nextBillingDate`
@@ -48,5 +48,27 @@ describe('isDurationExpired — to samo dla durationMonths liczonych od startDat
     expect(isDurationExpired({ durationMonths: undefined, startDate: '2026-01-31' })).toBe(false);
     expect(isDurationExpired({ durationMonths: 1, startDate: undefined })).toBe(false);
     expect(isDurationExpired({ durationMonths: 0, startDate: '2026-01-31' })).toBe(false);
+  });
+});
+
+describe('rollOverdueSubscription — wykrywanie martwej subskrypcji (2026-09-28)', () => {
+  test('nie zaległa → null, missedCycles się nie zmienia', () => {
+    expect(rollOverdueSubscription({ nextBillingDate: '2026-10-01', billingCycle: 'monthly', missedCycles: 0 }, '2026-09-28')).toBeNull();
+  });
+
+  test('zaległa dwa cykle (od 1.08, dziś 28.09 — 1.08 I 1.09 już minęły) → +2 missedCycles', () => {
+    const r = rollOverdueSubscription({ nextBillingDate: '2026-08-01', billingCycle: 'monthly', missedCycles: 0 }, '2026-09-28');
+    expect(r).toEqual({ nextBillingDate: '2026-10-01', missedCycles: 2 });
+  });
+
+  test('appka nieotwierana kilka miesięcy → wszystkie przegapione cykle liczą się naraz', () => {
+    const r = rollOverdueSubscription({ nextBillingDate: '2026-05-01', billingCycle: 'monthly', missedCycles: 0 }, '2026-09-28');
+    // maj, czerwiec, lipiec, sierpień, wrzesień — 5 minionych cykli
+    expect(r).toEqual({ nextBillingDate: '2026-10-01', missedCycles: 5 });
+  });
+
+  test('kumuluje się z istniejącym missedCycles (nie resetuje)', () => {
+    const r = rollOverdueSubscription({ nextBillingDate: '2026-08-01', billingCycle: 'monthly', missedCycles: 2 }, '2026-09-28');
+    expect(r).toEqual({ nextBillingDate: '2026-10-01', missedCycles: 4 });
   });
 });

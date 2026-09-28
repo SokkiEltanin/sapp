@@ -110,8 +110,9 @@ import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
-import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill, advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
-import { loadSubConfirms, removeSubConfirm, PendingSubConfirm } from '@/utils/subscriptionAuto';
+import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill, advanceNextBillingDate, isDurationExpired, rollOverdueSubscription } from '@/utils/recurringBills';
+import { loadSubConfirms, removeSubConfirm, queueSubConfirm, PendingSubConfirm, DEAD_SUB_THRESHOLD } from '@/utils/subscriptionAuto';
+import { loadReimbursementConfirms, removeReimbursementConfirm, PendingReimbursement } from '@/utils/reimbursementMatch';
 import { fixedVariableMonths, fixedDeviations, topVariableContributors, workFixedProgress, FvBucket } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFloor, EarnedMap } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
@@ -367,6 +368,7 @@ export default function DashboardScreen() {
   const dishesCreated = useMemo(() => foodProducts.filter(isRecipeProduct).length, [foodProducts]);
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
+  const [reimbConfirms, setReimbConfirms] = useState<PendingReimbursement[]>([]);
   const bankPendingCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 0 : 1), 0)); // manual review only
   const bankAutoCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 1 : 0), 0));
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
@@ -635,11 +637,20 @@ export default function DashboardScreen() {
     const todayS = ymd(new Date());
     const due = new Set<string>();
     for (const s of subscriptions) {
-      if (!s.active || isDurationExpired(s) || s.nextBillingDate > todayS) continue;
+      if (!s.active || isDurationExpired(s)) continue;
+      const roll = rollOverdueSubscription(s, todayS);
+      if (!roll) continue;
       due.add(s.id);
-      let next = s.nextBillingDate;
-      do { next = advanceNextBillingDate(next, s.billingCycle); } while (next <= todayS);
-      updateSub(s.id, { nextBillingDate: next }).catch(() => {});
+      updateSub(s.id, { nextBillingDate: roll.nextBillingDate, missedCycles: roll.missedCycles }).catch(() => {});
+      // Martwa subskrypcja (2026-09-28, user zaakceptował pomysł) — kilka okresów pod rząd
+      // bez ŻADNEJ złapanej płatności; queueSubConfirm dedupuje per subId+dzień, więc to
+      // bezpieczne wołać co mount dashboardu.
+      if (roll.missedCycles >= DEAD_SUB_THRESHOLD) {
+        queueSubConfirm({
+          subId: s.id, subName: s.name, merchant: s.name, amount: s.amount, currency: s.currency,
+          date: todayS, kind: 'possiblyDead', missedCycles: roll.missedCycles,
+        }).then(() => loadSubConfirms().then(setSubConfirms)).catch(() => {});
+      }
     }
     // Backfill: subscriptions that existed before the renewal heads-up feature won't have
     // it scheduled until their next add/update — arm it once here too (idempotent, same
@@ -679,6 +690,45 @@ export default function DashboardScreen() {
     try { await updateSub(c.subId, { amount: c.amount }); } catch {}
     toast.success(`Zaktualizowano cenę „${c.subName}"`);
   }, [updateSub]);
+  // Martwa subskrypcja (2026-09-28) — user potwierdza że NADAL korzysta, więc licznik
+  // wraca do zera (inaczej kolejny mount dashboardu zapytałby znowu od razu).
+  const keepUsingSub = useCallback(async (c: PendingSubConfirm) => {
+    haptic.tap();
+    setSubConfirms(list => list.filter(x => x.id !== c.id));
+    removeSubConfirm(c.id).catch(() => {});
+    try { await updateSub(c.subId, { missedCycles: 0 }); } catch {}
+  }, [updateSub]);
+  const deactivateDeadSub = useCallback(async (c: PendingSubConfirm) => {
+    haptic.medium();
+    setSubConfirms(list => list.filter(x => x.id !== c.id));
+    removeSubConfirm(c.id).catch(() => {});
+    try { await updateSub(c.subId, { active: false }); } catch {}
+    toast.success(`Wyłączono „${c.subName}"`);
+  }, [updateSub]);
+
+  // Auto-dopasowanie zwrotu (2026-09-28) — user potwierdza, że przychodzący przelew to
+  // zwrot za wcześniejszy wydatek: informacyjny `reimbursedAmount` na TYM wydatku, kwoty/
+  // statystyki się nie zmieniają (przelew jako przychód już jest zaksięgowany, zostaje).
+  const confirmReimbursement = useCallback(async (c: PendingReimbursement) => {
+    haptic.success();
+    setReimbConfirms(list => list.filter(x => x.id !== c.id));
+    removeReimbursementConfirm(c.id).catch(() => {});
+    try {
+      // Handler zapisujący do expenses — żywy store, NIE snapshot `expenses` (patrz
+      // CLAUDE.md §3): snapshot mógłby być spóźniony względem tego co realnie jest w bazie.
+      const st = useExpensesStore.getState();
+      const current = st.expenses.find(e => e.id === c.expenseId);
+      const next = (current?.reimbursedAmount ?? 0) + c.incomingAmount;
+      st.updateExpense(c.expenseId, { reimbursedAmount: next });
+      await expensesService.update(c.expenseId, { reimbursedAmount: next });
+      toast.success('Połączono ze zwrotem');
+    } catch {}
+  }, []);
+  const dismissReimbursement = useCallback((c: PendingReimbursement) => {
+    haptic.tap();
+    setReimbConfirms(list => list.filter(x => x.id !== c.id));
+    removeReimbursementConfirm(c.id).catch(() => {});
+  }, []);
 
   // First open, due, not-yet-dismissed debt → the dashboard asks about it.
   const dueDebt = useMemo(() => {
@@ -881,6 +931,7 @@ export default function DashboardScreen() {
     getTagBudgetRules().then(setTagRules).catch(() => {});
     getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
     loadSubConfirms().then(setSubConfirms).catch(() => {});
+    loadReimbursementConfirms().then(setReimbConfirms).catch(() => {});
     if (editRequested) { setEditingDash(true); clearEditRequest(); }
   }, [loadPomSessions, editRequested]));
 
@@ -2590,25 +2641,60 @@ export default function DashboardScreen() {
               nodes['sub-confirm'] = subConfirms.length > 0 && (() => {
                 const c = subConfirms[0];
                 const isPriceChange = c.kind === 'priceChange';
+                const isPossiblyDead = c.kind === 'possiblyDead';
                 return (
                   <View style={[s.card, { backgroundColor: cardBgDark }]}>
                     <View style={s.cardHeader}>
                       <Wallet size={13} color={colors.accent.amber} />
-                      <Text style={s.cardTitle}>{isPriceChange ? 'Zmieniła się cena subskrypcji?' : 'Płatność za subskrypcję?'}</Text>
+                      <Text style={s.cardTitle}>
+                        {isPossiblyDead ? 'Czy jeszcze z tego korzystasz?' : isPriceChange ? 'Zmieniła się cena subskrypcji?' : 'Płatność za subskrypcję?'}
+                      </Text>
                     </View>
                     <Text style={[s.factText, { marginTop: spacing[1] }]}>
-                      {isPriceChange ? (
+                      {isPossiblyDead ? (
+                        <>Nie widziałem żadnej płatności za <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> od {c.missedCycles} {plPlural(c.missedCycles ?? 0, 'okresu', 'okresów', 'okresów')} rozliczeniowych — nadal aktywna?</>
+                      ) : isPriceChange ? (
                         <>Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> za <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> — dotąd płaciłeś {c.oldAmount?.toFixed(2)} {c.currency}. Zaktualizować zapisaną kwotę?</>
                       ) : (
                         <>Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> w „{c.merchant}". Wygląda na Twoją subskrypcję <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> (kwota w innej walucie zależy od kursu). Oznaczyć jako opłaconą za ten okres?</>
                       )}
                     </Text>
                     <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
-                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => isPriceChange ? acceptSubPriceChange(c) : confirmSub(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>{isPriceChange ? 'Zaktualizuj' : 'Tak, opłacona'}</Text>
+                      <TouchableOpacity
+                        style={[s.paydayBtn, { backgroundColor: isPossiblyDead ? colors.accent.red : colors.accent.green }]}
+                        activeOpacity={0.85}
+                        onPress={() => isPossiblyDead ? deactivateDeadSub(c) : isPriceChange ? acceptSubPriceChange(c) : confirmSub(c)}
+                      >
+                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>{isPossiblyDead ? 'Wyłącz' : isPriceChange ? 'Zaktualizuj' : 'Tak, opłacona'}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => dismissSub(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>{isPriceChange ? 'Zignoruj' : 'Nie'}</Text>
+                      <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => isPossiblyDead ? keepUsingSub(c) : dismissSub(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>{isPossiblyDead ? 'Nadal korzystam' : isPriceChange ? 'Zignoruj' : 'Nie'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })();
+
+              // Auto-dopasowanie zwrotu (2026-09-28, user zaakceptował pomysł) — przychodzący
+              // przelew, który wygląda na zwrot/dopłatę za wcześniejszy wydatek (np. partnerka
+              // oddaje część za wspólne zakupy).
+              nodes['reimbursement-confirm'] = reimbConfirms.length > 0 && (() => {
+                const c = reimbConfirms[0];
+                return (
+                  <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                    <View style={s.cardHeader}>
+                      <Wallet size={13} color={colors.accent.green} />
+                      <Text style={s.cardTitle}>To zwrot za zakup?</Text>
+                    </View>
+                    <Text style={[s.factText, { marginTop: spacing[1] }]}>
+                      Otrzymałeś <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.incomingAmount.toFixed(2)} {c.currency}</Text> od „{c.sender}" — to zwrot za <Text style={{ fontWeight: '800', color: colors.text.primary }}>„{c.expenseNote}"</Text> ({c.expenseAmount.toFixed(2)} zł, {c.expenseDate.split('-').reverse().join('.')})?
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => confirmReimbursement(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak, połącz</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => dismissReimbursement(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie, zwykły przychód</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

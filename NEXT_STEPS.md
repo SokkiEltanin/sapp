@@ -3,6 +3,54 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Wykrywanie martwej subskrypcji + auto-dopasowanie zwrotu (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §196. Po odrzuceniu kilku pomysłów wymagających manualnego
+wpisywania (user: "nie będzie mi się chciało manualnie wpisywać... jak Co zjadłem") —
+przestawienie na w 100% automatyczne pomysły, oba naraz zaakceptowane:
+- Subskrypcja z terminem w przeszłości, bez ŻADNEJ złapanej płatności przez 2+ okresy →
+  dashboard pyta "czy jeszcze z tego korzystasz?" (nowy `Subscription.missedCycles`,
+  `rollOverdueSubscription()` w recurringBills.ts, zerowane w bankCommit.ts po realnej
+  płatności).
+- Przychodzący przelew mniejszy niż niedawny wydatek → dashboard proponuje połączenie jako
+  zwrot ("to zwrot za zakup?"), obsługuje user's dokładny przykład (partnerka oddaje 50 zł
+  za zakupy za 116,69 zł — częściowy zwrot). Nowy `Expense.reimbursedAmount` — czysto
+  informacyjne, nie zmienia sum/statystyk.
+`tsc`/`jest` czyste (87/87 suite, 1135 testów, +14 nowych).
+
+**🆕 Priorytet testu na urządzeniu — średni, wymaga realnych danych z banku**: (1) poczekaj
+aż jakaś subskrypcja przegapi 2+ okresy bez płatności (albo tymczasowo cofnij
+`nextBillingDate` testowo) → sprawdź kartę "czy jeszcze z tego korzystasz?"; (2) poproś kogoś
+o przelew mniejszy niż Twój niedawny wydatek → sprawdź kartę "to zwrot za zakup?" i że po
+zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt: Y zł".
+
+## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
+
+- **Powiadomienie push o terminie długu** (user zaakceptował pomysł 2026-09-27) —
+  `debts.tsx`'s pole "Kiedy przypomnieć / pytać" (`askDate`) dziś TYLKO pokazuje kartę na
+  dashboardzie (`index.tsx` linia ~686, gdy `askDate <= today`) — działa jedynie jeśli
+  akurat otworzysz appkę w tym dniu. Dodać `scheduleDebtReminder`/`cancelDebtReminder` w
+  `notificationsService.ts` (ten sam wzorzec co `scheduleCapsuleUnlockReminder`/
+  `scheduleEventReminder`), wywoływane z `debts.tsx` przy dodaniu/rozliczeniu/usunięciu długu.
+- **Łączny koszt subskrypcji "od zawsze"** (user zaakceptował pomysł 2026-09-27) —
+  `subscriptions.tsx` pokazuje tylko koszt miesięczny/roczny, nie ile już realnie wydano na
+  daną usługę. Dorzucić derived stat w `useSubscriptions.ts` (zero nowego store'u): zsumować
+  WSZYSTKIE historyczne wydatki dopasowane do subskrypcji po nazwie, tym samym fuzzy-matchem
+  co już istniejący `matchSubscriptionForPayment` w `subscriptionAuto.ts` (tam dopasowuje
+  tylko NAJNOWSZĄ płatność — tu potrzebne dopasowanie WSZYSTKICH, nie tylko jednej). Wyświetlić
+  w `SubItem` (subscriptions.tsx), np. "od {startDate}: X zł zapłacone".
+- **Przypomnienie do notatki** (user zaakceptował pomysł 2026-09-27) — `Note` (notesStorage.ts)
+  ma tagi/foldery/pin/link do licznika, ale brak pola z datą przypomnienia (jak w Google Keep).
+  Dodać opcjonalne `reminderAt?: string` w `Note`, pole w edytorze (reuse `DatePickerField`/
+  `TimePickerField`), nowy `scheduleNoteReminder`/`cancelNoteReminder` w
+  `notificationsService.ts` (ten sam wzorzec co kapsuła czasu/dług) — tap otwiera notatkę.
+- **Blokada appki biometrią** (user zaakceptował pomysł 2026-09-27, ALE NISKI PRIORYTET —
+  "na razie nie róbmy i tak nikt nie ma telefonu oprócz mnie", nie zaczynać budowy bez
+  wyraźnego sygnału że to teraz potrzebne) — appka trzyma dane finansowe, długi, prywatny
+  dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
+  jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
+  `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
+
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
@@ -5418,12 +5466,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Log sesji Pomodoro** (user zaakceptował pomysł 2026-09-27 — z zastrzeżeniem: jeszcze nie
-  używał Pomodoro w praktyce, sprawdzi najpierw czy się przyda przy studiach, więc NIE
-  zaczynać budowy dopóki nie potwierdzi że faktycznie z tego korzysta) — `pomodoroStore.ts`
-  liczy tylko żywy odliczany czas, nic się nie zapisuje po zakończeniu sesji. Dodać prosty log
-  (sesja: task.id/title, start, długość, zakończona/przerwana) → widok "X sesji, Y minut w tym
-  tygodniu", opcjonalnie per zadanie (link `startPomodoro(task.id, ...)` już istnieje).
 - **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
   appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
   (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.

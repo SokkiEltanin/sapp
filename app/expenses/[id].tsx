@@ -832,6 +832,15 @@ export default function ExpenseDetailScreen() {
               </Text>
             )}
 
+            {/* Auto-dopasowany zwrot (2026-09-28, user zaakceptował pomysł) — czysto
+                informacyjne, nie zmienia `amount`/statystyk, patrz komentarz przy polu w
+                types/index.ts. */}
+            {!!expense.reimbursedAmount && (
+              <Text style={[s.currencyLabel, { color: colors.accent.green, marginTop: -4 }]}>
+                Zwrócono: {expense.reimbursedAmount.toFixed(2)} zł · efektywny koszt: {(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
+              </Text>
+            )}
+
             {/* Date chip */}
             <View style={s.heroMeta}>
               <View style={[s.dateBadge, { borderColor: heroAccent + '30' }]}>
