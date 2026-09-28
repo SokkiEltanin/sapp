@@ -503,7 +503,7 @@ export default function RootLayout() {
       lastHandledNotifKey = key;
 
       const data = (response.notification.request.content.data ?? {}) as Record<string, any>;
-      const { screen, taskId, eventId } = data;
+      const { screen, taskId, eventId, noteId } = data;
 
       if (screen === 'mood') {
         suppressAutoMoodUntil = Date.now() + 8000; // the mood screen opens the check-in itself
@@ -520,6 +520,8 @@ export default function RootLayout() {
         router.navigate('/expenses/subscriptions' as any);
       } else if (screen === 'debts') {
         router.navigate('/debts' as any);      // termin długu reminder
+      } else if (screen === 'note') {
+        router.navigate({ pathname: '/notes', params: noteId ? { noteId } : {} } as any); // przypomnienie o notatce
       } else if (screen === 'vehicles') {
         router.navigate('/vehicles' as any);   // "Serwis / wymiana" reminder
       } else if (screen === 'finances') {
