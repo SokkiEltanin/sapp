@@ -1,6 +1,6 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { userCol, userDoc } from './firebase';
+import { userCol, userDoc, withTimeout } from './firebase';
 import { WorkShift, WorkSettings, DEFAULT_WORK_SETTINGS, Employer } from '@/types';
 
 const SHIFTS_COL     = 'workShifts';
@@ -40,16 +40,16 @@ export const workService = {
 
   async addShift(shift: Omit<WorkShift, 'id' | 'createdAt'>): Promise<WorkShift> {
     const now = new Date().toISOString();
-    const ref = await addDoc(await userCol(SHIFTS_COL), strip({ ...shift, createdAt: now }));
+    const ref = await withTimeout(addDoc(await userCol(SHIFTS_COL), strip({ ...shift, createdAt: now })));
     return { ...shift, id: ref.id, createdAt: now };
   },
 
   async updateShift(id: string, updates: Partial<WorkShift>): Promise<void> {
-    await updateDoc(await userDoc(SHIFTS_COL, id), strip(updates));
+    await withTimeout(updateDoc(await userDoc(SHIFTS_COL, id), strip(updates)));
   },
 
   async deleteShift(id: string): Promise<void> {
-    await deleteDoc(await userDoc(SHIFTS_COL, id));
+    await withTimeout(deleteDoc(await userDoc(SHIFTS_COL, id)));
   },
 
   // ── Settings (AsyncStorage) ──────────────────────────────────────────────────

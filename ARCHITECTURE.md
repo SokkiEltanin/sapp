@@ -11871,6 +11871,37 @@ wyjaśnienie jest trafne.
 przetestowania w izolacji — `evaluateAchievements`/`syncEarned` same w sobie niezmienione).
 `tsc --noEmit`/`jest` czyste (87/87 suite, 1135 testów, bez zmiany).
 
+## 198. Zawieszony zapis (`Zapisuję...` na zawsze) — `withTimeout` rozszerzony na 8 serwisów (2026-09-28)
+
+User przysłał screenshot: ekran "Nowe zadanie" zawieszony na "Zapis.../Zapisuję..." bez
+błędu, domyślił się że to może słabe łącze. Dokładnie ten sam objaw, co `firebase.ts`'s
+`withTimeout` już RAZ naprawił (2026-09-21, screenshot z mood check-in — patrz komentarz
+przy `withTimeout` w `firebase.ts`): bez `initializeFirestore({ localCache: ... })`,
+`addDoc`/`updateDoc`/`deleteDoc` NIE odrzucają na złym łączu — Promise po prostu wisi, ile
+by nie trzeba, bez błędu i bez timeoutu. `withTimeout()` (10s, potem zwykły `Error` do
+istniejącego `try/catch/finally`) był zastosowany WTEDY tylko do `moodService.ts` — reszta
+serwisów z identycznym `await addDoc/updateDoc/deleteDoc` nigdy go nie dostała, więc bug
+został naprawiony w JEDNYM miejscu, a czekał w kolejnych ośmiu (dokładnie ten dead-end,
+przed którym ostrzega CLAUDE.md zasada 7).
+
+**Fix — `withTimeout()` dopisany do KAŻDEGO `addDoc`/`updateDoc`/`deleteDoc`/`setDoc` w**:
+`calendarService.ts` (tasks + events — to złapał user), `expensesService.ts` (`add`/
+`addWithId`/`update`/`remove` — `addWithId` już było wołane fire-and-forget z retry-kolejki
+`expenseSync.ts`, teraz i TA ścieżka ma górny limit czasu zamiast wisieć bez końca przy
+próbie retry), `debtsService.ts`, `subscriptionsService.ts`, `vehiclesService.ts`,
+`templatesService.ts`, `maintenanceService.ts`, `workService.ts` (tylko `addShift`/
+`updateShift`/`deleteShift` — Firestore; `getSettings`/`saveSettings`/pracodawcy zostają
+nietknięte, to czyste AsyncStorage, nie może zawiesić się na sieci).
+
+**Świadomie POMINIĘTE w tym PR**: `backupService.ts` (`writeBatch`/multi-chunk
+restore/backup) — inna, bardziej złożona ścieżka (atomowość batcha, wielo-dokumentowy
+restore) niż proste CRUD reszty serwisów; wymaga osobnego przemyślenia, nie mechanicznego
+wrapu, żeby nie zepsuć atomowości. Zostaje jako znany, zapisany gap (NEXT_STEPS.md).
+
+**Testy**: brak nowych — czysty mechaniczny wrap istniejących `await` w `withTimeout()`
+(sama funkcja, jej test i zachowanie niezmienione). `tsc --noEmit`/`jest` czyste (87/87
+suite, 1135 testów, bez zmiany).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

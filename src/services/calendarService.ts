@@ -1,5 +1,5 @@
 import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy } from 'firebase/firestore';
-import { userCol, userDoc } from './firebase';
+import { userCol, userDoc, withTimeout } from './firebase';
 import { CalendarEvent, Task } from '@/types';
 
 const EVENTS_COL = 'events';
@@ -17,16 +17,16 @@ export const calendarService = {
 
   async addEvent(event: Omit<CalendarEvent, 'id' | 'createdAt'>): Promise<CalendarEvent> {
     const now = new Date().toISOString();
-    const ref = await addDoc(await userCol(EVENTS_COL), strip({ ...event, createdAt: now }));
+    const ref = await withTimeout(addDoc(await userCol(EVENTS_COL), strip({ ...event, createdAt: now })));
     return { ...event, id: ref.id, createdAt: now };
   },
 
   async updateEvent(id: string, updates: Partial<CalendarEvent>): Promise<void> {
-    await updateDoc(await userDoc(EVENTS_COL, id), updates);
+    await withTimeout(updateDoc(await userDoc(EVENTS_COL, id), updates));
   },
 
   async deleteEvent(id: string): Promise<void> {
-    await deleteDoc(await userDoc(EVENTS_COL, id));
+    await withTimeout(deleteDoc(await userDoc(EVENTS_COL, id)));
   },
 };
 
@@ -39,15 +39,15 @@ export const tasksService = {
 
   async addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
     const now = new Date().toISOString();
-    const ref = await addDoc(await userCol(TASKS_COL), strip({ ...task, createdAt: now, updatedAt: now }));
+    const ref = await withTimeout(addDoc(await userCol(TASKS_COL), strip({ ...task, createdAt: now, updatedAt: now })));
     return { ...task, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async updateTask(id: string, updates: Partial<Task>): Promise<void> {
-    await updateDoc(await userDoc(TASKS_COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await withTimeout(updateDoc(await userDoc(TASKS_COL, id), strip({ ...updates, updatedAt: new Date().toISOString() })));
   },
 
   async deleteTask(id: string): Promise<void> {
-    await deleteDoc(await userDoc(TASKS_COL, id));
+    await withTimeout(deleteDoc(await userDoc(TASKS_COL, id)));
   },
 };
