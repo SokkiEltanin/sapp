@@ -11902,6 +11902,36 @@ wrapu, żeby nie zepsuć atomowości. Zostaje jako znany, zapisany gap (NEXT_STE
 (sama funkcja, jej test i zachowanie niezmienione). `tsc --noEmit`/`jest` czyste (87/87
 suite, 1135 testów, bez zmiany).
 
+## 199. Powiadomienie push o terminie długu (2026-09-28)
+
+User (pierwszy z listy zaakceptowanych pomysłów tej rundy): `debts.tsx`'s pole "Kiedy
+przypomnieć / pytać" (`askDate`) dotąd TYLKO pokazywało kartę na dashboardzie
+(`index.tsx`'s `dueDebt`, gdy `askDate <= today`) — działało jedynie jeśli user akurat
+otworzył appkę w tym konkretnym dniu.
+
+**Rozwiązanie — ten sam schedule/cancel-po-identyfikatorze wzorzec co
+`scheduleCapsuleUnlockReminder`** (bez `notif_enabled` gate — bezpośrednia konsekwencja
+wyboru daty w formularzu dodawania długu, nie pasywny codzienny nag):
+- `notificationsService.ts` — nowa `scheduleDebtReminder(id, person, amount, iOwe,
+  askDateIso)` + `cancelDebtReminder(id)`. Identyfikator `debt-${id}`, fire o 10:00 w dniu
+  `askDate`.
+- `debts.tsx` — `saveDebt` planuje przypomnienie zaraz po dodaniu (`debtsService.add`
+  zwraca utworzony `Debt`, więc mamy `id` bez dodatkowego zapytania); `settle` i usunięcie
+  (`ConfirmDialog.onConfirm`) obie anulują — nieaktualny dług nie ma po co przypominać.
+- `app/_layout.tsx`'s tap-router — dopisana brakująca gałąź `screen === 'debts'` →
+  `/debts` (ten sam wzorzec co `screen === 'vehicles'` tuż obok) — bez tego tap w
+  powiadomienie spadałby na domyślny fallback (dashboard), nie na sam ekran długów.
+
+**Testy**: brak nowych — `notificationsService.ts` nie ma dedykowanych testów jednostkowych
+(owija `expo-notifications`, ten sam brak co reszta `schedule*`/`cancel*` w tym pliku —
+weryfikacja na urządzeniu). `tsc --noEmit`/`jest` czyste (87/87 suite, 1135 testów, bez
+zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dodaj dług z datą przypomnienia w bliskiej
+przyszłości (np. za 2 minuty, edytując system czasu albo czekając) → sprawdź że
+powiadomienie faktycznie przychodzi o 10:00 w tym dniu, tap otwiera `/debts`; rozlicz/usuń
+dług PRZED terminem → sprawdź że powiadomienie się NIE pojawia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

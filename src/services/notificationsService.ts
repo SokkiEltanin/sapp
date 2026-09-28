@@ -752,6 +752,37 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`capsule-${id}`).catch(() => {});
   },
 
+  // Dług (2026-09-28, user zaakceptował pomysł: powiadomienie push o terminie długu) —
+  // `askDate` dotąd tylko pokazywał kartę na dashboardzie, widoczną WYŁĄCZNIE gdy akurat
+  // otworzysz appkę tego dnia. Direct consequence of a user action (wybór daty w formularzu
+  // dodawania długu), więc bez `notif_enabled` gate — ta sama logika co
+  // scheduleCapsuleUnlockReminder wyżej. Fire o 10:00 w dniu `askDate` (ten sam czas co
+  // `refreshMaintenanceReminder`). Wołane z `debts.tsx` przy dodaniu; `cancelDebtReminder`
+  // przy rozliczeniu/usunięciu, żeby nie przypominać o czymś co już nieaktualne.
+  async scheduleDebtReminder(id: string, person: string, amount: number, iOwe: boolean, askDateIso: string): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(`debt-${id}`).catch(() => {});
+      const [year, month, day] = askDateIso.split('-').map(Number);
+      const fire = new Date(year, month - 1, day, 10, 0, 0);
+      if (fire <= new Date()) return;
+      await Notifications.scheduleNotificationAsync({
+        identifier: `debt-${id}`,
+        content: {
+          title: iOwe ? 'Pamiętaj oddać' : 'Sprawdź dług',
+          body: iOwe
+            ? `Miałeś oddać ${person} ${amount.toFixed(2)} zł`
+            : `${person} miał(a) oddać Ci ${amount.toFixed(2)} zł — sprawdź`,
+          data: { screen: 'debts' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+      });
+    } catch {}
+  },
+
+  async cancelDebtReminder(id: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`debt-${id}`).catch(() => {});
+  },
+
   // Pupil mission (petStore.startMission, 2026-08-15) — direct consequence of a user action
   // (sending the pet off), not a passive daily nag, so no `notif_enabled` gate — same reasoning
   // as scheduleSnoozeReminder above. Fires once the mission's real-time duration has elapsed,

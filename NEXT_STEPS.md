@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Powiadomienie push o terminie długu (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §199. Pierwszy z 3 zaakceptowanych, jeszcze niezbudowanych
+pomysłów tej sesji. `askDate` dotąd tylko pokazywał kartę na dashboardzie, widoczną WYŁĄCZNIE
+gdy akurat otworzysz appkę w tym dniu — teraz `scheduleDebtReminder`/`cancelDebtReminder`
+(ten sam wzorzec co kapsuła czasu) planuje realne powiadomienie push o 10:00 w dniu
+przypomnienia, anulowane przy rozliczeniu/usunięciu długu. Dopisana też brakująca gałąź
+`screen === 'debts'` w tap-routerze (`_layout.tsx`) — bez niej tap w powiadomienie lądowałby
+na dashboardzie zamiast na `/debts`. `tsc`/`jest` czyste (87/87 suite, 1135 testów, bez
+zmiany — `notificationsService.ts` bez dedykowanych testów jednostkowych, jak reszta
+`schedule*`/`cancel*` w tym pliku).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dodaj dług z bliską datą przypomnienia →
+sprawdź że powiadomienie przychodzi o 10:00, tap otwiera `/debts`; rozlicz/usuń dług przed
+terminem → sprawdź że powiadomienie się NIE pojawia.
+
 ## ✅ Zawieszony "Zapisuję..." — withTimeout rozszerzony na 8 serwisów (2026-09-28)
 
 User: screenshot ekranu "Nowe zadanie" zawieszonego na "Zapis.../Zapisuję..." (podejrzewał
@@ -58,12 +74,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
 
 ## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
 
-- **Powiadomienie push o terminie długu** (user zaakceptował pomysł 2026-09-27) —
-  `debts.tsx`'s pole "Kiedy przypomnieć / pytać" (`askDate`) dziś TYLKO pokazuje kartę na
-  dashboardzie (`index.tsx` linia ~686, gdy `askDate <= today`) — działa jedynie jeśli
-  akurat otworzysz appkę w tym dniu. Dodać `scheduleDebtReminder`/`cancelDebtReminder` w
-  `notificationsService.ts` (ten sam wzorzec co `scheduleCapsuleUnlockReminder`/
-  `scheduleEventReminder`), wywoływane z `debts.tsx` przy dodaniu/rozliczeniu/usunięciu długu.
 - **Łączny koszt subskrypcji "od zawsze"** (user zaakceptował pomysł 2026-09-27) —
   `subscriptions.tsx` pokazuje tylko koszt miesięczny/roczny, nie ile już realnie wydano na
   daną usługę. Dorzucić derived stat w `useSubscriptions.ts` (zero nowego store'u): zsumować
