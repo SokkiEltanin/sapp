@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: crash "Rendered fewer hooks than expected" po usunięciu zadania (2026-09-28)
+
+User: screenshot crash-screena "jak usunąłem zadanie to tak wywaliło". Pełny opis w
+ARCHITECTURE.md §203. Realny, potwierdzony bug (nie defensywne zgadywanie jak przy
+odznakach §197) — `useState` dla `confirmDelete` w `app/tasks/[id].tsx` był zadeklarowany
+PO warunkowym `if (!task) return`, więc gdy `task` znikał ze store'u po usunięciu (przed
+`router.back()`), kolejny render pomijał ten hook → "Rendered fewer hooks than expected".
+Fix: przeniesiony hook przed early return. `tsc`/`jest` czyste (87/87 suite, 1140 testów,
+bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: usuń dowolne zadanie, appka powinna wrócić do
+listy bez crasha.
+
 ## 🆕 Miesięczne porównanie wydatków miesiąc-do-miesiąca (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §202. Pierwszy zbudowany z NOWEJ (drugiej) rundy

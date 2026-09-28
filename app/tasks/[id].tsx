@@ -174,6 +174,7 @@ export default function TaskDetailScreen() {
   const [reminderMsg, setReminderMsg]   = useState(task?.reminderMessage ?? '');
   const [moodModal, setMoodModal]       = useState(false);
   const [moodTaskTitle, setMoodTaskTitle] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!task) {
     return (
@@ -240,7 +241,6 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const handleDelete = () => { haptic.tap(); setConfirmDelete(true); };
   const doDelete = async () => {
     haptic.medium();
