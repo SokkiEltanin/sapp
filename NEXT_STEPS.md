@@ -125,6 +125,14 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   czysto historyczna analiza z `expenses` po kategorii i miesiącu, porównanie z tym samym
   miesiącem rok wcześniej, zero nowego store'u, zero ręcznego wpisywania.
 
+- **Grupowanie powiadomień w jeden digest zamiast osobnego spamu** (user zaakceptował
+  2026-09-28, do zbudowania) — gdy kilka zaplanowanych powiadomień (przypomnienie długu +
+  subskrypcji + nawyku itp.) trafia na ten sam dzień/zbliżoną godzinę, jedno zbiorcze
+  powiadomienie zamiast trzech osobnych z rzędu. Wymaga przejrzenia WSZYSTKICH
+  `schedule*Reminder` w `notificationsService.ts` (kapsuła, dług, subskrypcja, nawyk, notatka)
+  i dodania warstwy grupującej przy planowaniu/wyzwalaniu — najbardziej złożony z tej rundy
+  pomysłów, nie mechaniczny wrap.
+
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
