@@ -1693,11 +1693,17 @@ export default function DashboardScreen() {
     })();
   }, [monthCards]);
   // Schedule the 1st-of-next-month nudge that a new card has joined the collection.
+  // Re-armed on every `featuredCard` change (not just mount) so the spend-comparison
+  // line stays current up to the actual fire date — see comment in
+  // notificationsService.refreshMonthCardReminder.
   useEffect(() => {
+    const comparison = featuredCard && featuredCard.spendVsPrevPct != null
+      ? { pct: featuredCard.spendVsPrevPct, spend: featuredCard.totalSpend }
+      : null;
     import('@/services/notificationsService')
-      .then(({ notificationsService }) => notificationsService.refreshMonthCardReminder())
+      .then(({ notificationsService }) => notificationsService.refreshMonthCardReminder(comparison))
       .catch(() => {});
-  }, []);
+  }, [featuredCard]);
   // Persist skin-unlock progress (cards collected + any legendary) for the Skórki
   // screen to read without recomputing the whole collection.
   useEffect(() => {

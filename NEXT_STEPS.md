@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: crash "Rendered fewer hooks than expected" po usunięciu zadania (2026-09-28)
+
+User: screenshot crash-screena "jak usunąłem zadanie to tak wywaliło". Pełny opis w
+ARCHITECTURE.md §203. Realny, potwierdzony bug (nie defensywne zgadywanie jak przy
+odznakach §197) — `useState` dla `confirmDelete` w `app/tasks/[id].tsx` był zadeklarowany
+PO warunkowym `if (!task) return`, więc gdy `task` znikał ze store'u po usunięciu (przed
+`router.back()`), kolejny render pomijał ten hook → "Rendered fewer hooks than expected".
+Fix: przeniesiony hook przed early return. `tsc`/`jest` czyste (87/87 suite, 1140 testów,
+bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: usuń dowolne zadanie, appka powinna wrócić do
+listy bez crasha.
+
+## 🆕 Miesięczne porównanie wydatków miesiąc-do-miesiąca (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §202. Pierwszy zbudowany z NOWEJ (drugiej) rundy
+brainstormingu tej sesji, po zamknięciu poprzedniej trójki (dług/subskrypcje/notatka).
+Dane (`spendVsPrevPct`/`totalSpend`) już istniały w `monthCards.ts` i są już pokazywane na
+karcie miesiąca — brakowało tylko zdania w powiadomieniu push. Świadomie SCALONE z już
+istniejącym powiadomieniem "Nowa karta miesiąca!" (ten sam moment, ten sam docelowy ekran)
+zamiast osobnego drugiego — zgodnie z duchem punktu "grupowanie powiadomień" niżej.
+`refreshMonthCardReminder()` w `notificationsService.ts` dostał opcjonalny `comparison`,
+wołający efekt w `index.tsx` re-armowany na `[featuredCard]` zamiast `[]`. `tsc`/`jest`
+czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski** (zależny od 1. dnia miesiąca): na początku
+października sprawdź treść powiadomienia "Nowa karta miesiąca!".
+
 ## 🆕 Przypomnienie do notatki (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §201. Trzeci, ostatni z 3 zaakceptowanych pomysłów tej sesji —
@@ -112,6 +140,19 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
   jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
   `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
+
+- **Sezonowy wzorzec wydatków rok do roku** (user zaakceptował 2026-09-28, do zbudowania) —
+  po roku działania appki: "W październiku zeszłego roku wydałeś najwięcej na X, uważaj" —
+  czysto historyczna analiza z `expenses` po kategorii i miesiącu, porównanie z tym samym
+  miesiącem rok wcześniej, zero nowego store'u, zero ręcznego wpisywania.
+
+- **Grupowanie powiadomień w jeden digest zamiast osobnego spamu** (user zaakceptował
+  2026-09-28, do zbudowania) — gdy kilka zaplanowanych powiadomień (przypomnienie długu +
+  subskrypcji + nawyku itp.) trafia na ten sam dzień/zbliżoną godzinę, jedno zbiorcze
+  powiadomienie zamiast trzech osobnych z rzędu. Wymaga przejrzenia WSZYSTKICH
+  `schedule*Reminder` w `notificationsService.ts` (kapsuła, dług, subskrypcja, nawyk, notatka)
+  i dodania warstwy grupującej przy planowaniu/wyzwalaniu — najbardziej złożony z tej rundy
+  pomysłów, nie mechaniczny wrap.
 
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 

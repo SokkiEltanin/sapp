@@ -12006,6 +12006,78 @@ niezbudowane pomysły (dług §199, subskrypcje §200, notatka §201). Zostaje t
 biometrią (świadomie odłożona, niski priorytet) i rozszerzenie banków (zablokowane na
 uporządkowaniu ustawień) — oba w NEXT_STEPS.md.
 
+## 202. Miesięczne porównanie wydatków miesiąc-do-miesiąca (2026-09-28)
+
+User (kolejna runda brainstormingu po zamknięciu poprzedniej listy, zaakceptował ten jeden
+pomysł z nowej dziesiątki): auto-push na koniec miesiąca z porównaniem wydatków do
+poprzedniego miesiąca, zero ręcznego wpisywania.
+
+**Odkrycie po drodze**: dane do tego JUŻ istniały w 100% — `MonthCard.spendVsPrevPct`/
+`.totalSpend` (`monthCards.ts`, "Wrapped"-owe karty miesiąca) liczą dokładnie tę
+różnicę i już ją POKAZUJĄ na karcie w kolekcji (`MonthWrappedCard.tsx`'s "X% vs poprz."
+chip + "X zł wydane" stopka). Brakowało tylko powiadomienia push z tą samą liczbą.
+
+**Świadoma decyzja — scalone z ISTNIEJĄCYM powiadomieniem "Nowa karta miesiąca!", nie
+osobne drugie** (bo user WŁAŚNIE zaakceptował pomysł "grupowanie powiadomień" i poprosił
+przestać dokładać osobnych powiadomień na ten sam moment — patrz zapisany, jeszcze
+niezbudowany punkt w NEXT_STEPS.md): oba powiadomienia i tak odpalają się w DOKŁADNIE tym
+samym momencie (1. dnia miesiąca, 10:00) i prowadzą do tego samego ekranu (`month-cards`,
+gdzie ta liczba i tak jest widoczna na karcie) — więc zamiast dwóch powiadomień z rzędu,
+`refreshMonthCardReminder()` (`notificationsService.ts`) dostał opcjonalny drugi argument
+`comparison: { pct, spend } | null` i dopisuje drugie zdanie do body: "Wydałeś X zł — to Y%
+więcej/mniej niż miesiąc wcześniej."
+
+- `app/(tabs)/index.tsx` — efekt wołający `refreshMonthCardReminder()` miał dotąd `[]` deps
+  (odpalał się raz, treść i tak była statyczna). Teraz liczy `comparison` z `featuredCard`
+  (kartą "miesiąca w którym jesteś", już istniejący `useMemo`) i ma `[featuredCard]` w
+  deps — re-armowane na każdą zmianę, jak `refreshWeeklySummary` niżej w tym samym pliku,
+  żeby liczby zdążyły dojrzeć do niemal ostatecznych zanim powiadomienie faktycznie
+  odpali się miesiąc później.
+- Próg `Math.abs(pct) >= 1` — pomija linijkę porównania przy zaokrągleniu do 0% (nowy
+  miesiąc bez wcześniejszej historii ma `spendVsPrevPct: null`, więc i tak by się pominęła,
+  próg chroni tylko przed myląco pustym "0% więcej").
+
+**Testy**: brak nowych — czysty wrap istniejącej, już przetestowanej pośrednio przez
+`MonthWrappedCard` logiki (`spendVsPrevPct`/`totalSpend` z `monthCards.ts`, bez zmian w tym
+pliku), `notificationsService.ts` bez dedykowanych testów jak reszta `schedule*`/`refresh*`.
+`tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski** (zależny od nadejścia 1. dnia miesiąca, nie da
+się wywołać na żądanie): na początku października sprawdź, że powiadomienie "Nowa karta
+miesiąca!" zawiera też zdanie o wydatkach względem września.
+
+## 203. Fix: crash "Rendered fewer hooks than expected" po usunięciu zadania (2026-09-28)
+
+User: screenshot crash-screena appki z dokładnie tym komunikatem, zgłoszony jako "jak
+usunąłem zadanie to tak wywaliło".
+
+**Bug** (`app/tasks/[id].tsx`, `TaskDetailScreen`): `const [confirmDelete, setConfirmDelete]
+= useState(false);` był zadeklarowany PO warunkowym `if (!task) return (...)` (linia 178),
+razem z funkcjami/handlerami, zamiast razem z resztą `useState` na górze komponentu. Dopóki
+`task` istniał, ten hook zawsze się wykonywał (early return nie odpalał), więc bug był
+niewidoczny. `doDelete()` woła `remove(id!)` → store `tasks` się zmienia → `task = tasks
+.find(t => t.id === id)` staje się `undefined` na KOLEJNYM renderze TEGO SAMEGO
+zamontowanego komponentu, ZANIM `router.back()` zdąży odmontować ekran — ten render trafia
+w early return i przez to POMIJA hook `confirmDelete`, którego poprzedni render wykonał.
+React liczy hooki po kolejności wywołań między renderami; różna liczba (16 na renderze z
+`task`, 15 na renderze bez) = dokładnie komunikat "Rendered fewer hooks than expected. This
+may be caused by an accidental early return statement" — React nie zgaduje, mówi wprost co
+się stało.
+
+**Fix**: przeniesiony `useState(false)` dla `confirmDelete` do grupy pozostałych `useState`
+(linie 159-176), PRZED `if (!task) return`. Teraz wszystkie hooki komponentu wykonują się
+w tej samej kolejności niezależnie od tego, czy `task` istnieje. Sprawdzone grepem po
+`useState|useEffect|useMemo|useRef|useCallback` w całym pliku — to był JEDYNY hook
+zadeklarowany po warunkowym return.
+
+**Testy**: brak nowych — `[id].tsx` (jak reszta ekranów `app/tasks/`) nie ma dedykowanych
+testów jednostkowych, sam bug jest strukturalny (kolejność hooków), nie do złapania testem
+na czystej funkcji. `tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki, łatwy do zweryfikowania na żądanie**: otwórz
+dowolne zadanie (`/tasks/[id]`), usuń je (ikona kosza → potwierdź) → appka powinna wrócić
+do listy zadań BEZ crash-screena "Coś się wykrzaczyło".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
