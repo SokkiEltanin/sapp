@@ -120,6 +120,11 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   `notificationsService` wzorzec (scheduled notification na 1. dzień miesiąca o ustalonej
   godzinie, czyta poprzedni miesiąc z `useExpensesStore.getState().expenses`).
 
+- **Sezonowy wzorzec wydatków rok do roku** (user zaakceptował 2026-09-28, do zbudowania) —
+  po roku działania appki: "W październiku zeszłego roku wydałeś najwięcej na X, uważaj" —
+  czysto historyczna analiza z `expenses` po kategorii i miesiącu, porównanie z tym samym
+  miesiącem rok wcześniej, zero nowego store'u, zero ręcznego wpisywania.
+
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §195. Ósmy (i ostatni budowany w tej rundzie) z listy
