@@ -17,7 +17,8 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { todayISO, ymd } from '@/utils/date';
-import { advanceNextBillingDate, isDurationExpired } from '@/utils/recurringBills';
+import { isDurationExpired, rollOverdueSubscription } from '@/utils/recurringBills';
+import { queueSubConfirm, DEAD_SUB_THRESHOLD } from '@/utils/subscriptionAuto';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -151,10 +152,19 @@ export default function SubscriptionsScreen() {
     });
 
     for (const sub of subscriptions) {
-      if (!sub.active || isDurationExpired(sub) || sub.nextBillingDate > todayStr) continue;
-      let next = sub.nextBillingDate;
-      do { next = advanceNextBillingDate(next, sub.billingCycle); } while (next <= todayStr);
-      update(sub.id, { nextBillingDate: next }).catch(() => {});
+      if (!sub.active || isDurationExpired(sub)) continue;
+      const roll = rollOverdueSubscription(sub, todayStr);
+      if (!roll) continue;
+      update(sub.id, { nextBillingDate: roll.nextBillingDate, missedCycles: roll.missedCycles }).catch(() => {});
+      // Martwa subskrypcja (2026-09-28, user zaakceptował pomysł) — ten sam check co na
+      // dashboardzie (index.tsx); queueSubConfirm dedupuje per subId+dzień, więc bezpieczne
+      // wołać z obu miejsc bez podwójnego pytania.
+      if (roll.missedCycles >= DEAD_SUB_THRESHOLD) {
+        queueSubConfirm({
+          subId: sub.id, subName: sub.name, merchant: sub.name, amount: sub.amount, currency: sub.currency,
+          date: todayStr, kind: 'possiblyDead', missedCycles: roll.missedCycles,
+        }).catch(() => {});
+      }
     }
   }, [subscriptions]);
 

@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Wykrywanie martwej subskrypcji + auto-dopasowanie zwrotu (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §196. Po odrzuceniu kilku pomysłów wymagających manualnego
+wpisywania (user: "nie będzie mi się chciało manualnie wpisywać... jak Co zjadłem") —
+przestawienie na w 100% automatyczne pomysły, oba naraz zaakceptowane:
+- Subskrypcja z terminem w przeszłości, bez ŻADNEJ złapanej płatności przez 2+ okresy →
+  dashboard pyta "czy jeszcze z tego korzystasz?" (nowy `Subscription.missedCycles`,
+  `rollOverdueSubscription()` w recurringBills.ts, zerowane w bankCommit.ts po realnej
+  płatności).
+- Przychodzący przelew mniejszy niż niedawny wydatek → dashboard proponuje połączenie jako
+  zwrot ("to zwrot za zakup?"), obsługuje user's dokładny przykład (partnerka oddaje 50 zł
+  za zakupy za 116,69 zł — częściowy zwrot). Nowy `Expense.reimbursedAmount` — czysto
+  informacyjne, nie zmienia sum/statystyk.
+`tsc`/`jest` czyste (87/87 suite, 1135 testów, +14 nowych).
+
+**🆕 Priorytet testu na urządzeniu — średni, wymaga realnych danych z banku**: (1) poczekaj
+aż jakaś subskrypcja przegapi 2+ okresy bez płatności (albo tymczasowo cofnij
+`nextBillingDate` testowo) → sprawdź kartę "czy jeszcze z tego korzystasz?"; (2) poproś kogoś
+o przelew mniejszy niż Twój niedawny wydatek → sprawdź kartę "to zwrot za zakup?" i że po
+zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt: Y zł".
+
 ## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
 
 - **Powiadomienie push o terminie długu** (user zaakceptował pomysł 2026-09-27) —

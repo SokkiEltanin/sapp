@@ -83,11 +83,16 @@ export function subscriptionPriceChanged(p: PaymentLite & { currency?: string },
 // (currency mismatch), zamiast osobnego systemu — jedyna różnica to treść/akcja karty.
 // `kind` brak/'currency' = stary przepływ (kwota w innej walucie, dopasowanie po nazwie).
 const CONFIRM_KEY = 'pending_sub_confirm';
+// Ile kolejnych okresów rozliczeniowych bez ŻADNEJ złapanej płatności, zanim dashboard
+// zapyta "nadal z tego korzystasz?" (2026-09-28, user zaakceptował pomysł: wykrywanie
+// martwej subskrypcji) — patrz `rollOverdueSubscription` w recurringBills.ts.
+export const DEAD_SUB_THRESHOLD = 2;
 export interface PendingSubConfirm {
   id: string; subId: string; subName: string; merchant: string;
   amount: number; currency: string; date: string; // YYYY-MM-DD
-  kind?: 'currency' | 'priceChange';
+  kind?: 'currency' | 'priceChange' | 'possiblyDead';
   oldAmount?: number; // tylko dla kind: 'priceChange' — zapisana kwota subskrypcji PRZED tą płatnością
+  missedCycles?: number; // tylko dla kind: 'possiblyDead' — ile okresów pod rząd bez płatności
 }
 
 export async function loadSubConfirms(): Promise<PendingSubConfirm[]> {

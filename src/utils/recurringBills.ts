@@ -115,6 +115,27 @@ export function advanceNextBillingDate(current: string, cycle: BillingCycle): st
   return ymdLocal(d);
 }
 
+// Wykrywanie martwej subskrypcji (2026-09-28, user zaakceptował pomysł) — wyciągnięte z
+// index.tsx/subscriptions.tsx, które OBA miały WŁASNĄ, identyczną kopię tej samej pętli
+// "przesuń nextBillingDate aż wyjdzie poza dzisiejszy dzień" (ten sam typ duplikacji co
+// trzy niezależne warianty `advanceBillingDate` skonsolidowane 2026-09-20, patrz komentarz
+// w subscriptionAuto.ts — nie kopiować tej logiki po trzeci raz). Zwraca null gdy sub nie
+// jest zaległa. Każde wywołanie z wynikiem != null jest z DEFINICJI okresem BEZ złapanej
+// płatności — gdyby bank złapał płatność, `maybeAutoPaySubscription` (bankCommit.ts) już
+// przesunęłaby `nextBillingDate` w przyszłość, więc ten warunek nigdy by nie trafił. Stąd
+// `missedCycles` tu tylko PRZYRASTA; zerowanie dzieje się osobno, w bankCommit.ts, gdy
+// płatność faktycznie złapana.
+export function rollOverdueSubscription(
+  sub: Pick<Subscription, 'nextBillingDate' | 'billingCycle' | 'missedCycles'>,
+  todayISO: string,
+): { nextBillingDate: string; missedCycles: number } | null {
+  if (sub.nextBillingDate > todayISO) return null;
+  let next = sub.nextBillingDate;
+  let missed = 0;
+  do { next = advanceNextBillingDate(next, sub.billingCycle); missed++; } while (next <= todayISO);
+  return { nextBillingDate: next, missedCycles: (sub.missedCycles ?? 0) + missed };
+}
+
 // Ten sam bug/fix co `advanceNextBillingDate` wyżej — `durationMonths` dodawane do
 // `startDate` (dowolny dzień usera) mogło tak samo przewinąć miesiąc.
 export function isDurationExpired(sub: Pick<Subscription, 'durationMonths' | 'startDate'>): boolean {

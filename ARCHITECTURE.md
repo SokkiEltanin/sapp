@@ -11725,6 +11725,108 @@ nigdy nie miały własnych testów jednostkowych — logika jest zbyt spleciona 
 (Zapiski/refleksje) i fragment nazwy osoby z długu — obie nowe sekcje powinny się pojawić z
 poprawnym podświetleniem dopasowania i prowadzić tam gdzie powinny po tapie.
 
+## 196. Wykrywanie martwej subskrypcji + auto-dopasowanie zwrotu (2026-09-28)
+
+User (kontynuacja brainstormu, po odrzuceniu kilku pomysłów wymagających manualnego
+wpisywania — "nie będzie mi się chciało manualnie wpisywać wszystkiego przez co będzie to
+po prostu martwa funkcja, jak Co zjadłem" — przestawienie na 100% automatyczne pomysły):
+zaakceptował oba naraz + dopisał trzeci wariant zwrotu: "jak moja dziewczyna płatnik oddaję
+mi część za zakupy (np. przelewa mi 50 PLN za zakupy 116,69 PLN) to żebym mógł połączyć że
+to zwrot za te zakupy".
+
+### A. Wykrywanie martwej subskrypcji
+
+**Problem**: `subscriptions.tsx`/`index.tsx` OBA miały własną, identyczną kopię tej samej
+pętli — gdy termin płatności subskrypcji minie, appka po cichu przesuwa `nextBillingDate` na
+kolejny cykl, NIEZALEŻNIE od tego, czy faktycznie złapała jakąkolwiek płatność z banku. Więc
+jeśli user odwoła np. Netflix gdzie indziej (przez stronę, nie przez tę samą kartę), appka
+bez końca pokazuje go jako aktywny, przesuwając termin w nieskończoność, i nigdy tego nie
+zauważy — klasyczny "dead end" (CLAUDE.md zasada 7).
+
+**Rozwiązanie**:
+- Nowe pole `Subscription.missedCycles?: number` (types/index.ts) — liczy kolejne okresy
+  rozliczeniowe BEZ złapanej płatności.
+- `rollOverdueSubscription(sub, todayISO)` (nowa funkcja, `recurringBills.ts`) —
+  WYCIĄGNIĘTA z index.tsx/subscriptions.tsx, które miały dokładnie tę samą pętlę
+  skopiowaną dwa razy (ten sam typ duplikacji co trzy niezależne warianty
+  `advanceBillingDate` skonsolidowane 2026-09-20, patrz komentarz w subscriptionAuto.ts —
+  ta klasa buga NIE dostała trzeciej kopii). Zwraca `null` gdy sub nie jest zaległa; inaczej
+  `{ nextBillingDate, missedCycles }` — `missedCycles` liczy WSZYSTKIE minione cykle naraz
+  (do-while), nie tylko jeden, żeby appka nieotwierana kilka miesięcy nie zgubiła licznika.
+  Każde wywołanie z wynikiem `!= null` jest z definicji okresem bez płatności — gdyby bank
+  złapał płatność, `maybeAutoPaySubscription` (bankCommit.ts) już przesunęłaby
+  `nextBillingDate` w przyszłość wcześniej, więc `rollOverdueSubscription` nigdy by tego nie
+  zobaczyła.
+- Zerowanie: `bankCommit.ts`'s `maybeAutoPaySubscription`, w gałęzi `isConfidentSubMatch`
+  (płatność faktycznie złapana) — `missedCycles: 0`.
+- Oba miejsca (`index.tsx`'s dashboardowy check, `subscriptions.tsx`'s ekranowy check) wołają
+  teraz `rollOverdueSubscription` + gdy `missedCycles >= DEAD_SUB_THRESHOLD` (2,
+  `subscriptionAuto.ts`) kolejkują dashboardową kartę `queueSubConfirm({..., kind:
+  'possiblyDead', missedCycles})` — REUŻYWA istniejącej kolejki/karty "Płatność za
+  subskrypcję?" (ten sam wzorzec co `priceChange` z §192), zamiast osobnego systemu.
+  `queueSubConfirm`'s per-dzień dedup chroni przed podwójnym pytaniem gdy oba miejsca
+  odpalą się tego samego dnia.
+- Karta (index.tsx): "Czy jeszcze z tego korzystasz? Nie widziałem żadnej płatności za
+  {subName} od {missedCycles} okresów rozliczeniowych" — przyciski "Wyłącz"
+  (`deactivateDeadSub`, `active: false`) / "Nadal korzystam" (`keepUsingSub`, zeruje
+  `missedCycles`, żeby kolejny mount dashboardu nie zapytał znowu od razu).
+
+### B. Auto-dopasowanie zwrotu
+
+**Problem**: przychodzący przelew (zwrot ze sklepu, zwrot od partnerki za wspólny zakup)
+księgował się jako zwykły, oderwany przychód (`commitBankTx`'s `direction === 'in'`) — zero
+próby powiązania z wcześniejszym wydatkiem, który realnie rozlicza.
+
+**Rozwiązanie — nowy plik `reimbursementMatch.ts`**:
+- `findReimbursementCandidate(incoming, expenses)` — szuka najlepszego kandydata: wcześniejszy
+  WYDATEK (nigdy income), w oknie 14 dni PRZED przelewem, gdzie kwota przelewu ≤ to co
+  zostało niezwrócone (`amount - reimbursedAmount`, z tolerancją 0.5 zł na zaokrąglenia),
+  próg minimalny 5 zł (nie każdy BLIK jest zwrotem za zakupy). Świadomie NIE wymaga
+  dopasowania nadawcy do sklepu/osoby — dla jednego użytkownika + jednej bliskiej osoby
+  fałszywe trafienie jest mało prawdopodobne, a wymaganie identyczności nazwy nadawcy z
+  paragonem (np. "Żabka" vs imię i nazwisko partnerki) w ogóle nie miałoby czego dopasować.
+  Obsługuje user's dokładny przykład: 116,69 zł wydatek + 50 zł przelew = kandydat z
+  `remaining: 116.69` (częściowy zwrot), tak samo jak pełny zwrot dokładną kwotą.
+- Osobna kolejka `pending_reimbursement_confirm` (ten sam wzorzec load/queue-z-dedupem/remove
+  co `pending_sub_confirm` w subscriptionAuto.ts, ale osobna — inna domena, expenseId nie
+  subId).
+- `bankCommit.ts`'s przychodzący-przelew ścieżka (TYLKO fresh add, nie ścieżki
+  dedup/matched — i nigdy dla `p.jd` pensji, kwoty rzędu tysięcy nigdy nie zmieściłyby się w
+  `remaining` pojedynczego wydatku) — po dodaniu przychodu, `findReimbursementCandidate` +
+  jeśli trafiony, `queueReimbursementConfirm`.
+- Nowe pole `Expense.reimbursedAmount?: number` (types/index.ts) — CZYSTO informacyjne,
+  ŚWIADOMIE wąski zakres: NIE zmienia `amount` ani żadnych sum/statystyk (netowanie
+  wydatków w całej appce to inna, znacznie większa zmiana, poza zakresem tego pomysłu).
+  Przychód z przelewu ZOSTAJE zaksięgowany normalnie (bez zmian) — to tylko dopisuje
+  informację na wydatku, który rozlicza.
+- Karta (index.tsx): "To zwrot za zakup? Otrzymałeś {kwota} od {nadawca} — to zwrot za
+  {opis wydatku} ({kwota wydatku}, {data})?" — przyciski "Tak, połącz" (`confirmReimbursement`,
+  dopisuje do `reimbursedAmount`) / "Nie, zwykły przychód" (`dismissReimbursement`, brak
+  zmian — przychód i tak już jest zaksięgowany jak dotąd).
+- Wyświetlenie: `expenses/[id].tsx`, pod kwotą — "Zwrócono: X zł · efektywny koszt: Y zł"
+  (ten sam layout co istniejąca linijka "Pierwotnie: X EUR" dla płatności w innej walucie).
+
+### Dashboard — nowa sekcja AUTO
+
+`reimbursement-confirm` dopisana do `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
+`SECTION_DESC`/`SECTION_GROUP`/`AUTO_SECTIONS` (`dashboardLayout.ts`) — pełne podpięcie wg
+playbooka §12, ten sam wzorzec co `sub-confirm`/`bill-suggest` (kontekstowy alert, niearanżowalny
+ręcznie, editor go nie pokazuje jako przełącznik). Rozszerzenie samej karty `sub-confirm`
+o `kind: 'possiblyDead'` NIE wymagało nowej sekcji (to wciąż ta sama karta, inna treść).
+
+**Testy**: nowe `__tests__/reimbursementMatch.test.ts` (10 testów — dokładny przykład usera,
+pełny zwrot, przelew większy niż wydatek, poza oknem czasowym, zła kolejność dat, próg
+minimalny, już w pełni zwrócone, częściowo zwrócone, income nigdy nie kandyduje, wybór
+najlepszego z kilku kandydatów) + `rollOverdueSubscription` dopisane do
+`recurringBills.test.ts` (4 testy — nie zaległa, jeden zaległy okres, appka nieotwierana kilka
+miesięcy liczy WSZYSTKIE naraz, kumulacja z istniejącym `missedCycles`). `tsc --noEmit`/`jest`
+czyste (87/87 suite, 1135 testów, +14 nowych).
+
+**Priorytet testu na urządzeniu — średni, wymaga realnych danych z banku**: (1) subskrypcja z
+`nextBillingDate` w przeszłości i bez płatności przez 2+ okresy → karta "czy jeszcze z tego
+korzystasz?" powinna się pojawić; (2) przelew od kogoś na kwotę mniejszą niż niedawny
+wydatek → karta "to zwrot za zakup?" z poprawnym dopasowaniem.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
