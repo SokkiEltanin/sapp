@@ -11932,6 +11932,39 @@ przyszłości (np. za 2 minuty, edytując system czasu albo czekając) → spraw
 powiadomienie faktycznie przychodzi o 10:00 w tym dniu, tap otwiera `/debts`; rozlicz/usuń
 dług PRZED terminem → sprawdź że powiadomienie się NIE pojawia.
 
+## 200. Łączny koszt subskrypcji "od zawsze" (2026-09-28)
+
+User (drugi z listy zaakceptowanych pomysłów tej rundy): `subscriptions.tsx` pokazywał
+tylko koszt miesięczny/roczny (bieżący cykl), nie ile już realnie wydano na daną usługę do
+tej pory.
+
+**Rozwiązanie — czysty derived stat, zero nowego store'u**:
+- `subscriptionLifetimeTotal(sub, expenses)` (nowa funkcja, `subscriptionAuto.ts`) — odwrotność
+  `matchSubscriptionForPayment` w tym samym pliku: tam dopasowuje się JEDNĄ płatność bankową
+  do najlepszej subskrypcji, tu dopasowuje się WSZYSTKIE historyczne wydatki do JEDNEJ
+  subskrypcji, tym samym dopasowaniem nazwy (`norm`/tokeny) — bez wymogu terminu/kwoty
+  (te obowiązują tylko przy automatycznym potwierdzaniu na żywo, tu liczymy retrospektywnie).
+  Zwraca `{ total, count, firstDate }` — `firstDate` to data NAJWCZEŚNIEJSZEGO dopasowanego
+  wydatku (nie `createdAt` subskrypcji w appce, które mogłoby być dużo później niż faktyczny
+  pierwszy zakup — user mógł dodać już od dawna istniejącą subskrypcję).
+- `subscriptions.tsx` — ekran dotąd w ogóle nie czytał wydatków; dociągnięty
+  `useExpensesStore` + "wczytaj jeśli puste" (ten sam wzorzec co index.tsx). Nowy
+  `lifetimeById` (`useMemo` po `subscriptions`+`expenses`) przekazywany do `SubItem` jako
+  prop `lifetime`.
+- `SubItem` — nowa linijka pod istniejącym "Przypomnienie X dni przed" (tylko gdy
+  `lifetime.count > 0`): "od {firstDate}: X zł zapłacone".
+- Świadomie przybliżone (fałszywe trafienie możliwe przy krótkiej/niejednoznacznej nazwie
+  subskrypcji, np. "TV") — informacyjny szacunek, nie księgowanie; brak linku
+  expense→subId, więc nie da się tego zrobić w 100% dokładnie bez większej zmiany.
+
+**Testy**: nowe `describe('subscriptionAuto — subscriptionLifetimeTotal')` w
+`subscriptionAuto.test.ts` (5 testów — suma wielu wydatków nie tylko najnowszego,
+dopasowanie po `storeName`, niedopasowane pomijane, income nigdy się nie liczy, brak
+wydatków → zera). `tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, +5 nowych).
+
+**Priorytet testu na urządzeniu — niski**: otwórz Subskrypcje, sprawdź że przy subskrypcji
+z historią płatności pojawia się linijka "od X: Y zł zapłacone" z sensowną sumą.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

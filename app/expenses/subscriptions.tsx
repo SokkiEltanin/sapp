@@ -18,7 +18,9 @@ import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { todayISO, ymd } from '@/utils/date';
 import { isDurationExpired, rollOverdueSubscription } from '@/utils/recurringBills';
-import { queueSubConfirm, DEAD_SUB_THRESHOLD } from '@/utils/subscriptionAuto';
+import { queueSubConfirm, DEAD_SUB_THRESHOLD, subscriptionLifetimeTotal, SubscriptionLifetimeTotal } from '@/utils/subscriptionAuto';
+import { useExpensesStore } from '@/store/expensesStore';
+import { expensesService } from '@/services/expensesService';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -124,6 +126,18 @@ export default function SubscriptionsScreen() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+
+  // Łączny koszt subskrypcji "od zawsze" (2026-09-28, user zaakceptował pomysł) — potrzebuje
+  // wydatków, których ten ekran dotąd w ogóle nie czytał. Ten sam "dociągnij jeśli puste"
+  // wzorzec co index.tsx (store mógł być już wczytany z innego ekranu, albo nie).
+  const expenses = useExpensesStore(st => st.expenses);
+  const setExpenses = useExpensesStore(st => st.setExpenses);
+  useEffect(() => { if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {}); }, []);
+  const lifetimeById = useMemo(() => {
+    const map: Record<string, SubscriptionLifetimeTotal> = {};
+    for (const sub of subscriptions) map[sub.id] = subscriptionLifetimeTotal(sub, expenses);
+    return map;
+  }, [subscriptions, expenses]);
 
   const checkedRef = useRef(false);
 
@@ -248,7 +262,7 @@ export default function SubscriptionsScreen() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>AKTYWNE</Text>
             {active.map((sub) => (
-              <SubItem key={sub.id} sub={sub} onEdit={openEdit} onDelete={confirmDelete} onToggle={(id) => update(id, { active: false })} />
+              <SubItem key={sub.id} sub={sub} lifetime={lifetimeById[sub.id]} onEdit={openEdit} onDelete={confirmDelete} onToggle={(id) => update(id, { active: false })} />
             ))}
           </View>
         )}
@@ -258,7 +272,7 @@ export default function SubscriptionsScreen() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>NIEAKTYWNE</Text>
             {inactive.map((sub) => (
-              <SubItem key={sub.id} sub={sub} onEdit={openEdit} onDelete={confirmDelete} onToggle={(id) => update(id, { active: true })} />
+              <SubItem key={sub.id} sub={sub} lifetime={lifetimeById[sub.id]} onEdit={openEdit} onDelete={confirmDelete} onToggle={(id) => update(id, { active: true })} />
             ))}
           </View>
         )}
@@ -456,8 +470,9 @@ export default function SubscriptionsScreen() {
 
 // ─── Subscription item ────────────────────────────────────────────────────────
 
-function SubItem({ sub, onEdit, onDelete, onToggle }: {
+function SubItem({ sub, lifetime, onEdit, onDelete, onToggle }: {
   sub: Subscription;
+  lifetime?: SubscriptionLifetimeTotal;
   onEdit: (s: Subscription) => void;
   onDelete: (s: Subscription) => void;
   onToggle: (id: string) => void;
@@ -491,6 +506,13 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
             <Bell size={9} color={colors.accent.amber} />
             <Text style={s.itemBellText}>Przypomnienie {sub.reminderDaysBefore} {plPlural(sub.reminderDaysBefore, 'dzień', 'dni', 'dni')} przed</Text>
           </View>
+        )}
+        {/* Łączny koszt "od zawsze" (2026-09-28, user zaakceptował pomysł) — derived stat,
+            zsumowane dopasowane historyczne wydatki, nie tylko bieżący cykl. */}
+        {!!lifetime && lifetime.count > 0 && lifetime.firstDate && (
+          <Text style={s.itemLifetime}>
+            od {lifetime.firstDate.split('-').reverse().join('.')}: {lifetime.total.toFixed(2)} zł zapłacone
+          </Text>
         )}
       </View>
       <View style={s.itemActions}>
@@ -562,6 +584,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   itemCycle: { fontSize: 11, color: c.text.muted },
   itemBell: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   itemBellText: { fontSize: 10, color: c.accent.amber },
+  itemLifetime: { fontSize: 10, color: c.text.muted, marginTop: 2 },
   itemActions: { alignItems: 'flex-end', gap: spacing[2] },
   daysBadge: {
     paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radius.sm,

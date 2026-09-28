@@ -1,7 +1,8 @@
-import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged } from '@/utils/subscriptionAuto';
-import { Subscription } from '@/types';
+import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged, subscriptionLifetimeTotal } from '@/utils/subscriptionAuto';
+import { Subscription, Expense } from '@/types';
 
 const sub = (o: any): Subscription => ({ active: true, name: 'X', amount: 0, currency: 'PLN', nextBillingDate: '2026-08-01', ...o } as any);
+const exp = (o: any): Expense => ({ id: 'e', amount: 0, currency: 'PLN', category: 'other', tags: [], note: '', date: '2026-08-01', createdAt: '', updatedAt: '', ...o } as any);
 
 describe('subscriptionAuto — matchSubscriptionForPayment', () => {
   test('nazwa + termin (due) → dopasowanie (kwota nieistotna, np. obca waluta)', () => {
@@ -60,5 +61,40 @@ describe('subscriptionAuto — subscriptionPriceChanged', () => {
   });
   test('cena spadła (obniżka) też jest wykrywana — |diff|, nie tylko podwyżka w górę', () => {
     expect(subscriptionPriceChanged({ amount: 30, currency: 'PLN', dateISO: '2026-08-04' }, sub({ amount: 43 }))).toBe(true);
+  });
+});
+
+describe('subscriptionAuto — subscriptionLifetimeTotal', () => {
+  test('sumuje wszystkie historyczne wydatki dopasowane po nazwie, nie tylko najnowszy', () => {
+    const s = sub({ name: 'Netflix' });
+    const es = [
+      exp({ note: 'NETFLIX.COM', amount: 43, date: '2026-06-01' }),
+      exp({ note: 'Netflix', amount: 43, date: '2026-07-01' }),
+      exp({ note: 'Netflix', amount: 52, date: '2026-08-01' }),
+    ];
+    const r = subscriptionLifetimeTotal(s, es);
+    expect(r).toEqual({ total: 138, count: 3, firstDate: '2026-06-01' });
+  });
+
+  test('dopasowanie po nazwie w storeName też się liczy', () => {
+    const s = sub({ name: 'Spotify Premium' });
+    const es = [exp({ storeName: 'SPOTIFY', note: '', amount: 19.99, date: '2026-05-10' })];
+    expect(subscriptionLifetimeTotal(s, es)).toEqual({ total: 19.99, count: 1, firstDate: '2026-05-10' });
+  });
+
+  test('niedopasowane wydatki (inny sklep) pomijane', () => {
+    const s = sub({ name: 'Netflix' });
+    const es = [exp({ note: 'Lidl', amount: 100, date: '2026-06-01' })];
+    expect(subscriptionLifetimeTotal(s, es)).toEqual({ total: 0, count: 0, firstDate: null });
+  });
+
+  test('income nigdy nie liczy się do sumy', () => {
+    const s = sub({ name: 'Netflix' });
+    const es = [exp({ type: 'income', note: 'Netflix', amount: 500, date: '2026-06-01' })];
+    expect(subscriptionLifetimeTotal(s, es)).toEqual({ total: 0, count: 0, firstDate: null });
+  });
+
+  test('brak żadnych wydatków → zera, firstDate null', () => {
+    expect(subscriptionLifetimeTotal(sub({ name: 'Netflix' }), [])).toEqual({ total: 0, count: 0, firstDate: null });
   });
 });

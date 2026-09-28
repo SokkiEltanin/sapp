@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Subscription } from '@/types';
+import { Subscription, Expense } from '@/types';
 import { ymd } from '@/utils/date';
 
 // `advanceBillingDate` USUNIĘTE STĄD (2026-09-20, audyt logika/optymalizacja — konsolidacja
@@ -55,6 +55,35 @@ export function matchSubscriptionForPayment(p: PaymentLite, subs: Subscription[]
   if (exactDue.length === 1) return exactDue[0];
 
   return null;
+}
+
+export interface SubscriptionLifetimeTotal { total: number; count: number; firstDate: string | null }
+
+// Łączny koszt subskrypcji "od zawsze" (2026-09-28, user zaakceptował pomysł) — ile realnie
+// zapłacono do tej pory, nie tylko dziś/rocznie. Odwrotność `matchSubscriptionForPayment`
+// wyżej: tam dopasowuje się JEDNĄ płatność bankową do NAJLEPSZEJ subskrypcji; tu dopasowuje
+// się WSZYSTKIE historyczne wydatki do JEDNEJ subskrypcji, po tym samym dopasowaniu nazwy
+// (`norm`/tokeny) — jedyna różnica: brak wymogu terminu/kwoty (te obowiązują tylko przy
+// AUTOMATYCZNYM potwierdzaniu płatności; tu liczymy retrospektywnie, więc dopasowanie samą
+// nazwą wystarcza). Świadomie przybliżone (fałszywe trafienie możliwe przy krótkiej/
+// niejednoznacznej nazwie) — to informacyjny szacunek, nie księgowanie.
+export function subscriptionLifetimeTotal(sub: Subscription, expenses: Expense[]): SubscriptionLifetimeTotal {
+  const nameNorm = norm(sub.name);
+  const tokens = sub.name.toLowerCase().split(/\s+/).map(norm).filter(t => t.length >= 4);
+  let total = 0, count = 0, firstDate: string | null = null;
+  for (const e of expenses) {
+    if (e.type === 'income') continue;
+    const hay = norm(`${e.note ?? ''} ${e.storeName ?? ''}`);
+    if (!hay) continue;
+    const hit = (nameNorm.length >= 4 && (hay.includes(nameNorm) || nameNorm.includes(hay)))
+      || tokens.some(t => hay.includes(t));
+    if (!hit) continue;
+    total += e.amount;
+    count++;
+    const day = (e.date ?? '').slice(0, 10);
+    if (day && (!firstDate || day < firstDate)) firstDate = day;
+  }
+  return { total, count, firstDate };
 }
 
 // Is a bank payment a CONFIDENT match for a subscription (same currency + close
