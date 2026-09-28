@@ -11827,6 +11827,50 @@ czyste (87/87 suite, 1135 testów, +14 nowych).
 korzystasz?" powinna się pojawić; (2) przelew od kogoś na kwotę mniejszą niż niedawny
 wydatek → karta "to zwrot za zakup?" z poprawnym dopasowaniem.
 
+## 197. Odznaki: wyścig przy synchronizacji "zdobyte" na cold-starcie (2026-09-28)
+
+User: "z tymi osiągnięciami do gabloty ciężko, bo wydaje mi się że trudno je skonfigurować,
+bo czasami się buguje i odblokowuje się mimo [niespełnionego warunku], a potem nie sprawdza
+tego" — bez konkretnej odznaki/daty do odtworzenia (user: "nie pamiętam dokładnie, poszukaj
+po prostu w kodzie"). Audyt kodu (bez potwierdzonej reprodukcji — patrz zastrzeżenie niżej).
+
+**Znaleziony realny wyścig**: `index.tsx` i `achievements.tsx` OBA liczą `achStates`/`states`
+(`evaluateAchievements(buildAchCtx({...}))`) w `useMemo`, i OBA mają `useEffect` wołający
+`syncEarned(achStates)` na KAŻDĄ zmianę tego `useMemo` — WŁĄCZNIE z pierwszym renderem, ZANIM
+`expenses` (i inne wejścia — `healthDays`/`budgetTotal`/`cardPeak`/`foodMeals`/`achFlags`)
+zdążą się wczytać. `useExpensesStore` używa `persist` (rehydratacja z AsyncStorage jest
+ASYNC) — więc na cold-starcie `expenses` faktycznie bywa pustą tablicą przez jeden lub więcej
+renderów, zanim realne dane dotrą. Problem: `syncEarned` PISZE TRWALE (`earned[id] = now`,
+raz zapisane nigdy się nie cofa — patrz `applyEarnedFloor`'s komentarz), więc JEDEN zły
+zapis z niekompletnego kontekstu na starcie zostaje na zawsze zablokowany jako "zdobyte",
+nawet jeśli żywa wartość nigdy realnie nie przekroczyła progu.
+
+**Fix — ten sam guard co już istniejący `pixelDayCache`'s efekt w index.tsx**:
+- `index.tsx` — `syncEarned`'s efekt teraz `if (isLoading) return;` (ten sam `isLoading =
+  finLoading || tasksLoading` co reszta ekranu), `isLoading` dopisane do dependency array.
+- `achievements.tsx` — brakowało tu odpowiednika `isLoading` w ogóle (ekran czytał
+  `useExpensesStore()` bezpośrednio, nie przez `useExpenses()`) — dociągnięty
+  `isLoading: expensesLoading` z samego store'u (`ExpensesState.isLoading`, ustawiane przez
+  `useExpenses()`'s `loadExpenses()` gdziekolwiek indziej w appce już zostało odpalone —
+  wystarczające, bo `expenses` to najciężej ważone pojedyncze wejście do `achCtx`).
+
+**Zastrzeżenie — to defensywne wzmocnienie, NIE potwierdzona naprawa**: bez konkretnej
+odznaki/daty od usera nie da się ZWERYFIKOWAĆ że to była faktyczna przyczyna zgłoszenia.
+Druga, prawdopodobnie BARDZIEJ prawdopodobna wersja tego co user zaobserwował: `applyEarnedFloor`
+działa CELOWO jak gablota trofeów — raz zdobyta odznaka NIE znika, nawet gdy żywa seria/streak
+później spadnie z powrotem poniżej progu (np. 7-dniowa seria bez wydatków zdobywa odznakę,
+user następnego dnia wydaje — odznaka ZOSTAJE zdobyta, mimo że AKTUALNA seria już nie
+spełnia warunku). To zachowanie jest UMYŚLNE (komentarz przy `applyEarnedFloor`, 2026-09-18) —
+jeśli TO jest to co user opisał, to nie bug, tylko design który warto wytłumaczyć, nie
+naprawiać. Oba fixy (cold-start race) zostają jako defensywne wzmocnienie niezależnie —
+tanie, bezpieczne, zero regresji (potwierdzone `tsc`/`jest`), ale user powinien potwierdzić
+przy następnym natrafieniu na objaw KTÓRA odznaka i kiedy, żeby dało się dowieść które
+wyjaśnienie jest trafne.
+
+**Testy**: brak nowych (czysty guard na istniejącym efekcie, nie nowa logika do
+przetestowania w izolacji — `evaluateAchievements`/`syncEarned` same w sobie niezmienione).
+`tsc --noEmit`/`jest` czyste (87/87 suite, 1135 testów, bez zmiany).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Odznaki: fix wyścigu przy synchronizacji na cold-starcie (2026-09-28, NIEPOTWIERDZONE)
+
+Pełny opis w ARCHITECTURE.md §197. User zgłosił "czasami się buguje i odblokowuje mimo
+niespełnionego warunku" bez konkretnej odznaki/daty. Znaleziony i naprawiony REALNY wyścig:
+`syncEarned` (zapisuje TRWALE, nigdy się nie cofa) mógł odpalić się na PIERWSZYM renderze
+dashboardu/gabloty, zanim `expenses` (persist, async rehydratacja) i inne wejścia się
+wczytają — teraz gated za `isLoading`/`expensesLoading` w obu miejscach (`index.tsx`,
+`achievements.tsx`).
+
+**ZASTRZEŻENIE — to defensywne wzmocnienie, nie potwierdzona naprawa zgłoszenia**: równie
+prawdopodobne, że user zaobserwował UMYŚLNE zachowanie `applyEarnedFloor` (raz zdobyta
+odznaka zostaje zdobyta na zawsze, nawet gdy żywy streak potem spadnie) i wziął to za bug.
+**Przy następnym natrafieniu na objaw — zapisz KTÓRĄ odznakę i kiedy**, żeby dało się
+zweryfikować które wyjaśnienie jest trafne (albo czy jest jeszcze trzecia przyczyna).
+`tsc`/`jest` czyste (87/87 suite, 1135 testów, bez zmiany — czysty guard, brak nowej logiki).
+
 ## 🆕 Wykrywanie martwej subskrypcji + auto-dopasowanie zwrotu (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §196. Po odrzuceniu kilku pomysłów wymagających manualnego
@@ -5466,9 +5482,16 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
-  appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
-  (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
+- **Powiadomienia bankowe** działają tylko dla Pekao (user zaakceptował kierunek 2026-09-28,
+  Z ZASTRZEŻENIEM — "rozszerzeniem spoko, ale na razie mamy chaos w ustawieniach jeżeli
+  chodzi o te banki, musielibyśmy to uporządkować najpierw"). WARUNEK WSTĘPNY przed
+  generalizacją: posprzątać sekcję "Auto-wydatki z banku (PeoPay)" w settings.tsx (nazwa
+  sekcji wciąż mówi "PeoPay" mimo że czyta ogólne powiadomienia bankowe, plus
+  `BankHistorySection`/`bankRulesStore`/kilka rozrzuconych przełączników — user chce to
+  ogarnięte, ZANIM dojdzie druga appka bankowa do wyboru). Plan (nie zbudowany, DOPIERO po
+  uporządkowaniu): user wybiera swoją appkę bankową z listy zainstalowanych (generalizacja
+  `BANK_PACKAGES`), generyczne heurystyki (kwota+waluta, słowa kluczowe), ekran "naucz mnie"
+  gdy niepewne.
 - `app/habits.tsx` (~linia 577-585) ma stary stepper ±1h/±5min do godziny przypomnienia —
   `TimePickerField`/`WheelPicker` już istnieją i są używane w zadaniach, tylko trzeba podmienić.
 - Tryb ręczny godzin pracy (Ustawienia→Praca→Ręcznie) nie ma odpowiednika na dashboardzie —
