@@ -97,6 +97,12 @@ export default function UsageStatsScreen() {
   const reset = useUsageStats(st => st.reset);
   const [confirmReset, setConfirmReset] = useState(false);
   const [tab, setTab] = useState<Tab>('przeglad');
+  // Ranking domyślnie top 5 (2026-09-28, user po zobaczeniu pierwszej wersji: "nie
+  // zakres wszystkie, po kliknięciu tak, top 5 niech będzie żeby nie było zajebania na
+  // ekranie") — pełna lista (dziesiątki ekranów) była domyślnie w całości rozwinięta,
+  // "Ranking ekranów" samo w sobie było niemal tak długie jak reszta karty razem wzięta.
+  const [rankingExpanded, setRankingExpanded] = useState(false);
+  const RANKING_COLLAPSED = 5;
 
   const dayBuckets = useMemo(() => bucketByDay(events, DAYS_SHOWN), [events]);
   const hourBuckets = useMemo(() => bucketByHour(events), [events]);
@@ -291,19 +297,28 @@ export default function UsageStatsScreen() {
           {ranking.length === 0 ? (
             <Text style={s.empty}>Jeszcze za mało danych.</Text>
           ) : (
-            <View style={s.list}>
-              {ranking.map((r, i) => (
-                <View key={r.id} style={[s.rankRow, i > 0 && s.rankRowBorder]}>
-                  <Text style={s.rankIndex}>{i + 1}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.rankLabel} numberOfLines={1}>{r.label}</Text>
-                    <Text style={s.rankWhen}>ostatnio: {fmtWhen(r.lastOpenedAt)}</Text>
+            <>
+              <View style={s.list}>
+                {(rankingExpanded ? ranking : ranking.slice(0, RANKING_COLLAPSED)).map((r, i) => (
+                  <View key={r.id} style={[s.rankRow, i > 0 && s.rankRowBorder]}>
+                    <Text style={s.rankIndex}>{i + 1}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.rankLabel} numberOfLines={1}>{r.label}</Text>
+                      <Text style={s.rankWhen}>ostatnio: {fmtWhen(r.lastOpenedAt)}</Text>
+                    </View>
+                    <Text style={s.rankCount}>{r.count}×</Text>
+                    <Text style={s.rankPct}>{totalOpens > 0 ? Math.round((r.count / totalOpens) * 100) : 0}%</Text>
                   </View>
-                  <Text style={s.rankCount}>{r.count}×</Text>
-                  <Text style={s.rankPct}>{totalOpens > 0 ? Math.round((r.count / totalOpens) * 100) : 0}%</Text>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+              {ranking.length > RANKING_COLLAPSED && (
+                <PressableScale onPress={() => setRankingExpanded(v => !v)}>
+                  <Text style={s.showMore}>
+                    {rankingExpanded ? 'Pokaż mniej' : `Pokaż wszystkie (${ranking.length})`}
+                  </Text>
+                </PressableScale>
+              )}
+            </>
           )}
         </View>
 
@@ -484,6 +499,7 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   // % udziału w łącznej liczbie otwarć (2026-09-28) — obok surowej liczby w rankingu, żeby
   // "336×" było konkretnie czytelne jako "to prawie 1/5 wszystkich otwarć", nie gołą cyfrą.
   rankPct: { fontSize: 10.5, fontWeight: '700', color: c.text.muted, minWidth: 34, textAlign: 'right' },
+  showMore: { fontSize: 12, fontWeight: '700', color: c.accent.blue, textAlign: 'center', paddingTop: spacing[2] },
   // Karta "Otwarcia" (2026-09-18) — 3 kafelki dziś/tydzień/miesiąc, każdy z deltą vs
   // poprzedni okres pod wartością główną.
   periodRow: { flexDirection: 'row', gap: spacing[2] },
