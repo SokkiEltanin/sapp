@@ -289,15 +289,34 @@ export const notificationsService = {
 
   // Nudge on the 1st of next month: a fresh "Karta miesiąca" (Wrapped) has sealed
   // and joined the collection. Deep-links to the collection screen.
-  async refreshMonthCardReminder(): Promise<void> {
+  //
+  // `comparison` (2026-09-28, user zaakceptował pomysł: miesięczne porównanie
+  // wydatków miesiąc-do-miesiąca) — zamiast osobnego DRUGIEGO powiadomienia na
+  // dokładnie ten sam moment (1. dnia miesiąca), co user WŁAŚNIE poprosił mnie
+  // przestać robić ("grupowanie powiadomień"), dopisana dodatkowa linijka do JUŻ
+  // istniejącego "Nowa karta miesiąca". `spendVsPrevPct`/`totalSpend` to te same
+  // liczby, które karta i tak pokazuje (`MonthWrappedCard.tsx`'s "X% vs poprz."
+  // chip) — więc tap w powiadomienie prowadzi dokładnie tam, gdzie user zobaczy
+  // pełny kontekst tej liczby, nie do osobnego ekranu finansów. Re-armowane na
+  // każdą zmianę `featuredCard` (jak `refreshWeeklySummary`), więc do momentu
+  // faktycznego odpalenia (1. dnia następnego miesiąca) liczby zdążą dojrzeć do
+  // niemal ostatecznych — ten sam kompromis co reszta `refresh*` w tym pliku.
+  async refreshMonthCardReminder(comparison?: { pct: number; spend: number } | null): Promise<void> {
     try {
       await Notifications.cancelScheduledNotificationAsync('month-card').catch(() => {});
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + 1, 1, 10, 0, 0, 0); // 1st of next month, 10:00
+      let body = 'Miniony miesiąc trafił do Twojej kolekcji — zobacz, jaki tier zdobył.';
+      if (comparison && Math.abs(comparison.pct) >= 1) {
+        const cmp = comparison.pct < 0
+          ? `${Math.abs(comparison.pct)}% mniej`
+          : `${comparison.pct}% więcej`;
+        body += ` Wydałeś ${Math.round(comparison.spend)} zł — to ${cmp} niż miesiąc wcześniej.`;
+      }
       await Notifications.scheduleNotificationAsync({
         identifier: 'month-card',
-        content: { title: '🎴 Nowa karta miesiąca!', body: 'Miniony miesiąc trafił do Twojej kolekcji — zobacz, jaki tier zdobył.', data: { screen: 'month-cards' } },
+        content: { title: '🎴 Nowa karta miesiąca!', body, data: { screen: 'month-cards' } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
       });
     } catch {}

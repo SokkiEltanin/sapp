@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Miesięczne porównanie wydatków miesiąc-do-miesiąca (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §202. Pierwszy zbudowany z NOWEJ (drugiej) rundy
+brainstormingu tej sesji, po zamknięciu poprzedniej trójki (dług/subskrypcje/notatka).
+Dane (`spendVsPrevPct`/`totalSpend`) już istniały w `monthCards.ts` i są już pokazywane na
+karcie miesiąca — brakowało tylko zdania w powiadomieniu push. Świadomie SCALONE z już
+istniejącym powiadomieniem "Nowa karta miesiąca!" (ten sam moment, ten sam docelowy ekran)
+zamiast osobnego drugiego — zgodnie z duchem punktu "grupowanie powiadomień" niżej.
+`refreshMonthCardReminder()` w `notificationsService.ts` dostał opcjonalny `comparison`,
+wołający efekt w `index.tsx` re-armowany na `[featuredCard]` zamiast `[]`. `tsc`/`jest`
+czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski** (zależny od 1. dnia miesiąca): na początku
+października sprawdź treść powiadomienia "Nowa karta miesiąca!".
+
 ## 🆕 Przypomnienie do notatki (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §201. Trzeci, ostatni z 3 zaakceptowanych pomysłów tej sesji —
@@ -112,13 +127,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
   jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
   `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
-
-- **Miesięczne porównanie miesiąc-do-miesiąca** (user zaakceptował 2026-09-28, do zbudowania)
-  — jednorazowy auto-push na koniec miesiąca: "Wrzesień: wydałeś X zł, to Y% mniej/więcej niż
-  w sierpniu" — czysto pochodna z już zebranych `expenses` (agregacja po miesiącu
-  kalendarzowym), zero nowego store'u, zero ręcznego wpisywania. Zaplanować przez istniejący
-  `notificationsService` wzorzec (scheduled notification na 1. dzień miesiąca o ustalonej
-  godzinie, czyta poprzedni miesiąc z `useExpensesStore.getState().expenses`).
 
 - **Sezonowy wzorzec wydatków rok do roku** (user zaakceptował 2026-09-28, do zbudowania) —
   po roku działania appki: "W październiku zeszłego roku wydałeś najwięcej na X, uważaj" —
