@@ -93,6 +93,8 @@ import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFood
 import SpendByDaySection from '@/components/dashboard/SpendByDaySection';
 import FixedVariableSection from '@/components/dashboard/FixedVariableSection';
 import YearAgoSection from '@/components/dashboard/YearAgoSection';
+import SeasonalSpendSection from '@/components/dashboard/SeasonalSpendSection';
+import { seasonalSpendWarning } from '@/utils/seasonalSpend';
 import CalorieBalanceSection from '@/components/dashboard/CalorieBalanceSection';
 import CorrelationsSection from '@/components/dashboard/CorrelationsSection';
 import TopProductsSection from '@/components/dashboard/TopProductsSection';
@@ -268,7 +270,7 @@ function todayStr() {
 // ułamek sekundy później, więc błędna klasyfikacja to kosmetyka do poprawienia, nie bug.
 const DEFERRED_SECTIONS = new Set<string>([
   'month-summary', 'weekly-insights', 'maintenance-reminders', 'pinned-notes',
-  'personal-records', 'trivia', 'reflections', 'time-capsule', 'year-ago',
+  'personal-records', 'trivia', 'reflections', 'time-capsule', 'year-ago', 'seasonal-spend',
   'food-breakdown', 'shops-collection', 'gablota-card', 'sweets-vs-food',
   'fixed-variable', 'spend-by-day', 'work-hours', 'top-products', 'fun-facts',
   'correlations', 'insights-web', 'mood-cal', 'mood-wave', 'month-tasks',
@@ -2260,6 +2262,18 @@ export default function DashboardScreen() {
     return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
   }, [expenses, moodByDay, healthDays, scope]);
 
+  // "Sezonowy wzorzec wydatków rok do roku" (2026-09-28, user zaakceptował pomysł: "po roku
+  // działania appki: W październiku zeszłego roku wydałeś najwięcej na X, uważaj") — czysta
+  // funkcja w seasonalSpend.ts, patrz odwrotność §202 (miesiąc-do-miesiąca) — tu punkt
+  // odniesienia to TEN SAM miesiąc kalendarzowy ROK wcześniej, nie miesiąc poprzedni.
+  // Gated do pierwszych 7 dni miesiąca — to ma być TERAZOWY heads-up na początku miesiąca,
+  // nie karta wisząca cały miesiąc (ten sam "ostatnia szansa"/"świeży początek" wzorzec co
+  // refreshEventEndingReminder w notificationsService.ts, tylko odwrócony w czasie).
+  const seasonalSpend = useMemo(() => {
+    if (new Date().getDate() > 7) return null;
+    return seasonalSpendWarning(expenses);
+  }, [expenses]);
+
   // Historyczna pogoda (past_days=60 z weatherService, cache 6h) — jedyna metryka w
   // insightLinks, której dashboard jeszcze nie trzyma w pamięci; pobierana raz, potem
   // scalana per-dzień poniżej. Brak zgody na lokalizację / offline → po prostu pusta mapa,
@@ -3058,6 +3072,8 @@ export default function DashboardScreen() {
             })();
 
             nodes['year-ago'] = yearAgo.has && <YearAgoSection s={s} cardBg={cardBgDark} accentColor={accentColor} yearAgo={yearAgo} />;
+
+            nodes['seasonal-spend'] = seasonalSpend && <SeasonalSpendSection s={s} cardBg={cardBgDark} accentColor={accentColor} warning={seasonalSpend} />;
 
             nodes['food-breakdown'] = foodBreakdown.months.some(m => m.total > 0) && (() => {
               const fb = foodBreakdown;

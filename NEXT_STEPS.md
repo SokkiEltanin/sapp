@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sezonowy wzorzec wydatków rok do roku (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §205. Drugi i ostatni z dwóch zaakceptowanych pomysłów z
+drugiej rundy brainstormingu tej sesji (pierwszy: miesięczne porównanie §202) — **TO
+ZAMYKA CAŁĄ TĘ RUNDĘ**. Nowa karta dashboardu "Wzorzec sezonowy" (gated do pierwszych 7 dni
+miesiąca): "W [miesiącu] [rok] najwięcej wydałeś na [kategoria] — X zł. Może się
+powtórzyć." — czysta funkcja `seasonalSpendWarning()` w `src/utils/seasonalSpend.ts`,
+zero ręcznego wpisywania, zero nowego store'u. `tsc`/`jest` czyste (88/88 suite, 1146
+testów, +6).
+
+**🆕 Priorytet testu na urządzeniu — niski, wymaga >1 roku danych**: na początku miesiąca
+(dni 1-7) sprawdź czy karta "Wzorzec sezonowy" pokazuje się i ma sensowną treść, jeśli masz
+już ponad rok historii wydatków.
+
+**Zostaje z listy pomysłów tej rundy**: tylko "Grupowanie powiadomień w jeden digest" —
+najbardziej złożony, jeszcze niezbudowany, patrz sekcja "Mniejsze, odłożone rzeczy" niżej.
+
 ## ✅ Statystyki apki: czytelne liczby + zakładki zamiast infinity scroll (2026-09-28)
 
 User: screenshot ekranu "Statystyki apki" — "nie ma co odczytać z tego, popraw żeby były
@@ -153,11 +170,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
   jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
   `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
-
-- **Sezonowy wzorzec wydatków rok do roku** (user zaakceptował 2026-09-28, do zbudowania) —
-  po roku działania appki: "W październiku zeszłego roku wydałeś najwięcej na X, uważaj" —
-  czysto historyczna analiza z `expenses` po kategorii i miesiącu, porównanie z tym samym
-  miesiącem rok wcześniej, zero nowego store'u, zero ręcznego wpisywania.
 
 - **Grupowanie powiadomień w jeden digest zamiast osobnego spamu** (user zaakceptował
   2026-09-28, do zbudowania) — gdy kilka zaplanowanych powiadomień (przypomnienie długu +
