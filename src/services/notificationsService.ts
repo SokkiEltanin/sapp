@@ -783,6 +783,37 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`debt-${id}`).catch(() => {});
   },
 
+  // Notatka (2026-09-28, user zaakceptował pomysł: przypomnienie do notatki, jak w Google
+  // Keep) — direct consequence of a user action (wybór daty/godziny w edytorze notatki),
+  // więc bez `notif_enabled` gate — ta sama logika co scheduleDebtReminder/
+  // scheduleCapsuleUnlockReminder wyżej. `reminderAtIso` to 'YYYY-MM-DDTHH:MM' lokalnego
+  // czasu (DatePickerField+TimePickerField połączone w notes.tsx). Wołane przy każdym
+  // zapisie notatki (dodanie/edycja/wyczyszczenie pola) — cancel zawsze pierwszy, żeby
+  // zmiana daty/wyczyszczenie nie zostawiły starego powiadomienia.
+  async scheduleNoteReminder(id: string, title: string, reminderAtIso: string): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(`note-${id}`).catch(() => {});
+      const [datePart, timePart] = reminderAtIso.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hour, minute] = (timePart ?? '09:00').split(':').map(Number);
+      const fire = new Date(year, month - 1, day, hour, minute, 0);
+      if (fire <= new Date()) return;
+      await Notifications.scheduleNotificationAsync({
+        identifier: `note-${id}`,
+        content: {
+          title: 'Przypomnienie o notatce',
+          body: title.trim() || 'Zajrzyj do zapisanej notatki',
+          data: { screen: 'note', noteId: id },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+      });
+    } catch {}
+  },
+
+  async cancelNoteReminder(id: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`note-${id}`).catch(() => {});
+  },
+
   // Pupil mission (petStore.startMission, 2026-08-15) — direct consequence of a user action
   // (sending the pet off), not a passive daily nag, so no `notif_enabled` gate — same reasoning
   // as scheduleSnoozeReminder above. Fires once the mission's real-time duration has elapsed,

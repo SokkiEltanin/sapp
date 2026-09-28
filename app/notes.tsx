@@ -9,6 +9,7 @@ import {
   ArrowLeft, Plus, Pin, PinOff, Trash2, Search, X, Tag,
   FileText, Bold, Italic, Underline, Type, ClipboardList,
   Folder, FolderOpen, FolderPlus, ChevronDown, CalendarClock,
+  Bell, BellOff,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
@@ -16,6 +17,8 @@ import { useCounters } from '@/store/countersStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import DatePickerField from '@/components/ui/DatePickerField';
+import TimePickerField from '@/components/ui/TimePickerField';
 import {
   Note, getAllNotes, createNote, updateNote, deleteNote,
   loadFolders, createFolder, renameFolder, deleteFolder,
@@ -24,11 +27,13 @@ import {
   RichBlock, makeBlock, serializeBlocks, deserializeBlocks,
   blocksToPlainText, RICH_COLORS, RICH_SIZES,
 } from '@/utils/richText';
+import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
+import { todayISO } from '@/utils/date';
 
 const V = {
   card:       '#1A1226',
@@ -246,7 +251,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   note: Note | null;
   visible: boolean;
   onClose: () => void;
-  onSave: (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => void;
+  onSave: (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined, reminderAt: string | undefined) => void;
   folders: string[];
 }) {
   const colors = useColors();
@@ -257,6 +262,11 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   const [tags, setTags]           = useState<string[]>([]);
   const [folder, setFolder]       = useState<string | undefined>(undefined);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  // Przypomnienie do notatki (2026-09-28, user zaakceptował pomysł) — osobne data/godzina
+  // (jak w tasks/add.tsx), złączone w jeden 'YYYY-MM-DDTHH:MM' string dopiero przy zapisie.
+  const [reminderOn, setReminderOn]     = useState(false);
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('09:00');
 
   const blockRefs = useRef<Map<string, TextInput | null>>(new Map());
 
@@ -274,6 +284,10 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
       setFolder(note?.folder);
       setTagInput('');
       setFocusedId(null);
+      const [d, t] = (note?.reminderAt ?? '').split('T');
+      setReminderOn(!!note?.reminderAt);
+      setReminderDate(d || todayISO());
+      setReminderTime(t || '09:00');
     }
   }, [visible, note]);
 
@@ -288,7 +302,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   const handleSave = () => {
     const hasContent = title.trim() || blocksToPlainText(blocks).trim();
     if (!hasContent) { onClose(); return; }
-    onSave(title.trim(), blocks, tags, folder);
+    onSave(title.trim(), blocks, tags, folder, reminderOn ? `${reminderDate}T${reminderTime}` : undefined);
   };
 
   const updateBlockText = (id: string, text: string) => {
@@ -415,6 +429,29 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
                 <FolderPicker folders={folders} value={folder} onChange={setFolder} />
               )}
 
+              {/* Przypomnienie (2026-09-28, user zaakceptował pomysł: jak w Google Keep) */}
+              <TouchableOpacity
+                style={[em.reminderToggle, reminderOn && em.reminderToggleOn]}
+                onPress={() => { haptic.tap(); setReminderOn(v => !v); }}
+                activeOpacity={0.8}
+              >
+                {reminderOn ? <Bell size={14} color={V.accent} /> : <BellOff size={14} color={colors.text.muted} />}
+                <Text style={[em.reminderToggleText, reminderOn && { color: V.accent }]}>
+                  {reminderOn ? `Przypomnienie ${reminderDate} o ${reminderTime}` : 'Dodaj przypomnienie'}
+                </Text>
+                {reminderOn && (
+                  <TouchableOpacity onPress={() => { haptic.tap(); setReminderOn(false); }} hitSlop={8}>
+                    <X size={12} color={colors.text.muted} />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+              {reminderOn && (
+                <View style={em.reminderFieldsRow}>
+                  <DatePickerField value={reminderDate} onChange={setReminderDate} style={{ flex: 1 }} />
+                  <TimePickerField value={reminderTime} onChange={setReminderTime} style={{ flex: 1 }} />
+                </View>
+              )}
+
               <View style={em.tagInputRow}>
                 <Tag size={13} color={colors.text.muted} />
                 <TextInput
@@ -492,6 +529,15 @@ const makeEm = (c: any) => StyleSheet.create({
     minHeight: 28,
   },
   metaSection: { gap: spacing[2], marginTop: spacing[3] },
+  reminderToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    borderRadius: radius.lg, borderWidth: 1,
+    borderColor: c.border.default, backgroundColor: c.bg.card,
+  },
+  reminderToggleOn: { borderColor: V.accent + '55', backgroundColor: V.accentDim },
+  reminderToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.muted },
+  reminderFieldsRow: { flexDirection: 'row', gap: spacing[2] },
   tagInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: c.bg.card,
@@ -710,20 +756,27 @@ export default function NotesScreen() {
     setEditorOpen(true);
   }, []);
 
-  const handleSave = async (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => {
+  const handleSave = async (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined, reminderAt: string | undefined) => {
     setEditorOpen(false);
     haptic.success();
     const body = blocksToPlainText(blocks);
     const hasFormatting = blocks.some(b => b.bold || b.italic || b.underline || b.color || b.size);
     const bodyRich = hasFormatting ? serializeBlocks(blocks) : undefined;
 
+    let savedId: string;
     if (editorNote) {
-      await updateNote(editorNote.id, { title, body, bodyRich, tags, folder });
+      await updateNote(editorNote.id, { title, body, bodyRich, tags, folder, reminderAt });
+      savedId = editorNote.id;
       toast.success('Notatka zaktualizowana');
     } else {
-      await createNote({ title, body, bodyRich, tags, folder: folder ?? (activeFolder ?? undefined) });
+      const created = await createNote({ title, body, bodyRich, tags, folder: folder ?? (activeFolder ?? undefined), reminderAt });
+      savedId = created.id;
       toast.success('Notatka zapisana');
     }
+    // scheduleNoteReminder cancel'uje stare powiadomienie samo w środku (na wypadek zmiany
+    // daty) — gdy pole wyczyszczone, trzeba to zrobić tu, bo nic już nie zaplanuje na nowo.
+    if (reminderAt) notificationsService.scheduleNoteReminder(savedId, title, reminderAt).catch(() => {});
+    else notificationsService.cancelNoteReminder(savedId).catch(() => {});
     loadAll();
   };
 
@@ -759,6 +812,7 @@ export default function NotesScreen() {
   const doDeleteNote = async (note: Note) => {
     haptic.medium();
     await deleteNote(note.id);
+    if (note.reminderAt) notificationsService.cancelNoteReminder(note.id).catch(() => {});
     toast.info('Usunięto');
     loadAll();
   };

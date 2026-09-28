@@ -9,6 +9,10 @@ export interface Note {
   folder?: string;    // catalog name, undefined = uncategorized
   pinned: boolean;
   counterId?: string; // linked to a Counter (odliczanie) — see app/counters/[id].tsx
+  // Przypomnienie do notatki (2026-09-28, user zaakceptował pomysł) — jak w Google Keep,
+  // opcjonalna data/godzina kiedy przypomnieć o tej notatce. 'YYYY-MM-DDTHH:MM' (lokalny
+  // czas, bez strefy — ten sam format co DatePickerField/TimePickerField łączone).
+  reminderAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,7 +44,7 @@ export async function getAllNotes(): Promise<Note[]> {
 }
 
 export async function createNote(
-  data: Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder'> & Partial<Pick<Note, 'counterId'>>,
+  data: Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder'> & Partial<Pick<Note, 'counterId' | 'reminderAt'>>,
 ): Promise<Note> {
   const notes = await load();
   const now = new Date().toISOString();
@@ -52,6 +56,7 @@ export async function createNote(
     tags: data.tags,
     folder: data.folder,
     counterId: data.counterId,
+    reminderAt: data.reminderAt,
     pinned: false,
     createdAt: now,
     updatedAt: now,
@@ -63,7 +68,7 @@ export async function createNote(
 
 export async function updateNote(
   id: string,
-  updates: Partial<Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder' | 'pinned' | 'counterId'>>,
+  updates: Partial<Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder' | 'pinned' | 'counterId' | 'reminderAt'>>,
 ): Promise<void> {
   const notes = await load();
   const idx = notes.findIndex(n => n.id === id);

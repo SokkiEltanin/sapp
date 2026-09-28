@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Przypomnienie do notatki (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §201. Trzeci, ostatni z 3 zaakceptowanych pomysłów tej sesji —
+**TO ZAMYKA CAŁĄ LISTĘ** (dług §199, subskrypcje §200, notatka §201). `Note` ma teraz
+opcjonalne `reminderAt` — toggle "Dodaj przypomnienie" w edytorze (jak w Google Keep),
+`scheduleNoteReminder`/`cancelNoteReminder` w `notificationsService.ts` (ten sam wzorzec co
+dług/kapsuła czasu), tap w powiadomienie otwiera tę konkretną notatkę (nowa gałąź
+`screen === 'note'` w tap-routerze). `tsc`/`jest` czyste (87/87 suite, 1140 testów, bez
+zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dodaj przypomnienie z bliską datą → sprawdź
+że przychodzi i tap otwiera właściwą notatkę; wyczyść pole w zapisanej notatce → sprawdź że
+stare powiadomienie znika.
+
+**Zostaje z listy pomysłów tej sesji**: blokada appki biometrią (świadomie odłożona, niski
+priorytet) i rozszerzenie powiadomień bankowych poza Pekao (zablokowane na uporządkowaniu
+ustawień banku — patrz sekcja "Mniejsze, odłożone rzeczy" niżej).
+
 ## 🆕 Łączny koszt subskrypcji "od zawsze" (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §200. Drugi z 3 zaakceptowanych, jeszcze niezbudowanych
@@ -88,11 +106,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
 
 ## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
 
-- **Przypomnienie do notatki** (user zaakceptował pomysł 2026-09-27) — `Note` (notesStorage.ts)
-  ma tagi/foldery/pin/link do licznika, ale brak pola z datą przypomnienia (jak w Google Keep).
-  Dodać opcjonalne `reminderAt?: string` w `Note`, pole w edytorze (reuse `DatePickerField`/
-  `TimePickerField`), nowy `scheduleNoteReminder`/`cancelNoteReminder` w
-  `notificationsService.ts` (ten sam wzorzec co kapsuła czasu/dług) — tap otwiera notatkę.
 - **Blokada appki biometrią** (user zaakceptował pomysł 2026-09-27, ALE NISKI PRIORYTET —
   "na razie nie róbmy i tak nikt nie ma telefonu oprócz mnie", nie zaczynać budowy bez
   wyraźnego sygnału że to teraz potrzebne) — appka trzyma dane finansowe, długi, prywatny

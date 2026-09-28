@@ -11965,6 +11965,47 @@ wydatków → zera). `tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, +5
 **Priorytet testu na urządzeniu — niski**: otwórz Subskrypcje, sprawdź że przy subskrypcji
 z historią płatności pojawia się linijka "od X: Y zł zapłacone" z sensowną sumą.
 
+## 201. Przypomnienie do notatki (2026-09-28)
+
+User (trzeci, ostatni z listy zaakceptowanych pomysłów tej rundy): `Note`
+(`notesStorage.ts`) miała tagi/foldery/pin/link do licznika, ale brak pola z datą
+przypomnienia (jak w Google Keep).
+
+**Rozwiązanie**:
+- `Note.reminderAt?: string` (nowe pole, `notesStorage.ts`) — `'YYYY-MM-DDTHH:MM'`
+  lokalnego czasu, dopisane do `createNote`/`updateNote`'s przyjmowanych pól.
+- `notificationsService.ts` — nowa `scheduleNoteReminder(id, title, reminderAtIso)` +
+  `cancelNoteReminder(id)`, ten sam schedule/cancel-po-identyfikatorze wzorzec co
+  `scheduleDebtReminder`/`scheduleCapsuleUnlockReminder` (bez `notif_enabled` gate —
+  bezpośrednia konsekwencja wyboru daty w edytorze).
+- `notes.tsx`'s `NoteEditorModal` — nowy toggle "Dodaj przypomnienie" (ten sam wzorzec co
+  `tasks/add.tsx`'s przypomnienie: `DatePickerField`+`TimePickerField` osobno, złączone w
+  jeden string dopiero przy zapisie). `onSave` rozszerzone o `reminderAt` jako ostatni
+  argument.
+- Ekranowy `handleSave` — po zapisie notatki (nowej lub edytowanej) planuje/anuluje
+  powiadomienie; `scheduleNoteReminder` samo cancel'uje stare wewnątrz (na wypadek zmiany
+  daty), więc jawny `cancelNoteReminder` woła się tylko gdy pole zostało WYCZYSZCZONE
+  (nic by inaczej nie zaplanowało nowego powiadomienia na to miejsce). `doDeleteNote` też
+  anuluje — usunięta notatka nie ma po co przypominać.
+- `app/_layout.tsx`'s tap-router — nowa gałąź `screen === 'note'` → `/notes` z parametrem
+  `noteId` (ekran `notes.tsx` już czyta ten param i otwiera edytor konkretnej notatki, patrz
+  `useLocalSearchParams<{ noteId?: string }>` — istniejący mechanizm, nie nowy).
+
+**Testy**: brak nowych — czysta UI-owa ekstensja istniejącego edytora + storage pole,
+`notesStorage.ts`/`notes.tsx` nie mają dedykowanych testów jednostkowych (logika zbyt
+spleciona z komponentem/AsyncStorage, ten sam brak co reszta tego ekranu).
+`tsc --noEmit`/`jest` czyste (87/87 suite, 1140 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dodaj/edytuj notatkę, włącz przypomnienie z
+bliską datą/godziną → sprawdź że powiadomienie przychodzi, tap otwiera tę konkretną
+notatkę; wyczyść pole przypomnienia w już zapisanej notatce → sprawdź że stare
+powiadomienie się NIE pojawia.
+
+**Status listy pomysłów tej sesji**: to zamyka WSZYSTKIE 3 zaakceptowane, wcześniej
+niezbudowane pomysły (dług §199, subskrypcje §200, notatka §201). Zostaje tylko blokada
+biometrią (świadomie odłożona, niski priorytet) i rozszerzenie banków (zablokowane na
+uporządkowaniu ustawień) — oba w NEXT_STEPS.md.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
