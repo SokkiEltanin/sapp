@@ -518,6 +518,8 @@ export default function RootLayout() {
         router.navigate('/habits' as any);
       } else if (screen === 'subscriptions') {
         router.navigate('/expenses/subscriptions' as any);
+      } else if (screen === 'debts') {
+        router.navigate('/debts' as any);      // termin długu reminder
       } else if (screen === 'vehicles') {
         router.navigate('/vehicles' as any);   // "Serwis / wymiana" reminder
       } else if (screen === 'finances') {

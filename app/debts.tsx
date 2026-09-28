@@ -11,6 +11,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { debtsService } from '@/services/debtsService';
 import { expensesService } from '@/services/expensesService';
+import { notificationsService } from '@/services/notificationsService';
 import { Debt, PaymentMethod } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -59,9 +60,10 @@ export default function DebtsScreen() {
     if (isNaN(amt) || amt <= 0) { Alert.alert('Błędna kwota', 'Podaj kwotę'); return; }
     haptic.success();
     try {
-      await debtsService.add({ person: person.trim(), kind, amount: amt, currency: 'PLN', askDate, note: note.trim() || undefined });
+      const created = await debtsService.add({ person: person.trim(), kind, amount: amt, currency: 'PLN', askDate, note: note.trim() || undefined });
       setAddOpen(false); resetForm(); reload();
       toast.success('Dodano');
+      notificationsService.scheduleDebtReminder(created.id, created.person, created.amount, kind === 'iOwe', askDate).catch(() => {});
     } catch (e: any) { Alert.alert('Błąd', e.message); }
   };
 
@@ -79,6 +81,7 @@ export default function DebtsScreen() {
         });
       }
       await debtsService.update(d.id, { settled: true, settledMethod: method, settledDate: todayIso() });
+      notificationsService.cancelDebtReminder(d.id).catch(() => {});
       setSettling(null); reload();
       toast.success(method === 'cash'
         ? (iOwe ? 'Rozliczono — dodano do wydatków' : 'Rozliczono — dodano do przychodów')
@@ -214,7 +217,13 @@ export default function DebtsScreen() {
         title="Usuń dług"
         message={pendingDelete ? `Usunąć „${pendingDelete.person} · ${pendingDelete.amount} zł"?` : undefined}
         onCancel={() => setPendingDelete(null)}
-        onConfirm={() => { if (pendingDelete) debtsService.remove(pendingDelete.id).then(reload).catch(() => {}); setPendingDelete(null); }}
+        onConfirm={() => {
+          if (pendingDelete) {
+            debtsService.remove(pendingDelete.id).then(reload).catch(() => {});
+            notificationsService.cancelDebtReminder(pendingDelete.id).catch(() => {});
+          }
+          setPendingDelete(null);
+        }}
       />
     </SafeAreaView>
   );
