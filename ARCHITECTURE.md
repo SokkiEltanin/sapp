@@ -12122,6 +12122,54 @@ testów, bez zmiany).
 że karta "Najczęściej używane" i zakładki się wyświetlają, liczby nad słupkami dziennego
 wykresu są czytelne, przełączanie zakładek działa i pokazuje właściwe karty.
 
+## 205. Sezonowy wzorzec wydatków rok do roku (2026-09-28)
+
+User (drugi z dwóch zaakceptowanych pomysłów z drugiej rundy brainstormingu tej sesji, po
+§202 miesięczne porównanie): "po roku działania appki: W październiku zeszłego roku
+wydałeś najwięcej na X, uważaj" — zero ręcznego wpisywania, czysto historyczna analiza.
+
+**Różnica względem §202** (żeby nie pomylić): §202 porównuje TEN miesiąc z POPRZEDNIM
+miesiącem (miesiąc-do-miesiąca, retrospektywnie na koniec miesiąca). §205 porównuje TEN
+miesiąc kalendarzowy z TYM SAMYM miesiącem ROK WCZEŚNIEJ (sezonowo, na POCZĄTKU miesiąca) —
+inny punkt odniesienia, inny cel (wzorzec się powtarzający co roku, nie trend miesiąc do
+miesiąca).
+
+- `src/utils/seasonalSpend.ts` (nowy) — `seasonalSpendWarning(expenses, now)`: filtruje
+  wydatki z `{rok(now)-1}-{miesiąc(now)}`, sumuje po kategorii (pomija `income` i
+  `isSelfTransfer`, ta sama para filtrów co `monthCards.ts`/`buildMonthPace`), zwraca
+  kategorię z najwyższą sumą + `monthLabel` w miejscowniku ("Październiku 2025", pasuje do
+  zdania "W ... wydałeś"). `null` gdy brak danych z tego miesiąca rok wcześniej (nowy
+  install, appka używana <1 rok — sam się wyłącza, nic nie trzeba warunkować w UI).
+- `src/components/dashboard/SeasonalSpendSection.tsx` (nowy) — mały kafelek, ten sam wzorzec
+  co `YearAgoSection.tsx` (memo, `s`/`cardBg`/`accentColor` propsy), kategoria kolorowana
+  przez `getCategoryMeta()`.
+- `app/(tabs)/index.tsx` — `seasonalSpend` `useMemo` GATED do pierwszych 7 dni miesiąca
+  (`new Date().getDate() > 7` → `null`) — to ma być świeży heads-up na START miesiąca ("uważaj
+  TERAZ, zanim znowu przepalisz"), nie karta wisząca przez cały miesiąc po tym jak już
+  minęło jego znaczenie. Nowa sekcja `'seasonal-spend'` w pełni podpięta: `DEFAULT_DASHBOARD_
+  SECTIONS`/`SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP` (`dashboardLayout.ts`, grupa
+  "Przegląd i statystyki" — obok `year-ago`) + `DEFERRED_SECTIONS` (nie krytyczna do
+  pierwszego renderu, jak `year-ago`) + node w drzewie sekcji. NIE dodana do `AUTO_SECTIONS`
+  — to zwykła orderable karta (user może schować/przenieść w edytorze), nie kontekstowy alert
+  ukryty przed edytorem jak `payday-prompt`/`reimbursement-confirm`.
+
+**Testy**: `__tests__/seasonalSpend.test.ts` (nowy, 6 testów) — pusta lista, brak danych z
+tego miesiąca rok wcześniej, wybór kategorii z najwyższą sumą, pominięcie przychodu,
+pominięcie transferu własnego, granica roku (styczeń → styczeń poprzedniego roku, NIE
+grudzień — złapane przez pierwszą wersję testu, który błędnie zakładał "poprzedni miesiąc
+poprzedniego roku" zamiast "ten sam miesiąc poprzedniego roku"). `tsc --noEmit`/`jest`
+czyste (88/88 suite, 1146 testów, +6).
+
+**Priorytet testu na urządzeniu — niski** (wymaga realnych danych sprzed >1 roku, których
+świeży use case może jeszcze nie mieć): na początku miesiąca (dni 1-7) sprawdź czy karta
+"Wzorzec sezonowy" pokazuje sensowną kategorię/kwotę z tego samego miesiąca rok wcześniej,
+jeśli appka ma już ponad rok danych.
+
+**Status listy pomysłów tej rundy**: to zamyka OBA zaakceptowane punkty z drugiej rundy
+brainstormingu (miesięczne porównanie §202, sezonowy wzorzec §205). Zostaje tylko
+"grupowanie powiadomień w jeden digest" — najbardziej złożony, jeszcze niezbudowany, w
+NEXT_STEPS.md.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
