@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Łączny koszt subskrypcji "od zawsze" (2026-09-28)
+
+Pełny opis w ARCHITECTURE.md §200. Drugi z 3 zaakceptowanych, jeszcze niezbudowanych
+pomysłów tej sesji. `subscriptions.tsx` pokazywał tylko koszt miesięczny/roczny — teraz
+przy subskrypcji z historią płatności pokazuje też "od {data pierwszego dopasowanego
+wydatku}: X zł zapłacone" (`subscriptionLifetimeTotal()` w `subscriptionAuto.ts`, odwrotność
+już istniejącego `matchSubscriptionForPayment` — dopasowuje WSZYSTKIE historyczne wydatki po
+nazwie, nie tylko najnowszą płatność). Czysto informacyjny szacunek (fałszywe trafienie
+możliwe przy niejednoznacznej nazwie), zero nowego store'u. `tsc`/`jest` czyste (87/87
+suite, 1140 testów, +5 nowych).
+
+**🆕 Priorytet testu na urządzeniu — niski**: otwórz Subskrypcje, sprawdź sensowność sumy
+przy subskrypcji z historią płatności.
+
 ## 🆕 Powiadomienie push o terminie długu (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §199. Pierwszy z 3 zaakceptowanych, jeszcze niezbudowanych
@@ -74,13 +88,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
 
 ## 🟢 Mniejsze, odłożone rzeczy (kontynuacja listy pomysłów, do zbudowania)
 
-- **Łączny koszt subskrypcji "od zawsze"** (user zaakceptował pomysł 2026-09-27) —
-  `subscriptions.tsx` pokazuje tylko koszt miesięczny/roczny, nie ile już realnie wydano na
-  daną usługę. Dorzucić derived stat w `useSubscriptions.ts` (zero nowego store'u): zsumować
-  WSZYSTKIE historyczne wydatki dopasowane do subskrypcji po nazwie, tym samym fuzzy-matchem
-  co już istniejący `matchSubscriptionForPayment` w `subscriptionAuto.ts` (tam dopasowuje
-  tylko NAJNOWSZĄ płatność — tu potrzebne dopasowanie WSZYSTKICH, nie tylko jednej). Wyświetlić
-  w `SubItem` (subscriptions.tsx), np. "od {startDate}: X zł zapłacone".
 - **Przypomnienie do notatki** (user zaakceptował pomysł 2026-09-27) — `Note` (notesStorage.ts)
   ma tagi/foldery/pin/link do licznika, ale brak pola z datą przypomnienia (jak w Google Keep).
   Dodać opcjonalne `reminderAt?: string` w `Note`, pole w edytorze (reuse `DatePickerField`/
