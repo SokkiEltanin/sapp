@@ -5466,9 +5466,16 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
-- **Powiadomienia bankowe** działają tylko dla Pekao. Plan (nie zbudowany): user wybiera swoją
-  appkę bankową z listy zainstalowanych (generalizacja `BANK_PACKAGES`), generyczne heurystyki
-  (kwota+waluta, słowa kluczowe), ekran "naucz mnie" gdy niepewne.
+- **Powiadomienia bankowe** działają tylko dla Pekao (user zaakceptował kierunek 2026-09-28,
+  Z ZASTRZEŻENIEM — "rozszerzeniem spoko, ale na razie mamy chaos w ustawieniach jeżeli
+  chodzi o te banki, musielibyśmy to uporządkować najpierw"). WARUNEK WSTĘPNY przed
+  generalizacją: posprzątać sekcję "Auto-wydatki z banku (PeoPay)" w settings.tsx (nazwa
+  sekcji wciąż mówi "PeoPay" mimo że czyta ogólne powiadomienia bankowe, plus
+  `BankHistorySection`/`bankRulesStore`/kilka rozrzuconych przełączników — user chce to
+  ogarnięte, ZANIM dojdzie druga appka bankowa do wyboru). Plan (nie zbudowany, DOPIERO po
+  uporządkowaniu): user wybiera swoją appkę bankową z listy zainstalowanych (generalizacja
+  `BANK_PACKAGES`), generyczne heurystyki (kwota+waluta, słowa kluczowe), ekran "naucz mnie"
+  gdy niepewne.
 - `app/habits.tsx` (~linia 577-585) ma stary stepper ±1h/±5min do godziny przypomnienia —
   `TimePickerField`/`WheelPicker` już istnieją i są używane w zadaniach, tylko trzeba podmienić.
 - Tryb ręczny godzin pracy (Ustawienia→Praca→Ręcznie) nie ma odpowiednika na dashboardzie —
