@@ -27,7 +27,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getPayers, addPayer } from '@/utils/payers';
 import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
-import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
+import { getBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { categorize, getFoodTags } from '@/utils/receiptParser';
 import { loadProductMemory, applyProductMemory, loadTagMemory, applyTagMemory, getTagFrequency, saveProductCategories, saveTagMemory } from '@/utils/productMemory';
@@ -82,7 +82,6 @@ export default function AddExpenseModal() {
   const addExpense  = useExpensesStore((s) => s.addExpense);
   const expenses    = useExpensesStore((s) => s.expenses);
   const [balanceOffset, setBalanceOffset] = useState(0);
-  const [cashOffset, setCashOffset] = useState(0);
   const [workPrefix, setWorkPrefix] = useState('');
   const kb = useKeyboardHeight();
   const colors = useColors();
@@ -107,18 +106,28 @@ export default function AddExpenseModal() {
   useEffect(() => { vehiclesService.getAll().then(setVehicles).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
   useEffect(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []);
-  useEffect(() => { getCashOffset().then(setCashOffset).catch(() => {}); }, []);
   useEffect(() => { workService.getSettings().then(s => setWorkPrefix((s.workPrefix ?? '').trim())).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
   const amountColor = isIncome ? '#2AC68F' : '#E43434';
 
-  // Current TOTAL balance (card + cash, mine only — matches Finances) + projection.
+  // Aktualne Saldo NA KARCIE (mine, bez gotówki) + projekcja po dodaniu tej transakcji.
+  // Gotówka (2026-09-29, user: "z gotówką w ogóle bez sensu... nie uwzględniam jej [w
+  // saldzie]") NIGDY nie wchodzi do Salda — to samo `mine && paymentMethod !== 'cash'`
+  // co `allExp`/`allInc` w finances.tsx (Saldo tam jest jawnie "NA KARCIE", nie karta+
+  // gotówka, patrz komentarz 2026-09-16 tam) — TEN kod dotąd liczył PRZECIWNIE (dodawał
+  // `cashOffset` + wliczał transakcje gotówkowe), więc podgląd Salda przy dodawaniu
+  // wydatku i realne Saldo w Finansach POKAZYWAŁY RÓŻNE LICZBY. `paymentMethod: 'cash'`
+  // na samym wydatku ZOSTAJE nietknięty — gotówkowy zakup nadal liczy się do wydatków
+  // miesiąca/jedzenia (finances.tsx `monthTotals.exp`/`food`), tylko nie do Salda.
   const accountBalance = (() => {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let net = 0;
-    for (const e of unique) { if (!isMine(e)) continue; net += e.type === 'income' ? e.amount : -e.amount; }
-    return balanceOffset + cashOffset + net;
+    for (const e of unique) {
+      if (!isMine(e) || e.paymentMethod === 'cash') continue;
+      net += e.type === 'income' ? e.amount : -e.amount;
+    }
+    return balanceOffset + net;
   })();
   const amtNum = parseFloat(amount.replace(',', '.'));
   const projectedBalance = !isNaN(amtNum) && amtNum > 0
