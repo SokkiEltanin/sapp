@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Auto-przyznane zamrożenia serii na kamieniach milowych (2026-09-29)
+
+Pełny opis w ARCHITECTURE.md §209. Wzorem Duolingo (user poprosił o research innych
+appek) — +1 zamrożenie serii automatycznie co 7 dni nieprzerwanej serii nawyku, obok
+istniejącego zakupu za monety. `grantMilestone()` w `streakFreezeStore.ts`, wołane z
+`useHabits.ts`. `tsc`/`jest` czyste (90/90 suite, 1166 testów, +7).
+
+**🆕 Priorytet testu na urządzeniu — niski** (wymaga 7-dniowej serii): sprawdź że licznik
+zamrożeń rośnie automatycznie przy wielokrotności 7 dni serii.
+
 ## 🆕 Roczne podsumowanie kosztu posiadania pojazdu (2026-09-29)
 
 Pełny opis w ARCHITECTURE.md §208. Nowa sekcja "Ostatnie 12 miesięcy" w rozwiniętym

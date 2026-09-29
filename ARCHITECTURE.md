@@ -12298,6 +12298,48 @@ poprzednie 12 mies., filtrowanie po pojeździe/przychodach). `tsc --noEmit`/`jes
 **Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd z historią wydatków →
 sprawdź sensowność sumy 12-miesięcznej i (jeśli >1 rok danych) procentu zmiany.
 
+## 209. Auto-przyznane zamrożenia serii na kamieniach milowych (2026-09-29)
+
+User (po researchu innych appek na jego prośbę — "zrob reaserch co ine aplikacje robią"):
+zaakceptował pomysł wzorowany na Duolingo. Z researchu: Duolingo przyznaje "streak freeze"
+AUTOMATYCZNIE na kamieniach milowych, zanim są potrzebne — "już w kieszeni", nie nagroda do
+kupienia w panice gdy seria już pęka; dane: użytkownicy z serią 7+ dni mają 2.4× wyższą
+retencję niż ci bez serii.
+
+Appka miała już DOKŁADNIE tę mechanikę zamrożenia (`streakFreezeStore.ts` — gdy ominiesz
+dzień z realną serią, appka automatycznie zużywa 1 zamrożenie z zapasu, seria nie pada), ale
+zapas rósł WYŁĄCZNIE przez zakup za monety w Rynku (`pet-shop.tsx`, `FREEZE_COST = 50`) —
+żadnego automatycznego przyznawania. To dokładnie luka względem sprawdzonego wzorca z
+researchu.
+
+**Rozwiązanie**:
+- `src/store/streakFreezeStore.ts` — nowe pole `grantedMilestones: Record<habitId,
+  number>` (najwyższy już nagrodzony próg, wielokrotność 7) + `grantMilestone(habitId,
+  streak): boolean`. Liczy `milestone = floor(streak/7)*7`; jeśli wyższy niż już
+  nagrodzony — `+1 freeze`, zapisuje nowy próg. Idempotentne (bezpieczne wołanie co render)
+  i trzyma się W STORE (nie w hooku) — przeżywa restart appki i podwójny mount hooka.
+- `src/hooks/useHabits.ts` — nowy efekt, TUŻ PO `getStreak`: dla każdego nawyku z serią
+  DZIENNĄ (nie cel tygodniowy — ta sama granica co istniejąca auto-konsumpcja freeze'a
+  wyżej w pliku) liczy `getStreak(h.id)` i woła `grantMilestone`. Bez toastu/hapticu —
+  hook montowany RÓWNOCZEŚNIE na dashboardzie i ekranie Nawyków (patrz istniejący komentarz
+  w pliku), więc jawna celebracja podwoiłaby się; istniejący badge z liczbą zamrożeń
+  (`StreakWallCard.tsx`, `pet-shop.tsx`) po prostu cicho rośnie — to zresztą zgodne z
+  duchem researchu: Duolingo świadomie NIE robi z tego "nagrody do odebrania", tylko cichy
+  refill.
+- Zakup za monety w Rynku zostaje bez zmian, nietknięty — auto-przyznawanie to DODATKOWE
+  źródło zapasu, nie zamiennik.
+
+**Testy**: `__tests__/streakFreezeStore.test.ts` (nowy, 7 testów) — poniżej progu, dokładnie
+próg 7, idempotencja (ten sam próg drugi raz), wzrost w obrębie tego samego progu (7→10),
+kolejny próg (14), progi niezależne per nawyk, przeskok od razu na wysoki próg (30) przyznaje
+tylko 1 zamrożenie (nie 4 naraz za wszystkie pominięte progi — ochrona przed nagłym
+zaimportowaniem/przeliczeniem starych danych). `tsc --noEmit`/`jest` czyste (90/90 suite,
+1166 testów, +7).
+
+**Priorytet testu na urządzeniu — niski** (wymaga 7-dniowej serii nawyku, nie da się
+wywołać na żądanie): jeśli masz nawyk z serią zbliżającą się do wielokrotności 7, sprawdź
+że licznik zamrożeń w Rynku/na ścianie serii rośnie automatycznie bez kupowania.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

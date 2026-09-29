@@ -77,9 +77,10 @@ export function useHabits() {
   const products = useFoodStore((s) => s.products);
 
   // Zamrożenia serii — dzień zamrożony liczy się jako zaliczony.
-  const frozen      = useStreakFreezeStore((s) => s.frozen);
-  const freezes     = useStreakFreezeStore((s) => s.freezes);
-  const applyFreeze = useStreakFreezeStore((s) => s.applyFreeze);
+  const frozen         = useStreakFreezeStore((s) => s.frozen);
+  const freezes        = useStreakFreezeStore((s) => s.freezes);
+  const applyFreeze    = useStreakFreezeStore((s) => s.applyFreeze);
+  const grantMilestone = useStreakFreezeStore((s) => s.grantMilestone);
   const isDoneOrFrozen = useCallback(
     (habit: Habit, date: string) =>
       isDone(habit, completions[date]?.[habit.id] ?? 0) || !!frozen[`${habit.id}|${date}`],
@@ -274,6 +275,23 @@ export function useHabits() {
       if (len >= 2) applyFreeze(h.id, yest);                // zużyj 1 zamrożenie na wczoraj
     }
   }, [isLoading, freezes, frozen, completions, habits, today, isDoneOrFrozen, applyFreeze]);
+
+  // AUTO-PRZYZNANE ZAMROŻENIA na kamieniach milowych serii (2026-09-29, user zaakceptował
+  // pomysł z researchu: Duolingo automatycznie przyznaje streak freeze na kamieniach
+  // milowych, ZANIM są potrzebne — "już w kieszeni", nie nagroda do kupienia w panice gdy
+  // seria już pęka; dane: 7+ dniowa seria = 2.4× wyższa retencja). +1 zamrożenie za każde
+  // kolejne 7 dni nieprzerwanej serii DZIENNEJ (nie cel tygodniowy — ta sama granica co
+  // auto-konsumpcja freeze'a wyżej). Idempotentne przez `grantedMilestones` w
+  // `streakFreezeStore.ts` (per-nawyk najwyższy już nagrodzony próg), więc bezpieczne na
+  // każdym renderze i w OBU jednoczesnych mount'ach hooka (dashboard + ekran Nawyków).
+  useEffect(() => {
+    if (isLoading) return;
+    for (const h of habits) {
+      if (h.weeklyTarget && h.weeklyTarget < 7) continue;
+      const streak = getStreak(h.id);
+      if (streak >= 7) grantMilestone(h.id, streak);
+    }
+  }, [isLoading, habits, getStreak, grantMilestone]);
 
   const getTodayCount = useCallback((habitId: string): number => {
     return completions[today]?.[habitId] ?? 0;
