@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Kafelek "Praca": pełny gradient zamiast płaskiego tła (2026-09-29)
+
+User: "z tym kolorem mi się jednak nie podoba, zrób jak byś ty to miał zrobić, może
+użyjemy ten gradientowy kafelek co na Planie [zajęć]... lekko napisy w kierunku białego
+i ten gradient na całym kafelku, wywalić ten prostokąt po lewej fioletowy". Pełny opis w
+ARCHITECTURE.md §206. Kafelek "Praca" na dashboardzie ma teraz prawdziwy `LinearGradient`
+(ciemny bursztyn, `WORK_GRADIENT`) na całej powierzchni zamiast płaskiego `cardBgDark`,
+tekst przesunięty w stronę bieli, `WORK_ACCENT` (złoto logo pracodawcy) nietknięty.
+`tsc`/`jest` czyste (88/88 suite, 1146 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dashboard → kafelek "Praca" → sprawdź gradient
+i czytelność tekstu, też w widoku wykresu (przełącznik "Ostatnie 6 msc").
+
 ## 🆕 Sezonowy wzorzec wydatków rok do roku (2026-09-28)
 
 Pełny opis w ARCHITECTURE.md §205. Drugi i ostatni z dwóch zaakceptowanych pomysłów z
