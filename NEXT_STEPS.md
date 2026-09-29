@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ TopPill: generyczny tekst zaległych, "ZARAZ" dla pracy, crossfade (2026-09-29)
+
+User: "ten pill stał się śmietnikiem... wystarczy warning albo słowo kluczowe...
+lepiej wygląda jak pisze masz przeterminowane zadanie a nie jak konkretnie, ale do
+pracy... jak mam pracę zaraz niech będzie non stop praca... żeby ten pill nie znika
+non stop zrobmy animacje pomiędzy wiadomościami inaczej". Pełny opis w
+ARCHITECTURE.md §210. Trzy zmiany w `TopPill.tsx`: (1) zaległe zadania — generyczny
+tekst zamiast rotujących tytułów, (2) zmiana pracy dziś — badge "ZARAZ" gdy start w
+ciągu godziny, (3) animacja przejścia — crossfade z podłogą opacity 0.4 zamiast miga do
+zera. `tsc`/`jest` czyste (90/90 suite, 1166 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: zaległe zadanie → generyczny tekst; zmiana
+pracy w ciągu godziny → "ZARAZ"; obserwuj pigułkę przy rotacji — płynne przesunięcie,
+nie miganie.
+
 ## 🆕 Auto-przyznane zamrożenia serii na kamieniach milowych (2026-09-29)
 
 Pełny opis w ARCHITECTURE.md §209. Wzorem Duolingo (user poprosił o research innych

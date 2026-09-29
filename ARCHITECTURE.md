@@ -12340,6 +12340,52 @@ zaimportowaniem/przeliczeniem starych danych). `tsc --noEmit`/`jest` czyste (90/
 wywołać na żądanie): jeśli masz nawyk z serią zbliżającą się do wielokrotności 7, sprawdź
 że licznik zamrożeń w Rynku/na ścianie serii rośnie automatycznie bez kupowania.
 
+## 210. TopPill: generyczny tekst zaległych, eskalacja "ZARAZ" dla pracy, crossfade zamiast miga (2026-09-29)
+
+User (screenshot pigułki "1 ZALEGŁE / DOKOŃCZYĆ SEGREGACJĘ ZDJĘĆ" na czerwonym tle):
+"ten pill stał się śmietnikiem trochę za dużo informacji na czerwonym tle wystarczy
+warning albo słowo kluczowe i chyba lepiej wygląda jak pisze masz przeterminowane
+zadanie a nie jak konkretnie, ale do pracy itp jak mam pracę zaraz niech będzie non stop
+praca plus żeby było tak że ten pill nie znika non stop zrobmy animacje pomiędzy
+wiadomościami inaczej może?" — trzy osobne zmiany w `src/components/ui/TopPill.tsx`.
+
+**1. Zaległe zadania (priorytet 4) — generyczny tekst zamiast konkretnego tytułu.**
+Dawniej rotował przez tytuły WSZYSTKICH zaległych zadań co `calmTick` (8s) — z kilkoma
+zaległymi czerwona pigułka non-stop zmieniała się na kolejne konkretne nazwy, stąd
+"śmietnik". Teraz stały tekst `'MASZ PRZETERMINOWANE ZADANIE'` + `${N} ZALEGŁE/ZALEGŁYCH`
+w badge'u (liczba zostaje, bo to realna informacja, nie szum) — konkretny tytuł dalej
+widać po stuknięciu (prowadzi do Zadań). Klucz zmieniony z `overdue-${id}` (rotujący) na
+stały `'overdue'` — skoro tekst już się nie zmienia, nie ma co animować/rotować co 8s.
+`.sort()` po deadline usunięty razem z `shown` — nie ma już potrzeby wybierać "które
+pokazać", tylko `overdue.length`.
+
+**2. Zmiana pracy dziś (priorytet 3) — eskalacja pilności.** Badge był na sztywno
+`'DZISIAJ'` od rana do wieczora, bez rozróżnienia "zmiana za 8h" od "zmiana za 10 min".
+Teraz liczy `minsUntil` do `startTime`; ≤60 min → badge `'ZARAZ'`, dalej → `'DZISIAJ'`.
+Klucz zostaje stały (`shift-today`) — to jeden ciągły stan, sama etykieta pilności się
+zmienia, żadnej rotacji/animacji przejścia między "innymi wiadomościami" w środku.
+
+**3. Animacja przejścia — crossfade zamiast miga-do-zera.** Stary efekt zmiany `key`
+animował opacity DO 0 (pigułka realnie znikała na ~130ms) przy KAŻDEJ zmianie treści —
+przy aktywnej rotacji (kilka zadań dziś/eventów gcal/kandydatów luźnej puli) pigułka
+mrugała co `CALM_ROTATE_MS` (8s) bez końca, co user odebrał jako "znika non-stop". Nowy
+`slideX` (Animated.Value) + opacity z PODŁOGĄ 0.4 (nigdy nie spada do zera) — pigułka
+lekko przygasa i zsuwa się o 5px zamiast gasnąć i zapalać się na nowo, więc czyta się
+jako przejście do nowej wiadomości, nie zniknięcie. Nadal WYŁĄCZNIE `Animated.timing` z
+`Easing.out(Easing.cubic)`, bez `Animated.spring` (ten sam ustalony 2026-09-13 zakaz —
+patrz istniejący komentarz w pliku, spring dawał bujający się "bouncy ball").
+
+**Testy**: brak nowych — `TopPill.tsx` nie ma dedykowanych testów jednostkowych (czysto
+prezentacyjny komponent z animacjami Reanimated/RN Animated, logika priorytetów zbyt
+spleciona z wieloma store'ami żeby testować bez pełnego mocka; ten sam brak co reszta
+plików UI w `components/ui/`). `tsc --noEmit`/`jest` czyste (90/90 suite, 1166 testów,
+bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: zaległe zadanie → sprawdź że pigułka pokazuje
+generyczny tekst (nie tytuł); zmiana pracy zaplanowana w ciągu godziny → badge "ZARAZ"
+zamiast "DZISIAJ"; obserwuj pigułkę podczas rotacji (kilka zadań dziś/eventów) — powinna
+się płynnie przesuwać, nie migać do czerni.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
