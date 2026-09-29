@@ -1,20 +1,56 @@
 import { buildRecords } from '@/utils/personalRecords';
-import { MoodEntry } from '@/types';
+import { Expense, MoodEntry } from '@/types';
 
 const mood = (date: string, m: number): MoodEntry => ({ date, mood: m, energy: m } as any);
+const sweetsExpense = (date: string): Expense => ({
+  id: date, amount: 10, currency: 'PLN', category: 'groceries', tags: [], note: '',
+  date, createdAt: '', updatedAt: '', type: 'expense',
+  receiptItems: [{ name: 'Ciastka', price: 10, quantity: 1, tags: ['słodycze'] } as any],
+} as Expense);
 
 describe('personalRecords — buildRecords', () => {
-  test('kroki/sen/waga — wartości + lowerIsBetter', () => {
+  test('kroki/sen/waga — wartości + lowerIsBetter + DATA dnia rekordu', () => {
     const recs = buildRecords({
       '2026-08-01': { steps: 12000, sleepMinutes: 430, weightKg: 72 },
       '2026-08-02': { steps: 8000, sleepMinutes: 500, weightKg: 71.2 },
     }, [], []);
     const byKey = Object.fromEntries(recs.map(r => [r.key, r]));
     expect(byKey.steps.num).toBe(12000);
+    expect(byKey.steps.date).toBe('2026-08-01');
     expect(byKey.sleep.num).toBe(500);
     expect(byKey.sleep.value).toBe('8h 20m');
+    expect(byKey.sleep.date).toBe('2026-08-02');
     expect(byKey.weight.num).toBe(71.2);
     expect(byKey.weight.lowerIsBetter).toBe(true);
+    expect(byKey.weight.date).toBe('2026-08-02');
+  });
+
+  test('najdłużej bez słodyczy — luka MIĘDZY zakupami, data = dzień przed kolejnym zakupem', () => {
+    // Zakup 2026-08-01, potem cisza, kolejny zakup 2026-08-20 → luka 18 dni (01→20 minus
+    // oba dni zakupu), kończąca się dzień przed drugim zakupem. Reszta zakupów co 10 dni
+    // od 08-20 AŻ DO WCZORAJ (dynamicznie, niezależnie od realnego "dziś" testu) — żeby
+    // żadna PÓŹNIEJSZA luka (w tym "seria wciąż trwa" od ostatniego zakupu do dziś) nie
+    // wypadła przypadkiem dłuższa niż 18 dni i nie wygrała zamiast luki w środku.
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const filler: string[] = [];
+    const cursor = new Date('2026-08-20T00:00:00');
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    while (cursor < yesterday) { cursor.setDate(cursor.getDate() + 10); filler.push(fmt(cursor)); }
+    filler.push(fmt(yesterday));
+    const recs = buildRecords({}, [sweetsExpense('2026-08-01'), sweetsExpense('2026-08-20'), ...filler.map(sweetsExpense)], []);
+    const r = recs.find(x => x.key === 'sweetless');
+    expect(r?.num).toBe(18);
+    expect(r?.date).toBe('2026-08-19');
+  });
+
+  test('najdłużej bez słodyczy — seria WCIĄŻ TRWA, data = dziś', () => {
+    const recs = buildRecords({}, [sweetsExpense('2026-08-01')], []);
+    const r = recs.find(x => x.key === 'sweetless');
+    expect(r?.date).toEqual(expect.any(String));
+    // "dziś" w formacie YYYY-MM-DD — nie zgadujemy dokładnej daty (zależna od zegara testu),
+    // tylko że to poprawny format i że num > 0 (seria faktycznie trwa).
+    expect(r?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(r!.num).toBeGreaterThan(0);
   });
 
   test('waga wymaga ≥2 odczytów', () => {
@@ -22,11 +58,12 @@ describe('personalRecords — buildRecords', () => {
     expect(recs.find(r => r.key === 'weight')).toBeUndefined();
   });
 
-  test('najlepszy tydzień nastroju (≥4 dni)', () => {
+  test('najlepszy tydzień nastroju (≥4 dni) — data = OSTATNI dzień najlepszego okna', () => {
     const entries = ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04'].map(d => mood(d, 5));
     const r = buildRecords({}, [], entries).find(x => x.key === 'mood');
     expect(r?.num).toBeCloseTo(5);
     expect(r?.value).toBe('5.0/5');
+    expect(r?.date).toBe('2026-08-04');
   });
 
   test('<4 dni nastroju → brak rekordu nastroju', () => {

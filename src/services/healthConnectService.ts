@@ -370,6 +370,13 @@ export interface HealthConnectDay {
   leanMassKg: number | null;
   bodyWaterKg: number | null;      // body water, kg (BIA)
   hydrationMl: number | null;      // water logged, ml
+  // Kiedy NAPRAWDĘ zmierzono skład ciała (2026-09-29, audyt czytelności) — `bfRec`/
+  // `leanRec`/`waterRec`/`bmrRec` niżej to "latest w ciągu 60 dni", NIE dzisiejszy
+  // pomiar (wagi BIA mierzy się co kilka dni, nie codziennie) — bez tej daty
+  // health.tsx pokazywał ten sam % TŁUSZCZU codziennie identycznie, niezależnie czy
+  // pomiar miał dzień czy 2 miesiące, bo Health Connect po cichu zwraca "ostatni znany"
+  // rekord. ISO string z `InstantaneousRecord.time`, `null` gdy brak żadnego pomiaru.
+  bodyCompDate: string | null;
 }
 
 // Read one day of everything we support from Health Connect. Each metric is read
@@ -486,6 +493,9 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
     leanMassKg: r1(leanRec?.mass?.inKilograms ?? leanRec?.mass?.value ?? null),
     bodyWaterKg: r1(waterRec?.mass?.inKilograms ?? waterRec?.mass?.value ?? null),
     hydrationMl: hydrationN != null ? Math.round(hydrationN) : null,
+    // Pierwszy dostępny — te cztery są zwykle zapisywane RAZEM przez tę samą wagę BIA
+    // w jednym pomiarze, więc czas dowolnego z nich reprezentuje cały odczyt.
+    bodyCompDate: bfRec?.time ?? leanRec?.time ?? waterRec?.time ?? bmrRec?.time ?? null,
   };
 }
 

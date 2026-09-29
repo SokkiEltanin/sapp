@@ -465,7 +465,13 @@ function StatTileImpl({ tile: t, statCtx, accentColor, cardBgDark, colors, s, up
           <View style={s.statTargetTrack}>
             <View style={[s.statTargetFill, { width: `${pct * 100}%`, backgroundColor: over ? colors.accent.red : accentColor }]} />
           </View>
-          <Text style={s.statSub}>{Math.round((r.value / t.target!) * 100)}% celu ({fmtStat(t.target!, r.unit)})</Text>
+          {/* Podpis okresu (2026-09-29, audyt czytelności) — gałąź "X% celu" nie mówiła
+              NIGDY czy cel jest tygodniowy czy miesięczny, mimo że druga gałąź (bez
+              celu, niżej) już to robi przy porównaniu z poprzednim okresem. */}
+          <Text style={s.statSub}>
+            {Math.round((r.value / t.target!) * 100)}% celu ({fmtStat(t.target!, r.unit)})
+            {def.periodic ? ` · ${period === 'month' ? 'ten miesiąc' : 'ten tydzień'}` : ''}
+          </Text>
         </>
       ) : (
         <Text style={s.statSub}>

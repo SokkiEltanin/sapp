@@ -3,7 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Audyt czytelności — paczka 1 z 2 (2026-09-29)
+## 🆕 Audyt czytelności — paczka 2 z 2 (2026-09-29)
+
+Pełny opis w ARCHITECTURE.md §212. **TO ZAMYKA CAŁY AUDYT** (wszystkie 12 znalezisk, obie
+paczki). Data rekordów życiowych (dziś/wczoraj/"12 wrz"), data pomiaru składu ciała z
+zegarka (Health Connect zwraca "ostatni znany" pomiar w oknie 60 dni, nie dzisiejszy —
+teraz jawnie pokazane), nowy stan `DayState = 'before'` odróżniający dni sprzed dodania
+nawyku od realnych pominięć (7-dniowy rząd + 30-dniowa siatka), liczba pomiarów przy
+trendzie tkanki tłuszczowej, okres przy "X% celu" w `StatTile`. `rateHint` w karcie Praca
+zweryfikowany — już czysty, bez zmiany. `tsc`/`jest` czyste (90/90 suite, 1168 testów, +2).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Rekordy życiowe → daty pod wartościami;
+Zdrowie → wiersz "Pomiar: ..." przy składzie ciała (jeśli masz dane BIA); Nawyki → dni
+sprzed dodania nawyku widoczne inaczej niż pominięte.
+
+## ✅ Audyt czytelności — paczka 1 z 2 (2026-09-29)
 
 Pełny opis w ARCHITECTURE.md §211. Agent-audyt (Explore) przeczytał dashboard + 7
 kluczowych ekranów na prośbę usera, znalazł 12 realnych luk "co to znaczy". Ta paczka:
@@ -14,34 +28,6 @@ testów, bez zmiany).
 
 **🆕 Priorytet testu na urządzeniu — niski**: sprawdź że nowe etykiety/dopiski nie łamią
 layoutu na wąskim ekranie.
-
-### 🟡 Paczka 2 audytu czytelności — DO ZROBIENIA (2026-09-29)
-
-Pozostałe 6 znalezisk z audytu, wymagają głębszych zmian (nowe pola w typach/store'ach,
-nie tylko dopisanie etykiety):
-
-1. **`RecordItem` bez daty** (`src/utils/personalRecords.ts`, `PersonalRecordsCard.tsx`)
-   — "Rekordy życiowe" pokazują wartość, ale nie datę kiedy padł rekord; nie da się
-   ocenić czy to świeże czy sprzed lat. Wymaga dopisania pola daty do `RecordItem` i
-   przeliczenia w `buildRecords()`.
-2. **Body-comp bez trendu/daty** (`app/(tabs)/health.tsx` ~1018-1032, `bodyCompTile`) —
-   tkanka tłuszczowa/masa mięśniowa/woda/BMR z zegarka pokazywane jako goły odczyt bez
-   znacznika czasu, mimo że komentarz w kodzie tuż obok mówi że liczy się trend, nie
-   pojedynczy odczyt. Stary pomiar wygląda identycznie jak dzisiejszy.
-3. **`HistoryDots` nie rozróżnia pominięcia od "przed śledzeniem"** (`app/habits.tsx`
-   ~53-74) — 7-dniowy rząd kropek używa tej samej pustej kropki dla "nie zrobione tego
-   dnia" i "nawyk jeszcze nie istniał" — tylko stan "zamrożone" jest wizualnie odróżniony.
-4. **Fat-trend bez liczby pomiarów** (`app/(tabs)/health.tsx` ~1042, `fatTrend`) —
-   "+0.3% w tym tygodniu" to surowa różnica pierwszy-vs-ostatni pomiar w tygodniu, nie
-   mówi ile pomiarów było (1 pomiar = fałszywy "trend").
-5. **Weryfikacja `rateHint`** (`app/(tabs)/index.tsx` ~3946-3974, "Stawka" w karcie Praca)
-   — sprawdzić czy `rateHint` zawsze jawnie mówi, czy stawka jest z tego miesiąca,
-   ostatniej wypłaty, czy ręcznie ustawionym domyślnym numerem, w KAŻDYM stanie (niektóre
-   sąsiednie stany, jak `earningsForecast`, dostały osobny chip "PROGNOZA" żeby uniknąć
-   tej samej dwuznaczności).
-6. **`StatTile` bez podpisu okresu** (`src/components/dashboard/StatTile.tsx` ~449) —
-   custom widgety liczbowe bez serii `spark` (i bez historii) pokazują samą liczbę +
-   ikonę/tytuł, bez żadnej etykiety "ten tydzień/miesiąc".
 
 ## ✅ TopPill: generyczny tekst zaległych, "ZARAZ" dla pracy, crossfade (2026-09-29)
 
