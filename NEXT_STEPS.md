@@ -3,7 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Plomba zwrotu na liście + filtr "Tylko ze zwrotem" (2026-09-29)
+## 🆕 Kafelek "Plan zajęć": pełny gradient + noise + wywalony lewy pasek (2026-09-29)
+
+User zrzutem: "zrob bardziej profesjonalny większy trochę i możesz dodać noise większy. I
+wywal ten lub zmien po lewej fioletowy dziwny element". Pełny opis w ARCHITECTURE.md §215.
+Zamyka pętlę z §206 (Praca) — ten sam trójstopniowy `LinearGradient` (fioletowy) zamiast
+płaskiego washu + `accentBar` (usunięty), nowy reużywalny `NoiseOverlay.tsx` (SVG-dots,
+bo RNSVG nie ma niezawodnego `feTurbulence` na Androidzie), padding 16→20. `tsc`/`jest`
+czyste (90/90 suite, 1168 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dashboard → "Plan zajęć" — gradient na
+całości, brak paska po lewej, widoczne ziarno, teksty czytelne w obu motywach.
+
+## ✅ Plomba zwrotu na liście + filtr "Tylko ze zwrotem" (2026-09-29)
 
 User: "taki connector zabawny... jak przytrzymujesz to pokazuje się z czym jest połączone,
 albo switch jakiś przy filtrach" — dokończenie §213: zwrot był widoczny tylko na ekranie

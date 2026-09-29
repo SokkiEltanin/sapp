@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { GraduationCap } from 'lucide-react-native';
 import { CalendarEvent } from '@/types';
@@ -9,6 +10,15 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import RadialGlow from '@/components/ui/RadialGlow';
+import NoiseOverlay from '@/components/ui/NoiseOverlay';
+
+// Diagonalny, ciemny fioletowy gradient — TEN SAM trójstopniowy przepis co `WORK_GRADIENT`
+// w `index.tsx` (który z kolei był świadomie WZOROWANY na TYM kafelku, patrz komentarz
+// tam) — teraz sprowadzony z powrotem tutaj (2026-09-29, user: "zrob bardziej
+// profesjonalny większy trochę... wywal ten fioletowy element po lewej bo nie pasuje").
+// Wystarczająco ciemny żeby biały tekst wszędzie miał kontrast, z `#A78BFA` (marka tej
+// funkcji) zarezerwowanym na ikonę/odznaki/tytuł, nie na całe tło.
+const CLASS_GRADIENT = ['#3D2A66', '#5B3FA0', '#140D26'] as const;
 
 // "Plan zajęć" dashboard card (2026-09-22) — TEN SAM wzorzec/rozmiar co `GCalCard.tsx`
 // (dziś/jutro, kropka+godzina+tytuł), rozszerzony o odznakę typu (W/C/L/P) i salę, bo to
@@ -61,62 +71,61 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => { haptic.tap(); router.push('/class-schedule' as any); }}
-      style={s.card}
     >
-      {/* Poświata (2026-09-26, user zrzutem kafelka "Liczniki": "O taki [gradient]... podoba
-          mi się taki" — ten sam `RadialGlow` przepis co `SinceCountersCard.tsx`'s wiersze,
-          tu w fioletowym akcencie karty zamiast koloru tieru streaka). */}
-      <View style={s.glowWrap} pointerEvents="none">
-        <RadialGlow size={170} color="#A78BFA" opacity={0.18} />
-      </View>
-      <View style={s.accentBar} />
-      <View style={s.cardHeader}>
-        <GraduationCap size={13} color="#A78BFA" />
-        <Text style={s.cardTitle}>Plan zajęć</Text>
-      </View>
-      {today.length > 0 && (
-        <>
-          <Text style={s.dayLabel}>Dziś</Text>
-          {today.map(renderRow)}
-        </>
-      )}
-      {tomorrow.length > 0 && (
-        <>
-          <Text style={[s.dayLabel, { marginTop: today.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
-          {tomorrow.map(renderRow)}
-        </>
-      )}
-      {showFallback && nextDay && (
-        <>
-          <Text style={s.dayLabel}>{fmtNextClassLabel(nextDay.date, nextDay.daysAway)}</Text>
-          {nextDay.events.map(renderRow)}
-        </>
-      )}
+      <LinearGradient colors={CLASS_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
+        {/* Ziarno (2026-09-29, user: "możesz dodać noise większy") + poświata — gradient
+            sam niesie akcent, żaden osobny "prostokąt" po lewej nie jest już potrzebny
+            (wywalony, patrz komentarz przy CLASS_GRADIENT). */}
+        <NoiseOverlay opacity={0.05} density={140} />
+        <View style={s.glowWrap} pointerEvents="none">
+          <RadialGlow size={200} color="#A78BFA" opacity={0.22} />
+        </View>
+        <View style={s.cardHeader}>
+          <GraduationCap size={13} color="#A78BFA" />
+          <Text style={s.cardTitle}>Plan zajęć</Text>
+        </View>
+        {today.length > 0 && (
+          <>
+            <Text style={s.dayLabel}>Dziś</Text>
+            {today.map(renderRow)}
+          </>
+        )}
+        {tomorrow.length > 0 && (
+          <>
+            <Text style={[s.dayLabel, { marginTop: today.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
+            {tomorrow.map(renderRow)}
+          </>
+        )}
+        {showFallback && nextDay && (
+          <>
+            <Text style={s.dayLabel}>{fmtNextClassLabel(nextDay.date, nextDay.daysAway)}</Text>
+            {nextDay.events.map(renderRow)}
+          </>
+        )}
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   card: {
-    backgroundColor: '#A78BFA14',
     borderRadius: radius.xl,
-    padding: spacing[4],
+    padding: spacing[5],
     borderWidth: 1,
     borderColor: '#A78BFA40',
     gap: spacing[3],
     overflow: 'hidden',
   },
-  accentBar: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3.5, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: '#A78BFA' },
-  glowWrap: { position: 'absolute', left: -40, top: '50%', marginTop: -85 },
+  glowWrap: { position: 'absolute', left: -40, top: '50%', marginTop: -100 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  cardTitle: { fontFamily: fonts.label, fontSize: 11, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
-  dayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  cardTitle: { fontFamily: fonts.label, fontSize: 11, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
+  dayLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: 0.8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
-  typeBadge: { width: 18, height: 18, borderRadius: radius.full, backgroundColor: '#A78BFA22', alignItems: 'center', justifyContent: 'center' },
+  typeBadge: { width: 18, height: 18, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   typeBadgeTxt: { fontSize: 10, fontWeight: '800', color: '#A78BFA' },
-  time: { fontSize: 10, color: c.text.muted, width: 36, fontWeight: '600' },
-  subject: { flex: 1, fontSize: 13, color: c.text.secondary },
-  room: { fontSize: 11, color: c.text.muted, fontWeight: '700' },
+  time: { fontSize: 10, color: 'rgba(255,255,255,0.62)', width: 36, fontWeight: '600' },
+  subject: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.88)' },
+  room: { fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: '700' },
 }));
 
 export default memo(ClassScheduleCard);
