@@ -1,6 +1,7 @@
 import {
   looksLikeFuel, expenseMatchesVehicle, mainCarId, summarizeVehicle,
   maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, costPerKm,
+  vehicleYearSummary,
 } from '@/utils/vehicleMatch';
 import { Expense, Vehicle, VehicleMaintenance, OdometerReading } from '@/types';
 
@@ -225,5 +226,47 @@ describe('vehicleMatch — costPerKm', () => {
     const r = costPerKm(bike, expenses);
     expect(r!.spendDelta).toBe(100);
     expect(r!.value).toBeCloseTo(1);
+  });
+});
+
+describe('vehicleMatch — vehicleYearSummary', () => {
+  const NOW = new Date(2026, 8, 29); // 29 września 2026 — okno bieżące: 2025-09-29..2026-09-29
+
+  test('sumuje ostatnie 12 miesięcy, dzieli na paliwo/inne, bez danych sprzed roku → prevTotal null', () => {
+    const car = v({ tag: 'auto' });
+    const expenses = [
+      e({ date: '2026-06-01T10:00:00', amount: 200, tags: ['auto'], storeName: 'Orlen' }), // w oknie, paliwo
+      e({ date: '2026-03-01T10:00:00', amount: 300, tags: ['auto'] }), // w oknie, nie-paliwo
+      e({ date: '2023-01-01T10:00:00', amount: 999, tags: ['auto'] }), // sprzed 24 mies. — poza oboma oknami
+    ];
+    const r = vehicleYearSummary(car, expenses, undefined, NOW);
+    expect(r.total).toBe(500);
+    expect(r.fuel).toBe(200);
+    expect(r.other).toBe(300);
+    expect(r.count).toBe(2);
+    expect(r.prevTotal).toBeNull();
+    expect(r.deltaPct).toBeNull();
+  });
+
+  test('liczy % zmiany względem poprzednich 12 miesięcy, gdy jest historia', () => {
+    const car = v({ tag: 'auto' });
+    const expenses = [
+      e({ date: '2026-06-01T10:00:00', amount: 600, tags: ['auto'] }),       // bieżące okno
+      e({ date: '2025-06-01T10:00:00', amount: 400, tags: ['auto'] }),       // poprzednie okno
+    ];
+    const r = vehicleYearSummary(car, expenses, undefined, NOW);
+    expect(r.total).toBe(600);
+    expect(r.prevTotal).toBe(400);
+    expect(r.deltaPct).toBe(50);
+  });
+
+  test('wydatki innego pojazdu / przychody nie wliczają się', () => {
+    const car = v({ id: 'v1', tag: 'auto' });
+    const expenses = [
+      e({ date: '2026-06-01T10:00:00', amount: 100, tags: ['rower'] }),
+      e({ date: '2026-06-01T10:00:00', amount: 50, type: 'income', tags: ['auto'] }),
+    ];
+    const r = vehicleYearSummary(car, expenses, undefined, NOW);
+    expect(r.total).toBe(0);
   });
 });

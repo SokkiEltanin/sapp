@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Roczne podsumowanie kosztu posiadania pojazdu (2026-09-29)
+
+Pełny opis w ARCHITECTURE.md §208. Nowa sekcja "Ostatnie 12 miesięcy" w rozwiniętym
+widoku pojazdu (`app/vehicles.tsx`) — suma + % zmiany vs poprzednie 12 mies. (gdy jest
+historia) + rozbicie paliwo/części. `vehicleYearSummary()` w `vehicleMatch.ts`. `tsc`/
+`jest` czyste (89/89 suite, 1159 testów, +3).
+
+**🆕 Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd z historią wydatków
+→ sprawdź sumę 12-miesięczną.
+
+**Pomysł na przyszłość (user, 2026-09-29, NIE zbudowany, większy temat)**: parser
+paragonów za tankowanie rozpoznający markę/typ paliwa i auto-przypisujący wydatek do
+właściwego pojazdu (dziś trzeba ręcznie otagować/przypisać) — user wtedy musiałby tylko
+ręcznie wpisywać przebieg (`odometerLog`), reszta (koszt/km, roczne podsumowanie) już
+działa automatycznie. Wymaga rozszerzenia `receiptParser.ts` o rozpoznawanie stacji/marek
+paliwa i integracji z `vehicleMatch.ts`'s auto-linkiem — osobna, większa runda.
+
 ## 🆕 Grupowanie powiadomień — węższy, bezpieczny wariant (2026-09-29)
 
 Pełny opis w ARCHITECTURE.md §207. **TO ZAMYKA CAŁĄ LISTĘ zaakceptowanych pomysłów tej

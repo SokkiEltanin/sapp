@@ -22,6 +22,7 @@ import { Vehicle, VehicleKind, VehicleMaintenance, OdometerReading, Expense } fr
 import {
   summarizeVehicle, expenseMatchesVehicle, mainCarId,
   maintenanceDueMonths, maintenanceDueLabel, maintenancePresets, VehicleSummary, costPerKm,
+  vehicleYearSummary,
 } from '@/utils/vehicleMatch';
 import { Gauge } from 'lucide-react-native';
 import { toast } from '@/store/toastStore';
@@ -106,6 +107,13 @@ export default function VehiclesScreen() {
   const costs = useMemo(() => {
     const m: Record<string, ReturnType<typeof costPerKm>> = {};
     for (const v of vehicles) m[v.id] = costPerKm(v, expenses, mainId);
+    return m;
+  }, [vehicles, expenses, mainId]);
+  // "Roczne podsumowanie kosztu posiadania pojazdu" (2026-09-29, user zaakceptował pomysł)
+  // — ten sam memoizacja-per-pojazd wzorzec co summaries/costs wyżej.
+  const yearSummaries = useMemo(() => {
+    const m: Record<string, ReturnType<typeof vehicleYearSummary>> = {};
+    for (const v of vehicles) m[v.id] = vehicleYearSummary(v, expenses, mainId);
     return m;
   }, [vehicles, expenses, mainId]);
   const setVF = <K extends keyof VForm>(k: K, v: VForm[K]) => setVForm(f => ({ ...f, [k]: v }));
@@ -359,6 +367,28 @@ export default function VehiclesScreen() {
                     <Gauge size={10} color={ACCENT} /><Text style={s.presetText}>Dodaj odczyt licznika</Text>
                   </TouchableOpacity>
 
+                  {/* Roczne podsumowanie (2026-09-29) — ostatnie 12 mies., z % zmiany vs
+                      poprzednie 12 mies. gdy jest historia. */}
+                  {yearSummaries[v.id] && yearSummaries[v.id]!.count > 0 && (() => {
+                    const ys = yearSummaries[v.id]!;
+                    return (
+                      <>
+                        <Text style={s.detailLabel}>Ostatnie 12 miesięcy</Text>
+                        <View style={s.yearRow}>
+                          <Text style={s.yearTotal}>{zl(ys.total)}</Text>
+                          {ys.deltaPct != null && (
+                            <Text style={[s.yearDelta, { color: ys.deltaPct > 0 ? c.accent.red : c.accent.green }]}>
+                              {ys.deltaPct > 0 ? '+' : ''}{ys.deltaPct}% vs poprz. 12 mies.
+                            </Text>
+                          )}
+                        </View>
+                        {v.kind === 'car' && ys.fuel > 0 && (
+                          <Text style={s.yearSplit}>paliwo {zl(ys.fuel)} · części/inne {zl(ys.other)}</Text>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   {/* Expenses */}
                   <View style={s.detailActions}>
                     <TouchableOpacity onPress={() => setPicker({ mode: 'attach', vehicle: v })} style={s.detailBtn} activeOpacity={0.75}>
@@ -594,6 +624,10 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   detailLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
   detailLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
   costPerKm: { fontSize: 11, fontWeight: '700', color: ACCENT },
+  yearRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], marginTop: 2 },
+  yearTotal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  yearDelta: { fontSize: 11, fontWeight: '700' },
+  yearSplit: { fontSize: 11, color: c.text.secondary, marginTop: 2 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginBottom: spacing[1] },
   presetChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   presetText: { fontSize: 11, fontWeight: '700', color: ACCENT },

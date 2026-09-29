@@ -92,6 +92,41 @@ export function summarizeVehicle(v: Vehicle, expenses: Expense[], mainId?: strin
   return { total, fuel, other, count: mine.length, thisMonth, expenses: mine };
 }
 
+export interface VehicleYearSummary {
+  total: number; fuel: number; other: number; count: number;
+  prevTotal: number | null;  // null = brak wystarczającej historii (< 24 mies. danych)
+  deltaPct: number | null;   // null gdy prevTotal null LUB prevTotal === 0
+}
+
+// "Roczne podsumowanie kosztu posiadania pojazdu" (2026-09-29, user zaakceptował pomysł) —
+// `summarizeVehicle()` wyżej liczy CAŁĄ historię od zawsze, bez okna czasowego — dobre na
+// "ile w sumie", złe na "ile w tym roku vs zeszłym". Okno 12 miesięcy wstecz od `now`
+// (nie rok kalendarzowy Sty-Gru) — user może otworzyć ekran w dowolnym miesiącu, ma
+// dostać "ostatnie 12 miesięcy", nie ucięty fragment roku kalendarzowego. `prevTotal`
+// tylko gdy jest cokolwiek w oknie 12-24 mies. wstecz (inaczej user z pojazdem młodszym
+// niż rok dostałby mylące "0 zł, -100%" zamiast uczciwego braku porównania.
+export function vehicleYearSummary(v: Vehicle, expenses: Expense[], mainId?: string, now: Date = new Date()): VehicleYearSummary {
+  const mine = expenses.filter(e => expenseMatchesVehicle(e, v, mainId));
+  const nowStr = now.toISOString().slice(0, 10);
+  const curStart = new Date(now); curStart.setFullYear(curStart.getFullYear() - 1);
+  const curStartStr = curStart.toISOString().slice(0, 10);
+  const prevStart = new Date(now); prevStart.setFullYear(prevStart.getFullYear() - 2);
+  const prevStartStr = prevStart.toISOString().slice(0, 10);
+
+  let total = 0, fuel = 0, other = 0, count = 0, prevTotal = 0, hasPrevData = false;
+  for (const e of mine) {
+    const d = (e.date ?? '').slice(0, 10);
+    if (d >= curStartStr && d <= nowStr) {
+      total += e.amount; count++;
+      if (looksLikeFuel(e)) fuel += e.amount; else other += e.amount;
+    } else if (d >= prevStartStr && d < curStartStr) {
+      prevTotal += e.amount; hasPrevData = true;
+    }
+  }
+  const deltaPct = hasPrevData && prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+  return { total, fuel, other, count, prevTotal: hasPrevData ? prevTotal : null, deltaPct };
+}
+
 // Months until a maintenance entry is next due (negative = overdue). Null when
 // no interval is set.
 // 2026-09-20, audyt logika/optymalizacja (runda 3) — gołe `setMonth` na dzień
