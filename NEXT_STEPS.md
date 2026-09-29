@@ -3,7 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: gotówka wciąż wliczała się do Salda w 2 miejscach (2026-09-29)
+## 🆕 Panel "Praca" pełnoekranowy: gradient + ziarno + mocniejsze akcenty (2026-09-29)
+
+User: "ten kafelek z pracy... i wtedy jak wchodzę w zakładkę to tam też poprawić styl,
+można dodać pogrubienie tekstów lepsze wizualizacje. Ogarnij to poważnie". Pełny opis w
+ARCHITECTURE.md §217. Pełnoekranowy panel Pracy (modal po tapnięciu kafelka) dostał
+`WORK_PANEL_GRADIENT` (stonowana wersja `WORK_GRADIENT`) + `NoiseOverlay`, pasek "Stałe
+wydatki" gradientowe wypełnienie zamiast płaskiego koloru, podsumowanie pod wykresem
+pogrubione. `tsc`/`jest` czyste (90/90 suite, 1168 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dashboard → tap kafelek "Praca" → gradient
+na całej wysokości panelu, ziarno widoczne, pasek postępu gradientowy, wszystkie sekcje
+czytelne.
+
+## ✅ Fix: gotówka wciąż wliczała się do Salda w 2 miejscach (2026-09-29)
 
 User: "z gotówką w ogóle bez sensu, wywalamy ją, nie używam... a jak używam nie uwzględniam
 jej [w saldzie] lub zaznaczam że zapłaciłem gotówką (żeby liczyło się do wydatków na

@@ -12666,6 +12666,43 @@ transakcję gotówkową w historii, różnica sprzed fixu powinna zniknąć. Ust
 "Saldo konta" → wpisanie realnego salda karty powinno dać ten sam wynik co dotąd (chyba że
 masz gotówkowe transakcje — wtedy dopiero teraz poprawny).
 
+## 217. Panel "Praca" pełnoekranowy: gradient + ziarno + mocniejsze akcenty (2026-09-29)
+
+User: "jak wchodzę w zakładkę to tam też poprawić styl, można dodać pogrubienie tekstów
+lepsze wizualizacje itp itd. Ogarnij to poważnie" — dokończenie §206/§215: kafelek "Praca"
+na dashboardzie i kafelek "Plan zajęć" dostały gradient, ale PEŁNOEKRANOWY panel
+("zakładka" — modal otwierany tapem na kafelek Pracy, `workPanel` w `index.tsx`, linie
+~3850-4099) wciąż był na płaskim `colors.bg.card`, mimo że to NAJWIĘKSZY, najgęstszy w
+dane ekran związany z Pracą w appce (live earnings, "Ten miesiąc", stałe wydatki, stawka,
+zaplanowane naprzód, wykres 6-mies., "W liczbach", wypłaty).
+
+**Nowa `WORK_PANEL_GRADIENT = ['#231909', '#140E05']`** — ta sama rodzina koloru co
+`WORK_GRADIENT` na kafelku, ale WYRAŹNIE stonowana (ciemniejsza, węższy zakres) — pełna
+moc kafelkowego gradientu na całej wysokości scrolla z dziesiątkiem sekcji przebiłaby
+przez WŁASNE akcenty tych sekcji (zielone "NA ŻYWO", żółte "Zaplanowane naprzód"), zamiast
+dawać im ciemne tło do odcięcia się. Kontener panelu (`View style={[s.card, {backgroundColor:
+colors.bg.card}]}`) zamieniony na `LinearGradient` + `NoiseOverlay` (opacity 0.035, gęściej
+niż na "Plan zajęć" bo panel jest większy). `s.card`/`s.cardTitle` (współdzielone przez
+20+ innych miejsc w tym pliku) NIE zmienione w miejscu — nowe `wpPanelCard`/`wpPanelTitle`
+dopisują TYLKO różnicę (`overflow:hidden` do przycięcia ziarna, tytuł w stronę bieli) przez
+kompozycję stylów (`[s.card, s.wpPanelCard]`), ten sam wzorzec co `workGradTitle` na
+kafelku.
+
+**Mocniejsze akcenty** (w stylach UNIKALNYCH dla tego panelu, bezpiecznych do edycji w
+miejscu — zweryfikowane grepem że nie są reużywane gdzie indziej, w przeciwieństwie do
+współdzielonych `wpBig`/`wpSub`/`wxChip*`, które celowo NIE zostały tknięte): pasek
+postępu "Stałe wydatki" (`wbBarTrack`, wcześniej płaski `WORK_ACCENT`) dostał dwutonowy
+`LinearGradient` (`#F4D488→WORK_ACCENT`) + wyższy (8→10px); `wpAvgLine` (podsumowanie pod
+wykresem 6-mies.) dostało `fontWeight: '600'` (wcześniej domyślne 400).
+
+**Testy**: brak nowych — czysto wizualna zmiana istniejącego node'a. `tsc --noEmit`/`jest`
+czyste (90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dashboard → tap kafelek "Praca" → panel ma
+gradient na całej wysokości (nie tylko widoczny fragment), ziarno widoczne, pasek "Stałe
+wydatki" ma gradientowe wypełnienie, wszystkie sekcje (NA ŻYWO/Ten miesiąc/Stawka/
+Zaplanowane/wykres/W liczbach/Wypłaty) czytelne na nowym tle.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
