@@ -248,6 +248,12 @@ export default function SubscriptionsScreen() {
             <View style={s.summaryItem}>
               <Text style={s.summaryVal}>{stats.yearlyTotal.toFixed(2)} zł</Text>
               <Text style={s.summaryLabel}>rocznie</Text>
+              {/* (2026-09-29, audyt czytelności) — to PROJEKCJA przy obecnych stawkach
+                  (monthlyTotal × 12), nie realna suma z ostatnich 12 mies. Bez tego
+                  dopisku myliło się z "od {data}: X zł zapłacone" przy każdej
+                  subskrypcji niżej, które SĄ realną historią — dwie różne liczby o
+                  podobnym brzmieniu na tym samym ekranie. */}
+              <Text style={s.summaryLabelHint}>przy obecnych stawkach</Text>
             </View>
             <View style={s.summaryDivider} />
             <View style={s.summaryItem}>
@@ -564,6 +570,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   summaryDivider: { width: 1, backgroundColor: c.border.default },
   summaryVal: { ...typography.h3, color: c.text.primary },
   summaryLabel: { ...typography.caption, color: c.text.muted },
+  summaryLabelHint: { fontSize: 8, color: c.text.muted, opacity: 0.7, textAlign: 'center' },
 
   section: { gap: spacing[2] },
   sectionTitle: {

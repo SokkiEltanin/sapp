@@ -273,7 +273,12 @@ export default function VehiclesScreen() {
                   <Text style={s.vSub}>{KIND_META[v.kind].label} · #{v.tag} · {sum.count} wyd.</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
+                  {/* "łącznie" (2026-09-29, audyt czytelności) — ta liczba nie miała ŻADNEJ
+                      etykiety, mimo że to suma OD ZAWSZE (odkąd otagowano pojazd, patrz
+                      summarizeVehicle()), tuż nad jawnie podpisaną kwotą miesięczną —
+                      czytało się dwuznacznie obok tej drugiej. */}
                   <Text style={[s.vTotal, { color: v.color }]}>{zl(sum.total)}</Text>
+                  <Text style={s.vTotalLabel}>łącznie</Text>
                   <Text style={s.vMonth}>{zl(sum.thisMonth)} ten mies.</Text>
                 </View>
                 {isOpen ? <ChevronUp size={16} color={c.text.muted} /> : <ChevronDown size={16} color={c.text.muted} />}
@@ -607,7 +612,8 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   vName: { fontSize: 15, fontWeight: '800', color: c.text.primary },
   vSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   vTotal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
-  vMonth: { fontSize: 10, color: c.text.muted },
+  vTotalLabel: { fontSize: 8.5, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  vMonth: { fontSize: 10, color: c.text.muted, marginTop: 2 },
 
   remindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   remindChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.full, borderWidth: 1 },
