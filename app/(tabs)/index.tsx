@@ -182,6 +182,16 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
 // musztardowe złoto zamiast czystej bieli), bo user chce żeby Praca kojarzyła się z żółtymi
 // barwami jego pracodawcy. Wszystkie trzy dawne role kolorów dzielą teraz TĘ SAMĄ wartość.
 const WORK_ACCENT = '#D8B45C';
+// Kafelek "Praca" (2026-09-29, user: "z tym kolorem mi się jednak nie podoba... może
+// użyjemy ten gradientowy kafelek co na Planie [zajęć]") — ten sam PRZEPIS wizualny co
+// `ClassScheduleCard.tsx` (RadialGlow + mocny akcent zamiast płaskiego neutralnego tła),
+// ale NIE 1:1 kopia: usera raził tam cienki lewy pasek + płaski wash, więc tu zamiast
+// tego prawdziwy `LinearGradient` na CAŁYM kafelku (żaden osobny "prostokąt" nie jest
+// potrzebny — gradient sam niesie akcent) i teksty przesunięte w stronę bieli (jak
+// `MonthWrappedCard.tsx`) zamiast stonowanego `text.secondary`. WORK_ACCENT (musztardowe
+// złoto) zostaje NIETKNIĘTY — to świadomy wybór usera powiązany z barwami jego pracodawcy
+// (patrz komentarz wyżej), gradient tylko podkreśla go głębią zamiast płaskiego tła.
+const WORK_GRADIENT = ['#4A3410', '#6E5220', '#181206'] as const;
 const WEEKS_BACK  = 8;
 
 // `metricIcon`/`STAT_METRIC_ICON`/`STAT_GROUP_ICON` przeniesione do `<StatTile>`
@@ -3455,94 +3465,99 @@ export default function DashboardScreen() {
               const wm = workMonthly;
               const hasRate = wm.rate > 0;
               return (
-                <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.9}
-                  onPress={() => { haptic.tap(); setWorkPanel(true); }}>
-                  <View style={s.cardHeader}>
-                    <Briefcase size={13} color={WORK_ACCENT} />
-                    <Text style={s.cardTitle}>Praca</Text>
-                    <TouchableOpacity
-                      onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
-                      style={s.workToggle}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[s.workToggleText, { color: WORK_ACCENT }]}>
-                        {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {!workHoursChart ? (
-                    <>
-                      <View style={s.workHeroRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[s.workHoursBig, { color: WORK_ACCENT }]}>
-                            {wm.workedH.toFixed(0)}
-                            <Text style={s.workHoursUnit}> h</Text>
-                          </Text>
-                          <Text style={s.workHoursSub}>
-                            przepracowane w tym miesiącu
-                            {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text></> : null}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {wm.plannedH > 0 && (
-                        <View style={{ marginTop: spacing[3] }}>
-                          <View style={s.workSplitBar}>
-                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
-                            {/* opacity, nie drugi odcień (2026-09-26, audyt dashboardu) — user
-                                jednym kolorem chciał, żeby Praca kojarzyła się z żółtym logo
-                                (patrz komentarz przy WORK_ACCENT wyżej w pliku), ale pasek
-                                "do teraz vs zaplanowane" wyszedł z tym jednolity, nie do
-                                odróżnienia bez czytania liczb. */}
-                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT, opacity: 0.35 }} />
-                          </View>
-                          <Text style={s.workSplitText}>
-                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
-                            {'  ·  '}
-                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>zaplanowane +{wm.plannedH.toFixed(0)} h</Text>
-                          </Text>
-                        </View>
-                      )}
-
-                      {wm.daysWorked > 0 && (
-                        <Text style={s.workMeta}>
-                          {wm.daysWorked} {wm.daysWorked === 1 ? 'dzień' : 'dni'} · śr. {wm.avgPerDay.toFixed(1)} h/dzień{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate).toLocaleString('pl-PL')} zł/dzień` : ''}
+                <TouchableOpacity activeOpacity={0.9} onPress={() => { haptic.tap(); setWorkPanel(true); }}>
+                  <LinearGradient
+                    colors={WORK_GRADIENT}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.workGradCard}
+                  >
+                    <View style={s.cardHeader}>
+                      <Briefcase size={13} color={WORK_ACCENT} />
+                      <Text style={[s.cardTitle, s.workGradTitle]}>Praca</Text>
+                      <TouchableOpacity
+                        onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
+                        style={[s.workToggle, s.workGradToggle]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[s.workToggleText, { color: WORK_ACCENT }]}>
+                          {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
                         </Text>
-                      )}
+                      </TouchableOpacity>
+                    </View>
 
-                      {/* grafik naprzód — od razu widać sumę godzin przyszłych miesięcy */}
-                      {wm.upcoming.length > 0 && (
-                        <View style={s.workAheadRow}>
-                          <CalendarClock size={12} color={WORK_ACCENT} />
-                          <Text style={s.workAheadText} numberOfLines={1}>
-                            Naprzód <Text style={{ color: WORK_ACCENT, fontWeight: '800' }}>{wm.upcomingH.toFixed(0)} h</Text>
-                            {'  ·  ' + wm.upcoming.map(m => `${m.label} ${m.hours.toFixed(0)}h`).join(' · ')}
-                          </Text>
+                    {!workHoursChart ? (
+                      <>
+                        <View style={s.workHeroRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[s.workHoursBig, { color: WORK_ACCENT }]}>
+                              {wm.workedH.toFixed(0)}
+                              <Text style={[s.workHoursUnit, s.workGradSub]}> h</Text>
+                            </Text>
+                            <Text style={[s.workHoursSub, s.workGradSub]}>
+                              przepracowane w tym miesiącu
+                              {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text></> : null}
+                            </Text>
+                          </View>
                         </View>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <View style={s.waveValues}>
-                        {wm.months.map((m, i) => (
-                          <Text key={i} style={[s.waveValue, m.isCurrent && { color: WORK_ACCENT, fontWeight: '800' }]}>
-                            {hasRate
-                              ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '')
-                              : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
+
+                        {wm.plannedH > 0 && (
+                          <View style={{ marginTop: spacing[3] }}>
+                            <View style={[s.workSplitBar, s.workGradSplitBar]}>
+                              <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
+                              {/* opacity, nie drugi odcień (2026-09-26, audyt dashboardu) — user
+                                  jednym kolorem chciał, żeby Praca kojarzyła się z żółtym logo
+                                  (patrz komentarz przy WORK_ACCENT wyżej w pliku), ale pasek
+                                  "do teraz vs zaplanowane" wyszedł z tym jednolity, nie do
+                                  odróżnialny bez czytania liczb. */}
+                              <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT, opacity: 0.35 }} />
+                            </View>
+                            <Text style={[s.workSplitText, s.workGradSub]}>
+                              <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
+                              {'  ·  '}
+                              <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>zaplanowane +{wm.plannedH.toFixed(0)} h</Text>
+                            </Text>
+                          </View>
+                        )}
+
+                        {wm.daysWorked > 0 && (
+                          <Text style={[s.workMeta, s.workGradMeta]}>
+                            {wm.daysWorked} {wm.daysWorked === 1 ? 'dzień' : 'dni'} · śr. {wm.avgPerDay.toFixed(1)} h/dzień{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate).toLocaleString('pl-PL')} zł/dzień` : ''}
                           </Text>
-                        ))}
-                      </View>
-                      <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={WORK_ACCENT} />
-                      <View style={s.waveLabels}>
-                        {wm.months.map((m, i) => (
-                          <Text key={i} style={[s.waveLabel, m.isCurrent && { color: WORK_ACCENT, fontWeight: '700' }]}>
-                            {m.label}
-                          </Text>
-                        ))}
-                      </View>
-                    </>
-                  )}
+                        )}
+
+                        {/* grafik naprzód — od razu widać sumę godzin przyszłych miesięcy */}
+                        {wm.upcoming.length > 0 && (
+                          <View style={[s.workAheadRow, s.workGradAheadRow]}>
+                            <CalendarClock size={12} color={WORK_ACCENT} />
+                            <Text style={[s.workAheadText, s.workGradSub]} numberOfLines={1}>
+                              Naprzód <Text style={{ color: WORK_ACCENT, fontWeight: '800' }}>{wm.upcomingH.toFixed(0)} h</Text>
+                              {'  ·  ' + wm.upcoming.map(m => `${m.label} ${m.hours.toFixed(0)}h`).join(' · ')}
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <View style={s.waveValues}>
+                          {wm.months.map((m, i) => (
+                            <Text key={i} style={[s.waveValue, s.workGradMeta, m.isCurrent && { color: WORK_ACCENT, fontWeight: '800' }]}>
+                              {hasRate
+                                ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '')
+                                : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
+                            </Text>
+                          ))}
+                        </View>
+                        <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={WORK_ACCENT} />
+                        <View style={s.waveLabels}>
+                          {wm.months.map((m, i) => (
+                            <Text key={i} style={[s.waveLabel, s.workGradMeta, m.isCurrent && { color: WORK_ACCENT, fontWeight: '700' }]}>
+                              {m.label}
+                            </Text>
+                          ))}
+                        </View>
+                      </>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
               );
             })();
@@ -4922,6 +4937,21 @@ const buildStyles = (c: any) => StyleSheet.create({
   workMeta: { fontSize: 11.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[3] },
   workAheadRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   workAheadText: { flex: 1, fontSize: 11.5, color: c.text.secondary, fontWeight: '600' },
+  // Kafelek "Praca" na LinearGradient zamiast płaskiego tła (2026-09-29) — patrz komentarz
+  // przy WORK_GRADIENT. Tekst przesunięty w stronę bieli (zamiast `text.secondary`/`text.
+  // muted`, które na tym ciemnym gradiencie traciły kontrast), obwódki/tła elementów na
+  // szkliste biało-przezroczyste zamiast neutralnych `c.border.subtle`/`c.fill.subtle`.
+  workGradCard: {
+    borderRadius: radius.xl, padding: spacing[4],
+    borderWidth: 1, borderColor: '#D8B45C40',
+    gap: spacing[3], overflow: 'hidden',
+  },
+  workGradTitle: { color: 'rgba(255,255,255,0.92)' },
+  workGradToggle: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  workGradSub: { color: 'rgba(255,255,255,0.82)' },
+  workGradMeta: { color: 'rgba(255,255,255,0.62)' },
+  workGradSplitBar: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  workGradAheadRow: { borderTopColor: 'rgba(255,255,255,0.14)' },
 
   card: {
     backgroundColor: c.bg.card,

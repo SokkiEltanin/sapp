@@ -12170,6 +12170,52 @@ brainstormingu (miesięczne porównanie §202, sezonowy wzorzec §205). Zostaje 
 "grupowanie powiadomień w jeden digest" — najbardziej złożony, jeszcze niezbudowany, w
 NEXT_STEPS.md.
 
+## 206. Kafelek "Praca": pełny LinearGradient zamiast płaskiego tła (2026-09-29)
+
+User: "zakładka pracy z tym kolorem mi się jednak nie podoba, zrób jak byś ty to miał
+zrobić, może użyjemy ten gradientowy kafelek co na Planie [zajęć]. I tam musimy jeszcze
+lekko napisy w kierunku białego i ten gradient na całym kafelku, i wtedy wywalić ten
+prostokąt po lewej fioletowy."
+
+**Interpretacja**: `ClassScheduleCard.tsx` ("Plan zajęć") ma mocniejszy wizualny przepis
+niż zwykłe karty — `RadialGlow` + fioletowy akcent — ale to płaski wash tła + cienki
+`accentBar` (prostokąt) po lewej, nie prawdziwy gradient. User chciał ten SAM POZIOM
+mocy wizualnej dla "Pracy", ale przez prawdziwy `LinearGradient` na całym kafelku
+(zamiast paska+washu) i BEZ kopiowania fioletu — `WORK_ACCENT` (musztardowe złoto)
+zostaje nietknięty, bo to świadomy wybór usera powiązany z barwami logo jego pracodawcy
+(patrz komentarz 2026-09-26 przy `WORK_ACCENT` w `index.tsx`). "Wywalić fioletowy
+prostokąt" = nie przenosić `accentBar` przy adaptacji stylu, nie usuwanie czegoś co już
+było na kafelku Pracy (tam żadnego paska nie było).
+
+**Rozwiązanie** (`app/(tabs)/index.tsx`, node `'work-hours'`):
+- Nowa stała `WORK_GRADIENT = ['#4A3410', '#6E5220', '#181206']` — diagonalny, ciemny
+  gradient bursztynowo-brązowy (ten sam trójstopniowy diagonalny przepis co palety tierów
+  w `monthCards.ts`), wystarczająco ciemny na całej powierzchni żeby biały tekst wszędzie
+  miał kontrast, z `WORK_ACCENT` zarezerwowanym na hero-liczby/ikony (dokładnie jak
+  `MonthWrappedCard.tsx` — białe teksty + kolorowy akcent na liczbach/plakietkach, nie
+  odwrotnie).
+- `TouchableOpacity` → `LinearGradient` (zamiast `[s.card, { backgroundColor: cardBgDark
+  }]`) jako kontener kafelka; `LinearGradient` sam niesie zaokrąglenie/padding/border
+  (nowy `s.workGradCard`), więc osobny "prostokąt" akcentu jest zbędny.
+- Nowe style-nakładki (`workGradTitle`/`workGradToggle`/`workGradSub`/`workGradMeta`/
+  `workGradSplitBar`/`workGradAheadRow`) — DOPISANE obok istniejących bazowych
+  (`cardTitle`/`workToggle`/`workHoursSub`/`workMeta`/`workSplitBar`/`workAheadRow`), NIE
+  zmiana tych bazowych — są reużywane przez dziesiątki innych kart na dashboardzie,
+  zmiana ich kolorów in-place zepsułaby wszystko inne. Tekst przesunięty w stronę bieli
+  (`rgba(255,255,255,0.62-0.92)` wg hierarchii), tła paska postępu/pigułki przełącznika/
+  linii separatora na szkliste biało-przezroczyste zamiast neutralnych `c.fill.subtle`/
+  `c.border.subtle` (za mało kontrastu na ciemnym gradiencie).
+- Widok wykresu (`workHoursChart` toggle, `WaveChart`) też dostał `workGradMeta` na
+  etykietach osi/wartości — wcześniej gubiłyby się jako `text.muted`/`text.secondary` na
+  nowym tle.
+
+**Testy**: brak nowych — czysto wizualna zmiana istniejącego node'a, bez nowej logiki.
+`tsc --noEmit`/`jest` czyste (88/88 suite, 1146 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: otwórz dashboard, sprawdź kafelek "Praca" —
+gradient na całej powierzchni, tekst czytelny, przełącznik "Ten miesiąc"/"Ostatnie 6 msc"
+i wykres fal też czytelne na nowym tle.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
