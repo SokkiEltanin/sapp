@@ -13,6 +13,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
 import WaterGauge from '@/components/health/WaterGauge';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 import { useMoodStore } from '@/store/moodStore';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
@@ -124,6 +125,10 @@ export default function HealthScreen() {
   const [loaded, setLoaded]             = useState(false);
   const [syncing, setSyncing]           = useState(false);
   const [hcExtra, setHcExtra]           = useState<Record<string, number | null>>({});
+  // Kiedy naprawdę zmierzono skład ciała (2026-09-29, audyt czytelności) — patrz komentarz
+  // przy `bodyCompDate` w healthConnectService.ts. Osobny stan (nie w `hcExtra`, który jest
+  // wyłącznie numeryczny) — persystowany osobno obok `hc` w tym samym dziennym zapisie.
+  const [bodyCompDate, setBodyCompDate] = useState<string | null>(null);
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
@@ -250,6 +255,7 @@ export default function HealthScreen() {
             sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin, sleepLightMin: day.sleepLightMin,
             hydrationMl: day.hydrationMl,
           }));
+          if (day.bodyCompDate) setBodyCompDate(day.bodyCompDate);
           setFromWatch(true);
         }
       } catch {}
@@ -335,6 +341,7 @@ export default function HealthScreen() {
           if (d.sleepQuality != null) setSleepQuality(d.sleepQuality);
           if (d.weight != null)       setWeight(d.weight);
           if (d.hc) setHcExtra(d.hc);
+          if (d.bodyCompDate) setBodyCompDate(d.bodyCompDate);
         }
 
         const today = new Date();
@@ -384,7 +391,7 @@ export default function HealthScreen() {
     if (!loaded) return;
     // Water is NOT persisted here — it lives solely in the "Woda" habit (loadWater
     // reads/writes it), so it stays one number across Zdrowie / Nawyki / pet / HC.
-    AsyncStorage.setItem(todayKey(), JSON.stringify({ steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra })).catch(() => {});
+    AsyncStorage.setItem(todayKey(), JSON.stringify({ steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra, bodyCompDate })).catch(() => {});
     if (weight > 0) AsyncStorage.setItem('health_last_weight', String(weight)).catch(() => {});
     const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     setWeekSteps(prev => { const n = [...prev]; n[todayIdx] = steps; return n; });
@@ -394,7 +401,7 @@ export default function HealthScreen() {
       n[todayIdx] = { h: sleepH, m: sleepM, quality: sleepQuality };
       return n;
     });
-  }, [steps, sleepH, sleepM, sleepQuality, weight, hcExtra, loaded]);
+  }, [steps, sleepH, sleepM, sleepQuality, weight, hcExtra, bodyCompDate, loaded]);
 
   // Water lives in the "Woda" habit (glasses) so the Health screen, the Habits
   // screen, the pet quest and Health Connect hydration all share one number.
@@ -564,6 +571,7 @@ export default function HealthScreen() {
           sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin, sleepLightMin: d.sleepLightMin,
           hydrationMl: d.hydrationMl,
         }));
+        if (d.bodyCompDate) setBodyCompDate(d.bodyCompDate);
         setFromWatch(true);
         autoSyncHealth(30, true).catch(() => {}); // backfill the per-day cache now so the dashboard is fresh too
         haptic.success();
@@ -1031,15 +1039,32 @@ export default function HealthScreen() {
               )}
             </View>
           )}
+          {/* Data pomiaru (2026-09-29, audyt czytelności) — Health Connect zwraca
+              "ostatni znany" odczyt wagi BIA w oknie 60 dni, nie dzisiejszy — bez tego
+              user widział ten sam % tłuszczu codziennie identycznie, nie wiedząc czy to
+              świeży pomiar czy sprzed tygodni. Bursztynowo gdy pomiar ma >7 dni. */}
+          {bodyCompDate && (() => {
+            const days = Math.floor((Date.now() - new Date(bodyCompDate).getTime()) / 86400000);
+            const label = days <= 0 ? 'dziś' : days === 1 ? 'wczoraj' : `${days} dni temu`;
+            return (
+              <Text style={[styles.bodyCompDate, days > 7 && { color: colors.accent.amber }]}>
+                Pomiar: {label}
+              </Text>
+            );
+          })()}
 
           {(() => {
-            let first = 0, last = 0;
-            for (const f of weekFat) { if (f > 0) { if (first === 0) first = f; last = f; } }
+            let first = 0, last = 0, count = 0;
+            for (const f of weekFat) { if (f > 0) { if (first === 0) first = f; last = f; count++; } }
             if (first === 0 || last === 0 || first === last) return null;
             const d = +(last - first).toFixed(1);
+            // Liczba pomiarów (2026-09-29, audyt czytelności) — dwa pomiary kilka dni od
+            // siebie liczą się TECHNICZNIE poprawnie jako różnica w tym tygodniu, ale bez
+            // dopisku wygląda jak gładki, wielopunktowy trend zamiast surowej różnicy
+            // dwóch odczytów — user nie mógł ocenić wiarygodności bez wejścia w szczegóły.
             return (
               <Text style={styles.fatTrend}>
-                Tkanka tłuszczowa: <Text style={{ color: d <= 0 ? T.accent : colors.accent.amber, fontWeight: '800' }}>{d > 0 ? '+' : ''}{d}%</Text> w tym tygodniu
+                Tkanka tłuszczowa: <Text style={{ color: d <= 0 ? T.accent : colors.accent.amber, fontWeight: '800' }}>{d > 0 ? '+' : ''}{d}%</Text> w tym tygodniu ({count} {plPlural(count, 'pomiar', 'pomiary', 'pomiarów')})
               </Text>
             );
           })()}
@@ -1835,6 +1860,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   bodyCompLabel: { fontSize: 10, color: c.text.muted },
+  bodyCompDate: { fontSize: 10, color: c.text.muted, marginTop: spacing[1], textAlign: 'center' },
   // Skurczony widget wody (2026-08-24) — zastępuje dawne `waterBody`/`weightBtn` (osobne
   // przyciski minus/plus wokół 158px gauge'a) — patrz komentarz przy JSX wyżej.
   waterCompactBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[2] },

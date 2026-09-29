@@ -12438,6 +12438,76 @@ wydzielony do osobnego testowalnego utils bo to jednolinijkowa funkcja lokalna).
 łamie/nie ucina na wąskim ekranie (szczególnie nowy dopisek w subskrypcjach i pierścień
 "kroki" z dłuższą liczbą celu).
 
+## 212. Audyt czytelności — paczka 2: data rekordów, trend składu ciała, "przed śledzeniem" (2026-09-29)
+
+Ciąg dalszy §211 — pozostałe 5 znalezisk wymagających nowych pól w typach/store'ach
+(6. było weryfikacją `rateHint`, bez zmiany kodu — patrz niżej).
+
+**1. `RecordItem` bez daty** (`src/utils/personalRecords.ts`, `PersonalRecordsCard.tsx`) —
+"Rekordy życiowe" pokazywały wartość bez daty, nie dało się ocenić świeżości. Nowe pole
+`RecordItem.date?: string`. `buildRecords()` przepisane z `Object.values(healthDays)` na
+`Object.entries()` dla kroków/snu/wagi (żeby zachować KTÓRY dzień był rekordem, nie tylko
+wartość). `longestSweetless()`/`bestMoodWeek()` zwracają teraz `{ ...; endDate }` zamiast
+gołej liczby — `endDate` to ostatni dzień najlepszej passy/okna (dla wciąż trwającej passy
+bez słodyczy: dzisiaj). `PersonalRecordsCard.tsx` dostał `fmtRecordDate()` (dziś/wczoraj/
+"12 wrz", rok tylko gdy nie bieżący) i renderuje datę pod wartością w hero i kafelkach.
+
+**2. Body-comp bez daty/trendu** (`app/(tabs)/health.tsx`, `bodyCompTile`) — zweryfikowane
+źródłowo: `readHealthDay()` w `healthConnectService.ts` woła `latest('BodyFat', 60)` —
+NAJNOWSZY pomiar w oknie 60 DNI, nie dzisiejszy (wagi BIA mierzy się co kilka dni, nie
+codziennie) — Health Connect po cichu zwraca "ostatni znany" rekord niezależnie jak stary.
+Bez daty user widziałby ten sam % tłuszczu identycznie każdego dnia, nie wiedząc że to
+sprzed tygodni. Nowe pole `HealthConnectDay.bodyCompDate: string | null` (`InstantaneousRecord.time`
+z pierwszego dostępnego z bfRec/leanRec/waterRec/bmrRec — te cztery zwykle pochodzą z
+TEJ SAMEJ wagi BIA w jednym pomiarze). `health.tsx` dostał osobny stan `bodyCompDate`
+(NIE w `hcExtra`, który jest czysto numeryczny) — persystowany w tym samym dziennym
+blobie AsyncStorage, aktualizowany w OBU ścieżkach synchronizacji (auto + ręczny przycisk
+"Synchronizuj"). Nowy wiersz "Pomiar: dziś/wczoraj/N dni temu" pod kafelkami, bursztynowy
+gdy >7 dni.
+
+**3. `HistoryDots`/`MonthGrid` nie rozróżniały "pominięte" od "przed dodaniem nawyku"**
+(`app/habits.tsx`, `src/hooks/useHabits.ts`) — 7-dniowy rząd kropek i 30-dniowa siatka
+używały TEJ SAMEJ pustej kropki dla obu stanów. Nowy wariant `DayState = 'before'`
+(`useHabits.ts`) — `dayState()` sprawdza `date < habit.createdAt.slice(0,10)` PO
+sprawdzeniu done/frozen. UWAGA: `habit-year.tsx` ma WŁASNY, ODDZIELNY lokalny typ
+`DayState` (z `'broke'` zamiast `'before'`) — ta zmiana świadomie go NIE dotyczy (już
+osobno wykrywa "przed startem" dla nawyków typu 'avoid', ale nie dla zwykłych — zostaje
+jako możliwy przyszły follow-up, nie w zakresie tego audytu). `'before'` renderowany jako
+przezroczysta/przygaszona kropka/komórka (opacity 0.3) zamiast pełnego `border.subtle`.
+
+**4. Fat-trend bez liczby pomiarów** (`app/(tabs)/health.tsx`, `fatTrend`) — "+0.3% w tym
+tygodniu" to surowa różnica pierwszy-vs-ostatni logowany odczyt w tygodniu; dwa pomiary
+kilka dni od siebie czytały się jak gładki trend. Dopisana liczba pomiarów w nawiasie:
+"(N pomiarów)". Uwaga: pojedynczy pomiar w tygodniu i tak nie pokazuje trendu wcale —
+`first === last` już wcześniej zwracało `null` (żadnej różnicy do pokazania), więc ten
+przypadek był już poprawnie obsłużony.
+
+**5. `StatTile` — gałąź "X% celu" bez okresu** (`src/components/dashboard/StatTile.tsx`)
+— custom widgety liczbowe Z ustawionym celem/targetem pokazywały "X% celu (Y)" BEZ
+wzmianki czy cel jest tygodniowy czy miesięczny — druga gałąź (bez celu, porównanie z
+poprzednim okresem) już to robiła. Dopisane `· ten miesiąc/ten tydzień` gdy `def.periodic`.
+(Zweryfikowane też: `moodStreak`/`habitsToday`, metryki bez okresu wcale, mają kontekst
+przez TYTUŁ kafelka — `t.title || def.label` zawsze widoczny w nagłówku — więc nie
+wymagały zmiany, w przeciwieństwie do pierwotnego podejrzenia audytu).
+
+**6. Weryfikacja `rateHint`** (`app/(tabs)/index.tsx`, panel Praca) — sprawdzone źródłowo:
+WSZYSTKIE trzy gałęzie już jawnie nazywają źródło stawki ("stawka ustawiona ręcznie" /
+"{kwota} zł (za {miesiąc}) ÷ {godziny} h" / "średnia z {N} wypłat") — **bez zmian, już
+czyste**.
+
+**Testy**: `personalRecords.test.ts` (+3: data przy kroki/sen/waga, dwa nowe testy dla
+`sweetless` — luka w środku z poprawną datą końca, seria wciąż trwająca z datą=dziś —
+przy pisaniu testu okazało się że trzeba zneutralizować "seria wciąż trwa" wypełniaczem co
+10 dni aż do wczoraj, inaczej test był niedeterministyczny względem realnego zegara).
+`useHabits.ts`/`healthConnectService.ts`/`health.tsx` bez nowych testów — logika zbyt
+spleciona z hookiem/AsyncStorage/Health Connect, ten sam brak co reszta tych plików.
+`tsc --noEmit`/`jest` czyste (90/90 suite, 1168 testów, +2).
+
+**Priorytet testu na urządzeniu — średni**: Rekordy życiowe → sprawdź daty pod wartościami;
+Zdrowie → jeśli masz dane BIA z zegarka, sprawdź wiersz "Pomiar: ..." i że synchronizacja
+(auto i ręczna) go aktualizuje; Nawyki → nawyk dodany niedawno, sprawdź że dni SPRZED
+dodania w 7-dniowym/30-dniowym widoku wyglądają inaczej niż realnie pominięte dni.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

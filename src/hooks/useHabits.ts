@@ -36,9 +36,14 @@ const LOAD_WINDOW_DAYS = 371;
 
 const isDone = isHabitDone;
 
-// Stan pojedynczego dnia w widoku serii: zaliczony / uratowany zamrożeniem / pominięty.
-// Zamrożony pokazujemy INACZEJ (niebieski) — user chce widzieć „wtedy był freeze".
-export type DayState = 'done' | 'frozen' | 'miss';
+// Stan pojedynczego dnia w widoku serii: zaliczony / uratowany zamrożeniem / pominięty /
+// sprzed dodania nawyku. Zamrożony pokazujemy INACZEJ (niebieski) — user chce widzieć
+// „wtedy był freeze". `'before'` (2026-09-29, audyt czytelności) — `HistoryDots`/
+// `MonthGrid` w habits.tsx renderowały dzień "przed dodaniem nawyku" TĄ SAMĄ pustą
+// kropką co realnie pominięty dzień, więc nie dało się na oko odróżnić "nie zrobiłem" od
+// "nawyku jeszcze nie było". TYLKO lokalny typ w `habit-year.tsx` ma WŁASNY, OSOBNY
+// `DayState` (z `'broke'` zamiast `'before'`) — zmiana tutaj go nie dotyczy.
+export type DayState = 'done' | 'frozen' | 'miss' | 'before';
 
 // Which habits count as done on `date` — the single rule behind todayDone (weekly-target
 // habits count when the rolling 7-day target is met). Exported so other screens can
@@ -89,6 +94,7 @@ export function useHabits() {
   const dayState = useCallback((habit: Habit, date: string): DayState => {
     if (isDone(habit, completions[date]?.[habit.id] ?? 0)) return 'done';
     if (frozen[`${habit.id}|${date}`]) return 'frozen';
+    if (date < habit.createdAt.slice(0, 10)) return 'before';
     return 'miss';
   }, [completions, frozen]);
 

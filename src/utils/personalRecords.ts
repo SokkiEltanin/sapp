@@ -13,6 +13,11 @@ export interface RecordItem {
   value: string;
   num: number;              // surowa wartość do porównań „pobity rekord"
   lowerIsBetter?: boolean;  // waga — mniej = lepiej
+  // Data padnięcia rekordu (2026-09-29, audyt czytelności) — dotąd karta pokazywała
+  // WARTOŚĆ bez żadnej daty, nie dało się ocenić czy rekord jest świeży czy sprzed lat.
+  // 'YYYY-MM-DD', opcjonalne tylko dla bezpieczeństwa typu — w praktyce każdy z pięciu
+  // rekordów niżej zawsze go ustawia.
+  date?: string;
 }
 
 type HealthDays = Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>;
@@ -20,14 +25,20 @@ type HealthDays = Record<string, { steps: number; sleepMinutes: number; weightKg
 const MS_DAY = 86400000;
 const dayDiff = (a: string, b: string) =>
   Math.round((new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime()) / MS_DAY);
+const addDays = (d: string, n: number) => {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 // The longest run of days with NO sweet/snack purchase, ever — the max gap between
-// consecutive sweet-purchase days (plus the current run up to today).
-function longestSweetless(expenses: Expense[]): number {
+// consecutive sweet-purchase days (plus the current run up to today). `endDate` = last day
+// of that run (day before the purchase that broke it, or today for the still-ongoing run).
+function longestSweetless(expenses: Expense[]): { days: number; endDate: string } | null {
   const days = new Set<string>();
   for (const e of expenses) {
     if (e.type === 'income') continue;
@@ -40,21 +51,25 @@ function longestSweetless(expenses: Expense[]): number {
     }
   }
   const sorted = [...days].sort();
-  if (!sorted.length) return 0;
-  let best = 0;
-  for (let i = 1; i < sorted.length; i++) best = Math.max(best, dayDiff(sorted[i], sorted[i - 1]) - 1);
-  best = Math.max(best, dayDiff(todayStr(), sorted[sorted.length - 1]));   // current run
-  return Math.max(0, best);
+  if (!sorted.length) return null;
+  let best = 0; let bestEnd = '';
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = dayDiff(sorted[i], sorted[i - 1]) - 1;
+    if (gap > best) { best = gap; bestEnd = addDays(sorted[i], -1); }
+  }
+  const currentRun = dayDiff(todayStr(), sorted[sorted.length - 1]);
+  if (currentRun > best) { best = currentRun; bestEnd = todayStr(); }
+  return best > 0 ? { days: best, endDate: bestEnd } : null;
 }
 
-// Best 7-day rolling average mood (needs at least 4 logged days in the window).
-// Two-pointer sliding window over the sorted distinct-day list — O(n) instead of the
-// previous O(n²) (re-filtering the whole `days` array for every single day). Correct
-// because `days` is sorted ascending and the 6-day window only ever grows forward, so
-// the left edge never needs to step backward once advanced (2026-08-25, perf pass —
-// this ran on every dashboard render via `records`/`buildRecords`, and scales with the
+// Best 7-day rolling average mood (needs at least 4 logged days in the window). `endDate` =
+// last day of the best window. Two-pointer sliding window over the sorted distinct-day list
+// — O(n) instead of the previous O(n²) (re-filtering the whole `days` array for every single
+// day). Correct because `days` is sorted ascending and the 6-day window only ever grows
+// forward, so the left edge never needs to step backward once advanced (2026-08-25, perf
+// pass — this ran on every dashboard render via `records`/`buildRecords`, and scales with the
 // SQUARE of how many days of mood history exist, so a year+ of logging made it real work).
-function bestMoodWeek(moodEntries: MoodEntry[]): number {
+function bestMoodWeek(moodEntries: MoodEntry[]): { avg: number; endDate: string } | null {
   const byDay = new Map<string, number[]>();
   for (const e of moodEntries) {
     const d = (e.date ?? '').slice(0, 10);
@@ -62,10 +77,10 @@ function bestMoodWeek(moodEntries: MoodEntry[]): number {
     (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(e.mood);
   }
   const days = [...byDay.keys()].sort();
-  if (days.length < 4) return 0;
+  if (days.length < 4) return null;
   const avgOf = (d: string) => { const a = byDay.get(d)!; return a.reduce((s, v) => s + v, 0) / a.length; };
   const avgs = days.map(avgOf);
-  let best = 0;
+  let best = 0; let bestEnd = '';
   let left = 0;
   let windowSum = 0;
   for (let right = 0; right < days.length; right++) {
@@ -75,28 +90,41 @@ function bestMoodWeek(moodEntries: MoodEntry[]): number {
       left++;
     }
     const windowLen = right - left + 1;
-    if (windowLen >= 4) best = Math.max(best, windowSum / windowLen);
+    if (windowLen >= 4) {
+      const avg = windowSum / windowLen;
+      if (avg > best) { best = avg; bestEnd = days[right]; }
+    }
   }
-  return best;
+  return best > 0 ? { avg: best, endDate: bestEnd } : null;
 }
 
 export function buildRecords(healthDays: HealthDays, expenses: Expense[], moodEntries: MoodEntry[]): RecordItem[] {
   const out: RecordItem[] = [];
 
-  const steps = Object.values(healthDays).map(d => d.steps).filter(s => s > 0);
-  if (steps.length) { const v = Math.max(...steps); out.push({ key: 'steps', icon: 'footprints', label: 'Najwięcej kroków w dniu', value: v.toLocaleString('pl-PL'), num: v }); }
+  const stepEntries = Object.entries(healthDays).filter(([, d]) => d.steps > 0);
+  if (stepEntries.length) {
+    const [date, d] = stepEntries.reduce((best, cur) => (cur[1].steps > best[1].steps ? cur : best));
+    out.push({ key: 'steps', icon: 'footprints', label: 'Najwięcej kroków w dniu', value: d.steps.toLocaleString('pl-PL'), num: d.steps, date });
+  }
 
-  const sleeps = Object.values(healthDays).map(d => d.sleepMinutes).filter(s => s > 0);
-  if (sleeps.length) { const m = Math.max(...sleeps); out.push({ key: 'sleep', icon: 'moon', label: 'Najdłuższy sen', value: `${Math.floor(m / 60)}h ${m % 60}m`, num: m }); }
+  const sleepEntries = Object.entries(healthDays).filter(([, d]) => d.sleepMinutes > 0);
+  if (sleepEntries.length) {
+    const [date, d] = sleepEntries.reduce((best, cur) => (cur[1].sleepMinutes > best[1].sleepMinutes ? cur : best));
+    const m = d.sleepMinutes;
+    out.push({ key: 'sleep', icon: 'moon', label: 'Najdłuższy sen', value: `${Math.floor(m / 60)}h ${m % 60}m`, num: m, date });
+  }
 
   const sweetless = longestSweetless(expenses);
-  if (sweetless > 0) out.push({ key: 'sweetless', icon: 'flame', label: 'Najdłużej bez słodyczy', value: `${sweetless} ${sweetless === 1 ? 'dzień' : 'dni'}`, num: sweetless });
+  if (sweetless) out.push({ key: 'sweetless', icon: 'flame', label: 'Najdłużej bez słodyczy', value: `${sweetless.days} ${sweetless.days === 1 ? 'dzień' : 'dni'}`, num: sweetless.days, date: sweetless.endDate });
 
   const mood = bestMoodWeek(moodEntries);
-  if (mood > 0) out.push({ key: 'mood', icon: 'smile', label: 'Najlepszy tydzień nastroju', value: `${mood.toFixed(1)}/5`, num: Math.round(mood * 100) / 100 });
+  if (mood) out.push({ key: 'mood', icon: 'smile', label: 'Najlepszy tydzień nastroju', value: `${mood.avg.toFixed(1)}/5`, num: Math.round(mood.avg * 100) / 100, date: mood.endDate });
 
-  const weights = Object.values(healthDays).map(d => d.weightKg).filter((w): w is number => !!w && w > 0);
-  if (weights.length >= 2) { const v = Math.min(...weights); out.push({ key: 'weight', icon: 'scale', label: 'Najniższa waga', value: `${v.toFixed(1)} kg`, num: Math.round(v * 10) / 10, lowerIsBetter: true }); }
+  const weightEntries = Object.entries(healthDays).filter((e): e is [string, HealthDays[string] & { weightKg: number }] => !!e[1].weightKg && e[1].weightKg > 0);
+  if (weightEntries.length >= 2) {
+    const [date, d] = weightEntries.reduce((best, cur) => (cur[1].weightKg < best[1].weightKg ? cur : best));
+    out.push({ key: 'weight', icon: 'scale', label: 'Najniższa waga', value: `${d.weightKg.toFixed(1)} kg`, num: Math.round(d.weightKg * 10) / 10, lowerIsBetter: true, date });
+  }
 
   return out;
 }

@@ -62,9 +62,12 @@ function HistoryDots({ days, color }: { days: DayState[]; color: string }) {
         const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
         const isToday = i === 6;
         const dotColor = st === 'done' ? color : st === 'frozen' ? ICE : undefined;
+        // 'before' (2026-09-29, audyt czytelności) — dzień sprzed dodania nawyku
+        // renderowany PRZYGASZONY zamiast tej samej pełnej "pustej" kropki co realnie
+        // pominięty dzień, żeby dało się je odróżnić na oko.
         return (
           <View key={i} style={hd.col}>
-            <View style={[hd.dot, dotColor && { backgroundColor: dotColor }, isToday && hd.dotToday]} />
+            <View style={[hd.dot, dotColor && { backgroundColor: dotColor }, st === 'before' && hd.dotBefore, isToday && hd.dotToday]} />
             <Text style={[hd.label, isToday && hd.labelToday]}>{DAY_LABELS[dow]}</Text>
           </View>
         );
@@ -77,6 +80,7 @@ const makeHd = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 6 },
   col: { alignItems: 'center', gap: 3 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.border.subtle },
+  dotBefore: { backgroundColor: 'transparent', opacity: 0.3 },
   dotToday: { borderWidth: 1, borderColor: c.border.default },
   label: { fontSize: 8, color: c.text.muted },
   labelToday: { color: c.text.secondary, fontWeight: '700' },
@@ -340,7 +344,10 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
               </View>
               {habits.map((h, hi) => {
                 const st = data[hi][di];
-                const bg = st === 'done' ? h.color + 'CC' : st === 'frozen' ? ICE : colors.border.subtle;
+                // 'before' (2026-09-29, audyt czytelności) — ta sama zmiana co
+                // HistoryDots wyżej: dzień sprzed dodania nawyku przygaszony, nie
+                // identyczny z realnym pominięciem.
+                const bg = st === 'done' ? h.color + 'CC' : st === 'frozen' ? ICE : st === 'before' ? 'transparent' : colors.border.subtle;
                 return (
                   <View key={h.id} style={[mg.cell, { backgroundColor: bg }, day.isToday && mg.cellToday]} />
                 );
