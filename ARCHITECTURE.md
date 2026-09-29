@@ -12386,6 +12386,58 @@ generyczny tekst (nie tytuł); zmiana pracy zaplanowana w ciągu godziny → bad
 zamiast "DZISIAJ"; obserwuj pigułkę podczas rotacji (kilka zadań dziś/eventów) — powinna
 się płynnie przesuwać, nie migać do czerni.
 
+## 211. Audyt czytelności/przejrzystości — paczka 1: brakujące etykiety i kontekst (2026-09-29)
+
+User: "zrob reaserch co ine aplikacje robią... a potem prosiłbym o przeczytanie apki
+całej widgetow itp czy brakuje gdzieś danych / jasności, przejrzystość itp wtedy jak tak
+to uzupełnij popraw". Zlecony agent-audyt (Explore) dashboardu + 7 kluczowych ekranów
+(finanse/zdrowie/subskrypcje/pojazdy/nawyki/długi/statystyki apki), znalazł 12 realnych
+luk "co to znaczy / czy to aktualne" (nie stylistyka). Ta sekcja — pierwsza paczka,
+6 najprostszych/najbezpieczniejszych napraw (samo dopisanie brakującej etykiety/liczby,
+zero nowej logiki):
+
+1. **`app/(tabs)/index.tsx`, `nodes['budget-warning']`** — karta ostrzeżenia o limicie
+   budżetu pokazywała TYLKO %, bez kwot w zł — sąsiednia karta `tag-limits` (ten sam typ
+   ostrzeżenia, inne źródło) już pokazywała `X/Y zł` obok %. `budgetAlertCard` niosło
+   `spend`/`limit` od zawsze, po prostu nie były renderowane tutaj. Dopisane, ten sam
+   format co `tag-limits`.
+2. **`app/vehicles.tsx`, suma pojazdu** — duża liczba `{zl(sum.total)}` nie miała ŻADNEJ
+   etykiety, tuż nad jawnie podpisanym "X zł ten mies." — czytało się dwuznacznie (czy to
+   suma od zawsze? tego miesiąca?). To suma OD ZAWSZE (`summarizeVehicle()`, od kiedy
+   pojazd otagowany) — dopisana mała etykieta "łącznie".
+3. **`app/(tabs)/index.tsx`, `dailyRings`** — pierścienie "woda"/"nawyki" pokazywały
+   jawne "X/Y" pod pierścieniem, "kroki"/"budżet dnia" TYLKO wartość bieżącą (cel widoczny
+   wyłącznie przez wypełnienie pierścienia) — niespójne w tym samym rzędzie. Dopisany cel:
+   "kroki" → "8.2k/10.0k", "budżet dnia" → "62/80 zł" (nowy `fmtRingK()` helper, ten sam
+   format liczb co istniejący numerator).
+4. **`app/expenses/subscriptions.tsx`, karta podsumowania** — "rocznie" to
+   `monthlyTotal × 12` (projekcja przy OBECNYCH stawkach), zweryfikowane w
+   `useSubscriptions.ts:67`, NIE realna suma z ostatnich 12 miesięcy — myliło się z
+   "od {data}: X zł zapłacone" przy każdej subskrypcji niżej (realna historia, §208).
+   Dopisany mały dopisek "przy obecnych stawkach" pod etykietą.
+5. **`app/habits.tsx`, karta "wszystkie ukończone"** — "Najlepsza seria: X dni" brzmiało
+   jak zapisany rekord życiowy (kolidowało nazewnictwem z prawdziwym konceptem "Rekordy
+   życiowe" gdzie indziej w appce), a to tylko `max(bieżąca seria)` z dzisiejszych
+   nawyków. Przemianowane na "Najdłuższa aktywna seria".
+6. **`app/(tabs)/index.tsx`, `nodes['gablota-card']`** — mianownik X/Y świadomie pomija
+   odznaki `kind:'bad'` (grupa "Grzeszki", anty-osiągnięcia), niewidoczne na ekranie —
+   user nie mógł zweryfikować że liczba zgadza się z pełną listą osiągnięć. Dopisany
+   dopisek "(bez Grzeszków)" do tekstu "jeszcze N do zdobycia".
+
+**Pozostałe 6 z audytu (`RecordItem` bez daty, body-comp bez trendu/daty, `HistoryDots`
+nie rozróżnia miss/przed-śledzeniem, fat-trend bez liczby pomiarów, `rateHint`
+weryfikacja, `StatTile` bez podpisu okresu)** wymagają głębszych zmian (nowe pola w
+typach, dodatkowa logika) — zostają w NEXT_STEPS.md jako kolejna paczka.
+
+**Testy**: brak nowych — czysto etykiety/tekst, zero nowej logiki poza `fmtRingK()`
+(trywialny formatter, ten sam wzorzec liczenia co istniejący numerator obok, nie
+wydzielony do osobnego testowalnego utils bo to jednolinijkowa funkcja lokalna). `tsc
+--noEmit`/`jest` czyste (90/90 suite, 1166 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: sprawdź wizualnie że żadna etykieta się nie
+łamie/nie ucina na wąskim ekranie (szczególnie nowy dopisek w subskrypcjach i pierścień
+"kroki" z dłuższą liczbą celu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

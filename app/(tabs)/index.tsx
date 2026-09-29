@@ -1845,12 +1845,17 @@ export default function DashboardScreen() {
   }, [petState.wellbeing, healthDays, habits.length, moodEntries.length]);
 
   // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
+  // `display` (2026-09-29, audyt czytelności) — "woda"/"nawyki" już pokazywały jawne
+  // "X/Y" pod pierścieniem, ale "kroki"/"budżet dnia" pokazywały TYLKO wartość bieżącą —
+  // sam cel był widoczny wyłącznie przez to, jak wypełniony jest pierścień, niespójnie z
+  // pozostałymi dwoma w tym samym rzędzie.
+  const fmtRingK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
   const dailyRings = useMemo<RingSpec[]>(() => {
     const tISO = todayISO();
     const rings: RingSpec[] = [];
     const stepsToday = healthDays[tISO]?.steps ?? 0;
     rings.push({ key: 'steps', label: 'kroki', Icon: Footprints, value: stepsToday, goal: healthGoals.stepGoal, color: '#2AC68F',
-      display: stepsToday > 0 ? (stepsToday >= 1000 ? `${(stepsToday / 1000).toFixed(1)}k` : String(stepsToday)) : '—' });
+      display: stepsToday > 0 ? `${fmtRingK(stepsToday)}/${fmtRingK(healthGoals.stepGoal)}` : '—' });
     const waterHabit = habits.find(h => h.kind === 'water');
     if (waterHabit) {
       const cnt = getTodayCount(waterHabit.id);
@@ -1861,7 +1866,7 @@ export default function DashboardScreen() {
       const now = new Date();
       const daily = totalBudget / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       const spentToday = scopedExpenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && e.date.slice(0, 10) === tISO).reduce((s, e) => s + e.amount, 0);
-      rings.push({ key: 'budget', label: 'budżet dnia', Icon: Wallet, value: spentToday, goal: daily, color: '#FBBF24', over: spentToday > daily, display: `${Math.round(spentToday)} zł` });
+      rings.push({ key: 'budget', label: 'budżet dnia', Icon: Wallet, value: spentToday, goal: daily, color: '#FBBF24', over: spentToday > daily, display: `${Math.round(spentToday)}/${Math.round(daily)} zł` });
     }
     if (habits.length > 0) {
       rings.push({ key: 'habits', label: 'nawyki', Icon: CheckSquare, value: habitsDoneIds.length, goal: habits.length, color: '#A78BFA', display: `${habitsDoneIds.length}/${habits.length}` });
@@ -2853,6 +2858,10 @@ export default function DashboardScreen() {
                   <Text style={s.budgetWarnBold}>#{budgetAlertCard.cat}</Text>
                   {'   '}
                   <Text style={[s.budgetWarnPct, budgetWarnOver && { color: colors.accent.red }]}>{Math.round(budgetAlertCard.pct * 100)}%</Text>
+                  {/* Kwoty w zł (2026-09-29, audyt czytelności) — sąsiednia karta "tag-limits"
+                      już pokazywała X/Y zł obok %, ta nie — user widział samą procent bez
+                      realnych liczb, musiał wejść w Finanse żeby sprawdzić kwoty. */}
+                  <Text style={s.budgetWarnAmt}>{'   '}{Math.round(budgetAlertCard.spend)}/{Math.round(budgetAlertCard.limit)} zł</Text>
                 </Text>
                 <View style={s.budgetWarnTrack}>
                   <View style={[s.budgetWarnFill, {
@@ -3229,8 +3238,13 @@ export default function DashboardScreen() {
                   <View style={{ height: 9, borderRadius: 5, backgroundColor: colors.fill.subtle, overflow: 'hidden', marginTop: spacing[2] }}>
                     <View style={{ width: `${Math.round(pct * 100)}%`, height: '100%', backgroundColor: '#FFC83D', borderRadius: 5 }} />
                   </View>
+                  {/* "bez Grzeszków" (2026-09-29, audyt czytelności) — mianownik X/Y
+                      świadomie pomija odznaki kind:'bad' (grupa "Grzeszki", anty-
+                      osiągnięcia za np. przekroczony budżet), ale nic na ekranie tego
+                      nie mówiło — user nie mógł zweryfikować że liczba się zgadza z tym
+                      co widzi w pełnej liście osiągnięć. */}
                   <Text style={[s.factText, { marginTop: spacing[2] }]}>
-                    {left > 0 ? `Jeszcze ${left} ${plPlural(left, 'odznaka', 'odznaki', 'odznak')} do zdobycia · stuknij` : 'Wszystkie zdobyte! 👑 stuknij'}
+                    {left > 0 ? `Jeszcze ${left} ${plPlural(left, 'odznaka', 'odznaki', 'odznak')} do zdobycia (bez Grzeszków) · stuknij` : 'Wszystkie zdobyte! 👑 stuknij'}
                   </Text>
                 </TouchableOpacity>
               );

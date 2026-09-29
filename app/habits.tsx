@@ -824,8 +824,12 @@ export default function HabitsScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.allDoneTitle}>Wszystkie nawyki ukończone!</Text>
+                {/* "najdłuższa AKTYWNA" nie "najlepsza" (2026-09-29, audyt czytelności) —
+                    to max(bieżąca seria) z dzisiejszych nawyków, nie zapisany rekord
+                    życiowy; "najlepsza seria" kolidowało brzmieniem z prawdziwym
+                    konceptem rekordu z karty "Rekordy życiowe" gdzie indziej w appce. */}
                 <Text style={styles.allDoneSub}>
-                  {bestStreak >= 2 ? `Najlepsza seria: ${bestStreak} dni` : 'Doskonała robota na dziś!'}
+                  {bestStreak >= 2 ? `Najdłuższa aktywna seria: ${bestStreak} dni` : 'Doskonała robota na dziś!'}
                 </Text>
               </View>
             </View>
