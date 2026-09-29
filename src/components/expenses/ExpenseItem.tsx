@@ -2,7 +2,7 @@ import { memo, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { ChevronDown, ChevronUp, Wallet } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Wallet, Link2 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
@@ -13,6 +13,7 @@ import { isMine } from '@/store/statsScope';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
+import { toast } from '@/store/toastStore';
 
 // Warm amber marks a transaction someone ELSE paid (payer ≠ "Ja"): it shows in the
 // list but does NOT count toward your spend/balance, so it needs an at-a-glance tell.
@@ -103,6 +104,26 @@ export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Prop
               <Wallet size={10} color={PAYER_ACCENT} />
               <Text style={styles.payerBadgeText} numberOfLines={1}>Płaci: {expense.payer}</Text>
             </View>
+          )}
+          {/* "Connector" — plomba zwrotu (2026-09-29, user: "taki connector zabawny...
+              jak przytrzymujesz to pokazuje się z czym jest połączone"). Long-press na
+              całym wierszu jest już zajęty (przenosi do edycji, patrz `onLongPress`
+              wyżej) — więc to zwykły TAP na małej plombie, nie long-press na wierszu;
+              `toast.info` zamiast osobnego popovera, bo to jedyna informacja do
+              pokazania (ten sam kształt jak `Zwrócono: ...` na ekranie szczegółów). */}
+          {!isIncome && !!expense.reimbursedAmount && expense.reimbursedAmount > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                haptic.tap();
+                toast.info(`Zwrócono: ${expense.reimbursedAmount!.toFixed(2)} zł · efektywny koszt: ${(expense.amount - expense.reimbursedAmount!).toFixed(2)} zł`);
+              }}
+              hitSlop={8}
+              style={styles.reimbBadge}
+              activeOpacity={0.7}
+            >
+              <Link2 size={10} color={colors.accent.green} />
+              <Text style={styles.reimbBadgeText}>zwrot</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -223,6 +244,13 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     borderColor: PAYER_ACCENT + '55', backgroundColor: PAYER_ACCENT + '18',
   },
   payerBadgeText: { fontSize: 9, fontWeight: '700', color: PAYER_ACCENT, maxWidth: 150 },
+  reimbBadge: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 3,
+    marginTop: 3, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: c.accent.green + '55', backgroundColor: c.accent.green + '18',
+  },
+  reimbBadgeText: { fontSize: 9, fontWeight: '700', color: c.accent.green },
   chevronBtn: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
