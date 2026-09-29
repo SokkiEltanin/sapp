@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import NoiseOverlay from '@/components/ui/NoiseOverlay';
 import DashEditRow from '@/components/dashboard/DashEditRow';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -193,6 +194,14 @@ const WORK_ACCENT = '#D8B45C';
 // złoto) zostaje NIETKNIĘTY — to świadomy wybór usera powiązany z barwami jego pracodawcy
 // (patrz komentarz wyżej), gradient tylko podkreśla go głębią zamiast płaskiego tła.
 const WORK_GRADIENT = ['#4A3410', '#6E5220', '#181206'] as const;
+// Panel "Praca" pełnoekranowy (2026-09-29, user: "jak wchodzę w zakładkę to tam też
+// poprawić styl... gradientem może albo plain fill jakiś stonowany będzie super") — TA
+// SAMA rodzina koloru co WORK_GRADIENT na kafelku, ale wyraźnie STONOWANA (ciemniejsza,
+// węższy zakres) — to duży, gęsty w tekst panel na scrollu z dziesiątkiem sekcji
+// (`wpCard`/`wpLive`/`wpAheadCard`/wykres), nie mały hero-kafelek — pełna moc
+// WORK_GRADIENT na całej wysokości scrolla przebijałaby przez własne akcenty sekcji
+// (zielone "NA ŻYWO", żółte "Zaplanowane naprzód") zamiast dawać im tło do odcięcia się.
+const WORK_PANEL_GRADIENT = ['#231909', '#140E05'] as const;
 const WEEKS_BACK  = 8;
 
 // `metricIcon`/`STAT_METRIC_ICON`/`STAT_GROUP_ICON` przeniesione do `<StatTile>`
@@ -3838,14 +3847,15 @@ export default function DashboardScreen() {
           dzisiejszego. Poprawianie pomyłek robisz w zakładce Humor (edytuj konkretny wpis). */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={null} />
 
-      {/* Work panel */}
+      {/* Work panel — gradient + ziarno (2026-09-29), patrz WORK_PANEL_GRADIENT wyżej */}
       <Modal visible={workPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWorkPanel(false)}>
         <View style={s.npOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setWorkPanel(false)} />
-          <View style={[s.card, { backgroundColor: colors.bg.card }]}>
+          <LinearGradient colors={WORK_PANEL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.card, s.wpPanelCard]}>
+            <NoiseOverlay opacity={0.035} density={160} />
             <View style={s.cardHeader}>
               <Briefcase size={15} color={WORK_ACCENT} />
-              <Text style={s.cardTitle}>Praca</Text>
+              <Text style={[s.cardTitle, s.wpPanelTitle]}>Praca</Text>
               <TouchableOpacity onPress={() => setWorkPanel(false)} hitSlop={10} style={{ marginLeft: 'auto' }}>
                 <X size={18} color={colors.text.muted} />
               </TouchableOpacity>
@@ -3946,7 +3956,11 @@ export default function DashboardScreen() {
                           <Text style={s.wbBucketAmt}>{workFixed.filled.toLocaleString('pl-PL')} / {workFixed.target.toLocaleString('pl-PL')} zł</Text>
                         </View>
                         <View style={s.wbBarTrack}>
-                          <View style={{ width: `${Math.min(workFixed.pct, 1) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: WORK_ACCENT }} />
+                          <LinearGradient
+                            colors={['#F4D488', WORK_ACCENT]}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            style={{ width: `${Math.min(workFixed.pct, 1) * 100}%`, height: '100%', borderRadius: 4 }}
+                          />
                         </View>
                       </View>
                       {workFixed.above > 0 && (
@@ -4084,7 +4098,7 @@ export default function DashboardScreen() {
                 </ScrollView>
               );
             })()}
-          </View>
+          </LinearGradient>
         </View>
       </Modal>
 
@@ -4993,6 +5007,12 @@ const buildStyles = (c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
+  // Panel "Praca" na `WORK_PANEL_GRADIENT` (2026-09-29) — overlay na WSPÓLNYCH `card`/
+  // `cardTitle` (dziesiątki innych miejsc), więc TYLKO dopisuje różnice (overflow do
+  // przycięcia ziarna do zaokrąglonych rogów, tytuł przesunięty w stronę bieli jak
+  // `workGradTitle` na kafelku) zamiast kopiować całą definicję.
+  wpPanelCard: { overflow: 'hidden' },
+  wpPanelTitle: { color: 'rgba(255,255,255,0.9)' },
 
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
@@ -5037,7 +5057,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   wbBucketHead: { flexDirection: 'row', alignItems: 'baseline' },
   wbBucketLbl: { flex: 1, fontSize: 12, fontWeight: '700', color: c.text.secondary },
   wbBucketAmt: { fontSize: 11.5, fontWeight: '700', color: c.text.muted },
-  wbBarTrack: { height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: c.fill.subtle },
+  wbBarTrack: { height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.fill.subtle },
   // ── Stat widgets ──
   statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
   statNumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
@@ -5132,7 +5152,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpLeftUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
   wpLeftLbl: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
   wpLeftDivider: { width: 1, height: 40, backgroundColor: c.border.default },
-  wpAvgLine: { fontSize: 12.5, color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
+  wpAvgLine: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
   wpAvgB: { fontWeight: '800', color: c.text.primary },
   // „Zaplanowane naprzód" — grafik przyszłych miesięcy
   wpAheadCard: { marginTop: spacing[3], backgroundColor: WORK_ACCENT + '12', borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: WORK_ACCENT + '3A' },
