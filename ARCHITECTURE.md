@@ -12267,6 +12267,37 @@ dzień, trudne do wywołania na żądanie bez ręcznego ustawienia dat): jeśli 
 naturalnie wypadną dwie rzeczy tego samego dnia, sprawdź czy przed 8:00 przychodzi
 dodatkowe zbiorcze powiadomienie "N rzeczy do ogarnięcia dziś".
 
+## 208. Roczne podsumowanie kosztu posiadania pojazdu (2026-09-29)
+
+User (kolejna runda brainstormingu, zaakceptował ten jeden pomysł): suma kosztu pojazdu za
+ostatnie 12 miesięcy w jednym miejscu, z porównaniem rok do roku jeśli jest historia. User
+zaznaczył też przy okazji plan na przyszłość: sparsować paragony z tankowania tak, żeby
+same trafiały do przypisanego pojazdu i user musiał tylko wpisywać przebieg — NIE zbudowane
+teraz (osobny, większy temat — parser paragonów + auto-link do pojazdu po marce/typie
+paliwa), zostaje jako pomysł na kolejną rundę.
+
+**Rozwiązanie**:
+- `src/utils/vehicleMatch.ts` — nowa `vehicleYearSummary(v, expenses, mainId, now)`. Okno
+  OSTATNICH 12 miesięcy wstecz od `now` (NIE rok kalendarzowy Sty-Gru — user może otworzyć
+  ekran w dowolnym miesiącu), suma/paliwo/inne/count w tym oknie + `prevTotal`/`deltaPct`
+  względem poprzednich 12 miesięcy (miesiące 13-24 wstecz). `prevTotal: null` (nie `0`)
+  gdy w oknie porównawczym nie ma NIC — pojazd młodszy niż rok dostaje uczciwy brak
+  porównania zamiast mylącego "-100%". Reużywa `expenseMatchesVehicle`/`looksLikeFuel` —
+  te same zasady dopasowania co `summarizeVehicle`/`costPerKm` obok.
+- `app/vehicles.tsx` — nowy `yearSummaries` memo (ten sam per-pojazd wzorzec co
+  `summaries`/`costs` obok, patrz komentarz o audycie wydajności #4 przy `summaries`),
+  nowa sekcja "Ostatnie 12 miesięcy" w rozwiniętym widoku pojazdu (między "Przebieg" a listą
+  wydatków) — suma + `±X% vs poprz. 12 mies.` (czerwony gdy więcej, zielony gdy mniej) gdy
+  jest historia, plus rozbicie paliwo/części dla samochodów.
+
+**Testy**: `__tests__/vehicleMatch.test.ts` — nowy `describe('vehicleMatch —
+vehicleYearSummary')`, 3 testy (suma+podział w oknie/brak historii→null, % zmiany vs
+poprzednie 12 mies., filtrowanie po pojeździe/przychodach). `tsc --noEmit`/`jest` czyste
+(89/89 suite, 1159 testów, +3).
+
+**Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd z historią wydatków →
+sprawdź sensowność sumy 12-miesięcznej i (jeśli >1 rok danych) procentu zmiany.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
