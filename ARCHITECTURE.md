@@ -12298,6 +12298,94 @@ poprzednie 12 mies., filtrowanie po pojeździe/przychodach). `tsc --noEmit`/`jes
 **Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd z historią wydatków →
 sprawdź sensowność sumy 12-miesięcznej i (jeśli >1 rok danych) procentu zmiany.
 
+## 209. Auto-przyznane zamrożenia serii na kamieniach milowych (2026-09-29)
+
+User (po researchu innych appek na jego prośbę — "zrob reaserch co ine aplikacje robią"):
+zaakceptował pomysł wzorowany na Duolingo. Z researchu: Duolingo przyznaje "streak freeze"
+AUTOMATYCZNIE na kamieniach milowych, zanim są potrzebne — "już w kieszeni", nie nagroda do
+kupienia w panice gdy seria już pęka; dane: użytkownicy z serią 7+ dni mają 2.4× wyższą
+retencję niż ci bez serii.
+
+Appka miała już DOKŁADNIE tę mechanikę zamrożenia (`streakFreezeStore.ts` — gdy ominiesz
+dzień z realną serią, appka automatycznie zużywa 1 zamrożenie z zapasu, seria nie pada), ale
+zapas rósł WYŁĄCZNIE przez zakup za monety w Rynku (`pet-shop.tsx`, `FREEZE_COST = 50`) —
+żadnego automatycznego przyznawania. To dokładnie luka względem sprawdzonego wzorca z
+researchu.
+
+**Rozwiązanie**:
+- `src/store/streakFreezeStore.ts` — nowe pole `grantedMilestones: Record<habitId,
+  number>` (najwyższy już nagrodzony próg, wielokrotność 7) + `grantMilestone(habitId,
+  streak): boolean`. Liczy `milestone = floor(streak/7)*7`; jeśli wyższy niż już
+  nagrodzony — `+1 freeze`, zapisuje nowy próg. Idempotentne (bezpieczne wołanie co render)
+  i trzyma się W STORE (nie w hooku) — przeżywa restart appki i podwójny mount hooka.
+- `src/hooks/useHabits.ts` — nowy efekt, TUŻ PO `getStreak`: dla każdego nawyku z serią
+  DZIENNĄ (nie cel tygodniowy — ta sama granica co istniejąca auto-konsumpcja freeze'a
+  wyżej w pliku) liczy `getStreak(h.id)` i woła `grantMilestone`. Bez toastu/hapticu —
+  hook montowany RÓWNOCZEŚNIE na dashboardzie i ekranie Nawyków (patrz istniejący komentarz
+  w pliku), więc jawna celebracja podwoiłaby się; istniejący badge z liczbą zamrożeń
+  (`StreakWallCard.tsx`, `pet-shop.tsx`) po prostu cicho rośnie — to zresztą zgodne z
+  duchem researchu: Duolingo świadomie NIE robi z tego "nagrody do odebrania", tylko cichy
+  refill.
+- Zakup za monety w Rynku zostaje bez zmian, nietknięty — auto-przyznawanie to DODATKOWE
+  źródło zapasu, nie zamiennik.
+
+**Testy**: `__tests__/streakFreezeStore.test.ts` (nowy, 7 testów) — poniżej progu, dokładnie
+próg 7, idempotencja (ten sam próg drugi raz), wzrost w obrębie tego samego progu (7→10),
+kolejny próg (14), progi niezależne per nawyk, przeskok od razu na wysoki próg (30) przyznaje
+tylko 1 zamrożenie (nie 4 naraz za wszystkie pominięte progi — ochrona przed nagłym
+zaimportowaniem/przeliczeniem starych danych). `tsc --noEmit`/`jest` czyste (90/90 suite,
+1166 testów, +7).
+
+**Priorytet testu na urządzeniu — niski** (wymaga 7-dniowej serii nawyku, nie da się
+wywołać na żądanie): jeśli masz nawyk z serią zbliżającą się do wielokrotności 7, sprawdź
+że licznik zamrożeń w Rynku/na ścianie serii rośnie automatycznie bez kupowania.
+
+## 210. TopPill: generyczny tekst zaległych, eskalacja "ZARAZ" dla pracy, crossfade zamiast miga (2026-09-29)
+
+User (screenshot pigułki "1 ZALEGŁE / DOKOŃCZYĆ SEGREGACJĘ ZDJĘĆ" na czerwonym tle):
+"ten pill stał się śmietnikiem trochę za dużo informacji na czerwonym tle wystarczy
+warning albo słowo kluczowe i chyba lepiej wygląda jak pisze masz przeterminowane
+zadanie a nie jak konkretnie, ale do pracy itp jak mam pracę zaraz niech będzie non stop
+praca plus żeby było tak że ten pill nie znika non stop zrobmy animacje pomiędzy
+wiadomościami inaczej może?" — trzy osobne zmiany w `src/components/ui/TopPill.tsx`.
+
+**1. Zaległe zadania (priorytet 4) — generyczny tekst zamiast konkretnego tytułu.**
+Dawniej rotował przez tytuły WSZYSTKICH zaległych zadań co `calmTick` (8s) — z kilkoma
+zaległymi czerwona pigułka non-stop zmieniała się na kolejne konkretne nazwy, stąd
+"śmietnik". Teraz stały tekst `'MASZ PRZETERMINOWANE ZADANIE'` + `${N} ZALEGŁE/ZALEGŁYCH`
+w badge'u (liczba zostaje, bo to realna informacja, nie szum) — konkretny tytuł dalej
+widać po stuknięciu (prowadzi do Zadań). Klucz zmieniony z `overdue-${id}` (rotujący) na
+stały `'overdue'` — skoro tekst już się nie zmienia, nie ma co animować/rotować co 8s.
+`.sort()` po deadline usunięty razem z `shown` — nie ma już potrzeby wybierać "które
+pokazać", tylko `overdue.length`.
+
+**2. Zmiana pracy dziś (priorytet 3) — eskalacja pilności.** Badge był na sztywno
+`'DZISIAJ'` od rana do wieczora, bez rozróżnienia "zmiana za 8h" od "zmiana za 10 min".
+Teraz liczy `minsUntil` do `startTime`; ≤60 min → badge `'ZARAZ'`, dalej → `'DZISIAJ'`.
+Klucz zostaje stały (`shift-today`) — to jeden ciągły stan, sama etykieta pilności się
+zmienia, żadnej rotacji/animacji przejścia między "innymi wiadomościami" w środku.
+
+**3. Animacja przejścia — crossfade zamiast miga-do-zera.** Stary efekt zmiany `key`
+animował opacity DO 0 (pigułka realnie znikała na ~130ms) przy KAŻDEJ zmianie treści —
+przy aktywnej rotacji (kilka zadań dziś/eventów gcal/kandydatów luźnej puli) pigułka
+mrugała co `CALM_ROTATE_MS` (8s) bez końca, co user odebrał jako "znika non-stop". Nowy
+`slideX` (Animated.Value) + opacity z PODŁOGĄ 0.4 (nigdy nie spada do zera) — pigułka
+lekko przygasa i zsuwa się o 5px zamiast gasnąć i zapalać się na nowo, więc czyta się
+jako przejście do nowej wiadomości, nie zniknięcie. Nadal WYŁĄCZNIE `Animated.timing` z
+`Easing.out(Easing.cubic)`, bez `Animated.spring` (ten sam ustalony 2026-09-13 zakaz —
+patrz istniejący komentarz w pliku, spring dawał bujający się "bouncy ball").
+
+**Testy**: brak nowych — `TopPill.tsx` nie ma dedykowanych testów jednostkowych (czysto
+prezentacyjny komponent z animacjami Reanimated/RN Animated, logika priorytetów zbyt
+spleciona z wieloma store'ami żeby testować bez pełnego mocka; ten sam brak co reszta
+plików UI w `components/ui/`). `tsc --noEmit`/`jest` czyste (90/90 suite, 1166 testów,
+bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: zaległe zadanie → sprawdź że pigułka pokazuje
+generyczny tekst (nie tytuł); zmiana pracy zaplanowana w ciągu godziny → badge "ZARAZ"
+zamiast "DZISIAJ"; obserwuj pigułkę podczas rotacji (kilka zadań dziś/eventów) — powinna
+się płynnie przesuwać, nie migać do czerni.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

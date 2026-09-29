@@ -224,12 +224,19 @@ export default function TopPill() {
       };
     }
 
-    // 3 — Work shift TODAY
+    // 3 — Work shift TODAY. Badge eskaluje na "ZARAZ" gdy start w ciągu godziny (user:
+    // "jak mam pracę zaraz niech będzie non stop praca") — dotąd "DZISIAJ" wisiało bez
+    // zmian od rana do wieczora, bez rozróżnienia "za 8h" od "za 10 min". Klucz zostaje
+    // stały (`shift-today`) niezależnie od badge'a — to JEDEN ciągły stan, nie ma się co
+    // animować/rotować w środku, tylko sama etykieta pilności się zmienia.
     const todayShift = shifts.find(sh => sh.date === today);
     if (todayShift) {
       const pre = workPrefix ? `${workPrefix} ` : '';
+      const [sh, sm] = todayShift.startTime.split(':').map(Number);
+      const minsUntil = sh * 60 + sm - (new Date().getHours() * 60 + new Date().getMinutes());
+      const badge = minsUntil <= 60 ? 'ZARAZ' : 'DZISIAJ';
       return {
-        badge: 'DZISIAJ',
+        badge,
         color:  '#2BC8E0',             // cyan
         text:  `${pre}MASZ ZMIANĘ NA ${todayShift.startTime}`,
         route: '/(tabs)/stats',
@@ -285,26 +292,27 @@ export default function TopPill() {
       };
     }
 
-    // 4 — Overdue tasks (status pending + deadline < today). Rotuje przez WSZYSTKIE
-    // zaległe (jak pula LUŹNA niżej, ten sam `calmTick`), nie tylko najstarsze — user
-    // z 3 zaległymi widziałby wiecznie TO SAMO jedno zadanie, resztę tylko po wejściu w
-    // Zadania (2026-09-20, "lepszymi odmianami zadań"). Sortowanie po deadline ustala
-    // KOLEJNOŚĆ rotacji (najpilniejsze pierwsze), nie wybór — a `key` po `id` zamiast po
-    // samej liczbie sprawia, że zmiana w puli faktycznie odpala animację przejścia (przy
-    // stałym `key` pill nigdy się nie animował, mimo że treść pod spodem się zmieniała).
+    // 4 — Overdue tasks (status pending + deadline < today). Generyczny tekst, NIE
+    // konkretny tytuł zadania (2026-09-29, user: "ten pill stał się śmietnikiem, trochę
+    // za dużo informacji na czerwonym tle, wystarczy warning albo słowo kluczowe, lepiej
+    // wygląda jak pisze masz przeterminowane zadanie a nie jak konkretnie") — dawniej
+    // rotował przez tytuły WSZYSTKICH zaległych co `calmTick`, więc czerwona pigułka
+    // non-stop zmieniała się na kolejne konkretne nazwy zadań, co user odebrał jako
+    // "śmietnik". Stały klucz (`overdue`, nie po `id`) — nic tu już się nie rotuje, więc
+    // nie ma co animować co 8s. Konkretny tytuł dalej widać po stuknięciu (prowadzi do
+    // Zadań), tu tylko warning + liczba.
     const overdue = calTasks.filter(t =>
       t.status === 'pending' &&
       t.deadline &&
       t.deadline.split('T')[0] < today
-    ).sort((a, b) => a.deadline!.localeCompare(b.deadline!));
+    );
     if (overdue.length > 0) {
-      const shown = overdue[calmTick % overdue.length];
       return {
         badge: `${overdue.length} ${plPlural(overdue.length, 'ZALEGŁE', 'ZALEGŁE', 'ZALEGŁYCH')}`,
         color:  colors.tabs.finances,  // #E63535 red
-        text:   up(shown.title),
+        text:   'MASZ PRZETERMINOWANE ZADANIE',
         route:  '/(tabs)/tasks',
-        key:    `overdue-${shown.id}`,
+        key:    'overdue',
       };
     }
 
@@ -523,6 +531,7 @@ export default function TopPill() {
   // ── Animation on content change — Dynamic-Island style pop ────────────────
   const opacity  = useRef(new Animated.Value(item ? 1 : 0)).current;
   const scale    = useRef(new Animated.Value(item ? 1 : 0.9)).current;
+  const slideX   = useRef(new Animated.Value(0)).current;
   const prevKey  = useRef<string | null>(item?.key ?? null);
   const pulse    = useRef(new Animated.Value(0)).current;
 
@@ -557,16 +566,23 @@ export default function TopPill() {
       return;
     }
     if (prevKey.current !== item.key) {
-      // Płynne przejście: lekki oddech w dół, potem gładkie rozszerzenie do pełnego
-      // rozmiaru wraz z nowym tekstem — bez sprężynowego odbicia.
+      // Crossfade zamiast miga-do-zera (2026-09-29, user: "zeby bylo tak ze ten pill nie
+      // znika non stop zrobmy animacje pomiędzy wiadomościami inaczej") — dawna wersja
+      // spadała do opacity 0 (pigułka na chwilę realnie znikała) przy KAŻDEJ zmianie
+      // treści, więc przy rotacji co `CALM_ROTATE_MS` (8s) mrugała bez końca. Teraz
+      // opacity ma PODŁOGĘ 0.4 (nigdy nie znika całkiem) + lekkie zsunięcie w bok
+      // (`slideX`), więc czyta się jako przesunięcie do nowej wiadomości, nie zgaśnięcie
+      // i zapalenie na nowo. Nadal bez `Animated.spring` (patrz komentarz wyżej).
+      slideX.setValue(5);
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(opacity, { toValue: 0, duration: 130, easing: EASE_OUT, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 0.94, duration: 130, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.4, duration: 110, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.97, duration: 110, easing: EASE_OUT, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(opacity, { toValue: 1, duration: 240, easing: EASE_OUT, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 1, duration: 240, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration: 220, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 220, easing: EASE_OUT, useNativeDriver: true }),
+          Animated.timing(slideX, { toValue: 0, duration: 220, easing: EASE_OUT, useNativeDriver: true }),
         ]),
       ]).start();
     } else {
@@ -585,7 +601,7 @@ export default function TopPill() {
   const on   = textOn(item.color);
 
   return (
-    <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
+    <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }, { translateX: slideX }] }]}>
       {/* A single self-contained pill (its own solid background) that hugs its
           content — no surrounding band/border/halo around it. */}
       <TouchableOpacity
