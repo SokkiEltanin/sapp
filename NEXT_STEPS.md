@@ -3,6 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Grupowanie powiadomień — węższy, bezpieczny wariant (2026-09-29)
+
+Pełny opis w ARCHITECTURE.md §207. **TO ZAMYKA CAŁĄ LISTĘ zaakceptowanych pomysłów tej
+sesji.** Zamiast ryzykownego scalania w locie (przebudowa WSZYSTKICH ~15 schedule*/
+cancel* w notificationsService.ts, ryzyko cichego zgubienia powiadomienia) — nowe,
+OSOBNE poranne powiadomienie-digest (`scheduleTodayDigestReminder`, 8:00), odpalające się
+TYLKO gdy 2+ rzeczy (dług/subskrypcja/notatka/kapsuła) wypadają tego samego dnia. Istniejące
+indywidualne powiadomienia działają jak dotąd, nietknięte. `src/utils/todayReminders.ts`
+(nowy, czysta funkcja + 10 testów). `tsc`/`jest` czyste (89/89 suite, 1156 testów, +10).
+
+**🆕 Priorytet testu na urządzeniu — niski** (wymaga 2+ rzeczy tego samego dnia, trudne do
+wywołania na żądanie): jeśli naturalnie się zdarzy, sprawdź czy przed 8:00 przychodzi
+dodatkowe zbiorcze powiadomienie.
+
+**OTWARTY TEMAT dla przyszłości — pełne scalanie w locie** (opcja 1 z rozmowy
+2026-09-28/29, NIE zbudowana, świadomie odłożona jako zbyt ryzykowna na autonomiczną turę)
+— prawdziwe przechwytywanie/łączenie już zaplanowanych powiadomień wymagałoby przebudowy
+architektury `schedule*`/`cancel*` w `notificationsService.ts` (centralny rejestr,
+sprawdzanie kolizji przed każdym planowaniem, przepisywanie treści przy każdej zmianie).
+Do zrobienia stopniowo, z testowaniem usera po drodze, jeśli kiedyś zechce więcej niż
+obecny poranny digest.
+
 ## ✅ Kafelek "Praca": pełny gradient zamiast płaskiego tła (2026-09-29)
 
 User: "z tym kolorem mi się jednak nie podoba, zrób jak byś ty to miał zrobić, może
@@ -183,14 +205,6 @@ zatwierdzeniu `expenses/[id].tsx` pokazuje "Zwrócono: X zł · efektywny koszt:
   dziennik impulsów, a nie ma ŻADNEJ blokady/biometrii (`expo-local-authentication` nawet nie
   jest w `package.json`). Nowa zależność + przełącznik w Ustawieniach + ekran blokady w
   `_layout.tsx` pokazywany na cold-start i po powrocie z tła po X minutach (konfigurowalne).
-
-- **Grupowanie powiadomień w jeden digest zamiast osobnego spamu** (user zaakceptował
-  2026-09-28, do zbudowania) — gdy kilka zaplanowanych powiadomień (przypomnienie długu +
-  subskrypcji + nawyku itp.) trafia na ten sam dzień/zbliżoną godzinę, jedno zbiorcze
-  powiadomienie zamiast trzech osobnych z rzędu. Wymaga przejrzenia WSZYSTKICH
-  `schedule*Reminder` w `notificationsService.ts` (kapsuła, dług, subskrypcja, nawyk, notatka)
-  i dodania warstwy grupującej przy planowaniu/wyzwalaniu — najbardziej złożony z tej rundy
-  pomysłów, nie mechaniczny wrap.
 
 ## 🆕 Wyszukiwanie obejmujące zapiski/refleksje i długi (2026-09-27)
 

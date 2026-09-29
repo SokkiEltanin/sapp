@@ -12216,6 +12216,57 @@ było na kafelku Pracy (tam żadnego paska nie było).
 gradient na całej powierzchni, tekst czytelny, przełącznik "Ten miesiąc"/"Ostatnie 6 msc"
 i wykres fal też czytelne na nowym tle.
 
+## 207. Grupowanie powiadomień w jeden digest — WĘŻSZY, bezpieczny wariant (2026-09-29)
+
+User zaakceptował pomysł "grupowanie powiadomień w jeden digest zamiast osobnego spamu"
+(gdy dług/subskrypcja/notatka/kapsuła wypadają tego samego dnia, kilka osobnych
+powiadomień z rzędu). Po analizie `notificationsService.ts` (~15 niezależnych
+`schedule*`/`refresh*`, każda z własnym identyfikatorem/logiką anulowania, wołana z ~10
+ekranów) zdecydowałem że **prawdziwe scalanie w locie jest zbyt ryzykowne do zrobienia
+autonomicznie w jednym PR-ze** — wymagałoby przebudowy WSZYSTKICH wywołań naraz, a
+najgorszy scenariusz buga to CICHE ZGUBIENIE powiadomienia (np. o długu), gorsze niż
+obecny "spam". Przedstawiłem userowi 3 opcje (pełne rozwiązanie / węższy bezpieczny
+wariant / odłożyć); user odpowiedział "dawaj rozbudowywać" po mojej rekomendacji
+ostrożności — zbudowany WĘŻSZY wariant (opcja 2).
+
+**Czym TO NIE JEST**: żadnego przechwytywania/scalania już zaplanowanych powiadomień
+OS-owych. Istniejące `scheduleDebtReminder`/`scheduleSubscriptionReminder`/
+`scheduleNoteReminder`/`scheduleCapsuleUnlockReminder` działają DOKŁADNIE jak wcześniej,
+nietknięte — user i tak dostanie swoje indywidualne powiadomienia o każdej z tych rzeczy
+osobno.
+
+**Czym TO JEST**: nowe, CAŁKOWICIE OSOBNE powiadomienie-podgląd poranny.
+- `src/utils/todayReminders.ts` (nowy) — czysta funkcja `todayReminders(data, now)`
+  licząca NIEZALEŻNIE z już zebranych danych (nie z OS-owej listy zaplanowanych
+  powiadomień) co wypada na DZIŚ: dług z `askDate`=dziś (pomijając rozliczone),
+  subskrypcja gdzie `nextBillingDate - reminderDaysBefore` = dziś (pomijając nieaktywne/
+  bez przypomnienia), notatka z `reminderAt` zaczynającym się od dzisiejszej daty, kapsuła
+  z `unlockAt` przypadającym dziś.
+- `notificationsService.ts` — nowa `refreshTodayDigestReminder(items)` (identifier
+  `'today-digest'`) + `cancelTodayDigestReminder()`. Odpala TYLKO gdy `items.length >= 2`
+  (przy jednej rzeczy user i tak dostanie jej własne powiadomienie — digest niczego by nie
+  dodał, tylko podwoił) i tylko jeśli 8:00 jeszcze nie minęło (po 8:00 nie ma sensu
+  planować "podglądu dnia" na dzień który już trwa). Ten sam re-arm-na-każdej-zmianie
+  wzorzec co `refreshWeeklySummary`.
+- `app/(tabs)/index.tsx` — `todayDigest` `useMemo` łączący już wczytane `debts`/
+  `subscriptions`/`allNotes`/`capsuleLetters` (wszystkie 4 źródła danych JUŻ były wczytane
+  na dashboardzie dla innych funkcji — zero nowego fetchu), efekt re-armujący
+  `refreshTodayDigestReminder` na `[todayDigest]`, tuż obok efektu `weeklySummary`.
+
+**Pełne scalanie w locie (opcja 1) zostaje OTWARTYM tematem** — patrz NEXT_STEPS.md, jeśli
+user zechce tego w przyszłości, z jego testowaniem po drodze zamiast jednej autonomicznej
+tury.
+
+**Testy**: `__tests__/todayReminders.test.ts` (nowy, 10 testów) — pusta lista, dług
+złapany/pominięty (rozliczony/inny dzień), subskrypcja złapana/pominięta (nieaktywna/bez
+przypomnienia), notatka złapana/pominięta, kapsuła złapana, wszystkie 4 naraz. `tsc
+--noEmit`/`jest` czyste (89/89 suite, 1156 testów, +10).
+
+**Priorytet testu na urządzeniu — niski** (wymaga 2+ rzeczy zaplanowanych na ten sam
+dzień, trudne do wywołania na żądanie bez ręcznego ustawienia dat): jeśli kiedyś
+naturalnie wypadną dwie rzeczy tego samego dnia, sprawdź czy przed 8:00 przychodzi
+dodatkowe zbiorcze powiadomienie "N rzeczy do ogarnięcia dziś".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
