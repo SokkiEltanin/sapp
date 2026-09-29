@@ -3,7 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Audyt czytelności — paczka 2 z 2 (2026-09-29)
+## 🆕 Ręczna edycja zwrotu na ekranie wydatku (2026-09-29)
+
+User: PGE prąd — dziewczyna oddała część, ale przelew przyszedł za późno/gotówką żeby
+auto-dopasowanie (§196) go złapało (okno 14 dni od zakupu), i chciał móc EDYTOWAĆ już
+podpięte zwroty. Pełny opis w ARCHITECTURE.md §213. Wiersz "Zwrócono" na
+`expenses/[id].tsx` jest teraz pressable — inline edycja `reimbursedAmount` (ustaw/
+poprawij/usuń), niezależnie od auto-dopasowania. Gdy nic nie jest podpięte, widoczne
+"+ Podepnij zwrot" zamiast pustego miejsca. `tsc`/`jest` czyste (90/90 suite, 1168 testów,
+bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski**: otwórz wydatek → tapnij wiersz zwrotu →
+wpisz/zmień/wyczyść kwotę → sprawdź że "efektywny koszt" się przelicza i przetrwa
+zamknięcie ekranu.
+
+## ✅ Audyt czytelności — paczka 2 z 2 (2026-09-29)
 
 Pełny opis w ARCHITECTURE.md §212. **TO ZAMYKA CAŁY AUDYT** (wszystkie 12 znalezisk, obie
 paczki). Data rekordów życiowych (dziś/wczoraj/"12 wrz"), data pomiaru składu ciała z

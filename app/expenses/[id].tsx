@@ -495,6 +495,32 @@ export default function ExpenseDetailScreen() {
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
 
+  // Ręczna edycja zwrotu (2026-09-29, user: "żebym mógł edytować podpięcia" — auto-
+  // dopasowanie w reimbursementMatch.ts łapie tylko przelew PRZYCHODZĄCY w ciągu 14 dni
+  // od zakupu; zwrot za rachunek za prąd, który wraca po miesiącu, albo gotówką, nigdy
+  // się nie zaproponuje). Ten sam wzorzec co `reclassifyFv` wyżej: lokalny store +
+  // Firestore, z toastem przy błędzie. `0` (nie `undefined`) do usuwania — `strip()` w
+  // expensesService.ts filtruje `undefined` PRZED zapisem, więc `undefined` nigdy by nie
+  // wyczyścił pola w Firestore, tylko zniknąłby z payloadu.
+  const [editingReimb, setEditingReimb] = useState(false);
+  const [reimbInput, setReimbInput] = useState('');
+  const openReimbEdit = () => {
+    haptic.tap();
+    setReimbInput(expense.reimbursedAmount ? expense.reimbursedAmount.toFixed(2) : '');
+    setEditingReimb(true);
+  };
+  const saveReimb = async () => {
+    const raw = reimbInput.trim().replace(',', '.');
+    let value = raw === '' ? 0 : parseFloat(raw);
+    if (isNaN(value) || value < 0) value = 0;
+    if (value > expense.amount) value = expense.amount;
+    haptic.medium();
+    setEditingReimb(false);
+    updateExpense(expense.id, { reimbursedAmount: value });
+    try { await expensesService.update(expense.id, { reimbursedAmount: value }); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
+  };
+
   const editIsIncome = txType === 'income';
   const quickTags = editIsIncome ? INCOME_TAGS : EXPENSE_TAGS;
   const accentColor = editIsIncome ? colors.accent.green : colors.accent.red;
@@ -832,13 +858,44 @@ export default function ExpenseDetailScreen() {
               </Text>
             )}
 
-            {/* Auto-dopasowany zwrot (2026-09-28, user zaakceptował pomysł) — czysto
-                informacyjne, nie zmienia `amount`/statystyk, patrz komentarz przy polu w
-                types/index.ts. */}
-            {!!expense.reimbursedAmount && (
-              <Text style={[s.currencyLabel, { color: colors.accent.green, marginTop: -4 }]}>
-                Zwrócono: {expense.reimbursedAmount.toFixed(2)} zł · efektywny koszt: {(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
-              </Text>
+            {/* Zwrot — auto-dopasowany (2026-09-28) albo ręcznie podpięty/edytowany
+                (2026-09-29, patrz `saveReimb` wyżej). Nie zmienia `amount`/statystyk,
+                patrz komentarz przy polu w types/index.ts. Tylko dla wydatków — zwrot za
+                przychód nie ma sensu. */}
+            {expense.type !== 'income' && (
+              editingReimb ? (
+                <View style={s.reimbEditRow}>
+                  <TextInput
+                    value={reimbInput}
+                    onChangeText={setReimbInput}
+                    style={[s.reimbInput, { color: colors.accent.green }]}
+                    keyboardType="decimal-pad"
+                    autoFocus
+                    placeholder="0,00"
+                    placeholderTextColor={colors.accent.green + '60'}
+                  />
+                  <Text style={[s.currencyLabel, { color: colors.accent.green + 'AA', marginTop: -4 }]}>zł zwrotu</Text>
+                  <PressableScale onPress={saveReimb} style={s.reimbIconBtn}>
+                    <Check size={16} color={colors.accent.green} />
+                  </PressableScale>
+                  <PressableScale onPress={() => setEditingReimb(false)} style={s.reimbIconBtn}>
+                    <XIcon size={16} color={colors.text.secondary} />
+                  </PressableScale>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={openReimbEdit} activeOpacity={0.7} style={s.reimbRow}>
+                  {!!expense.reimbursedAmount ? (
+                    <Text style={[s.currencyLabel, { color: colors.accent.green, marginTop: -4 }]}>
+                      Zwrócono: {expense.reimbursedAmount.toFixed(2)} zł · efektywny koszt: {(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
+                    </Text>
+                  ) : (
+                    <Text style={[s.currencyLabel, { color: heroAccent + '80', marginTop: -4, fontSize: 12 }]}>
+                      + Podepnij zwrot
+                    </Text>
+                  )}
+                  <Pencil size={11} color={heroAccent + '80'} style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              )
             )}
 
             {/* Date chip */}
@@ -1369,6 +1426,10 @@ const makeS = (c: any) => StyleSheet.create({
     flex: 1, padding: 0, lineHeight: 50,
   },
   currencyLabel: { fontSize: 20, fontWeight: '300', lineHeight: 50 },
+  reimbRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  reimbEditRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: 4 },
+  reimbInput: { fontSize: 14, fontWeight: '600', padding: 0, minWidth: 44 },
+  reimbIconBtn: { padding: 4 },
   heroMeta: { flexDirection: 'row', marginTop: 2 },
   dateBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
