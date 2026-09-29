@@ -12580,6 +12580,43 @@ mechanizm co reszta filtrów strukturalnych (Typ/Płatnik/Płatność/Kwota/Rach
 Filtry → włącz "Tylko ze zwrotem", sprawdź że lista zwęża się do tych transakcji i łączy
 się z innymi filtrami.
 
+## 215. Kafelek "Plan zajęć": pełny gradient + noise + wywalony lewy pasek (2026-09-29)
+
+User (zrzutem kafelka): "zrob bardziej profesjonalny większy trochę i możesz dodać noise
+większy. I wywal ten lub zmien po lewej fioletowy dziwny element bo on nie pasuje do
+kształtu kafelka". Zamyka pętlę zaczętą przy §206 ("Praca") — TAM user wziął przepis TEGO
+kafelka (RadialGlow + wash + lewy `accentBar`) i poprosił o prawdziwy `LinearGradient`
+zamiast paska, bo pasek "nie pasował"; TERAZ ten sam zarzut wraca do ŹRÓDŁOWEGO kafelka —
+`ClassScheduleCard.tsx` nigdy nie dostał własnej poprawki, tylko został skopiowany dalej.
+
+**`src/components/dashboard/ClassScheduleCard.tsx`** — `View style={s.card}` (flat
+`#A78BFA14` wash) + osobny `accentBar` (cienki prostokąt po lewej) zastąpione
+`LinearGradient` na CAŁYM kafelku (nowa stała `CLASS_GRADIENT = ['#3D2A66', '#5B3FA0',
+'#140D26']`, ten sam trójstopniowy diagonalny przepis co `WORK_GRADIENT` — patrz §206).
+`accentBar` USUNIĘTY CAŁKOWICIE (gradient sam niesie akcent, osobny pasek zbędny — tak jak
+przy Pracy). Padding `spacing[4]→spacing[5]` (16→20, "trochę większy"), `RadialGlow`
+170→200. Teksty przesunięte w stronę bieli (`rgba(255,255,255,0.62-0.92)`, ten sam
+przepis co `workGrad*` nakładki) — na ciemnym gradiencie poprzednie `c.text.muted`/
+`c.text.secondary` traciłyby kontrast.
+
+**Nowy `src/components/ui/NoiseOverlay.tsx`** — user: "możesz dodać noise większy", ale w
+całym repo nie było ŻADNEGO komponentu ziarna/noise (zweryfikowane grepem). RNSVG nie
+wspiera niezawodnie filtrów SVG (`feTurbulence`) na Androidzie (docelowa platforma, patrz
+stack w CLAUDE.md) — więc zamiast filtra: rozrzucone, malutkie półprzezroczyste `<Circle>`
+(ten sam trik co ziarno w druku offsetowym), uniwersalnie wspierane na obu platformach bo
+to zwykłe, podstawowe elementy SVG. Deterministyczny seedowany PRNG (nie `Math.random()`)
+— ten sam seed zawsze rysuje TE SAME kropki, żeby tekstura nie "migała" przy każdym
+rerenderze karty. Reużywalny (`opacity`/`density`/`color`/`seed` jako propsy) — pierwszy
+kafelek na nim to "Plan zajęć" (`density={140}`, `opacity=0.05`, biały), ale komponent nie
+jest zawężony do tej jednej karty.
+
+**Testy**: brak nowych — czysto wizualna zmiana istniejącego node'a (ten sam wzorzec co
+§206). `tsc --noEmit`/`jest` czyste (90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dashboard → kafelek "Plan zajęć" — gradient na
+całej powierzchni, brak paska po lewej, widoczne subtelne ziarno na tle, teksty (godzina/
+przedmiot/sala/odznaka typu) czytelne na nowym tle w obu motywach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
