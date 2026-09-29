@@ -97,6 +97,11 @@ export default function FinancesScreen() {
   // rachunku" na dashboardzie) — łapie "PGE"/"Tauron"/"Energa"/"Enea" w nazwie sklepu czy
   // notatce bez konieczności ręcznego tagowania każdej płatności.
   const [activeBillFilter, setActiveBillFilter] = useState<string | null>(null);
+  // Switch "Ze zwrotem" (2026-09-29, user: "connector... albo switch jakiś przy
+  // filtrach" — po dodaniu ręcznej edycji zwrotu (§213) nie było sposobu ZOBACZYĆ
+  // wszystkie transakcje z podpiętym zwrotem naraz, tylko po jednej na ekranie
+  // szczegółów). Tylko wydatki mają `reimbursedAmount` (patrz warunek w [id].tsx).
+  const [activeReimbFilter, setActiveReimbFilter] = useState(false);
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<'all' | 'cash' | 'card'>('all');
   const [activeType, setActiveType] = useState<'all' | 'income' | 'expense'>('all');
@@ -286,11 +291,13 @@ export default function FinancesScreen() {
   const max = parseFloat(amtMax.replace(',', '.'));
   const activeFilterCount =
     (activeType !== 'all' ? 1 : 0) + (activePayer ? 1 : 0) + (activePayment !== 'all' ? 1 : 0) +
-    (activeTagFilter ? 1 : 0) + (activeBillFilter ? 1 : 0) + (!isNaN(min) ? 1 : 0) + (!isNaN(max) ? 1 : 0);
+    (activeTagFilter ? 1 : 0) + (activeBillFilter ? 1 : 0) + (!isNaN(min) ? 1 : 0) + (!isNaN(max) ? 1 : 0) +
+    (activeReimbFilter ? 1 : 0);
 
   const clearFilters = () => {
     setActiveType('all'); setActivePayer(null); setActivePayment('all');
     setActiveTagFilter(null); setActiveBillFilter(null); setAmtMin(''); setAmtMax('');
+    setActiveReimbFilter(false);
   };
 
   // Cap the DEFAULT (unfiltered) transaction list to a recent window so a long history
@@ -318,7 +325,7 @@ export default function FinancesScreen() {
   // `sections` dokłada WYŁĄCZNIE dopasowanie tagu na już przefiltrowanym, dużo mniejszym
   // wejściu — jedyny koszt per-klawisz to sam substring-scan, nie cała reszta filtrów + cięcie.
   const hasStructuralFilter = activeType !== 'all' || !!activePayer || activePayment !== 'all'
-    || !isNaN(min) || !isNaN(max) || !!activeBillFilter;
+    || !isNaN(min) || !isNaN(max) || !!activeBillFilter || activeReimbFilter;
   const structuralFiltered = useMemo(() => {
     const matchesStructural = (e: Expense) => {
       if (activeType === 'income' && e.type !== 'income') return false;
@@ -328,6 +335,7 @@ export default function FinancesScreen() {
       if (!isNaN(min) && e.amount < min) return false;
       if (!isNaN(max) && e.amount > max) return false;
       if (activeBillFilter && billTagFor(e)?.tag !== activeBillFilter) return false;
+      if (activeReimbFilter && !(e.reimbursedAmount && e.reimbursedAmount > 0)) return false;
       return true;
     };
     const base = capTx ? grouped.filter(([date]) => date >= recentCutoff) : grouped;
@@ -335,7 +343,7 @@ export default function FinancesScreen() {
       ? base.map(([date, items]) => [date, items.filter(matchesStructural)] as [string, typeof items])
           .filter(([, items]) => items.length > 0)
       : base;
-  }, [grouped, activeBillFilter, activePayer, activePayment, activeType, min, max, capTx, recentCutoff, hasStructuralFilter]);
+  }, [grouped, activeBillFilter, activePayer, activePayment, activeType, min, max, capTx, recentCutoff, hasStructuralFilter, activeReimbFilter]);
 
   const sections = useMemo(() => {
     // Dopasowanie CASE-INSENSITIVE substring (2026-09-12, user: "możliwość wpisania tagu
@@ -738,6 +746,23 @@ export default function FinancesScreen() {
                         </TouchableOpacity>
                       );
                     })}
+                  </View>
+                </>
+              )}
+
+              {/* Zwroty — switch (2026-09-29, user: "connector... albo switch jakiś przy
+                  filtrach"). Ten sam chip-toggle co "Rachunki" wyżej, ale jednostanowy
+                  (włącz/wyłącz), nie wielowyboru — pokazuje TYLKO wydatek === !!e.
+                  reimbursedAmount, żeby dało się zebrać na jednym ekranie wszystkie
+                  transakcje z podpiętym zwrotem, bez przeklikiwania po jednej. */}
+              {expenses.some(e => (e.reimbursedAmount ?? 0) > 0) && (
+                <>
+                  <Text style={st.fmLabel}>Zwroty</Text>
+                  <View style={st.fmRow}>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setActiveReimbFilter(v => !v); }}
+                      style={[st.tagChip, activeReimbFilter && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, activeReimbFilter && st.tagTextOn]}>Tylko ze zwrotem</Text>
+                    </TouchableOpacity>
                   </View>
                 </>
               )}

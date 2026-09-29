@@ -12547,6 +12547,39 @@ auto-dopasowanie strukturalnie nie może złapać (zwrot spóźniony/gotówkowy/
 (albo "+ Podepnij zwrot" jeśli go nie ma), wpisz kwotę, zapisz — sprawdź że "efektywny
 koszt" się przelicza i że wartość przetrwa zamknięcie/otwarcie ekranu (Firestore sync).
 
+## 214. Plomba zwrotu na liście + filtr "Tylko ze zwrotem" (2026-09-29)
+
+User: "taki connector zabawny wyświetlany jakby jak przytrzymujesz to pokazuje się z czym
+jest połączone, albo switch jakiś przy filtrach" — po §213 (ręczna edycja zwrotu) zwrot był
+widoczny WYŁĄCZNIE na ekranie szczegółów pojedynczego wydatku; na liście transakcji w
+Finansach nie było żadnego znaku że dana pozycja ma podpięty zwrot, i nie dało się zebrać
+wszystkich takich pozycji naraz. Long-press na wierszu listy jest już zajęty (przenosi do
+edycji, `handleExpenseLongPress` w `finances.tsx`) — więc "connector" jest zwykłym TAPEM na
+małej plombie, nie osobnym long-pressem na całym wierszu.
+
+**`src/components/expenses/ExpenseItem.tsx`** — nowa zielona plomba "🔗 zwrot" pod
+tytułem/tagami (ten sam wzorzec jak istniejący `payerBadge`), widoczna gdy
+`!isIncome && reimbursedAmount > 0`. Tap (nie long-press — zagnieżdżony `TouchableOpacity`
+w `PressableScale` wiersza, identyczny mechanizm jak istniejący `chevronBtn` do rozwijania
+paragonu, więc tap na plombie NIE odpala `onPress`/`onLongPress` całego wiersza) pokazuje
+`toast.info(...)` z tą samą treścią co wiersz "Zwrócono" na ekranie szczegółów (kwota +
+efektywny koszt) — bez budowania osobnego popovera, bo to jedna linijka informacji.
+
+**`app/(tabs)/finances.tsx`** — nowy switch-chip "Tylko ze zwrotem" w panelu filtrów (sekcja
+"Zwroty", widoczna tylko gdy `expenses.some(e => reimbursedAmount > 0)` — zero szumu dla
+kogoś kto nigdy nie miał zwrotu). Jeden boolean `activeReimbFilter`, wliczony do
+`hasStructuralFilter`/`matchesStructural`/`activeFilterCount`/`clearFilters`, ten sam
+mechanizm co reszta filtrów strukturalnych (Typ/Płatnik/Płatność/Kwota/Rachunki) — więc
+łączy się z nimi (np. "wydatki + tylko ze zwrotem" naraz), a nie zastępuje.
+
+**Testy**: bez nowych — czysto UI/store (toast + filtr chip), ten sam brak pokrycia co
+`reclassifyFv`/filtry sąsiednie. `tsc --noEmit`/`jest` czyste (90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: wydatek z podpiętym zwrotem na liście Finansów
+→ sprawdź zieloną plombę "zwrot" i że tap pokazuje toast BEZ przechodzenia do edycji;
+Filtry → włącz "Tylko ze zwrotem", sprawdź że lista zwęża się do tych transakcji i łączy
+się z innymi filtrami.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -3,7 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Ręczna edycja zwrotu na ekranie wydatku (2026-09-29)
+## 🆕 Plomba zwrotu na liście + filtr "Tylko ze zwrotem" (2026-09-29)
+
+User: "taki connector zabawny... jak przytrzymujesz to pokazuje się z czym jest połączone,
+albo switch jakiś przy filtrach" — dokończenie §213: zwrot był widoczny tylko na ekranie
+szczegółów, na liście Finansów nie było żadnego znaku. Pełny opis w ARCHITECTURE.md §214.
+Zielona plomba "zwrot" na kafelku listy (tap → toast z kwotą/efektywnym kosztem, long-press
+wiersza zostaje jak było — przenosi do edycji) + switch-chip "Tylko ze zwrotem" w panelu
+filtrów Finansów, łączy się z resztą filtrów. `tsc`/`jest` czyste (90/90 suite, 1168
+testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski**: lista Finansów z wydatkiem mającym zwrot →
+plomba widoczna, tap pokazuje toast bez przechodzenia do edycji; filtr "Tylko ze zwrotem"
+zwęża listę poprawnie.
+
+## ✅ Ręczna edycja zwrotu na ekranie wydatku (2026-09-29)
 
 User: PGE prąd — dziewczyna oddała część, ale przelew przyszedł za późno/gotówką żeby
 auto-dopasowanie (§196) go złapało (okno 14 dni od zakupu), i chciał móc EDYTOWAĆ już
