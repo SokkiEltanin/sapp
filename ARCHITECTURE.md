@@ -12508,6 +12508,45 @@ Zdrowie → jeśli masz dane BIA z zegarka, sprawdź wiersz "Pomiar: ..." i że 
 (auto i ręczna) go aktualizuje; Nawyki → nawyk dodany niedawno, sprawdź że dni SPRZED
 dodania w 7-dniowym/30-dniowym widoku wyglądają inaczej niż realnie pominięte dni.
 
+## 213. Ręczna edycja zwrotu na ekranie wydatku (2026-09-29)
+
+User: "dodałeś to, że mogę podpinać płatności? Np. że zapłaciłem za PGE prąd i moja
+dziewczyna mi przelała część za to — żebym mógł podpiąć że właśnie za to i żebym mógł
+edytować podpięcia i w ogóle?" — auto-dopasowanie zwrotu (§196, `reimbursementMatch.ts`)
+łapie WYŁĄCZNIE przychodzący przelew bankowy w ciągu 14 dni od zakupu; zwrot za rachunek
+za prąd, który wraca po miesiącu (albo gotówką, albo BLIKiem bez powiadomienia banku),
+nigdy nie trafi w to okno — a `expense.reimbursedAmount` po zatwierdzeniu auto-dopasowania
+był dotąd wyłącznie READ-ONLY na `expenses/[id].tsx` (`Zwrócono: X zł`), bez żadnej ścieżki
+żeby go ręcznie ustawić, poprawić czy usunąć.
+
+`app/expenses/[id].tsx` — wiersz "Zwrócono" pod kwotą hero jest teraz pressable (ten sam
+wzorzec co `reclassifyFv`/`FvBadge` na tym ekranie: lokalny `updateExpense` + osobne
+`expensesService.update` w try/catch z toastem przy błędzie, niezależnie od głównego
+trybu edycji `editing`). Tap otwiera inline `TextInput` (`decimal-pad`, prefilled aktualną
+wartością) + ✓/✕. Gdy `reimbursedAmount` nie jest ustawiony, wiersz pokazuje subtelne
+"+ Podepnij zwrot" zamiast nic — więc afordancja jest widoczna, nie trzeba zgadywać że
+tam coś można kliknąć. Tylko dla `expense.type !== 'income'` (zwrot za przychód nie ma
+sensu). Zapis czyści/klampuje wejście: puste → `0` (usuwa zwrot), poza `[0, amount]` →
+przycięte do granicy.
+
+Pułapka do zapamiętania: usuwanie zapisuje `reimbursedAmount: 0`, NIE `undefined` —
+`strip()` w `expensesService.ts` filtruje `undefined` z payloadu PRZED zapisem (Firestore
+`updateDoc` po prostu nie dotyka pola, którego nie ma w payloadzie), więc wysłanie
+`undefined` nigdy by nie wyczyściło starej wartości w Firestore, tylko po cichu
+zignorowało próbę usunięcia — `0` zapisuje się normalnie i `!!expense.reimbursedAmount`
+w warunkach wyświetlania i tak już traktuje `0` jak "brak zwrotu".
+
+Nie zmienia sposobu auto-dopasowania (wciąż działa jak w §196, na przelewach
+przychodzących) — to czysto ręczna nakładka na to samo pole, dla przypadków które
+auto-dopasowanie strukturalnie nie może złapać (zwrot spóźniony/gotówkowy/BLIK).
+
+**Testy**: bez nowych — czysto UI/store, ten sam brak pokrycia co `reclassifyFv` obok
+(logika zbyt spleciona z komponentem/RN). `tsc --noEmit`/`jest` czyste (90/90, 1168).
+
+**Priorytet testu na urządzeniu — niski**: otwórz dowolny wydatek, tapnij wiersz zwrotu
+(albo "+ Podepnij zwrot" jeśli go nie ma), wpisz kwotę, zapisz — sprawdź że "efektywny
+koszt" się przelicza i że wartość przetrwa zamknięcie/otwarcie ekranu (Firestore sync).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
