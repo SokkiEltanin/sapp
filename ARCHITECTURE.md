@@ -12617,6 +12617,55 @@ jest zawężony do tej jednej karty.
 całej powierzchni, brak paska po lewej, widoczne subtelne ziarno na tle, teksty (godzina/
 przedmiot/sala/odznaka typu) czytelne na nowym tle w obu motywach.
 
+## 216. Fix: gotówka wciąż wliczała się do Salda w 2 miejscach mimo cięcia z 2026-07-20 (2026-09-29)
+
+Pierwszy konkret z audytu "niezgodności metryk" (subagent-audyt, patrz kontekst sesji).
+User: "z gotówką w ogóle bez sensu, gotówkę wywalamy, nie używam jej, a jak używam nie
+uwzględniam jej [w saldzie] lub zaznaczam że zapłaciłem gotówką (żeby liczyło się do
+wydatków na jedzenie i danych)". Sprawdzone w kodzie: DOKŁADNIE ta decyzja została już
+podjęta 2026-07-20 — patrz notatka wyżej w tym pliku ("Saldo = JEDNA liczba NA KARCIE...
+cash/gotówka WYCIĘTE... usunięto pigułki Gotówka/Razem G+K z hero i pola gotówki z
+Ustawień"). Ale cięcie dotarło tylko do UI (hero/Ustawienia) i do `finances.tsx`
+(`allExp`/`allInc` filtrują `paymentMethod !== 'cash'`, fix 2026-09-16) — DWA inne miejsca
+liczące to samo Saldo zostały pominięte i wciąż wliczały gotówkę, więc user mógł zobaczyć
+RÓŻNE liczby dla "Saldo" na różnych ekranach, dokładnie jak zgłosił.
+
+**1. `app/expenses/add.tsx`** — `accountBalance` (podgląd Salda przy dodawaniu transakcji)
+liczył `balanceOffset + cashOffset + net`, gdzie `net` sumował WSZYSTKIE moje transakcje
+(kartę I gotówkę), z komentarzem twierdzącym "matches Finances" — nieprawda od fixu
+2026-09-16. `cashOffset`/`getCashOffset` (legacy z modelu sprzed cięcia, wciąż eksportowane
+z `accountBalance.ts`, ale UI Ustawień który je zapisywał już nie istnieje) usunięte z tego
+ekranu całkowicie — teraz `mine && paymentMethod !== 'cash'`, identycznie jak
+`allExp`/`allInc` w `finances.tsx`.
+
+**2. `app/settings.tsx`** — `accountNet` (reconciliacja "Saldo konta" — user wpisuje realne
+saldo karty, appka liczy offset) też liczyła `net` z gotówką wliczoną, MIMO komentarza w
+kodzie "MUST match the Finances balance". Efekt: gdyby user kiedykolwiek zapisał tu
+wpisaną gotówkową transakcję i potem wpisał realne saldo karty, wyliczony offset byłby
+błędny o różnicę gotówkową — utajony bug, niewidoczny dopóki gotówka = 0 (czyli dotąd,
+skoro user faktycznie jej prawie nie używa). Naprawione tym samym filtrem. Martwe
+`cashInc`/`cashExp`/`cashNet` (liczone, nigdy nie renderowane — zweryfikowane grepem)
+usunięte przy okazji, bo były częścią tej samej niepoprawnej funkcji.
+
+**`accountBalance.ts`** (definicje `getCashOffset`/`setCashOffset`/`migrateBalanceModel`)
+ŚWIADOMIE nietknięte — to wciąż działający, jednorazowy mechanizm migracji dla starego
+modelu total-offset (konwertuje `cardOffset = oldTotalOffset - cashOffset` RAZ, chroniony
+`MIGRATION_KEY`); usunięcie go nie naprawia niczego widocznego, a ryzykuje zepsucie
+migracji komuś kto jej jeszcze nie przeszedł. `paymentMethod: 'cash'` na samym wydatku też
+nietknięty — gotówkowy zakup nadal poprawnie liczy się do wydatków miesiąca/jedzenia
+(`finances.tsx` `monthTotals.exp`/`food`), tylko nigdzie już nie do Salda.
+
+**Testy**: bez nowych — istniejący `accountBalance.test.ts` (migracja) nie dotyczy tych
+dwóch ekranów, oba to inline `useMemo`/IIFE bez eksportowanej funkcji do testowania w
+izolacji (ten sam brak co reszta logiki w tych plikach). `tsc --noEmit`/`jest` czyste
+(90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: ekran "Dodaj wydatek" → Saldo u góry powinno
+się teraz zgadzać z "Saldo" w Finansach (bez gotówki w obu); jeśli masz jakąkolwiek
+transakcję gotówkową w historii, różnica sprzed fixu powinna zniknąć. Ustawienia →
+"Saldo konta" → wpisanie realnego salda karty powinno dać ten sam wynik co dotąd (chyba że
+masz gotówkowe transakcje — wtedy dopiero teraz poprawny).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

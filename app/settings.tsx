@@ -539,17 +539,18 @@ export default function SettingsScreen() {
   // screen flags those.
   const accountNet = useMemo(() => {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
-    let inc = 0, exp = 0, cashInc = 0, cashExp = 0;
+    let inc = 0, exp = 0;
     for (const e of unique) {
-      // MUST match the Finances balance: only MY transactions count toward my
-      // money. Otherwise the saved offset is computed against a different net
-      // and the displayed balance drifts.
-      if (!isMine(e)) continue;
-      const cash = e.paymentMethod === 'cash';
-      if (e.type === 'income') { inc += e.amount; if (cash) cashInc += e.amount; }
-      else { exp += e.amount; if (cash) cashExp += e.amount; }
+      // MUST match the Finances balance: only MY transactions, i BEZ gotówki, liczą
+      // się do mojego Salda (2026-09-29, user: "z gotówką w ogóle bez sensu... nie
+      // uwzględniam jej" — ta funkcja liczyła gotówkę do `net` mimo komentarza
+      // "MUST match", więc wpisanie realnego salda KARTY tutaj dawało zły offset,
+      // gdy tylko user miał jakąkolwiek transakcję gotówkową — patrz ten sam fix w
+      // `expenses/add.tsx`, ten sam filtr co `allExp`/`allInc` w finances.tsx).
+      if (!isMine(e) || e.paymentMethod === 'cash') continue;
+      if (e.type === 'income') inc += e.amount; else exp += e.amount;
     }
-    return { net: inc - exp, cashNet: cashInc - cashExp };
+    return { net: inc - exp };
   }, [expenses]);
   const [balanceOffset, setBalanceOffsetState] = useState(0);
   const [balanceInput, setBalanceInput] = useState('');

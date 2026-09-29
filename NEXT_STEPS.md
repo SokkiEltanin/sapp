@@ -3,7 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Kafelek "Plan zajęć": pełny gradient + noise + wywalony lewy pasek (2026-09-29)
+## 🆕 Fix: gotówka wciąż wliczała się do Salda w 2 miejscach (2026-09-29)
+
+User: "z gotówką w ogóle bez sensu, wywalamy ją, nie używam... a jak używam nie uwzględniam
+jej [w saldzie] lub zaznaczam że zapłaciłem gotówką (żeby liczyło się do wydatków na
+jedzenie)". Pierwszy konkretny fix z audytu niezgodności metryk. Pełny opis w
+ARCHITECTURE.md §216. Decyzja "gotówka nie wchodzi do Salda" była już podjęta 2026-07-20,
+ale nie dotarła do `app/expenses/add.tsx` (podgląd Salda przy dodawaniu) ani
+`app/settings.tsx` (reconciliacja "Saldo konta") — oba wciąż wliczały gotówkę, mimo
+komentarzy twierdzących że są zgodne z Finansami. Naprawione tym samym filtrem co
+`finances.tsx` (`mine && paymentMethod !== 'cash'`). `paymentMethod: 'cash'` na wydatku
+zostaje — gotówkowy zakup nadal liczy się do wydatków miesiąca/jedzenia, tylko nie do
+Salda. `tsc`/`jest` czyste (90/90 suite, 1168 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: "Dodaj wydatek" → Saldo u góry zgadza się
+teraz z Finansami; Ustawienia → "Saldo konta" → reconciliacja działa poprawnie nawet z
+gotówkową transakcją w historii.
+
+## ✅ Kafelek "Plan zajęć": pełny gradient + noise + wywalony lewy pasek (2026-09-29)
 
 User zrzutem: "zrob bardziej profesjonalny większy trochę i możesz dodać noise większy. I
 wywal ten lub zmien po lewej fioletowy dziwny element". Pełny opis w ARCHITECTURE.md §215.
