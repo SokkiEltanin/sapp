@@ -12830,6 +12830,59 @@ plikiem).
 jeśli kiedyś 2+ rzeczy wypadną tego samego dnia, NIE powinno przyjść dodatkowe zbiorcze
 powiadomienie rano (tylko pojedyncze, jak zawsze).
 
+## 221. Zadania: usunięta ręczna "trudność", nagroda automatyczna z priorytetu + pilności/tempa (2026-09-30)
+
+User: "Za zadania muszą byc coiny pupila i XP rosnące wzglem poziomu i pilnosci taska (im
+pilniejszy i szybciej wykonany tym więcej XP i coinow) i wywalić musimy teudnosc zadania
+trochę jest bez sensu." Dwie zmiany naraz: (1) usunięcie pola `difficulty` (1-5, ręcznie
+ustawiane w formularzu, nic realnego nie licząc), (2) nowa formuła nagrody z dwóch
+sygnałów appka JUŻ ZNA — priorytet ("poziom") i pilność/tempo wykonania.
+
+**Nowy `src/utils/taskReward.ts`** (czysta funkcja, ZERO importów serwisów/store'ów —
+`useTasks.ts` ciągnie za sobą całe drzewo Firebase/`calendarService`, które w testach
+jednostkowych nie transformuje się, `export const env = process.env` z `expo/virtual/
+env.js` wywala się na "Unexpected token 'export'" — ten sam powód co inne samodzielne
+pure-utile w repo). `taskReward(task, completedAt = now)`:
+- `PRIORITY_WEIGHT`: low=1, normal=2, high=3 (waga bazowa — "poziom" pilności).
+- `speedMult`: bonus za NIE odkładanie — dni od `createdAt` do `completedAt`. Ten sam
+  dzień = ×1.5, dzień później = ×1.25, do 3 dni = ×1.1, dalej = ×1 (brak bonusu, NIE kara).
+- `urgencyMult`: bonus za bliskość terminu w MOMENCIE ukończenia (ale nie po terminie) —
+  termin dziś = ×1.5, jutro = ×1.25, dalej/bez terminu/PO terminie = ×1.
+- `coins = round(priorityWeight × speedMult × urgencyMult)`, `xp = round((6 + priorityWeight×4)
+  × speedMult × urgencyMult)`, oba z podłogą `max(1, ...)`. Mnożniki się MNOŻĄ — pilny
+  priorytet + termin dziś + zrobione tego samego dnia = wyraźnie więcej niż sam priorytet.
+
+**`src/hooks/useTasks.ts`** — `markTaskDone` woła `taskReward(task)` zamiast starych
+`taskCoins(difficulty)`/`taskXp(difficulty)`; re-eksportuje `taskReward` z nowego utila,
+żeby ekrany importujące go dotąd stąd nie musiały zmieniać ścieżki. Recurring-task-
+creation payload (kopiowanie zadania na następny termin) nie kopiuje już `difficulty`.
+
+**Usunięte całkowicie**: `TaskDifficulty` (typ), `Task.difficulty` (pole), `DiffPicker`
+(`app/tasks/[id].tsx`) i analogiczny inline picker w `app/tasks/add.tsx` (kropki 1-5 +
+etykieta Łatwe/Proste/Średnie/Trudne/Hardkor), sekcja "Czas ukończenia wg trudności" w
+`app/weekly.tsx` (analityka tygodniowa licząca średni czas ukończenia PO trudności —
+razem z polem straciła sens; sąsiadująca "terminowość %" ZOSTAJE, liczona niezależnie z
+samych deadline'ów).
+
+**Zastąpione/dodane w UI**: `app/tasks/[id].tsx` — miejsce po "Trudność" dostało wiersz
+"Nagroda teraz" (tylko dla niedokończonych) z live podglądem `taskReward(...)` — user od
+razu widzi ile dostanie za ukończenie TERAZ, uwzględniając (przy edycji) zmieniany na
+bieżąco priorytet. `app/(tabs)/tasks.tsx` — monetowa plomba na kafelku listy była dotąd
+warunkowana `difficulty != null` (opcjonalne pole) — teraz pokazuje się dla KAŻDEGO
+nieukończonego zadania (`taskReward` zawsze coś zwraca, nic już nie jest opcjonalne),
+licząc `taskReward(task).coins` zamiast starego `taskCoins(task.difficulty)`.
+
+**Testy**: nowy `__tests__/taskReward.test.ts` (7 testów) — sam priorytet bez bonusów,
+skalowanie priorytetu low<normal<high, bonus za tempo (dziś>dzień>3dni>tydzień), bonus za
+pilność (dziś>jutro>dalej), PO terminie = tyle co bez terminu (bez kary), mnożenie się
+bonusów w scenariuszu maksymalnym. `todayReminders.test.ts` (-10, usunięty w §220) — netto
+90/90 suite. `tsc --noEmit`/`jest` czyste (90/90, 1165 testów, +7 netto).
+
+**Priorytet testu na urządzeniu — średni**: dodaj zadanie, ukończ tego samego dnia z
+terminem na dziś → sprawdź że dostałeś wyraźnie więcej monet/XP niż za zwykłe zadanie bez
+terminu; ekran szczegółów → wiersz "Nagroda teraz" pokazuje sensowną liczbę i znika po
+ukończeniu; lista zadań → plomba z monetami na każdym aktywnym zadaniu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Usunięcie addytywnego "porannego podglądu dnia" (audyt spamu powiadomień, cz. 1) (2026-09-30)
+## 🆕 Zadania: usunięta ręczna "trudność", nagroda automatyczna z priorytetu + pilności/tempa (2026-09-30)
+
+User: "Za zadania muszą byc coiny pupila i XP rosnące wzglem poziomu i pilnosci taska (im
+pilniejszy i szybciej wykonany tym więcej XP i coinow) i wywalić musimy teudnosc zadania
+trochę jest bez sensu." Pełny opis w ARCHITECTURE.md §221. Ręczne pole "trudność" (1-5)
+usunięte całkowicie — z typu, obu formularzy (add/edit), listy zadań i analityki
+tygodniowej. Nowy `src/utils/taskReward.ts` (czysta, testowalna funkcja) liczy nagrodę z
+priorytetu (low/normal/high) × bonus za szybkie działanie (im mniej dni od dodania do
+ukończenia) × bonus za pilność (im bliżej terminu w momencie ukończenia, ale nie po
+terminie). Ekran szczegółów zadania dostał w tym samym miejscu podgląd "Nagroda teraz".
+`tsc`/`jest` czyste (90/90 suite, 1165 testów, +7).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dodaj i ukończ zadanie tego samego dnia z
+terminem na dziś → sprawdź wyraźnie wyższą nagrodę niż zwykłe zadanie bez terminu; ekran
+szczegółów pokazuje "Nagroda teraz"; lista zadań ma plombę z monetami na każdym zadaniu.
+
+## ✅ Usunięcie addytywnego "porannego podglądu dnia" (audyt spamu powiadomień, cz. 1) (2026-09-30)
 
 User: "te powiadomienia trzeba ogarnąć... dzieje się spam który olewam". Pełny opis w
 ARCHITECTURE.md §220. Usunięty "poranny podgląd dnia" (§207) — był czysto addytywny

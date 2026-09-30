@@ -8,22 +8,16 @@ import { Task, Subtask } from '@/types';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { nextDeadline } from '@/utils/date';
+import { taskReward } from '@/utils/taskReward';
 
 const SAVE_FAIL = 'Nie zapisano — sprawdź połączenie';
 
-// ─── Pet reward: finishing your real tasks feeds the companion ───────────────
-// You set a task's difficulty yourself; the harder you rate it, the more coins the
-// pet earns when you complete it (1 / 2 / 3). Every milestone you tick off gives a
-// small XP nibble so breaking a task down pays off as you chip at it.
-export function taskCoins(difficulty?: number): number {
-  if (!difficulty) return 1;
-  if (difficulty <= 2) return 1;   // Łatwe / Proste
-  if (difficulty === 3) return 2;  // Średnie
-  return 3;                        // Trudne / Hardkor
-}
-function taskXp(difficulty?: number): number {
-  return 6 + (difficulty ?? 1) * 3;
-}
+// Nagroda pupila za ukończenie zadania — czysta logika (priorytet + pilność/tempo, ręczna
+// "trudność" wywalona) mieszka w `src/utils/taskReward.ts`, żeby dało się ją testować bez
+// ciągnięcia całego drzewa Firebase/calendarService za tym hookiem. Re-eksport, żeby
+// ekrany importujące dotąd `taskReward`/`taskCoins` z tego hooka nie musiały zmieniać
+// ścieżki importu.
+export { taskReward };
 const MILESTONE_XP = 4;
 
 // Wyciągnięte z `toggle()`'s branchu pending→done (2026-09-27, interaktywny widget "Zadania" —
@@ -41,10 +35,10 @@ export async function markTaskDone(id: string): Promise<void> {
   const task = tasks.find((t) => t.id === id);
   if (!task || task.status === 'done') return;
   haptic.success();
-  const coins = taskCoins(task.difficulty);
+  const { coins, xp } = taskReward(task);
   const pet = usePetStore.getState();
   pet.addCoins(coins);
-  pet.addXp(taskXp(task.difficulty));
+  pet.addXp(xp);
   toast.success(`Ukończono!  +${coins} 🪙`);
   updateTask(id, { status: 'done' });
   try {
@@ -63,7 +57,6 @@ export async function markTaskDone(id: string): Promise<void> {
         deadline: newDeadline,
         status: 'pending',
         priority: task.priority,
-        difficulty: task.difficulty,
         estimatedPomodoros: task.estimatedPomodoros,
         tags: task.tags ?? [],
         recurring: task.recurring,
