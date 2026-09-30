@@ -3,7 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Rachunki" — wykres zmian stałych opłat (2026-09-30)
+## 🆕 Fix: Rachunki — słupki z kwotą i datą zamiast gołej fali (2026-09-30)
+
+User zrzutem z żywego urządzenia: "A gdzie dane i w ogóle? Ty się nie starasz" — wykres
+"+198%" bez ŻADNEGO sposobu sprawdzenia która płatność była tym dołkiem. Pełny opis w
+ARCHITECTURE.md §224. `WaveChart` (gołą linia + tylko dwie skrajne daty) zastąpiony
+słupkami — kwota NAD każdym słupkiem, data POD nim (ten sam przepis co usage-stats.tsx
+§204). `tsc`/`jest` czyste (91/91 suite, 1172 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni** (bezpośrednia reakcja na zgłoszony problem):
+Rachunki → sprawdź że każdy słupek ma czytelną kwotę i datę, długa historia scrolluje się
+poziomo.
+
+## ✅ "Rachunki" — wykres zmian stałych opłat (2026-09-30)
 
 User: "możemy dodać stałe opłaty mieszkanie/prąd internet żeby był wykres który pokazuje
 czy są jakieś zmiany (głównie chodzi o prąd)". Pełny opis w ARCHITECTURE.md §223. Nowy

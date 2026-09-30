@@ -6,7 +6,6 @@ import { ChevronLeft, TrendingUp, TrendingDown, Minus, Receipt } from 'lucide-re
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import WaveChart from '@/components/dashboard/WaveChart';
 import { useExpensesStore } from '@/store/expensesStore';
 import { buildBillTrends } from '@/utils/billTrends';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -66,8 +65,15 @@ export default function BillsScreen() {
           trends.map(t => {
             const IconComp: any = (LucideIcons as any)[t.icon];
             const tc = trendColor(t.changePct, colors);
-            const chartColor = t.changePct == null || t.changePct === 0 ? colors.text.secondary : tc;
             const TrendIcon = t.changePct == null || t.changePct === 0 ? Minus : t.changePct > 0 ? TrendingUp : TrendingDown;
+            // Słupki z podpisaną kwotą I datą PRZY KAŻDYM punkcie (2026-09-30, user
+            // zrzutem "gdzie dane i w ogóle" — pierwsza wersja z WaveChart pokazywała
+            // gołą linię + tylko pierwszą/ostatnią datę, więc skok typu "+198%" nie dało
+            // się zweryfikować bez zgadywania, która płatność była tym dołkiem). Ten sam
+            // przepis co słupki w usage-stats.tsx (§204, identyczny powód zgłoszenia:
+            // "żeby tam były realnie widoczne szczegóły dane") — wartość NAD słupkiem,
+            // etykieta pod nim, nie abstrakcyjna fala.
+            const maxAmt = Math.max(...t.points.map(p => p.amount), 1);
             return (
               <View key={t.tag} style={s.card}>
                 <View style={s.cardHead}>
@@ -90,13 +96,22 @@ export default function BillsScreen() {
                     </View>
                   </View>
                 </View>
-                <View style={s.chartWrap}>
-                  <WaveChart data={t.points.map(p => p.amount)} color={chartColor} zoom />
-                </View>
-                <View style={s.chartLabels}>
-                  <Text style={s.chartLabelText}>{fmtShort(t.points[0].date)}</Text>
-                  <Text style={s.chartLabelText}>{fmtShort(t.points[t.points.length - 1].date)}</Text>
-                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={s.barsRow}>
+                    {t.points.map((p, i) => {
+                      const h = Math.max(4, (p.amount / maxAmt) * 64);
+                      return (
+                        <View key={`${t.tag}-${p.date}-${i}`} style={s.barCol}>
+                          <View style={s.barWrap}>
+                            <Text style={s.barValue}>{p.amount.toFixed(0)}</Text>
+                            <View style={[s.bar, { height: h, backgroundColor: tc }]} />
+                          </View>
+                          <Text style={s.barDateLabel} numberOfLines={1}>{fmtShort(p.date)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
               </View>
             );
           })
@@ -146,7 +161,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   changeRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
   changeText: { fontSize: 10.5, fontWeight: '700' },
 
-  chartWrap: { height: 64 },
-  chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  chartLabelText: { fontSize: 9, color: c.text.muted },
+  barsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[3], paddingTop: spacing[1] },
+  barCol: { alignItems: 'center', width: 38 },
+  barWrap: { height: 78, justifyContent: 'flex-end', alignItems: 'center', width: '100%' },
+  bar: { width: 14, borderRadius: 4, minHeight: 3 },
+  barValue: { fontSize: 9, fontWeight: '700', color: c.text.secondary, marginBottom: 3 },
+  barDateLabel: { fontSize: 8.5, color: c.text.muted, marginTop: 3 },
 }));
