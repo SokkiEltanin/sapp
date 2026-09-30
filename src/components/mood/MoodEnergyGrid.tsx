@@ -97,9 +97,17 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>Nastrój i energia</Text>
-      <Text style={styles.hint}>przeciągnij lub tapnij — w prawo lepszy nastrój, w górę więcej energii</Text>
+      <Text style={[styles.sectionLabel, styles.inset]}>Nastrój i energia</Text>
+      <Text style={[styles.hint, styles.inset]}>przeciągnij lub tapnij — w prawo lepszy nastrój, w górę więcej energii</Text>
 
+      {/* Siatka na całą szerokość ekranu (2026-09-30, user: "ta siatka humoru mnie
+          denerwuje że jest taka niewpasowana w ten telefon... damy po prostu na całej
+          szerokości żeby było wygodniej" — dotąd dziedziczyła 20px padding rodzica
+          (`MoodCheckInModal`'s `styles.scroll`), tak jak reszta sekcji. Tu jedyny box z
+          gestem przeciągania — większy = wygodniejszy cel dotyku, więc bleeduje przez
+          ujemny margines TYLKO ten box, nie całą sekcję (etykieta/hint/odczyt zostają
+          wyrównane z resztą treści przez `.inset`, inaczej ich lewy brzeg nie zgadzałby
+          się z "Co czujesz?" pod spodem). */}
       <View style={styles.gridWrap} onLayout={e => setGridSize(e.nativeEvent.layout.width)}>
         <LinearGradient
           colors={[c.bg.elevated, MOOD_COLORS[5] + '22']}
@@ -138,7 +146,7 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
         )}
       </View>
 
-      <Text style={[styles.readout, { color: hasValue ? dotColor : c.text.muted }]} numberOfLines={1}>
+      <Text style={[styles.readout, styles.inset, { color: hasValue ? dotColor : c.text.muted }]} numberOfLines={1}>
         {hasValue
           ? `${MOOD_EMOJIS[mood!]} ${MOOD_LABELS[mood!]}  ·  ${ENERGY_EMOJIS[energy!]} ${ENERGY_LABELS[energy!]}`
           : 'Jeszcze nie zaznaczono'}
@@ -149,6 +157,9 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
 
 const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   container: { gap: spacing[2] },
+  // Wyrównanie z resztą sekcji modala mimo że `gridWrap` niżej bleeduje poza ten padding
+  // (patrz komentarz przy `<View style={styles.gridWrap}>`).
+  inset: { paddingHorizontal: spacing[5] },
   sectionLabel: {
     ...typography.label, color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 1, fontSize: 10,
@@ -157,6 +168,8 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
 
   gridWrap: {
     width: '100%', aspectRatio: 1, maxHeight: 260,
+    marginHorizontal: -spacing[5],
+    alignSelf: 'stretch',
     borderRadius: radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: c.border.default,
   },

@@ -10,7 +10,6 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import RadialGlow from '@/components/ui/RadialGlow';
-import NoiseOverlay from '@/components/ui/NoiseOverlay';
 
 // Diagonalny, ciemny fioletowy gradient — TEN SAM trójstopniowy przepis co `WORK_GRADIENT`
 // w `index.tsx` (który z kolei był świadomie WZOROWANY na TYM kafelku, patrz komentarz
@@ -73,10 +72,12 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
       onPress={() => { haptic.tap(); router.push('/class-schedule' as any); }}
     >
       <LinearGradient colors={CLASS_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
-        {/* Ziarno (2026-09-29, user: "możesz dodać noise większy") + poświata — gradient
-            sam niesie akcent, żaden osobny "prostokąt" po lewej nie jest już potrzebny
-            (wywalony, patrz komentarz przy CLASS_GRADIENT). */}
-        <NoiseOverlay opacity={0.05} density={140} />
+        {/* Ziarno usunięte (2026-09-30, user o panelu Pracy z tym samym komponentem:
+            "to miał być noise texture a nie kropki jakieś... wygląda jakby dziecko
+            zrobiło" — kropkowy `NoiseOverlay` nie daje wrażenia realnego ziarna, tylko
+            widoczne pojedyncze kropki; wycofany stąd też, nie tylko z panelu Pracy, żeby
+            nie zostawiać tej samej, odrzuconej techniki w drugim miejscu). Poświata
+            zostaje — gradient sam niesie akcent. */}
         <View style={s.glowWrap} pointerEvents="none">
           <RadialGlow size={200} color="#A78BFA" opacity={0.22} />
         </View>
