@@ -3,7 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Zwrot podpinany do konkretnej transakcji, nie tylko gołą liczbą (2026-09-30)
+## 🆕 Usunięcie addytywnego "porannego podglądu dnia" (audyt spamu powiadomień, cz. 1) (2026-09-30)
+
+User: "te powiadomienia trzeba ogarnąć... dzieje się spam który olewam". Pełny opis w
+ARCHITECTURE.md §220. Usunięty "poranny podgląd dnia" (§207) — był czysto addytywny
+(dokładał powiadomienie, nie zastępował żadnego), więc obiektywnie pogłębiał problem który
+miał rozwiązać. Reszta ~24 typów powiadomień zostaje nietknięta (tylko 4 mają własny
+przełącznik w Ustawieniach, reszta jedynie globalny on/off) — prawdziwe scalanie/dodanie
+przełączników per-kategoria to OTWARTY temat, wymaga testowania na urządzeniu przy okazji
+(ryzyko: cicha utrata notyfikacji o czymś finansowym), nie jednej autonomicznej tury.
+`tsc`/`jest` czyste (89/89 suite, 1158 testów, -10).
+
+**🆕 DO ZROBIENIA (czeka na usera)**: pełny inwentarz ~24 typów powiadomień w §220 — user
+ma go przejrzeć i wskazać co dalej grupować/wyłączać, bo nie pamiętał konkretów z głowy.
+
+**Priorytet testu na urządzeniu — niski**: BRAK dodatkowego zbiorczego powiadomienia
+rano gdy 2+ rzeczy wypadną tego samego dnia (tylko pojedyncze, jak zawsze).
+
+## ✅ Zwrot podpinany do konkretnej transakcji, nie tylko gołą liczbą (2026-09-30)
 
 User: "musi być wybierz zwrot jakby z transakcji, żebym mógł realnie podpiąć". Pełny opis
 w ARCHITECTURE.md §219. Wiersz "Zwrócono" na ekranie wydatku otwiera teraz picker (ten sam

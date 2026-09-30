@@ -322,6 +322,13 @@ export default function RootLayout() {
   }), []);
 
   useEffect(() => afterInteractions(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }), []);
+  // Sprzątanie po usuniętym "porannym podglądzie dnia" (2026-09-30, patrz komentarz przy
+  // `cancelTodayDigestReminder` w notificationsService.ts) — jednorazowe, idempotentne
+  // (anulowanie nieistniejącego powiadomienia to bezpieczny no-op) czyszczenie ewentualnej
+  // instancji zarmowanej u kogoś PRZED tym usunięciem, żeby osierocony harmonogram OS-owy
+  // nie odpalił się mimo że nic już go nie re-armuje. Ten sam wzorzec co
+  // `migrateBalanceModel`/`migratePaydayDefaultOff` niżej.
+  useEffect(() => afterInteractions(() => { notificationsService.cancelTodayDigestReminder().catch(() => {}); }), []);
 
   // Auth resolution itself MOVED to firebase.ts (2026-09-15, `whenAuthReady()`) — the
   // `<Stack>` below no longer waits for it (patrz komentarz przy JSX niżej), this

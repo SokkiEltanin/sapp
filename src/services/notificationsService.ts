@@ -5,7 +5,6 @@ import { Subscription, Task } from '@/types';
 import { PAYDAY_WINDOW_DAYS } from '@/utils/payday';
 import { shiftFireTimes } from '@/utils/workEvents';
 import { plPlural } from '@/utils/plural';
-import { TodayReminderItem } from '@/utils/todayReminders';
 
 // Next clock time for hour:minute — today if it's still ahead and we're not
 // skipping today, otherwise tomorrow. Used so the mood reminder can SKIP today
@@ -902,31 +901,14 @@ export const notificationsService = {
   // `todayReminders.ts`). Nie dotyka ŻADNEGO z istniejących `schedule*`/`cancel*` wyżej —
   // to CAŁKIEM OSOBNE powiadomienie obok nich, licząc z `todayReminders()` co jest
   // zaplanowane na dziś (dług/subskrypcja/notatka/kapsuła). Odpala się TYLKO gdy 2+ rzeczy
-  // wypadają tego samego dnia (przy 1 rzeczy user i tak dostanie jej własne powiadomienie —
-  // digest niczego by nie dodał) i tylko jeśli 8:00 jeszcze nie minęło (po 8:00 nie ma sensu
-  // planować "podglądu dnia", który już trwa). Re-armowane na każdą zmianę danych, jak
-  // `refreshWeeklySummary` wyżej.
-  async refreshTodayDigestReminder(items: TodayReminderItem[]): Promise<void> {
-    try {
-      await Notifications.cancelScheduledNotificationAsync('today-digest').catch(() => {});
-      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
-      if (items.length < 2) return;
-      const now = new Date();
-      const fire = new Date(now);
-      fire.setHours(8, 0, 0, 0);
-      if (fire <= now) return;
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'today-digest',
-        content: {
-          title: `${items.length} ${plPlural(items.length, 'rzecz', 'rzeczy', 'rzeczy')} do ogarnięcia dziś`,
-          body: items.map(i => i.label).join(' · '),
-          data: { screen: 'index' },
-        },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
-      });
-    } catch {}
-  },
-
+  // Powiadomienie USUNIĘTE (2026-09-30, audyt "spamu" powiadomień, user: "musimy ogarnąć,
+  // dzieje się spam który olewam") — było CZYSTO ADDYTYWNE: indywidualne powiadomienia o
+  // długu/subskrypcji/notatce/kapsule i tak leciały jak wcześniej, ten digest tylko
+  // DOKŁADAŁ dodatkowe powiadomienie rano, nie zastępując żadnego z nich (patrz historia
+  // §207) — czyli sam, obiektywnie, pogłębiał dokładnie ten problem, który miał złagodzić.
+  // `cancelTodayDigestReminder` ZOSTAJE (wołane raz z `_layout.tsx` na starcie) — czyści
+  // ewentualną już zaplanowaną instancję u userów, którzy mieli ją zarmowaną PRZED tym
+  // usunięciem; bez tego sprzątania stary, osierocony harmonogram OS-owy wciąż by odpalił.
   async cancelTodayDigestReminder(): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync('today-digest').catch(() => {});
   },

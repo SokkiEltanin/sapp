@@ -12788,6 +12788,48 @@ PRZED zapisem, więc `undefined` nigdy by nie wyczyścił starego id w Firestore
 zwrot" → wybierz przychód z listy → sprawdź że wiersz pokazuje "z: {nazwa}"; spróbuj też
 "Wpisz kwotę ręcznie" i "Odepnij zwrot".
 
+## 220. Usunięcie addytywnego "porannego podglądu dnia" (audyt spamu powiadomień, cz. 1) (2026-09-30)
+
+User: "te powiadomienia trzeba ogarnąć... dzieje się spam który olewam najzwyczajniej".
+Zapytany dokładnie które typy go wkurzają — nie wskazał konkretnych (brak preferencji w
+AskUserQuestion) — więc zamiast zgadywać i ciąć coś co faktycznie chce dostawać (najgorszy
+scenariusz nazwany już w §207: "ciche zgubienie powiadomienia o DŁUGU, gorsze niż obecny
+spam"), zacząłem od JEDYNEGO bezpiecznego, zweryfikowanego kroku: "poranny podgląd dnia"
+(§207) był CZYSTO ADDYTYWNY — indywidualne powiadomienia o długu/subskrypcji/notatce/
+kapsule i tak leciały jak wcześniej, ten digest tylko DOKŁADAŁ dodatkowe powiadomienie
+rano, gdy 2+ rzeczy wypadało tego samego dnia. Obiektywnie pogłębiał dokładnie ten problem
+("spam"), który miał złagodzić — usunięcie go nie traci ŻADNEJ informacji (wszystkie
+źródłowe powiadomienia zostają nietknięte), tylko usuwa realną nadwyżkę.
+
+**Usunięte**: `notificationsService.refreshTodayDigestReminder` (cała funkcja),
+`src/utils/todayReminders.ts` (util + `TodayReminderItem`), `__tests__/todayReminders.
+test.ts` (10 testów), `todayDigest` useMemo/useEffect w `index.tsx`. **Zostaje**:
+`cancelTodayDigestReminder()` (bez parametrów, czysty cancel-by-identifier) — teraz wołane
+RAZ z `app/_layout.tsx` na starcie appki (ten sam wzorzec co `migrateBalanceModel`/
+`migratePaydayDefaultOff` obok), żeby sprzątnąć ewentualną instancję zarmowaną u kogoś
+PRZED tym usunięciem — bez tego osierocony harmonogram OS-owy odpaliłby się mimo że nic
+już go nie re-armuje.
+
+**Pełny inwentarz powiadomień appki** (do dalszej pracy — user dostał tę listę na czacie,
+żeby wskazać co dalej ciąć/grupować, skoro nie pamiętał nazw z głowy): 4 z własnym
+przełącznikiem w Ustawieniach (humor wieczorem/rano, plan dnia, zbiorcze o nawykach) +
+~20 BEZ osobnego przełącznika (per-nawyk indywidualne, zadania/deadline'y/snooze,
+subskrypcje + "renewal heads-up", wydarzenia kalendarza, zmiany w pracy, długi, notatki z
+przypomnieniem, kapsuła czasu, misje, limit kategorii budżetu, payday, przegląd
+tygodniowy, karta miesiąca, zwierzak, boss fight, kończące się wydarzenie, przegląd
+konserwacji pojazdu) — sterowane WYŁĄCZNIE globalnym `notif_enabled` (wszystko albo nic).
+**Prawdziwe scalanie/dodanie przełączników per-kategoria zostaje OTWARTYM tematem**
+(patrz NEXT_STEPS.md) — jak w §207, wymaga testowania na urządzeniu przy okazji, nie
+jednej autonomicznej tury, bo najgorszy scenariusz to cicha utrata notyfikacji o czymś
+finansowym.
+
+**Testy**: `tsc --noEmit`/`jest` czyste (89/89 suite, 1158 testów, -10 usuniętych razem z
+plikiem).
+
+**Priorytet testu na urządzeniu — niski**: nic nowego do zaobserwowania poza BRAKIEM —
+jeśli kiedyś 2+ rzeczy wypadną tego samego dnia, NIE powinno przyjść dodatkowe zbiorcze
+powiadomienie rano (tylko pojedyncze, jak zawsze).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
