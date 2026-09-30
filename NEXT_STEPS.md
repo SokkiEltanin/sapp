@@ -3,7 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Cofnięcie: gradient+ziarno Pracy → płaskie wypełnienie; siatka humoru na całą szerokość (2026-09-30)
+## 🆕 Zwrot podpinany do konkretnej transakcji, nie tylko gołą liczbą (2026-09-30)
+
+User: "musi być wybierz zwrot jakby z transakcji, żebym mógł realnie podpiąć". Pełny opis
+w ARCHITECTURE.md §219. Wiersz "Zwrócono" na ekranie wydatku otwiera teraz picker (ten sam
+wzorzec co "Wybierz transakcję" w vehicles.tsx) z listą przychodów do podpięcia — tap
+ustawia `reimbursedAmount` + `reimbursedFromId`, wiersz pokazuje "z: {nazwa}". Pinowane
+"Wpisz kwotę ręcznie" zostaje jako fallback dla zwrotów bez transakcji w appce (gotówka).
+`tsc`/`jest` czyste (90/90 suite, 1168 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: wydatek → "Zwrócono"/"+ Podepnij zwrot" →
+wybierz przychód z listy → sprawdź "z: {nazwa}"; sprawdź też ręczne wpisanie i odpięcie.
+
+## ✅ Cofnięcie: gradient+ziarno Pracy → płaskie wypełnienie; siatka humoru na całą szerokość (2026-09-30)
 
 User zrzutem: "to miał być noise texture a nie kropki jakieś, zakładka pracy okropna,
 wygląda jakby dziecko zrobiło... Miałeś zmienić wygląd kafelka na dashboardzie na

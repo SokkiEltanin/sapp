@@ -12750,6 +12750,44 @@ bez gradientu i bez kropek; "Plan zajęć" → też bez kropek (gradient tam zos
 humoru → siatka nastrój/energia sięga krawędzi ekranu, etykiety nad/pod nią wciąż wyrównane
 z resztą modala.
 
+## 219. Zwrot podpinany DO KONKRETNEJ transakcji, nie tylko gołą liczbą (2026-09-30)
+
+User: "i jeszcze to podpięcie zwrotu musi być — wybierz zwrot jakby z transakcji, żebym
+mógł realnie podpiąć". §213 dało tylko pole liczbowe (`reimbursedAmount` bez żadnego
+śladu skąd kwota się wzięła) — user chciał wybór z LISTY, jak "Wybierz transakcję" w
+`vehicles.tsx` (link wydatku do serwisu/pojazdu, już istniejący w appce wzorzec).
+
+**`src/types/index.ts`** — nowe pole `Expense.reimbursedFromId?: string` — id innej
+`Expense` (typowo `type: 'income'`) wybranej jako źródło zwrotu. Czysto do WYŚWIETLENIA
+("Zwrócono: X zł z: {note}"), tak jak `reimbursedAmount` — NIE zmienia `amount`/statystyk
+żadnej ze stron, i świadomie BRAK logiki "zużycia" wskazanej transakcji (jeden duży
+przelew może pokrywać kilka wydatków naraz, to nie book-keeping z podwójnym zapisem).
+
+**`app/expenses/[id].tsx`** — wiersz "Zwrócono" otwiera teraz picker (`reimbPicker`,
+modal, TEN SAM wzorzec/nazwy stylów co `pickerOverlay`/`pickerCard`/`exRow`/`exName`/
+`exMeta`/`exAmt`/`pickerClose` w `vehicles.tsx`) z listą `expenses.filter(type ===
+'income')`, max 50, najnowsze pierwsze. Tap na transakcję → `linkReimb()` ustawia
+`reimbursedAmount = min(source.amount, expense.amount)` + `reimbursedFromId = source.id`.
+Pinowany wiersz "Wpisz kwotę ręcznie" na górze listy przełącza w TYM SAMYM modalu na pole
+liczbowe (fallback dla zwrotów bez odpowiadającej transakcji w appce — gotówka, coś sprzed
+założenia appki) — `saveReimbManual()` zapisuje `reimbursedFromId: ''` (czyści ewentualne
+poprzednie podpięcie). Gdy jest już zwrot ustawiony, modal pokazuje dodatkowo "Odepnij
+zwrot" (`unlinkReimb()` → `reimbursedAmount: 0, reimbursedFromId: ''`). Wiersz "Zwrócono"
+na hero doczytuje `reimbSource` (`expenses.find(id === reimbursedFromId)`) i dokleja
+"z: {storeName/note}" do tekstu, gdy podpięcie jest do konkretnej transakcji.
+
+Pułapka (ta sama co przy `reimbursedAmount` w §213): `reimbursedFromId: ''`, NIE
+`undefined`, przy czyszczeniu — `strip()` w `expensesService.ts` filtruje `undefined`
+PRZED zapisem, więc `undefined` nigdy by nie wyczyścił starego id w Firestore.
+
+**Testy**: brak nowych — czysto UI/store, ten sam brak pokrycia co `reclassifyFv`/
+`linkToMaintenance` w `vehicles.tsx` (identyczny wzorzec, też bez testów).
+`tsc --noEmit`/`jest` czyste (90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: otwórz wydatek → tapnij "Zwrócono"/"+ Podepnij
+zwrot" → wybierz przychód z listy → sprawdź że wiersz pokazuje "z: {nazwa}"; spróbuj też
+"Wpisz kwotę ręcznie" i "Odepnij zwrot".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
