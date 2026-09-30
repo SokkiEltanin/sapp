@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,6 +42,18 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
   const styles = useMemo(() => makeStyles(c), [c]);
   const [gridSize, setGridSize] = useState(0);
   const lastKey = useSharedValue(-1);
+  // Szerokość liczona WPROST z okna (2026-09-30, user DALEJ zgłaszał wąską siatkę mimo
+  // wcześniejszego fixu przez `width:'100%'` + `marginHorizontal: -spacing[5]` — ten trik
+  // MATEMATYCZNIE jest poprawny/standardowy ("full-bleed przez ujemny margines"), ale
+  // zależy od tego, że KAŻDY rodzic w łańcuchu faktycznie ma dokładnie `spacing[5]`
+  // paddingu i nic go nie psuje po drodze (np. zaokrąglenia procentów w zagnieżdżonym
+  // ScrollView na Androidzie) — trudne do zweryfikowania bez urządzenia, więc zamiast
+  // dalej zgadywać, liczone jest WPROST z `useWindowDimensions()`, niezależnie od
+  // jakiejkolwiek szerokości rodzica. `-2` za obramowanie arkusza (`sheet`'s
+  // `borderLeftWidth`/`borderRightWidth: 1` w MoodCheckInModal.tsx), żeby siatka nie
+  // wystawała POZA zaokrąglony arkusz.
+  const { width: winWidth } = useWindowDimensions();
+  const gridBleedWidth = winWidth - 2;
 
   const commit = (m: MoodLevel, e: MoodLevel) => {
     haptic.medium();
@@ -108,7 +120,10 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
           ujemny margines TYLKO ten box, nie całą sekcję (etykieta/hint/odczyt zostają
           wyrównane z resztą treści przez `.inset`, inaczej ich lewy brzeg nie zgadzałby
           się z "Co czujesz?" pod spodem). */}
-      <View style={styles.gridWrap} onLayout={e => setGridSize(e.nativeEvent.layout.width)}>
+      <View
+        style={[styles.gridWrap, { width: gridBleedWidth, height: Math.min(260, gridBleedWidth) }]}
+        onLayout={e => setGridSize(e.nativeEvent.layout.width)}
+      >
         <LinearGradient
           colors={[c.bg.elevated, MOOD_COLORS[5] + '22']}
           start={{ x: 0, y: 1 }}
@@ -166,10 +181,12 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   },
   hint: { ...typography.caption, color: c.text.muted, fontSize: 11, marginTop: -4 },
 
+  // `width`/`height` NIE tu — liczone wprost z `useWindowDimensions()` w komponencie
+  // (patrz komentarz przy `gridBleedWidth`), dopisywane inline. Tu tylko wygląd + margines
+  // przesuwający box w lewo, żeby zniwelować 20px wcięcia odziedziczone z `container`'s
+  // rodzica (`MoodCheckInModal`'s `styles.scroll`, padding `spacing[5]`).
   gridWrap: {
-    width: '100%', aspectRatio: 1, maxHeight: 260,
     marginHorizontal: -spacing[5],
-    alignSelf: 'stretch',
     borderRadius: radius.lg, overflow: 'hidden',
     borderWidth: 1, borderColor: c.border.default,
   },

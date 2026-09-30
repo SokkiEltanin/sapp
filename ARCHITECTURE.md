@@ -12981,6 +12981,39 @@ Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian" → sprawdź że KA�
 kwotę nad sobą i datę pod sobą, że długa historia scrolluje się poziomo zamiast ściskać się
 do nieczytelności.
 
+## 225. Fix #2: siatka nastrój×energia NADAL wąska mimo §218 — liczona wprost z okna (2026-09-30)
+
+User zrzutem z żywego urządzenia: "A naprawisz to? Żeby była ta siatka na całej
+szerokości? Wiesz o co chodzi nie? 😅" — DOKŁADNIE ten sam problem co §218 (2026-09-30,
+wcześniej w tej sesji), wciąż widoczny mimo że fix już był zmergowany i powinien być na
+tym buildzie (kolejność zgłoszeń w tej sesji — Rachunki/RingCountdown — sugeruje build
+świeższy niż §218, więc to nie kwestia starego APK).
+
+**Root cause (poprawiony teraz)**: §218 użył standardowego triku "full-bleed" —
+`width:'100%'` + `marginHorizontal: -spacing[5]`, matematycznie poprawnego, ALE zależnego
+od tego, że KAŻDY rodzic w łańcuchu (`container` → `MoodCheckInModal`'s `scroll`
+contentContainerStyle) ma dokładnie `spacing[5]` paddingu i nic go po drodze nie psuje
+(np. jak procent się zaokrągla przez zagnieżdżony `ScrollView` z `react-native-gesture-
+handler` na Androidzie — nie do zweryfikowania bez urządzenia, a urządzenie pokazuje że
+coś jednak nie zadziałało).
+
+**Fix**: `MoodEnergyGrid.tsx` liczy szerokość siatki WPROST z `useWindowDimensions()`
+(`gridBleedWidth = winWidth - 2`, `-2` za obramowanie arkusza modala), zamiast przez
+`width:'100%'` zależne od łańcucha rodziców. `gridWrap`'s statyczny styl stracił
+`width`/`aspectRatio`/`maxHeight`/`alignSelf` (teraz dopisywane inline z jawnej wartości:
+`{ width: gridBleedWidth, height: Math.min(260, gridBleedWidth) }`, ten sam efekt co stare
+`aspectRatio:1, maxHeight:260` — kwadrat do 260px, potem ucięty). `marginHorizontal:
+-spacing[5]` ZOSTAJE (wciąż potrzebny do pozycjonowania — przesuwa box w lewo, żeby
+zniwelować wcięcie odziedziczone z `container`'s rodzica), ale teraz to JEDYNA zmienna
+zależna od założenia o rodzicu, nie także szerokość.
+
+**Testy**: brak nowych — czysto wizualna zmiana, logika gestu (`gridSize` z `onLayout`)
+nietknięta. `tsc --noEmit`/`jest` czyste (91/91, 1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (drugi raz zgłoszone, bezpośrednia reakcja):
+check-in humoru → siatka MUSI sięgać obu krawędzi ekranu (minus 1px obramowania arkusza
+po każdej stronie), nie tylko wizualnie "trochę szerzej" niż wcześniej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
