@@ -3,7 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: Rachunki — słupki z kwotą i datą zamiast gołej fali (2026-09-30)
+## 🆕 Fix #2: siatka nastrój×energia NADAL wąska mimo §218 — liczona wprost z okna (2026-09-30)
+
+User zrzutem: "A naprawisz to? Żeby była ta siatka na całej szerokości?" — TEN SAM problem
+co wcześniejszy fix (§218) tego samego dnia, wciąż widoczny na urządzeniu mimo że był
+zmergowany. Pełny opis w ARCHITECTURE.md §225. Poprzedni fix (`width:'100%'` + ujemny
+margines) był matematycznie poprawny, ale zależał od dokładnego paddingu KAŻDEGO rodzica w
+łańcuchu — teraz `MoodEnergyGrid.tsx` liczy szerokość WPROST z `useWindowDimensions()`,
+niezależnie od szerokości rodzica. `tsc`/`jest` czyste (91/91 suite, 1172 testów, bez
+zmiany).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (drugi raz zgłoszone): check-in humoru →
+siatka MUSI sięgać obu krawędzi ekranu, nie tylko "trochę szerzej".
+
+## ✅ Fix: Rachunki — słupki z kwotą i datą zamiast gołej fali (2026-09-30)
 
 User zrzutem z żywego urządzenia: "A gdzie dane i w ogóle? Ty się nie starasz" — wykres
 "+198%" bez ŻADNEGO sposobu sprawdzenia która płatność była tym dołkiem. Pełny opis w
