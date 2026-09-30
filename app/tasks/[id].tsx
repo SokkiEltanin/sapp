@@ -8,17 +8,17 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft, Trash2, Check, Timer, Edit3, Save,
   Calendar, Flag, AlignLeft, Tag, Clock, RefreshCw, BellOff, Bell,
-  Plus, CheckSquare, Square, X as XIcon,
+  Plus, CheckSquare, Square, X as XIcon, Coins,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TimePickerField from '@/components/ui/TimePickerField';
-import { useTasks } from '@/hooks/useTasks';
+import { useTasks, taskReward } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import { EventPriority, TaskDifficulty, TaskStatus, MoodLevel, TaskRecurring, Subtask } from '@/types';
+import { EventPriority, TaskStatus, MoodLevel, TaskRecurring, Subtask } from '@/types';
 
 const RECURRING_OPTIONS: { value: TaskRecurring; label: string }[] = [
   { value: 'none',    label: 'Brak' },
@@ -57,34 +57,6 @@ function addDays(n: number) {
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-
-// ─── Difficulty bar ───────────────────────────────────────────────────────────
-
-function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v: TaskDifficulty) => void }) {
-  const colors = useColors();
-  const dp = useMemo(() => makeDp(colors), [colors]);
-  const col = (v?: TaskDifficulty) => !v ? colors.text.muted : v <= 2 ? G.accent : v === 3 ? colors.accent.amber : colors.accent.red;
-  const labels = ['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'] as const;
-  return (
-    <View style={dp.row}>
-      {([1,2,3,4,5] as TaskDifficulty[]).map(d => (
-        <PressableScale key={d} onPress={() => onChange(d)} style={dp.dotWrap}>
-          <View style={[dp.dot,
-            { backgroundColor: value && d <= value ? col(value) : colors.border.subtle },
-            value === d && { width: 20, height: 20 },
-          ]} />
-        </PressableScale>
-      ))}
-      {value && <Text style={[dp.label, { color: col(value) }]}>{labels[value]}</Text>}
-    </View>
-  );
-}
-const makeDp = themedStyles((c: any) => StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dotWrap: { padding: 4 },
-  dot: { width: 16, height: 16, borderRadius: 8 },
-  label: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
-}));
 
 // ─── Priority pills ───────────────────────────────────────────────────────────
 
@@ -161,7 +133,6 @@ export default function TaskDetailScreen() {
   const [description, setDescription]   = useState(task?.description ?? '');
   const [deadline, setDeadline]         = useState(fmtDate(task?.deadline));
   const [priority, setPriority]         = useState<EventPriority>(task?.priority ?? 'normal');
-  const [difficulty, setDifficulty]     = useState<TaskDifficulty | undefined>(task?.difficulty);
   const [pomodoros, setPomodoros]       = useState(task?.estimatedPomodoros ?? 0);
   const [tags, setTags]                 = useState<string[]>(task?.tags ?? []);
   const [tagInput, setTagInput]         = useState('');
@@ -205,7 +176,6 @@ export default function TaskDetailScreen() {
         description: description.trim() || undefined,
         deadline: deadlineIso,
         priority,
-        difficulty,
         estimatedPomodoros: pomodoros > 0 ? pomodoros : undefined,
         tags,
         recurring,
@@ -583,12 +553,17 @@ export default function TaskDetailScreen() {
               </View>
             </Row>
 
-            <Row icon={<Flag size={12} color={colors.text.muted} />} label="Trudność">
-              <DiffPicker
-                value={editing ? difficulty : task.difficulty}
-                onChange={v => editing && setDifficulty(v)}
-              />
-            </Row>
+            {/* "Trudność" WYCIĘTA (2026-09-30, user: "trochę jest bez sensu" — ręcznie
+                ustawiana, nic realnego nie licząca) — w tym samym miejscu podgląd nowej,
+                automatycznej nagrody (priorytet + pilność/tempo, patrz `taskReward` w
+                useTasks.ts), żeby user od razu widział co dostanie za ukończenie TERAZ. */}
+            {task.status !== 'done' && (
+              <Row icon={<Coins size={12} color="#FBBF24" />} label="Nagroda teraz">
+                <Text style={[styles.recurText, { color: '#FBBF24', fontWeight: '800' }]}>
+                  +{taskReward({ ...task, priority: editing ? priority : task.priority }).coins} 🪙 · +{taskReward({ ...task, priority: editing ? priority : task.priority }).xp} XP
+                </Text>
+              </Row>
+            )}
 
             <Row icon={<Tag size={12} color={colors.text.muted} />} label="Tagi">
               <View style={{ gap: spacing[2] }}>

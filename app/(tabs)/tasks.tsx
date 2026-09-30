@@ -13,7 +13,7 @@ import {
   Zap, Target, Hourglass,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { useTasks, taskCoins } from '@/hooks/useTasks';
+import { useTasks, taskReward } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -297,12 +297,12 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
             </View>
           );
         })()}
-        {((task.estimatedPomodoros ?? 0) > 0 || (task.tags?.length ?? 0) > 0 || task.difficulty != null || (task.recurring && task.recurring !== 'none')) && (
+        {((task.estimatedPomodoros ?? 0) > 0 || (task.tags?.length ?? 0) > 0 || !isDone || (task.recurring && task.recurring !== 'none')) && (
           <View style={s.cardMeta}>
-            {task.difficulty != null && !isDone && (
+            {!isDone && (
               <View style={s.coinPill}>
                 <Coins size={9} color="#FBBF24" strokeWidth={2.5} />
-                <Text style={s.coinPillText}>{taskCoins(task.difficulty)}</Text>
+                <Text style={s.coinPillText}>{taskReward(task).coins}</Text>
               </View>
             )}
             {!!task.estimatedPomodoros && task.estimatedPomodoros > 0 && (

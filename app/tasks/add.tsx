@@ -8,18 +8,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   X, Check, CalendarDays, Flag, AlignLeft, Timer,
-  Bell, BellOff, ChevronUp, ChevronDown, ListChecks, Plus, Coins,
+  Bell, BellOff, ChevronUp, ChevronDown, ListChecks, Plus,
   Zap, Target, Hourglass,
 } from 'lucide-react-native';
 
-import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
+import { EventPriority, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
 import { KIND_META, KIND_ORDER, inferKind } from '@/utils/taskKind';
 import { tasksService } from '@/services/calendarService';
 import DatePickerField from '@/components/ui/DatePickerField';
 import TimePickerField from '@/components/ui/TimePickerField';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
-import { taskCoins } from '@/hooks/useTasks';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -131,7 +130,6 @@ export default function AddTaskScreen() {
 
   // Advanced (collapsed by default)
   const [showAdvanced, setShowAdvanced]   = useState(false);
-  const [difficulty, setDifficulty]       = useState<TaskDifficulty | undefined>(undefined);
   const [pomodoros, setPomodoros]         = useState(0);
   const [recurring, setRecurring]         = useState<TaskRecurring>('none');
   const [tags, setTags]                   = useState<string[]>([]);
@@ -187,7 +185,6 @@ export default function AddTaskScreen() {
         kind,
         waitingFor: kind === 'waiting' && waitingFor.trim() ? waitingFor.trim() : undefined,
         wakeAt: kind === 'waiting' && wakeAt ? wakeAt : undefined,
-        difficulty,
         estimatedPomodoros: pomodoros > 0 ? pomodoros : undefined,
         completedPomodoros: 0,
         tags,
@@ -506,37 +503,6 @@ export default function AddTaskScreen() {
 
           {showAdvanced && (
             <>
-              {/* Difficulty — you rate it, the pet gets 1/2/3 coins on completion */}
-              <View style={s.advCard}>
-                <Text style={s.advLabel}>TRUDNOŚĆ → MONETY DLA PUPILA</Text>
-                <View style={s.diffRow}>
-                  {([1, 2, 3, 4, 5] as TaskDifficulty[]).map(d => {
-                    const active = difficulty !== undefined && d <= difficulty;
-                    const col = difficulty ? (difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red) : G.accent;
-                    return (
-                      <TouchableOpacity key={d} onPress={() => { haptic.tap(); setDifficulty(d); }} style={s.diffDotWrap} activeOpacity={0.7}>
-                        <View style={[
-                          s.diffDot,
-                          active && { backgroundColor: col, width: 18, height: 18 },
-                          !active && { backgroundColor: colors.border.subtle },
-                        ]} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {difficulty !== undefined && (
-                    <Text style={[s.diffLabel, { color: difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red }]}>
-                      {['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'][difficulty]}
-                    </Text>
-                  )}
-                  {difficulty !== undefined && (
-                    <View style={s.diffCoin}>
-                      <Coins size={11} color="#FBBF24" strokeWidth={2.5} />
-                      <Text style={s.diffCoinText}>+{taskCoins(difficulty)}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
               {/* Pomodoros */}
               <View style={s.advCard}>
                 <Text style={s.advLabel}>SZAC. CZAS (× 25 MIN)</Text>
@@ -758,13 +724,6 @@ const makeS = (c: any) => StyleSheet.create({
     fontSize: 9, fontWeight: '700', color: G.muted,
     letterSpacing: 1.1, textTransform: 'uppercase',
   },
-
-  diffRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  diffDotWrap: { padding: 4 },
-  diffDot: { width: 14, height: 14, borderRadius: 7 },
-  diffLabel: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
-  diffCoin: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto', backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)' },
-  diffCoinText: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
 
   // milestones
   msRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
