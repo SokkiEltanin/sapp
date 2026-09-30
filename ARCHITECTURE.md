@@ -12953,6 +12953,34 @@ rozdzielone, sortowanie po |zmianie|, spadek → ujemny %. `tsc --noEmit`/`jest`
 typu w historii): Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian" → sprawdź że prąd
 (jeśli ma zmienne kwoty) wypływa na górę listy, wykres czytelnie pokazuje wahania.
 
+## 224. Fix: Rachunki — słupki z kwotą i datą przy KAŻDYM punkcie zamiast gołej fali (2026-09-30)
+
+User zrzutem §223 na żywym urządzeniu: "A gdzie dane i w ogóle? Ty się nie starasz". Na
+zrzucie widać dokładnie zgłoszony problem: kafelek "Prąd" pokazuje "+198%" i krzywą z
+wyraźnym dołkiem, ale BEZ ŻADNEGO sposobu sprawdzenia która płatność/kiedy była tym
+dołkiem — `WaveChart` rysował tylko gładką linię + dwie etykiety dat na samych krawędziach
+(pierwszy/ostatni punkt), reszta punktów (w tym ten odpowiedzialny za "+198%") była
+niepodpisana. Ten sam KSZTAŁT zgłoszenia co §204 (usage-stats.tsx, wcześniej w tej sesji:
+"żeby tam były realnie widoczne szczegóły dane") — abstrakcyjny wykres bez liczb czyta się
+jak ozdobnik, nie dane.
+
+**Fix** (`app/expenses/bills.tsx`) — `WaveChart` zastąpiony słupkami, TEN SAM przepis co
+`usage-stats.tsx`'s `barWrap`/`barValue` (§204): jeden słupek PER płatność, wartość
+(zaokrąglona kwota) NAD słupkiem, krótka data POD słupkiem — więc "+198%" teraz da się od
+razu zweryfikować, widząc dokładnie która płatność i kiedy była niska, a która obecna.
+Owinięte w poziomy `ScrollView` (bill z długą historią nie ściska słupków do
+nieczytelności). Kolor wszystkich słupków w danym trendzie = kolor zmiany (czerwony/
+zielony/neutralny z nagłówka karty), spójnie z plombą % obok.
+
+**Testy**: brak nowych — czysto wizualna zmiana renderu istniejącego ekranu, logika
+`billTrends.ts` (już przetestowana w §223) nietknięta. `tsc --noEmit`/`jest` czyste
+(91/91, 1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni** (bezpośrednia reakcja na zgłoszony problem):
+Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian" → sprawdź że KAŻDY słupek ma czytelną
+kwotę nad sobą i datę pod sobą, że długa historia scrolluje się poziomo zamiast ściskać się
+do nieczytelności.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
