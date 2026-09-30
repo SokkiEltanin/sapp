@@ -20,6 +20,7 @@ import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import LevelUpCelebration from '@/components/pet/LevelUpCelebration';
 import { usePetStore, levelFromXp } from '@/store/petStore';
+import { useFontsStore } from '@/store/fontsStore';
 import { usePetLevelUp } from '@/store/petLevelUpStore';
 import AnimatedSplash from '@/components/AnimatedSplash';
 import { appSettings } from '@/utils/appSettings';
@@ -225,7 +226,7 @@ export default function RootLayout() {
   // Bundled hero greeting fonts — registered by name so react-native-svg can use
   // them. Non-blocking: the app renders immediately, the greeting updates once
   // these finish loading.
-  useFonts({
+  const [customFontsLoaded] = useFonts({
     Blackout:      require('../assets/fonts/Blackout.ttf'),
     Pastel:        require('../assets/fonts/Pastel.ttf'),
     Airstrike:     require('../assets/fonts/airstrike.ttf'),
@@ -234,6 +235,10 @@ export default function RootLayout() {
     Oswald:        require('../assets/fonts/Oswald.ttf'),       // CAPS-owe nagłówki sekcji (2026-08-10, zastąpił Lexend Tera — "dziwna")
     ArchivoBlack:  require('../assets/fonts/ArchivoBlack.ttf'), // wielkie liczby (heavy 900)
   });
+  // Ekspozycja dla komponentów renderujących liczby czcionką `fonts.display` PRZED jej
+  // załadowaniem (2026-09-30, patrz fontsStore.ts — user: "czasami pokazuje kropki
+  // zamiast dni" w RingCountdown.tsx). Nieblokujące jak wyżej — tylko flaga do odczytu.
+  useEffect(() => { if (customFontsLoaded) useFontsStore.getState().setLoaded(); }, [customFontsLoaded]);
 
   useEffect(() => afterInteractions(() => { appSettings.loadAll(); }), []);
   useEffect(() => afterInteractions(() => { migrateBalanceModel().catch(() => {}); }), []);

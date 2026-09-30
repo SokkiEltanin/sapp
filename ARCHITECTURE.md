@@ -12883,6 +12883,76 @@ terminem na dziś → sprawdź że dostałeś wyraźnie więcej monet/XP niż za
 terminu; ekran szczegółów → wiersz "Nagroda teraz" pokazuje sensowną liczbę i znika po
 ukończeniu; lista zadań → plomba z monetami na każdym aktywnym zadaniu.
 
+## 222. Fix: RingCountdown czasem pokazywał "kropki" zamiast liczby dni (2026-09-30)
+
+User zrzutem kafelka "Odliczania": "ten czasami pokazuje kropki zamiast dni ile" — pierścień
+pokazywał ".." w środku zamiast "5", mimo że tekst pod spodem ("za 5 dni") był poprawny.
+
+**Root cause**: `app/_layout.tsx`'s `useFonts({...})` (rejestrujące własne, dołączone fonty
+— Blackout/Pastel/Airstrike/Oswald/Archivo Black) jest ŚWIADOMIE nieblokujące — appka
+renderuje się NATYCHMIAST, fonty doładowują się w tle (komentarz w kodzie to już mówił:
+"the app renders immediately"). Skutek uboczny nigdy wcześniej nie zauważony: komponent
+renderujący liczbę czcionką `fonts.display` (Archivo Black) ZANIM ten font zdąży się
+załadować dostaje na Androidzie fallback/tofu-glify (wyglądające jak małe kropki) zamiast
+cyfr — i ten stan POTRAFI ZOSTAĆ NA STAŁE, bo `RingCountdown` nie re-renderuje się
+ponownie po doładowaniu fonta (jego propsy `days`/`color` się nie zmieniają). `fonts.
+display` jest używany w PONAD 15 innych miejscach w repo (kafelki rekordów, serie,
+liczniki, TopPill, DailyRings, habit-year, food itd.) z DOKŁADNIE tą samą, dotąd
+niezauważoną wadą — poprawione na razie TYLKO w zgłoszonym przypadku (`RingCountdown`),
+reszta zostaje znanym ryzykiem (patrz NEXT_STEPS.md).
+
+**Fix**: nowy `src/store/fontsStore.ts` (Zustand, `{ loaded: boolean }`) — `_layout.tsx`
+ustawia `loaded: true` w `useEffect` gdy `useFonts()`'s zwrócona flaga staje się `true`
+(wcześniej ta flaga była w ogóle NIEODCZYTYWANA — `useFonts({...})` wołane bez
+destrukturyzacji zwrotu). `RingCountdown.tsx` czyta ten store i stosuje `fontFamily: fonts.
+display` WARUNKOWO (`fontsLoaded && { fontFamily: fonts.display }` w tablicy stylów, baza
+`st.num` już BEZ `fontFamily`) — przed załadowaniem fonta liczba renderuje się fontem
+systemowym (nigdy nie pokazuje tofu/kropek), po załadowaniu automatycznie przeskakuje na
+docelowy Archivo Black.
+
+**Testy**: brak nowych — czysto wizualny/renderingowy fix, nie da się go zweryfikować
+jednostkowo (zależy od timingu ładowania fonta na realnym urządzeniu).
+`tsc --noEmit`/`jest` czyste (91/91, 1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: trudne do wymuszenia na żądanie (zależy od
+timingu cold-startu) — jeśli problem się powtórzy w "Odliczaniach" mimo fixu, albo pojawi
+się w innym miejscu z dużą liczbą (rekordy, serie), to znak że trzeba rozszerzyć ten sam
+fix na któreś z pozostałych 15 miejsc z `fonts.display`.
+
+## 223. "Rachunki" — wykres zmian stałych opłat (2026-09-30)
+
+User: "możemy dodać stałe opłaty mieszkanie/prąd internet żeby był wykres który pokazuje
+czy są jakieś zmiany (głównie chodzi o prąd bo mieszkanie i internet raczej się nie
+zmienia...)". Nowy ekran `/expenses/bills` pokazujący, per typ rachunku, chronologiczny
+wykres kwot — żeby dało się gołym okiem zobaczyć czy prąd/czynsz/internet drożeje.
+
+**`src/utils/billTrends.ts`** (nowy, czysta funkcja) — `buildBillTrends(expenses)` grupuje
+wydatki przez `billTagFor()`/`BILL_TYPES` (TA SAMA definicja "co jest rachunkiem za prąd"
+co filtr "Rachunki" w `finances.tsx` i sugestia "stały rachunek" na dashboardzie — trzeci
+konsument tej samej, już istniejącej definicji, nie nowa kopia). Zwraca per tag:
+chronologiczną listę punktów (data+kwota), ostatnią kwotę, średnią, i `changePct` (%
+zmiany względem POPRZEDNIEGO wpisu). Wymaga >=2 wpisów danego typu (jeden punkt to nie
+trend). Sortowanie: NAJWIĘKSZA `|changePct|` pierwsza — user explicite chce widzieć GŁÓWNIE
+to, co się zmienia (prąd), nie stabilny czynsz/internet, które naturalnie spadną niżej na
+liście zamiast zajmować pierwsze miejsce.
+
+**`app/expenses/bills.tsx`** (nowy ekran) — dla każdego trendu: ikona+nazwa (z
+`BILL_TYPES`), ostatnia kwota + plomba zmiany (▲/▼/— z %, kolor czerwony/zielony/neutralny),
+`WaveChart` (reużyty z dashboardu, `zoom` żeby subtelne wahania prądu były faktycznie
+widoczne na wąskim zakresie kwot, nie płaska linia) z etykietami dat pierwszego/ostatniego
+punktu pod spodem. Pusty stan tłumaczy że potrzeba >=2 zapłaconych rachunków tego samego
+typu. Link wejściowy: nowy przycisk "Zobacz wykres zmian →" w panelu filtrów "Rachunki"
+(`finances.tsx`, tuż pod chipami typów), widoczny tylko gdy `billsInData.length > 0`.
+
+**Testy**: nowy `__tests__/billTrends.test.ts` (7 testów) — pusta lista, jeden wpis
+pominięty, dwa wpisy z poprawną kolejnością/%, przychód nigdy się nie liczy, typy
+rozdzielone, sortowanie po |zmianie|, spadek → ujemny %. `tsc --noEmit`/`jest` czyste
+(91/91, 1172, +7).
+
+**Priorytet testu na urządzeniu — niski** (wymaga >=2 zapłaconych rachunków tego samego
+typu w historii): Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian" → sprawdź że prąd
+(jeśli ma zmienne kwoty) wypływa na górę listy, wykres czytelnie pokazuje wahania.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

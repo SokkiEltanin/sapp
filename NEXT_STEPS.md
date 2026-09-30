@@ -3,7 +3,39 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Zadania: usunięta ręczna "trudność", nagroda automatyczna z priorytetu + pilności/tempa (2026-09-30)
+## 🆕 "Rachunki" — wykres zmian stałych opłat (2026-09-30)
+
+User: "możemy dodać stałe opłaty mieszkanie/prąd internet żeby był wykres który pokazuje
+czy są jakieś zmiany (głównie chodzi o prąd)". Pełny opis w ARCHITECTURE.md §223. Nowy
+ekran `/expenses/bills` — per typ rachunku (czynsz/prąd/internet/gaz/woda/ogrzewanie/
+ubezpieczenie/telefon, z już istniejącego `BILL_TYPES`) chronologiczny wykres kwot +
+% zmiany vs poprzedni wpis, sortowane najbardziej zmienne pierwsze (prąd naturalnie na
+górze). Link z Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian". `tsc`/`jest` czyste
+(91/91 suite, 1172 testów, +7).
+
+**🆕 Priorytet testu na urządzeniu — niski** (wymaga >=2 zapłaconych rachunków tego samego
+typu): sprawdź czy wykres czytelnie pokazuje wahania prądu.
+
+## 🆕 Fix: RingCountdown czasem pokazywał "kropki" zamiast liczby dni (2026-09-30)
+
+User zrzutem: "ten czasami pokazuje kropki zamiast dni ile" (kafelek "Odliczania"). Pełny
+opis w ARCHITECTURE.md §222. Root cause: `fonts.display` (Archivo Black) ładuje się
+NIEBLOKUJĄCO w tle — komponent renderujący liczbę TĄ czcionką zanim się załaduje dostaje
+na Androidzie tofu-glify zamiast cyfr, i ten stan potrafi ZOSTAĆ na stałe (brak kolejnego
+re-renderu). Naprawione w `RingCountdown.tsx` przez nowy `fontsStore.ts` (flaga
+`fontsLoaded`) — przed załadowaniem fonta liczba spada na systemowy font (nigdy tofu),
+po załadowaniu przeskakuje na docelowy. **UWAGA**: `fonts.display` używany w 15+ innych
+miejscach z TĄ SAMĄ, niezałataną wadą (patrz DO ZROBIENIA niżej). `tsc`/`jest` czyste
+(91/91 suite, 1172 testów, bez zmiany).
+
+**🆕 DO ZROBIENIA**: jeśli problem z "kropkami"/tofu pojawi się gdzie indziej (rekordy
+życiowe, serie, DailyRings, TopPill, habit-year, food — wszystkie używają `fonts.display`),
+zastosować TEN SAM fix (`useFontsStore` + warunkowy `fontFamily`) tam też.
+
+**Priorytet testu na urządzeniu — średni**: trudne do wymuszenia na żądanie (zależy od
+timingu cold-startu appki).
+
+## ✅ Zadania: usunięta ręczna "trudność", nagroda automatyczna z priorytetu + pilności/tempa (2026-09-30)
 
 User: "Za zadania muszą byc coiny pupila i XP rosnące wzglem poziomu i pilnosci taska (im
 pilniejszy i szybciej wykonany tym więcej XP i coinow) i wywalić musimy teudnosc zadania

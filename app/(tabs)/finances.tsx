@@ -747,6 +747,16 @@ export default function FinancesScreen() {
                       );
                     })}
                   </View>
+                  {/* Wykres zmian (2026-09-30, user: "możemy dodać stałe opłaty mieszkanie/
+                      prąd/internet żeby był wykres który pokazuje czy są jakieś zmiany") —
+                      link do `/expenses/bills`, osobnego ekranu z wykresem kwota-w-czasie
+                      per typ rachunku (ten sam BILL_TYPES co chipy wyżej). */}
+                  <TouchableOpacity
+                    onPress={() => { haptic.tap(); setFilterModal(false); router.push('/expenses/bills' as any); }}
+                    style={st.billsTrendLink} activeOpacity={0.8}
+                  >
+                    <Text style={st.billsTrendLinkText}>Zobacz wykres zmian →</Text>
+                  </TouchableOpacity>
                 </>
               )}
 
@@ -1016,6 +1026,8 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   fmTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   fmLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: spacing[3], marginBottom: spacing[2] },
   fmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  billsTrendLink: { alignSelf: 'flex-start', marginTop: spacing[2] },
+  billsTrendLinkText: { fontSize: 12, fontWeight: '700', color: f.accent },
   fmAmtRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
   fmInput: {
     flex: 1, backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
