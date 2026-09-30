@@ -74,6 +74,16 @@ export interface Expense {
   // `amount` ani żadnych sum/statystyk (świadomy, wąski zakres — netowanie wydatków to inna,
   // znacznie większa zmiana) — tylko pokazuje efektywny koszt na ekranie szczegółów.
   reimbursedAmount?: number;
+  // Ręczne podpięcie zwrotu DO KONKRETNEJ transakcji (2026-09-30, user: "musi być wybierz
+  // zwrot jakby z transakcji, żebym mógł realnie podpiąć" — dotąd `reimbursedAmount` szedł
+  // wyłącznie z auto-dopasowania ALBO z gołej ręcznie wpisanej liczby, bez śladu SKĄD ta
+  // kwota się wzięła). Id innej `Expense` (zwykle `type: 'income'`) wybranej w pickerze na
+  // `expenses/[id].tsx` — czysto do WYŚWIETLENIA ("z: {note} · {data}" zamiast gołej
+  // liczby); j.w. NIE zmienia `amount`/statystyk żadnej ze stron, nie ma żadnej logiki
+  // "zużycia" wskazanej transakcji (świadomie: ta sama transakcja może pokryć wiele
+  // wydatków, np. jeden duży przelew rozliczający kilka zakupów). `undefined` gdy zwrot
+  // wpisany ręcznie (bez wskazanej transakcji źródłowej) albo usunięty.
+  reimbursedFromId?: string;
   createdAt: string;
   updatedAt: string;
 }

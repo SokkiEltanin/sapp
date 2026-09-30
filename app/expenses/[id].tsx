@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch,
+  TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -495,31 +495,57 @@ export default function ExpenseDetailScreen() {
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
 
-  // Ręczna edycja zwrotu (2026-09-29, user: "żebym mógł edytować podpięcia" — auto-
-  // dopasowanie w reimbursementMatch.ts łapie tylko przelew PRZYCHODZĄCY w ciągu 14 dni
-  // od zakupu; zwrot za rachunek za prąd, który wraca po miesiącu, albo gotówką, nigdy
-  // się nie zaproponuje). Ten sam wzorzec co `reclassifyFv` wyżej: lokalny store +
-  // Firestore, z toastem przy błędzie. `0` (nie `undefined`) do usuwania — `strip()` w
-  // expensesService.ts filtruje `undefined` PRZED zapisem, więc `undefined` nigdy by nie
-  // wyczyścił pola w Firestore, tylko zniknąłby z payloadu.
-  const [editingReimb, setEditingReimb] = useState(false);
+  // Podpięcie zwrotu DO KONKRETNEJ transakcji (2026-09-30, user: "musi być wybierz zwrot
+  // jakby z transakcji, żebym mógł realnie podpiąć" — poprzednia wersja, §213, miała
+  // tylko gołe pole liczbowe: dawało to samo `reimbursedAmount`, ale bez śladu SKĄD kwota
+  // się wzięła). Picker — TEN SAM wzorzec co "Wybierz transakcję" w vehicles.tsx (link
+  // istniejącego wydatku do serwisu/pojazdu): modal z listą, tap = podpięcie. Tu lista to
+  // PRZYCHODY (`type === 'income'`) — zwrot to pieniądze, które WRACAJĄ. Pinowany wiersz
+  // "Wpisz ręcznie" na górze listy zostaje jako fallback dla zwrotów bez odpowiadającej
+  // transakcji w appce (gotówka, coś sprzed założenia appki).
+  const [reimbPicker, setReimbPicker] = useState(false);
+  const [reimbManual, setReimbManual] = useState(false);
   const [reimbInput, setReimbInput] = useState('');
-  const openReimbEdit = () => {
+  const reimbSource = expense.reimbursedFromId ? expenses.find(e => e.id === expense.reimbursedFromId) : undefined;
+  const openReimbPicker = () => {
     haptic.tap();
+    setReimbManual(false);
     setReimbInput(expense.reimbursedAmount ? expense.reimbursedAmount.toFixed(2) : '');
-    setEditingReimb(true);
+    setReimbPicker(true);
   };
-  const saveReimb = async () => {
+  // `reimbursedFromId: ''` (nie `undefined`) przy odpinaniu/ręcznym wpisie — ten sam powód
+  // co `reimbursedAmount: 0` niżej: `strip()` w expensesService.ts filtruje `undefined`
+  // PRZED zapisem, więc nigdy by nie wyczyścił starego id w Firestore.
+  const linkReimb = async (source: Expense) => {
+    const value = Math.min(source.amount, expense.amount);
+    haptic.medium();
+    setReimbPicker(false);
+    updateExpense(expense.id, { reimbursedAmount: value, reimbursedFromId: source.id });
+    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: source.id }); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
+  };
+  const saveReimbManual = async () => {
     const raw = reimbInput.trim().replace(',', '.');
     let value = raw === '' ? 0 : parseFloat(raw);
     if (isNaN(value) || value < 0) value = 0;
     if (value > expense.amount) value = expense.amount;
     haptic.medium();
-    setEditingReimb(false);
-    updateExpense(expense.id, { reimbursedAmount: value });
-    try { await expensesService.update(expense.id, { reimbursedAmount: value }); }
+    setReimbPicker(false);
+    updateExpense(expense.id, { reimbursedAmount: value, reimbursedFromId: '' });
+    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: '' }); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
+  const unlinkReimb = async () => {
+    haptic.medium();
+    setReimbPicker(false);
+    updateExpense(expense.id, { reimbursedAmount: 0, reimbursedFromId: '' });
+    try { await expensesService.update(expense.id, { reimbursedAmount: 0, reimbursedFromId: '' }); }
+    catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
+  };
+  const reimbCandidates = useMemo(
+    () => expenses.filter(e => e.type === 'income' && e.id !== expense.id).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 50),
+    [expenses, expense.id],
+  );
 
   const editIsIncome = txType === 'income';
   const quickTags = editIsIncome ? INCOME_TAGS : EXPENSE_TAGS;
@@ -858,44 +884,25 @@ export default function ExpenseDetailScreen() {
               </Text>
             )}
 
-            {/* Zwrot — auto-dopasowany (2026-09-28) albo ręcznie podpięty/edytowany
-                (2026-09-29, patrz `saveReimb` wyżej). Nie zmienia `amount`/statystyk,
-                patrz komentarz przy polu w types/index.ts. Tylko dla wydatków — zwrot za
-                przychód nie ma sensu. */}
+            {/* Zwrot — auto-dopasowany (2026-09-28) albo ręcznie podpięty do transakcji
+                (2026-09-30, patrz `linkReimb`/picker niżej). Nie zmienia `amount`/
+                statystyk, patrz komentarz przy polu w types/index.ts. Tylko dla wydatków
+                — zwrot za przychód nie ma sensu. */}
             {expense.type !== 'income' && (
-              editingReimb ? (
-                <View style={s.reimbEditRow}>
-                  <TextInput
-                    value={reimbInput}
-                    onChangeText={setReimbInput}
-                    style={[s.reimbInput, { color: colors.accent.green }]}
-                    keyboardType="decimal-pad"
-                    autoFocus
-                    placeholder="0,00"
-                    placeholderTextColor={colors.accent.green + '60'}
-                  />
-                  <Text style={[s.currencyLabel, { color: colors.accent.green + 'AA', marginTop: -4 }]}>zł zwrotu</Text>
-                  <PressableScale onPress={saveReimb} style={s.reimbIconBtn}>
-                    <Check size={16} color={colors.accent.green} />
-                  </PressableScale>
-                  <PressableScale onPress={() => setEditingReimb(false)} style={s.reimbIconBtn}>
-                    <XIcon size={16} color={colors.text.secondary} />
-                  </PressableScale>
-                </View>
-              ) : (
-                <TouchableOpacity onPress={openReimbEdit} activeOpacity={0.7} style={s.reimbRow}>
-                  {!!expense.reimbursedAmount ? (
-                    <Text style={[s.currencyLabel, { color: colors.accent.green, marginTop: -4 }]}>
-                      Zwrócono: {expense.reimbursedAmount.toFixed(2)} zł · efektywny koszt: {(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
-                    </Text>
-                  ) : (
-                    <Text style={[s.currencyLabel, { color: heroAccent + '80', marginTop: -4, fontSize: 12 }]}>
-                      + Podepnij zwrot
-                    </Text>
-                  )}
-                  <Pencil size={11} color={heroAccent + '80'} style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
-              )
+              <TouchableOpacity onPress={openReimbPicker} activeOpacity={0.7} style={s.reimbRow}>
+                {!!expense.reimbursedAmount ? (
+                  <Text style={[s.currencyLabel, { color: colors.accent.green, marginTop: -4 }]}>
+                    Zwrócono: {expense.reimbursedAmount.toFixed(2)} zł
+                    {reimbSource ? ` z: ${reimbSource.storeName || reimbSource.note || 'przelewu'}` : ''}
+                    {' · efektywny koszt: '}{(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
+                  </Text>
+                ) : (
+                  <Text style={[s.currencyLabel, { color: heroAccent + '80', marginTop: -4, fontSize: 12 }]}>
+                    + Podepnij zwrot
+                  </Text>
+                )}
+                <Pencil size={11} color={heroAccent + '80'} style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
             )}
 
             {/* Date chip */}
@@ -1374,6 +1381,66 @@ export default function ExpenseDetailScreen() {
         )}
       </KeyboardAvoidingView>
 
+      {/* Picker zwrotu (2026-09-30) — TEN SAM wzorzec co "Wybierz transakcję" w
+          vehicles.tsx. Pinowany wiersz "Wpisz ręcznie" na górze przełącza w tym samym
+          modalu na pole liczbowe (fallback dla zwrotów bez transakcji w appce), niżej
+          lista przychodów do podpięcia. */}
+      <Modal visible={reimbPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setReimbPicker(false)}>
+        <View style={s.pickerOverlay}>
+          <View style={s.pickerCard}>
+            <Text style={s.sheetTitle}>Podepnij zwrot</Text>
+            {reimbManual ? (
+              <View style={s.reimbManualRow}>
+                <TextInput
+                  value={reimbInput}
+                  onChangeText={setReimbInput}
+                  style={[s.reimbInput, { color: colors.accent.green }]}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                  placeholder="0,00"
+                  placeholderTextColor={colors.accent.green + '60'}
+                />
+                <Text style={[s.currencyLabel, { color: colors.accent.green + 'AA' }]}>zł</Text>
+                <PressableScale onPress={saveReimbManual} style={s.reimbIconBtn}>
+                  <Check size={18} color={colors.accent.green} />
+                </PressableScale>
+                <PressableScale onPress={() => setReimbManual(false)} style={s.reimbIconBtn}>
+                  <XIcon size={18} color={colors.text.secondary} />
+                </PressableScale>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity style={s.exRow} onPress={() => { haptic.tap(); setReimbInput(expense.reimbursedAmount ? expense.reimbursedAmount.toFixed(2) : ''); setReimbManual(true); }} activeOpacity={0.7}>
+                  <Pencil size={14} color={colors.accent.green} />
+                  <Text style={[s.exName, { marginLeft: spacing[2] }]}>Wpisz kwotę ręcznie</Text>
+                </TouchableOpacity>
+                <ScrollView style={{ marginTop: spacing[1] }}>
+                  {reimbCandidates.length === 0 ? (
+                    <Text style={s.reimbEmptyHint}>Brak przychodów do podpięcia — dodaj przelew jako przychód, albo wpisz zwrot ręcznie.</Text>
+                  ) : reimbCandidates.map(e => (
+                    <TouchableOpacity key={e.id} style={s.exRow} onPress={() => linkReimb(e)} activeOpacity={0.7}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.exName} numberOfLines={1}>{e.storeName || e.note || 'Przychód'}</Text>
+                        <Text style={s.exMeta}>{new Date(e.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })}</Text>
+                      </View>
+                      <Text style={[s.exAmt, { color: colors.accent.green }]}>{e.amount.toFixed(2)} zł</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+            {!!expense.reimbursedAmount && !reimbManual && (
+              <TouchableOpacity onPress={unlinkReimb} style={s.reimbUnlinkBtn} activeOpacity={0.8}>
+                <Text style={s.reimbUnlinkText}>Odepnij zwrot</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setReimbPicker(false)} style={s.pickerClose} activeOpacity={0.8}>
+              <Text style={s.pickerCloseText}>Zamknij</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ConfirmDialog
         visible={confirmDelete}
         title="Usuń transakcję"
@@ -1427,9 +1494,22 @@ const makeS = (c: any) => StyleSheet.create({
   },
   currencyLabel: { fontSize: 20, fontWeight: '300', lineHeight: 50 },
   reimbRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  reimbEditRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: 4 },
+  reimbManualRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[2] },
   reimbInput: { fontSize: 14, fontWeight: '600', padding: 0, minWidth: 44 },
   reimbIconBtn: { padding: 4 },
+  reimbEmptyHint: { fontSize: 12.5, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[5], lineHeight: 18 },
+  reimbUnlinkBtn: { marginTop: spacing[2], paddingVertical: spacing[2], alignItems: 'center' },
+  reimbUnlinkText: { fontSize: 12.5, fontWeight: '700', color: c.accent.red },
+  // Picker zwrotu — TEN SAM wzorzec/nazwy co "Wybierz transakcję" w vehicles.tsx.
+  sheetTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: spacing[4] },
+  pickerCard: { backgroundColor: c.bg.elevated, borderRadius: radius.xl, padding: spacing[4], maxHeight: '78%' },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  exName: { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  exMeta: { fontSize: 10.5, color: c.text.muted, marginTop: 1 },
+  exAmt: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  pickerClose: { marginTop: spacing[2], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.card, alignItems: 'center' },
+  pickerCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   heroMeta: { flexDirection: 'row', marginTop: 2 },
   dateBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
