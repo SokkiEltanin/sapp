@@ -23,7 +23,6 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import NoiseOverlay from '@/components/ui/NoiseOverlay';
 import DashEditRow from '@/components/dashboard/DashEditRow';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -184,24 +183,17 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
 // musztardowe złoto zamiast czystej bieli), bo user chce żeby Praca kojarzyła się z żółtymi
 // barwami jego pracodawcy. Wszystkie trzy dawne role kolorów dzielą teraz TĘ SAMĄ wartość.
 const WORK_ACCENT = '#D8B45C';
-// Kafelek "Praca" (2026-09-29, user: "z tym kolorem mi się jednak nie podoba... może
-// użyjemy ten gradientowy kafelek co na Planie [zajęć]") — ten sam PRZEPIS wizualny co
-// `ClassScheduleCard.tsx` (RadialGlow + mocny akcent zamiast płaskiego neutralnego tła),
-// ale NIE 1:1 kopia: usera raził tam cienki lewy pasek + płaski wash, więc tu zamiast
-// tego prawdziwy `LinearGradient` na CAŁYM kafelku (żaden osobny "prostokąt" nie jest
-// potrzebny — gradient sam niesie akcent) i teksty przesunięte w stronę bieli (jak
-// `MonthWrappedCard.tsx`) zamiast stonowanego `text.secondary`. WORK_ACCENT (musztardowe
-// złoto) zostaje NIETKNIĘTY — to świadomy wybór usera powiązany z barwami jego pracodawcy
-// (patrz komentarz wyżej), gradient tylko podkreśla go głębią zamiast płaskiego tła.
-const WORK_GRADIENT = ['#4A3410', '#6E5220', '#181206'] as const;
-// Panel "Praca" pełnoekranowy (2026-09-29, user: "jak wchodzę w zakładkę to tam też
-// poprawić styl... gradientem może albo plain fill jakiś stonowany będzie super") — TA
-// SAMA rodzina koloru co WORK_GRADIENT na kafelku, ale wyraźnie STONOWANA (ciemniejsza,
-// węższy zakres) — to duży, gęsty w tekst panel na scrollu z dziesiątkiem sekcji
-// (`wpCard`/`wpLive`/`wpAheadCard`/wykres), nie mały hero-kafelek — pełna moc
-// WORK_GRADIENT na całej wysokości scrolla przebijałaby przez własne akcenty sekcji
-// (zielone "NA ŻYWO", żółte "Zaplanowane naprzód") zamiast dawać im tło do odcięcia się.
-const WORK_PANEL_GRADIENT = ['#231909', '#140E05'] as const;
+// Kafelek + panel "Praca" (2026-09-30, user zrzutem panelu: "zakładka pracy okropna,
+// wygląda jakby dziecko zrobiło... miałeś zmienić wygląd kafelka na dashboardzie na
+// wypełnienie a jest jaki był taki jest") — COFNIĘTE od diagonalnego `LinearGradient`
+// (2026-09-29 wersja, §206/§217) do JEDNEGO płaskiego, stonowanego koloru wypełnienia —
+// user explicite prosił o "gradient MOŻE ALBO plain fill", gradient + kropkowy
+// `NoiseOverlay` na dużym, gęstym w tekst panelu wypadł źle (kropki na dużej powierzchni
+// czytają się jako bałagan, nie ziarno) i tego nie da się bezpiecznie "podkręcić" bez
+// realnego testu na urządzeniu — płaskie wypełnienie jest bezpieczniejszym, bardziej
+// stonowanym wyborem drugim wymienionym przez usera. WORK_ACCENT (musztardowe złoto)
+// zostaje NIETKNIĘTY.
+const WORK_FILL = '#1F1707';
 const WEEKS_BACK  = 8;
 
 // `metricIcon`/`STAT_METRIC_ICON`/`STAT_GROUP_ICON` przeniesione do `<StatTile>`
@@ -3504,11 +3496,7 @@ export default function DashboardScreen() {
               const hasRate = wm.rate > 0;
               return (
                 <TouchableOpacity activeOpacity={0.9} onPress={() => { haptic.tap(); setWorkPanel(true); }}>
-                  <LinearGradient
-                    colors={WORK_GRADIENT}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={s.workGradCard}
-                  >
+                  <View style={[s.workGradCard, { backgroundColor: WORK_FILL }]}>
                     <View style={s.cardHeader}>
                       <Briefcase size={13} color={WORK_ACCENT} />
                       <Text style={[s.cardTitle, s.workGradTitle]}>Praca</Text>
@@ -3595,7 +3583,7 @@ export default function DashboardScreen() {
                         </View>
                       </>
                     )}
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               );
             })();
@@ -3847,12 +3835,11 @@ export default function DashboardScreen() {
           dzisiejszego. Poprawianie pomyłek robisz w zakładce Humor (edytuj konkretny wpis). */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={null} />
 
-      {/* Work panel — gradient + ziarno (2026-09-29), patrz WORK_PANEL_GRADIENT wyżej */}
+      {/* Work panel — płaskie wypełnienie (2026-09-30, patrz WORK_FILL wyżej) */}
       <Modal visible={workPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWorkPanel(false)}>
         <View style={s.npOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setWorkPanel(false)} />
-          <LinearGradient colors={WORK_PANEL_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.card, s.wpPanelCard]}>
-            <NoiseOverlay opacity={0.035} density={160} />
+          <View style={[s.card, s.wpPanelCard, { backgroundColor: WORK_FILL }]}>
             <View style={s.cardHeader}>
               <Briefcase size={15} color={WORK_ACCENT} />
               <Text style={[s.cardTitle, s.wpPanelTitle]}>Praca</Text>
@@ -4098,7 +4085,7 @@ export default function DashboardScreen() {
                 </ScrollView>
               );
             })()}
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
 
@@ -4980,10 +4967,11 @@ const buildStyles = (c: any) => StyleSheet.create({
   workMeta: { fontSize: 11.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[3] },
   workAheadRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   workAheadText: { flex: 1, fontSize: 11.5, color: c.text.secondary, fontWeight: '600' },
-  // Kafelek "Praca" na LinearGradient zamiast płaskiego tła (2026-09-29) — patrz komentarz
-  // przy WORK_GRADIENT. Tekst przesunięty w stronę bieli (zamiast `text.secondary`/`text.
-  // muted`, które na tym ciemnym gradiencie traciły kontrast), obwódki/tła elementów na
-  // szkliste biało-przezroczyste zamiast neutralnych `c.border.subtle`/`c.fill.subtle`.
+  // Kafelek "Praca" na płaskim, stonowanym `WORK_FILL` (2026-09-30, patrz komentarz przy
+  // stałej — cofnięte z diagonalnego gradientu, user: "wygląda jakby dziecko zrobiło").
+  // Tekst wciąż przesunięty w stronę bieli (zamiast `text.secondary`/`text.muted`, które
+  // na tym ciemnym tle traciły kontrast), obwódki/tła elementów szkliste biało-
+  // przezroczyste zamiast neutralnych `c.border.subtle`/`c.fill.subtle`.
   workGradCard: {
     borderRadius: radius.xl, padding: spacing[4],
     borderWidth: 1, borderColor: '#D8B45C40',
@@ -5007,10 +4995,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
-  // Panel "Praca" na `WORK_PANEL_GRADIENT` (2026-09-29) — overlay na WSPÓLNYCH `card`/
-  // `cardTitle` (dziesiątki innych miejsc), więc TYLKO dopisuje różnice (overflow do
-  // przycięcia ziarna do zaokrąglonych rogów, tytuł przesunięty w stronę bieli jak
-  // `workGradTitle` na kafelku) zamiast kopiować całą definicję.
+  // Panel "Praca" na `WORK_FILL` (2026-09-30) — overlay na WSPÓLNYCH `card`/`cardTitle`
+  // (dziesiątki innych miejsc), więc TYLKO dopisuje różnice (zaokrąglone rogi, tytuł
+  // przesunięty w stronę bieli jak `workGradTitle` na kafelku) zamiast kopiować definicję.
   wpPanelCard: { overflow: 'hidden' },
   wpPanelTitle: { color: 'rgba(255,255,255,0.9)' },
 

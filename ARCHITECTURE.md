@@ -12703,6 +12703,53 @@ gradient na całej wysokości (nie tylko widoczny fragment), ziarno widoczne, pa
 wydatki" ma gradientowe wypełnienie, wszystkie sekcje (NA ŻYWO/Ten miesiąc/Stawka/
 Zaplanowane/wykres/W liczbach/Wypłaty) czytelne na nowym tle.
 
+## 218. Cofnięcie: gradient+ziarno Pracy → płaskie wypełnienie; siatka humoru na całą szerokość (2026-09-30)
+
+User zrzutem panelu Pracy: "to miał być noise texture a nie kropki jakieś, zakładka pracy
+okropna, wygląda jakby dziecko zrobiło i dziecko dobierało kolory. Miałeś zmienić wygląd
+kafelka pracy na dashboardzie na wypełnienie a jest jaki był taki jest." §217 (i pośrednio
+§206/§215) nie wypaliły — kropkowy `NoiseOverlay` na dużej powierzchni panelu czytał się
+jako bałagan pojedynczych kropek, nie ziarno, a dashboardowy kafelek Pracy w ogóle nie
+dostał zmiany w poprzedniej turze (tylko panel).
+
+**1. Kafelek + panel "Praca"** (`app/(tabs)/index.tsx`) — `WORK_GRADIENT`/
+`WORK_PANEL_GRADIENT` (diagonalne `LinearGradient`) zastąpione JEDNYM płaskim kolorem
+`WORK_FILL = '#1F1707'` na OBU miejscach (user dosłownie prosił o "gradient MOŻE ALBO
+plain fill" — po nieudanej próbie z gradientem, plain fill jest bezpieczniejszym, drugim
+wymienionym wyborem). `LinearGradient` zamieniony z powrotem na zwykły `View` z
+`backgroundColor`. Mały gradient na pasku postępu "Stałe wydatki" (`wbBarTrack` fill,
+§217) ZOSTAJE — to inny, kontrolowany akcent (dwutonowy pasek 10px), nie tło całego
+ekranu, i nie był przedmiotem skargi.
+
+**2. `NoiseOverlay` USUNIĘTY CAŁKOWICIE z repo** (`src/components/ui/NoiseOverlay.tsx`,
+`ClassScheduleCard.tsx`) — nie tylko z panelu Pracy, gdzie był najbardziej widoczny, ale
+też z kafelka "Plan zajęć" (§215), który nikt jeszcze nie zgłosił jako zepsuty, ale używa
+DOKŁADNIE tej samej, odrzuconej techniki (rozrzucone kropki zamiast realnego ziarna) —
+zostawienie jej tam czekałoby tylko na tę samą skargę przy następnym screenshocie.
+Uzasadnienie techniczne (RNSVG nie wspiera niezawodnie `feTurbulence` na Androidzie)
+wciąż stoi, ale "kropki jako substytut ziarna" okazało się wizualnie nieakceptowalne —
+nie ma tu bezpiecznego "podkręcenia" bez testu na urządzeniu, więc komponent skasowany
+zamiast zostawiony martwy/nieużywany.
+
+**3. Siatka nastrój×energia na całą szerokość** (`src/components/mood/MoodEnergyGrid.tsx`)
+— user: "ta siatka humoru mnie denerwuje że jest taka niewpasowana w ten telefon... damy
+po prostu na całej szerokości żeby było wygodniej". Siatka dziedziczyła 20px padding
+rodzica (`MoodCheckInModal.tsx`'s `styles.scroll`) jak reszta sekcji modala. Tylko
+`gridWrap` (faktyczny box z gestem przeciągania) dostał `marginHorizontal: -spacing[5]`
+(bleed do krawędzi ekranu — większy box = wygodniejszy cel dotyku/przeciągnięcia); etykieta
+"Nastrój i energia", hint i odczyt pod siatką dostały nowy styl `.inset`
+(`paddingHorizontal: spacing[5]`), żeby zostały wyrównane z "Co czujesz?" i resztą
+sekcji modala pod spodem — bleeduje TYLKO interaktywny box, nie cała sekcja.
+
+**Testy**: brak nowych — czysto wizualne cofnięcie/zmiana istniejących node'ów.
+`tsc --noEmit`/`jest` czyste (90/90, 1168, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (bezpośrednia reakcja na zgłoszony problem, nie
+kosmetyka): dashboard → kafelek "Praca" i panel po tapnięciu → płaski, stonowany kolor,
+bez gradientu i bez kropek; "Plan zajęć" → też bez kropek (gradient tam zostaje); check-in
+humoru → siatka nastrój/energia sięga krawędzi ekranu, etykiety nad/pod nią wciąż wyrównane
+z resztą modala.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

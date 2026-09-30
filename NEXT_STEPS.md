@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Panel "Praca" pełnoekranowy: gradient + ziarno + mocniejsze akcenty (2026-09-29)
+## 🆕 Cofnięcie: gradient+ziarno Pracy → płaskie wypełnienie; siatka humoru na całą szerokość (2026-09-30)
+
+User zrzutem: "to miał być noise texture a nie kropki jakieś, zakładka pracy okropna,
+wygląda jakby dziecko zrobiło... Miałeś zmienić wygląd kafelka na dashboardzie na
+wypełnienie a jest jaki był taki jest." Pełny opis w ARCHITECTURE.md §218. §217 (gradient+
+kropkowe ziarno na panelu Pracy) cofnięte do JEDNEGO płaskiego koloru `WORK_FILL` — na
+KAFELKU i PANELU. `NoiseOverlay` (kropkowy komponent ziarna) usunięty z całego repo,
+łącznie z kafelkiem "Plan zajęć" (§215), żeby nie zostawiać tej samej odrzuconej techniki
+gdzie indziej. Osobno: siatka nastrój×energia w check-inie humoru sięga teraz krawędzi
+ekranu (większy, wygodniejszy cel dotyku), etykiety wokół niej zostają wyrównane z resztą
+modala. `tsc`/`jest` czyste (90/90 suite, 1168 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na zgłoszony problem):
+kafelek/panel Pracy → płaski kolor bez gradientu/kropek; "Plan zajęć" → bez kropek; check-in
+humoru → siatka na całą szerokość, etykiety nadal wyrównane.
+
+## ✅ Panel "Praca" pełnoekranowy: gradient + ziarno + mocniejsze akcenty (2026-09-29)
 
 User: "ten kafelek z pracy... i wtedy jak wchodzę w zakładkę to tam też poprawić styl,
 można dodać pogrubienie tekstów lepsze wizualizacje. Ogarnij to poważnie". Pełny opis w
