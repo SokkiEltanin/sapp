@@ -67,7 +67,6 @@ import { useFoodStore, targetIntake, isRecipeProduct } from '@/store/foodStore';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange, elapsedShiftHours } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
-import { todayReminders } from '@/utils/todayReminders';
 import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
 import { getHealthGoals, bmrMifflin, ACTIVITY_FACTOR } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
@@ -2026,20 +2025,6 @@ export default function DashboardScreen() {
       .then(({ notificationsService }) => notificationsService.refreshWeeklySummary(weeklySummary))
       .catch(() => {});
   }, [weeklySummary]);
-
-  // "Grupowanie powiadomień w jeden digest" (2026-09-28, user zaakceptował pomysł, węższy
-  // bezpieczny wariant — patrz uzasadnienie w todayReminders.ts) — co jest zaplanowane na
-  // DZIŚ z już zebranych danych (dług/subskrypcja/notatka/kapsuła), re-armowane na każdą
-  // zmianę tych danych jak weeklySummary wyżej.
-  const todayDigest = useMemo(
-    () => todayReminders({ debts, subscriptions, notes: allNotes, capsules: capsuleLetters }),
-    [debts, subscriptions, allNotes, capsuleLetters],
-  );
-  useEffect(() => {
-    import('@/services/notificationsService')
-      .then(({ notificationsService }) => notificationsService.refreshTodayDigestReminder(todayDigest))
-      .catch(() => {});
-  }, [todayDigest]);
 
   // ── Dynamic hero briefing ──────────────────────────────────────────────────
   // A contextual one-liner — complements the TopPill (which shows the single top
