@@ -3,7 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Connector zwrotu pokazuje REALNY wiersz drugiej transakcji, nie tylko plombę+toast (2026-10-01)
+## 🆕 Kafel serii logowań pupila: pełny gradient zamiast tintu (2026-10-01)
+
+User: "jak skończysz tam gdzie pupil ma streak to zamień wizualnie ten streak na mały
+kafelek z gradientem i liczba". Pełny opis w ARCHITECTURE.md §227. Prawy panel kafla
+pupila (seria logowań) zmieniony z płaskiego tintu (`color+'1E'`) na pełny diagonalny
+gradient `[color, shade(color,-0.16)]` — ten sam przepis co kafle "Twoje serie"
+(`StreakWallCard`), dla spójności. Tekst przeszedł na biały (gradient za nasycony dla
+kolorowego tekstu). `tsc`/`jest` czyste (91/91 suite, 1172 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski** (czysta kosmetyka): dashboard → kafel pupila
+z aktywną serią logowań → sprawdź że prawy panel ma pełny nasycony gradient, nie subtelny
+tint, tekst czytelny.
+
+## ✅ Connector zwrotu pokazuje REALNY wiersz drugiej transakcji, nie tylko plombę+toast (2026-10-01)
 
 User zrzutem listy Finansów (dwie zielone "OLESIA NEZHUHA" podpięte jako zwrot do PGE i
 Lidl): "nie możemy jakoś zrobić żeby one się realnie podpisały pod płatnością, żeby było
