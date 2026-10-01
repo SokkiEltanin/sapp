@@ -16,6 +16,7 @@ interface CalendarState {
   addEvent: (event: CalendarEvent) => void;
   updateEvent: (id: string, updates: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
+  deleteEvents: (ids: string[]) => void;
 
   setTasks: (tasks: Task[]) => void;
   addTask: (task: Task) => void;
@@ -48,6 +49,16 @@ export const useCalendarStore = create<CalendarState>()(
           events: state.events.filter((e) => e.id !== id),
           gcalEvents: state.gcalEvents.filter((e) => e.id !== id),
         })),
+      // Jedno `set()` zamiast N wywołań `deleteEvent` w pętli (2026-10-01, "usuń wszystkie
+      // zajęcia planu" — potrafi być kilkadziesiąt eventów naraz) — bez tego każdy usunięty
+      // event osobno re-renderowałby wszystko co subskrybuje `gcalEvents`.
+      deleteEvents: (ids) => {
+        const idSet = new Set(ids);
+        set((state) => ({
+          events: state.events.filter((e) => !idSet.has(e.id)),
+          gcalEvents: state.gcalEvents.filter((e) => !idSet.has(e.id)),
+        }));
+      },
 
       setTasks: (tasks) => set({ tasks }),
       addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),

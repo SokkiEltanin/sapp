@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL, Trash2 } from 'lucide-react-native';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, ClassType } from '@/utils/classSchedule';
 import { toYMD, addDays, mondayOf, fmtWeekRange, fmtDayLabel, fmtMonthLabel, monthGrid } from '@/utils/weekGrid';
 import { CalendarEvent } from '@/types';
+import { googleCalendarService } from '@/services/googleCalendarService';
+import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
-import { spacing, radius, fonts } from '@/theme';
+import { plPlural } from '@/utils/plural';
+import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 
@@ -45,7 +48,37 @@ export default function ClassSchedule() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const gcalEvents = useCalendarStore(st => st.gcalEvents);
+  const deleteEvents = useCalendarStore(st => st.deleteEvents);
   const classPrefix = useClassScheduleStore(st => st.prefix);
+
+  // "Usuń wszystkie" (2026-10-01, user: "zmienia mi się plan... żebym mógł usunąć
+  // wszystkie eventy z kalendarza jednym przyciskiem złapane i wtedy żebym mógł wgrać
+  // nowe, i przed usunięciem pokazuje jakie usunie dla potwierdzenia") — nowy semestr =
+  // inny rozkład zajęć pod tym samym prefiksem; zamiast kasować event po evencie ręcznie
+  // w Kalendarzu Google, jeden przycisk tutaj + pełna lista do wglądu przed kasowaniem.
+  // Te same dane co `eventsByDate` niżej, ale płaska posortowana lista (data+godzina) —
+  // widok dnia/tygodnia/miesiąca nie nadaje się do pokazania "wszystko naraz".
+  const allClassEvents = useMemo(() => {
+    return gcalEvents
+      .filter(e => isClassEvent(e.title, classPrefix))
+      .sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
+  }, [gcalEvents, classPrefix]);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const doWipe = async () => {
+    haptic.medium();
+    setWiping(true);
+    const targets = allClassEvents;
+    const results = await Promise.allSettled(targets.map(e => googleCalendarService.deleteEvent(e.id)));
+    const deletedIds = targets.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<boolean>).value).map(e => e.id);
+    if (deletedIds.length > 0) deleteEvents(deletedIds);
+    setWiping(false);
+    setConfirmWipe(false);
+    const failed = targets.length - deletedIds.length;
+    if (failed === 0) toast.success(`Usunięto ${deletedIds.length} ${plPlural(deletedIds.length, 'event', 'eventy', 'eventów')}`);
+    else if (deletedIds.length === 0) toast.error('Nie udało się usunąć — sprawdź połączenie z Kalendarzem Google');
+    else toast.info(`Usunięto ${deletedIds.length}, ${failed} się nie udało — spróbuj ponownie`);
+  };
 
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -121,7 +154,13 @@ export default function ClassSchedule() {
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Plan zajęć</Text>
-        <View style={{ width: 24 }} />
+        {allClassEvents.length > 0 ? (
+          <TouchableOpacity onPress={() => { haptic.tap(); setConfirmWipe(true); }} hitSlop={10}>
+            <Trash2 size={20} color={colors.accent.red} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
 
       <View style={s.tabRow}>
@@ -213,9 +252,57 @@ export default function ClassSchedule() {
           ))}
         </ScrollView>
       )}
+
+      {/* Potwierdzenie "usuń wszystkie" — pełna lista eventów do wglądu PRZED kasowaniem
+          (user explicite: "przed usunięciem pokazuje jakie usunie żeby dla potwierdzenia"),
+          nie sam `ConfirmDialog` (jego `message` to goły string, nie nadaje się do listy
+          dziesiątek eventów) — ten sam język wizualny (overlay+karta), własny scrollowalny
+          środek. */}
+      <Modal visible={confirmWipe} transparent animationType="fade" statusBarTranslucent onRequestClose={() => !wiping && setConfirmWipe(false)}>
+        <Pressable style={s.wipeOverlay} onPress={() => !wiping && setConfirmWipe(false)}>
+          <Pressable style={s.wipeCard} onPress={() => {}}>
+            <Text style={s.wipeTitle}>Usunąć wszystkie zajęcia?</Text>
+            <Text style={s.wipeSub}>
+              Usunie {allClassEvents.length} {plPlural(allClassEvents.length, 'event', 'eventy', 'eventów')} z Kalendarza Google (prefiks „{classPrefix}”) — nieodwracalne.
+            </Text>
+            <ScrollView style={s.wipeList} contentContainerStyle={{ gap: spacing[2] }}>
+              {groupByDate(allClassEvents).map(({ ymd, events }) => (
+                <View key={ymd}>
+                  <Text style={s.wipeDateHead}>
+                    {DAY_SHORT[(new Date(ymd + 'T12:00:00').getDay() + 6) % 7]}, {Number(ymd.split('-')[2])} {MONTH_SHORT_GEN[Number(ymd.split('-')[1]) - 1]}
+                  </Text>
+                  {events.map(renderEventRow)}
+                </View>
+              ))}
+            </ScrollView>
+            <View style={s.wipeRow}>
+              <TouchableOpacity style={s.wipeCancelBtn} onPress={() => setConfirmWipe(false)} activeOpacity={0.8} disabled={wiping}>
+                <Text style={s.wipeCancelTxt}>Anuluj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.wipeConfirmBtn} onPress={doWipe} activeOpacity={0.8} disabled={wiping}>
+                {wiping
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.wipeConfirmTxt}>Usuń wszystkie ({allClassEvents.length})</Text>}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+function groupByDate(events: CalendarEvent[]): { ymd: string; events: CalendarEvent[] }[] {
+  const out: { ymd: string; events: CalendarEvent[] }[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    if (last && last.ymd === e.date) last.events.push(e);
+    else out.push({ ymd: e.date, events: [e] });
+  }
+  return out;
+}
+
+const MONTH_SHORT_GEN = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
@@ -277,4 +364,34 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   monthCellNumOut: { color: c.text.muted, opacity: 0.4 },
   monthCellNumToday: { color: '#A78BFA', fontWeight: '800' },
   monthDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#A78BFA' },
+
+  // ── Modal "usuń wszystkie" — ten sam język co ConfirmDialog (overlay+karta), własny
+  // scrollowalny środek bo tu trzeba zmieścić listę eventów, nie goły string. ──
+  wipeOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[5],
+  },
+  wipeCard: {
+    width: '100%', maxWidth: 400, maxHeight: '80%', backgroundColor: c.bg.secondary,
+    borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default,
+    padding: spacing[4], gap: spacing[2],
+  },
+  wipeTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  wipeSub: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17 },
+  wipeList: { maxHeight: 320, marginTop: spacing[1] },
+  wipeDateHead: {
+    fontFamily: fonts.label, fontSize: 10.5, color: c.text.muted, textTransform: 'uppercase',
+    letterSpacing: 0.6, fontWeight: '700', paddingBottom: spacing[1], marginTop: spacing[1],
+  },
+  wipeRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] },
+  wipeCancelBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', height: 46,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card,
+  },
+  wipeCancelTxt: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
+  wipeConfirmBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', height: 46,
+    borderRadius: radius.lg, backgroundColor: colors.accent.red,
+  },
+  wipeConfirmTxt: { fontSize: 13.5, fontWeight: '800', color: '#fff' },
 }));

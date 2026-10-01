@@ -13205,6 +13205,60 @@ nowej logiki biznesowej. `tsc --noEmit`/`jest` czyste (92/92, 1180, jak wyżej).
    zaległych/dzisiejszych), sprawdź że karta w ogóle się pokazuje ("NADCHODZĄCE") i że
    każdy taki wiersz ma czytelną plombę dnia.
 
+## 230. "Usuń wszystkie" zajęcia planu — z pełną listą do wglądu przed kasowaniem (2026-10-01)
+
+User: "jak mi się zmieni plan... żebym mógł usunąć wszystkie eventy z kalendarza jednym
+przyciskiem złapane i wtedy żebym mógł wgrać nowe (i przed usunięciem pokazuje jakie
+usunie żeby dla potwierdzenia)". Zaczęli od pytania o "edycję eventów względem zmiany
+planu", ale sami się poprawili w trakcie ("czekaj bo przecież ty mi to robiłeś tutaj") —
+finalny zakres to WYŁĄCZNIE bulk-delete z podglądem, nie edycja/regeneracja.
+
+**Kontekst architektury — WAŻNE do zapamiętania**: "plan zajęć" NIE jest osobnym modelem
+danych w appce. To czysty filtr w czasie odczytu nad prawdziwymi eventami Google
+Calendar (`gcalEvents` w `calendarStore`) — rozpoznawanie dzieje się WYŁĄCZNIE po
+prefiksie tytułu (`isClassEvent`, `classSchedule.ts`, domyślnie `[PUR]`, edytowalny w
+Ustawieniach). User wpisuje zajęcia RĘCZNIE bezpośrednio w aplikacji Google Calendar —
+appka nigdy nie tworzyła/importowała tych eventów masowo, więc "wgranie nowych" zostaje
+poza tym repo (ręczne wpisywanie w GCal) — zakres tej zmiany to TYLKO strona kasowania.
+
+**`src/store/calendarStore.ts`** — nowa akcja `deleteEvents(ids: string[])` obok
+istniejącego `deleteEvent(id)` — jedno `set()` filtrujące oba (`events`/`gcalEvents`)
+na raz, zamiast N osobnych wywołań `deleteEvent` w pętli (semestralny plan to potrafi
+być kilkadziesiąt eventów — N osobnych `set()` re-renderowałoby wszystko co subskrybuje
+`gcalEvents` N razy z rzędu).
+
+**`app/class-schedule.tsx`** — nowy przycisk (Trash2, czerwony) w nagłówku, widoczny
+TYLKO gdy jest co najmniej jeden event do skasowania (`allClassEvents.length > 0`,
+płaska posortowana lista chronologiczna — dotychczasowy `eventsByDate` to `Map` niewygodna
+do pokazania "wszystko naraz"). Tap otwiera modal potwierdzenia — WŁASNY komponent, nie
+gołe `ConfirmDialog` (jego `message` to zwykły string, nie nadaje się do listy dziesiątek
+eventów), ale ten sam język wizualny (overlay+karta, taki sam kształt przycisków
+anuluj/usuń). Modal: liczba+plPlural w nagłówku, scrollowalna lista pogrupowana po dacie
+(`groupByDate`, ten sam wzorzec sekcji co widok tygodnia), `ActivityIndicator` w trakcie
+kasowania (przycisk anuluj wyłączony, `onRequestClose` zablokowany) żeby nie dało się
+przerwać/zamknąć w połowie operacji sieciowej.
+
+**Kasowanie** (`doWipe`) — Google Calendar API nie ma endpointu bulk-delete (potwierdzone
+researchem `googleCalendarService.ts` — tylko pojedynczy `DELETE` per event), więc
+`Promise.allSettled` nad `googleCalendarService.deleteEvent(id)` dla każdego eventu
+RÓWNOLEGLE (nie sekwencyjnie — przy kilkudziesięciu eventach sekwencyjne wywołania
+trwałyby wyraźnie zauważalnie długo). Do lokalnego store'u (`deleteEvents`) trafiają
+TYLKO id-ki które faktycznie się powiodły — częściowa porażka (np. utrata sieci w
+trakcie) nie kasuje z appki eventów które wciąż istnieją w Google Calendar, i toast
+informuje ile się udało/nie udało zamiast cichego sukcesu.
+
+**Testy**: brak nowych — `doWipe`/`groupByDate` to proste operacje nad już istniejącym,
+przetestowanym pośrednio (`isClassEvent`) filtrem; realna logika wymagająca testu
+(`deleteEvent`/sieć) żyje w serwisie który i tak nie jest jednostkowo testowalny (wymaga
+prawdziwego tokenu/fetch). `tsc --noEmit`/`jest` czyste (92/92, 1180, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (prawdziwe, nieodwracalne kasowanie danych w
+Google Calendar użytkownika — nie kosmetyka): Plan zajęć → ikona kosza w nagłówku →
+sprawdź że lista w modalu pokazuje DOKŁADNIE te eventy które faktycznie zostaną usunięte
+(porównaj z widokiem tygodnia/miesiąca) → potwierdź na jednym/dwóch TESTOWYCH eventach
+najpierw (nie na całym semestrze za pierwszym razem) → sprawdź że zniknęły zarówno w
+appce jak i w prawdziwym Google Calendar.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
