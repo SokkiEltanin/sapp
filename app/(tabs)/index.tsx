@@ -126,6 +126,7 @@ import { getLastBackup } from '@/services/backupService';
 import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StreakFlameGlow, streakColor } from '@/components/counters/StreakFlame';
+import { shade } from '@/utils/catPalettes';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
@@ -2768,14 +2769,25 @@ export default function DashboardScreen() {
                         <View style={s.petCombinedLeft}>
                           <PetTile name={petName} pet={petState} level={petLevel} claimable={claimTotal} bare />
                         </View>
-                        <View style={[s.petLoginTile, { backgroundColor: loginStreakColor + '1E', borderColor: loginStreakColor + '3A' }]}>
+                        {/* Pełny gradient zamiast cienkiego tintu (2026-10-01, user: "zamień
+                            wizualnie ten streak na mały kafelek z gradientem i liczbą") — ten
+                            sam przepis co `StreakWallCard`'s kafle ("Twoje serie"): diagonalny
+                            `color → shade(color,-0.16)` zamiast płaskiego `color+'1E'` tła, dla
+                            spójności z resztą kafli serii na dashboardzie. Tekst na pełnym
+                            kolorze, nie progowym `loginStreakColor`, bo gradient jest wystarczająco
+                            nasycony żeby wymagać białego/jasnego tekstu zamiast kolorowego. */}
+                        <LinearGradient
+                          colors={[loginStreakColor, shade(loginStreakColor, -0.16)]}
+                          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                          style={[s.petLoginTile, { borderColor: loginStreakColor + '3A' }]}
+                        >
                           <View style={s.petLoginFlame} pointerEvents="none">
                             <StreakFlameGlow days={petLoginStreak} size={44} />
                           </View>
-                          <Text style={[s.petLoginNum, { color: loginStreakColor }]}>{petLoginStreak}</Text>
-                          <Text style={s.petLoginLabel} numberOfLines={1}>{petLoginStreak === 1 ? 'dzień logowań' : 'dni logowań'}</Text>
-                          <Text style={s.petLoginNext} numberOfLines={1}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
-                        </View>
+                          <Text style={[s.petLoginNum, { color: '#fff' }]}>{petLoginStreak}</Text>
+                          <Text style={[s.petLoginLabel, { color: 'rgba(255,255,255,0.78)' }]} numberOfLines={1}>{petLoginStreak === 1 ? 'dzień logowań' : 'dni logowań'}</Text>
+                          <Text style={[s.petLoginNext, { color: 'rgba(255,255,255,0.65)' }]} numberOfLines={1}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
+                        </LinearGradient>
                       </>
                     ) : (
                       <PetTile name={petName} pet={petState} level={petLevel} claimable={claimTotal} />

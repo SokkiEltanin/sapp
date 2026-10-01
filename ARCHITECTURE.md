@@ -13063,6 +13063,36 @@ przenosi do szczegółów tego przychodu. Potem na samym przychodzie (zielona ka
 że plomba "pokrywa: ..." się pojawia i rozwija analogicznie; jeśli jeden przychód pokrywa
 kilka wydatków, każdy musi mieć osobny, poprawnie podpisany wiersz.
 
+## 227. Kafel serii logowań pupila: pełny gradient zamiast tintu (2026-10-01)
+
+User: "jak skończysz tam gdzie pupil ma streak to zamień wizualnie ten streak na mały
+kafelek z gradientem i liczba" — chodziło o prawy panel dokładanej do kafla pupila na
+dashboardzie karty "seria logowań" (`nodes['pet']`, `app/(tabs)/index.tsx`), NIE o osobną
+sekcję "Twoje serie" (`StreakWallCard`/`nodes['streak-wall']`) ani o per-nawyk plombę
+streaka — to wyjaśniło się przez research kodu, bez potrzeby dopytywania o zrzut.
+
+**Fix** (`app/(tabs)/index.tsx`, `nodes['pet']`) — `petLoginTile` był płaskim `View` z
+subtelnym tintem koloru progu (`backgroundColor: loginStreakColor + '1E'`, ~12% krycia).
+Zamieniony na `LinearGradient` (diagonalny, `start:{0,0} end:{1,1}`) z kolorami
+`[loginStreakColor, shade(loginStreakColor, -0.16)]` — DOKŁADNIE ten sam przepis co kafle
+w `StreakWallCard.tsx` ("Twoje serie", `color → darken(color,0.16)`), dla wizualnej
+spójności z resztą kafli serii na dashboardzie, zamiast wymyślać nowy wzorzec. Zamiast
+osobnej lokalnej kopii `darken()` (trzecia kopia tej samej 6-liniowej funkcji w repo),
+reużyty już istniejący, wyeksportowany `shade()` z `src/utils/catPalettes.ts` —
+matematycznie identyczny (`shade(hex, -0.16)` ≡ `darken(hex, 0.16)`, tylko inny znak
+parametru), pierwszy raz użyty poza modułem palet kota. Tekst (liczba/etykieta/"jutro +N")
+przeszedł z progowego koloru (`loginStreakColor`, nieczytelny na nasyconym gradiencie w tym
+samym kolorze) na biały/półprzezroczysty biały — pełny, nasycony gradient wymaga jasnego
+tekstu, nie kolorowego.
+
+**Testy**: brak nowych — czysto wizualna zmiana wypełnienia istniejącego kafla, dane
+(`petLoginStreak`, `loginBonusCoins`) nietknięte. `tsc --noEmit`/`jest` czyste (91/91,
+1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski** (kosmetyka, zero zmiany logiki): dashboard →
+kafel pupila z aktywną serią logowań → sprawdź że prawy panel ma pełny, nasycony gradient
+(nie subtelny tint) w kolorze progu serii, liczba i etykiety czytelne na jasnym tekście.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
