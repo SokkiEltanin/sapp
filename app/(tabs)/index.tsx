@@ -270,6 +270,11 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+function offsetDateStr(days: number): string {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+const DOW_SHORT_IDX = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
 // Sekcje dashboardu które NIE muszą pojawić się w pierwszej, synchronicznej klatce —
 // historyczne/statystyczne/kolekcjonerskie, bez znaczenia "co dziś muszę zrobić" (2026-08-24,
 // user: "ogólnie na wejście apki laguje" → doprecyzował priorytety: EVENTY/KALENDARZ/ZADANIA/
@@ -1415,6 +1420,24 @@ export default function DashboardScreen() {
   const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed'), [tasks]);
   const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
   const todayTasks     = useMemo(() => pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today), [pendingTasks, today]);
+  // Jutro + reszta tygodnia (2026-10-01, user: "widget zeby bardziej czytelnie pokazywał
+  // które dzisiaj a które na jutro i dalej") — kafel `today-tasks` dotąd pokazywał
+  // WYŁĄCZNIE zaległe+dziś, więc "jutro i dalej" nie było tam widoczne wcale. Ograniczone
+  // do 6 dni naprzód (ten tydzień), żeby widget nie zamienił się w pełną listę zadań —
+  // to już robi zakładka Zadania.
+  const upcomingTasks = useMemo(() => {
+    const limit = offsetDateStr(6);
+    return pendingTasks
+      .filter(t => {
+        const k = t.deadline ? t.deadline.split('T')[0] : t.scheduledDate;
+        return !!k && k > today && k <= limit;
+      })
+      .sort((a, b) => {
+        const ka = (a.deadline ? a.deadline.split('T')[0] : a.scheduledDate)!;
+        const kb = (b.deadline ? b.deadline.split('T')[0] : b.scheduledDate)!;
+        return ka.localeCompare(kb);
+      });
+  }, [pendingTasks, today]);
   const doneToday      = useMemo(() => tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length, [tasks, today]);
 
   // 2026-09-26, audyt dashboardu — deps `[]` zamrażały "jutro" NA STAŁE od pierwszego
@@ -2949,19 +2972,24 @@ export default function DashboardScreen() {
             </View>
             );
 
-            nodes['today-tasks'] = (todayTasks.length > 0 || overdueTasks.length > 0) && (() => {
+            nodes['today-tasks'] = (todayTasks.length > 0 || overdueTasks.length > 0 || upcomingTasks.length > 0) && (() => {
               const PORD: Record<string, number> = { high: 0, normal: 1, low: 2 };
               const todaySorted    = [...todayTasks].sort((a, b) => (PORD[a.priority] ?? 1) - (PORD[b.priority] ?? 1));
-              const combined       = [...overdueTasks, ...todaySorted];
+              // Jutro+dalej DOKLEJONE na końcu (2026-10-01, user: "żeby widget pokazywał
+              // czytelniej które dzisiaj a które na jutro i dalej") — `upcomingTasks` już
+              // posortowane chronologicznie. Każdy taki wiersz dostaje plombę dnia
+              // (JUTRO/dzień tygodnia) niżej, żeby nie wyglądał jak zwykłe zadanie "na dziś".
+              const combined       = [...overdueTasks, ...todaySorted, ...upcomingTasks];
               const shown          = combined.slice(0, 4);
               const totalCount     = combined.length;
               const hasOverdue     = overdueTasks.length > 0;
+              const title = hasOverdue ? 'ZALEGŁE & DZIŚ' : todayTasks.length > 0 ? 'DZIŚ' : 'NADCHODZĄCE';
               return (
                 <View style={[s.todayCard, { backgroundColor: cardBgDark }, hasOverdue && { borderColor: colors.accent.red + '30' }]}>
                   <View style={s.todayHeader}>
                     <Check size={12} color={hasOverdue ? colors.accent.red : accentColor} strokeWidth={3} />
                     <Text style={[s.todayTitle, hasOverdue && { color: colors.accent.red }]}>
-                      {hasOverdue ? 'ZALEGŁE & DZIŚ' : 'DZIŚ'}
+                      {title}
                     </Text>
                     <View style={[s.todayBadge, hasOverdue && { backgroundColor: colors.accent.red + '20' }]}>
                       <Text style={[s.todayBadgeText, hasOverdue && { color: colors.accent.red }]}>{totalCount}</Text>
@@ -2974,7 +3002,14 @@ export default function DashboardScreen() {
                     )}
                   </View>
                   {shown.map(task => {
-                    const isOverdue = task.deadline && task.deadline.split('T')[0] < today;
+                    const isOverdue = !!task.deadline && task.deadline.split('T')[0] < today;
+                    const dateKey = task.deadline ? task.deadline.split('T')[0] : task.scheduledDate;
+                    // Plomba dnia — TYLKO dla jutro/dalej (dziś zostaje bez plomby, czytelne
+                    // przez eliminację: ma ZALEGŁE → zaległe, ma JUTRO/dzień tyg. → później,
+                    // nic z tego → dziś). `dateKey > today` wyklucza dziś i zaległe naraz.
+                    const dayLabel = !isOverdue && dateKey && dateKey > today
+                      ? (dateKey === tomorrow ? 'JUTRO' : DOW_SHORT_IDX[new Date(dateKey + 'T12:00:00').getDay()].toUpperCase())
+                      : null;
                     const checkColor = isOverdue ? colors.accent.red : task.priority === 'high' ? colors.accent.red : accentColor;
                     return (
                       <TouchableOpacity
@@ -2997,6 +3032,11 @@ export default function DashboardScreen() {
                         {isOverdue && (
                           <View style={s.overduePill}>
                             <Text style={s.overduePillText}>ZALEGŁE</Text>
+                          </View>
+                        )}
+                        {dayLabel && (
+                          <View style={s.dayPill}>
+                            <Text style={s.dayPillText}>{dayLabel}</Text>
                           </View>
                         )}
                         {!isOverdue && task.priority === 'high' && (
@@ -5329,6 +5369,14 @@ const buildStyles = (c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.accent.red + '45',
   },
   overduePillText: { fontSize: 9, fontWeight: '800', color: c.accent.red, letterSpacing: 0.8 },
+  // Plomba dnia (JUTRO / dzień tygodnia) — neutralna, nie czerwona jak ZALEGŁE/PILNE,
+  // żeby "później" nie czytało się jako "pilne" (2026-10-01, §229).
+  dayPill: {
+    backgroundColor: c.text.muted + '18', borderRadius: radius.sm,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: c.text.muted + '30',
+  },
+  dayPillText: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8 },
   todayPomBtn: {
     width: 26, height: 26, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center',

@@ -3,7 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Propagacja fixu "kropek zamiast cyfr" na WSZYSTKIE miejsca z `fonts.display` (2026-10-01)
+## 🆕 Formularz zadania: zbita jedna karta zamiast 6 (+ świadome tygodnie) + widget dziś/jutro/dalej (2026-10-01)
+
+User: "zrob go bardziej zbity może bez napisów typu 'tutaj są terminy'... wszystkie
+kafelki zbić może w jednym... I w tym tygodniu jak zaznaczam żeby pokazywało ten tydzień
+przyszły tydzień i w nawiasie który... i może na widgecie zrobić bardziej czytelniej
+które dzisiaj a które na jutro i dalej". Pełny opis w ARCHITECTURE.md §229.
+
+Formularz (`app/tasks/add.tsx`): 6 osobnych kart z powtórzonymi nagłówkami WIELKIMI
+LITERAMI → 1 karta z cienkimi liniami między sekcjami, nagłówki usunięte (treść mówi sama
+za siebie), etykiety chipów terminu ZOSTAJĄ (to nie dekoracja). Stary chip "Ten tydz."
+(= po prostu +7 dni, niejednoznaczne) zastąpiony dwoma: "Ten tydz. (zakres dat)" i
+"Przyszły tydz. (zakres dat)" — nowy `src/utils/weekChips.ts`, testowalny w Jest.
+
+Widget zadań na dashboardzie (`nodes['today-tasks']`): dotąd pokazywał WYŁĄCZNIE
+zaległe+dziś — "jutro i dalej" nie było widoczne wcale. Teraz dokleja zadania z tego
+tygodnia (`upcomingTasks`, okno dziś+1…dziś+6), każdy wiersz jutro/dalej dostaje plombę
+dnia ("JUTRO" / skrót dnia tygodnia), dziś zostaje bez plomby (czytelne przez eliminację).
+Nowy nagłówek "NADCHODZĄCE" dla przypadku bez zaległych/dzisiejszych (wcześniej karta była
+wtedy całkiem ukryta). `tsc`/`jest` czyste (92/92 suite, 1180 testów, +8).
+
+**🆕 Priorytet testu na urządzeniu — średni**: (1) Zadania → dodaj nowe → sprawdź zbitą
+kartę i poprawne zakresy dat na chipach "Ten tydz."/"Przyszły tydz."; (2) Dashboard →
+jeśli masz zadanie na jutro/za kilka dni bez zaległych/dzisiejszych, sprawdź że kafel w
+ogóle się pokazuje ("NADCHODZĄCE") z czytelną plombą dnia na każdym wierszu.
+
+## ✅ Propagacja fixu "kropek zamiast cyfr" na WSZYSTKIE miejsca z `fonts.display` (2026-10-01)
 
 User: "Dawaj" (na propozycję dokończenia §222). Pełny opis w ARCHITECTURE.md §228. Nowy
 `src/components/ui/DisplayText.tsx` — jeden wrapper nad `Text` zamiast kopiowania tego
