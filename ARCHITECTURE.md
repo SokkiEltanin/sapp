@@ -13014,6 +13014,55 @@ nietknięta. `tsc --noEmit`/`jest` czyste (91/91, 1172, bez zmiany).
 check-in humoru → siatka MUSI sięgać obu krawędzi ekranu (minus 1px obramowania arkusza
 po każdej stronie), nie tylko wizualnie "trochę szerzej" niż wcześniej.
 
+## 226. Connector zwrotu pokazuje REALNY wiersz drugiej transakcji, nie tylko plombę+toast (2026-10-01)
+
+User zrzutem listy Finansów (dwie przychodowe transakcje "OLESIA NEZHUHA" podpięte jako
+zwrot do PGE i Lidl): "nie możemy jakoś zrobić żeby one się realnie podpisały pod
+płatnością, żeby było widać połączenie i nie musiał tej dziwnej ikonki?" — plomba "zwrot"
+(§213/§219) po tapnięciu pokazywała tylko `toast.info` z kwotą, bez informacji Z CZYM jest
+połączone; a sam przychód (zielona karta) nie miał ŻADNEGO śladu, że jest czyimś źródłem
+zwrotu. Dopytany o przypadek "kilku naraz" (jeden przychód pokrywający kilka wydatków) —
+user: "jak jest kilka żeby było wiadomo który co daje".
+
+**Dlaczego nie fizyczne przeniesienie obok siebie**: lista w `finances.tsx` jest sztywno
+grupowana po dacie (`SectionList` nad `useExpenses()`'s `grouped`), a zwrot i wydatek mogą
+być dniami/tygodniami od siebie (auto-match ma 14-dniowe okno, ręczny picker nie ma
+żadnego ograniczenia dat) — przeniesienie wymagałoby wyjęcia ich z naturalnych sekcji dat,
+co myliłoby się z resztą listy. Zamiast tego: rozwijany "connector" przypięty do KAŻDEJ
+karty osobno, pokazujący prawdziwe dane drugiej strony na miejscu.
+
+**`src/components/expenses/ExpenseItem.tsx`** — nowy prop `linkedReimb?: Expense[]`
+(liczony w `finances.tsx`, nie tutaj — komponent pojedynczego wiersza nie zna reszty
+listy). Plomba "zwrot" (wydatek) i nowa plomba "pokrywa: {nazwa}" / "pokrywa N wydatki"
+(przychód, widoczna tylko gdy `linkedReimb` niepuste) nie wołają już `toast.info` — tap
+przełącza `reimbExpanded` (osobny stan od `expanded` paragonu, mogą być rozwinięte
+niezależnie), który renderuje pod kartą prawdziwy wiersz(e) drugiej transakcji: ikona-
+łącznik "└" (`reimbElbow`, dwie krawędzie jednego `View` — border-left + border-bottom),
+nazwa, data, kwota ze znakiem i kolorem zgodnym z typem (zielony przychód/czerwony
+wydatek). Każdy wiersz jest osobno tappable → `router.push('/expenses/{id}')`, więc dla
+przychodu pokrywającego kilka wydatków każdy dostaje WŁASNY podpisany wiersz z kwotą —
+bezpośrednia odpowiedź na "jak jest kilka żeby było wiadomo który co daje". Dla wydatku
+nad listą zostaje stare podsumowanie "Zwrócono X zł · efektywny koszt Y zł" (ta sama
+informacja co dawny toast, tylko już nie jedyna). Usunięty teraz-nieużywany import
+`toast` z `@/store/toastStore`.
+
+**`app/(tabs)/finances.tsx`** — nowy `reimbCounterparts` (`useMemo` po PEŁNEJ,
+niefiltrowanej `expenses`, nie po przefiltrowanej liście widocznej na ekranie — link może
+wskazywać poza bieżący filtr/zakres dat): mapa `id → Expense[]` budowana w obie strony
+jednym przejściem (`byId` lookup żeby uniknąć O(n²) przez `expenses.find` w pętli) —
+wydatek → `[przychód źródłowy]`, przychód → `[wszystkie wydatki które pokrywa]`. Podpięta
+jako `linkedReimb={reimbCounterparts.get(item.id)}` w `renderItem`.
+
+**Testy**: brak nowych — czysto UI/connector nad już istniejącym, przetestowanym polem
+`reimbursedFromId` (logika ustawiania/czyszczenia linku nietknięta, tylko odczyt).
+`tsc --noEmit`/`jest` czyste (91/91, 1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: Finanse → tapnij plombę "zwrot" na wydatku z
+podpiętym zwrotem → sprawdź że rozwija się wiersz przychodu z poprawną kwotą/datą, tap nań
+przenosi do szczegółów tego przychodu. Potem na samym przychodzie (zielona karta) → sprawdź
+że plomba "pokrywa: ..." się pojawia i rozwija analogicznie; jeśli jeden przychód pokrywa
+kilka wydatków, każdy musi mieć osobny, poprawnie podpisany wiersz.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

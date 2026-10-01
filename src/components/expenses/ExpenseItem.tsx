@@ -1,5 +1,6 @@
 import { memo, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { router } from 'expo-router';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { ChevronDown, ChevronUp, Wallet, Link2 } from 'lucide-react-native';
@@ -13,7 +14,6 @@ import { isMine } from '@/store/statsScope';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
-import { toast } from '@/store/toastStore';
 
 // Warm amber marks a transaction someone ELSE paid (payer ≠ "Ja"): it shows in the
 // list but does NOT count toward your spend/balance, so it needs an at-a-glance tell.
@@ -27,6 +27,22 @@ interface Props {
   expense: Expense;
   onPress?: (expense: Expense) => void;
   onLongPress?: (expense: Expense) => void;
+  // "Drugie strony" zwrotu (2026-10-01, user zrzutem: "nie możemy jakoś zrobić zeby one
+  // sie realnie podpisały pod platnoscia ... zeby bylo widać połączenie i nie musiał tej
+  // dzianej ikonki" — poprzednia plomba ("zwrot" + toast) nie pokazywała Z CZYM jest
+  // połączone, tylko samą kwotę). Dla wydatku: jednoelementowa tablica z przychodem,
+  // z którego pochodzi zwrot. Dla przychodu: WSZYSTKIE wydatki, które ten przychód pokrywa
+  // (może być kilka — stąd tablica, nie pojedynczy obiekt, i user: "jak jest kilka zeby
+  // bylo wiadomo który co daje" → każdy dostaje własny podpisany wiersz w rozwinięciu).
+  // Wyliczane raz w `finances.tsx` (mapa po całej liście), nie tutaj — ExpenseItem nie zna
+  // reszty listy.
+  linkedReimb?: Expense[];
+}
+
+function fmtReimbDate(iso: string): string {
+  const d = new Date((iso || '').split('T')[0] + 'T12:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
 }
 
 // React.memo (2026-09-17, audyt wydajności — ta sama klasa buga co Gablota/§103) — lista
@@ -41,8 +57,11 @@ interface Props {
 // komponent ich używa, a `index` zmienia się dla wielu wierszy przy każdym dodaniu/usunięciu
 // transakcji w danej sekcji — zostawione, cichaczem unieważniałoby memo dla sąsiadów, których
 // treść wcale się nie zmieniła.
-export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Props) {
+export default memo(function ExpenseItem({ expense, onPress, onLongPress, linkedReimb }: Props) {
   const [expanded, setExpanded] = useState(false);
+  // Osobny stan od `expanded` (receipt items) — wydatek-paragon z podpiętym zwrotem
+  // mógłby chcieć rozwinąć oba naraz, niezależnie od siebie.
+  const [reimbExpanded, setReimbExpanded] = useState(false);
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -105,17 +124,19 @@ export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Prop
               <Text style={styles.payerBadgeText} numberOfLines={1}>Płaci: {expense.payer}</Text>
             </View>
           )}
-          {/* "Connector" — plomba zwrotu (2026-09-29, user: "taki connector zabawny...
-              jak przytrzymujesz to pokazuje się z czym jest połączone"). Long-press na
-              całym wierszu jest już zajęty (przenosi do edycji, patrz `onLongPress`
-              wyżej) — więc to zwykły TAP na małej plombie, nie long-press na wierszu;
-              `toast.info` zamiast osobnego popovera, bo to jedyna informacja do
-              pokazania (ten sam kształt jak `Zwrócono: ...` na ekranie szczegółów). */}
+          {/* "Connector" — plomba zwrotu (2026-09-29 → 2026-10-01, user drugi raz zrzutem:
+              "żeby bylo widać połączenie i nie musiał tej dzianej ikonki" — `toast.info`
+              z samą kwotą nie pokazywał Z CZYM jest połączone. Teraz tap rozwija PRAWDZIWY
+              wiersz drugiej transakcji pod kartą, patrz blok `reimbExpanded` niżej). Long-
+              press na całym wierszu jest już zajęty (przenosi do edycji) — więc to zwykły
+              TAP na plombie, nie long-press. Działa symetrycznie: wydatek pokazuje przychód
+              z którego pochodzi zwrot, przychód pokazuje wszystkie wydatki które pokrywa. */}
           {!isIncome && !!expense.reimbursedAmount && expense.reimbursedAmount > 0 && (
             <TouchableOpacity
               onPress={() => {
                 haptic.tap();
-                toast.info(`Zwrócono: ${expense.reimbursedAmount!.toFixed(2)} zł · efektywny koszt: ${(expense.amount - expense.reimbursedAmount!).toFixed(2)} zł`);
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setReimbExpanded(v => !v);
               }}
               hitSlop={8}
               style={styles.reimbBadge}
@@ -123,6 +144,31 @@ export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Prop
             >
               <Link2 size={10} color={colors.accent.green} />
               <Text style={styles.reimbBadgeText}>zwrot</Text>
+              {reimbExpanded
+                ? <ChevronUp size={9} color={colors.accent.green} />
+                : <ChevronDown size={9} color={colors.accent.green} />}
+            </TouchableOpacity>
+          )}
+          {isIncome && (linkedReimb?.length ?? 0) > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                haptic.tap();
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setReimbExpanded(v => !v);
+              }}
+              hitSlop={8}
+              style={styles.reimbBadge}
+              activeOpacity={0.7}
+            >
+              <Link2 size={10} color={colors.accent.green} />
+              <Text style={styles.reimbBadgeText} numberOfLines={1}>
+                {linkedReimb!.length === 1
+                  ? `pokrywa: ${linkedReimb![0].storeName || linkedReimb![0].note || 'wydatek'}`
+                  : `pokrywa ${linkedReimb!.length} wydatki`}
+              </Text>
+              {reimbExpanded
+                ? <ChevronUp size={9} color={colors.accent.green} />
+                : <ChevronDown size={9} color={colors.accent.green} />}
             </TouchableOpacity>
           )}
         </View>
@@ -197,6 +243,37 @@ export default memo(function ExpenseItem({ expense, onPress, onLongPress }: Prop
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Rozwinięty connector zwrotu — realny wiersz drugiej transakcji, nie tylko ikonka.
+          Element-łącznik (└) przed każdym wierszem wizualnie "podpina" go pod tę kartę. */}
+      {reimbExpanded && (linkedReimb?.length ?? 0) > 0 && (
+        <View style={styles.reimbList}>
+          {!isIncome && !!expense.reimbursedAmount && (
+            <Text style={styles.reimbSummary}>
+              Zwrócono {expense.reimbursedAmount.toFixed(2)} zł · efektywny koszt {(expense.amount - expense.reimbursedAmount).toFixed(2)} zł
+            </Text>
+          )}
+          {linkedReimb!.map(tx => (
+            <TouchableOpacity
+              key={tx.id}
+              style={styles.reimbRow}
+              onPress={() => { haptic.tap(); router.push(`/expenses/${tx.id}` as any); }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.reimbElbow} />
+              <View style={styles.reimbRowInfo}>
+                <Text style={styles.reimbRowTitle} numberOfLines={1}>
+                  {tx.storeName || tx.note || (tx.type === 'income' ? 'Przychód' : 'Wydatek')}
+                </Text>
+                <Text style={styles.reimbRowMeta}>{fmtReimbDate(tx.date)}</Text>
+              </View>
+              <Text style={[styles.reimbRowAmount, { color: tx.type === 'income' ? colors.accent.green : colors.accent.red }]}>
+                {tx.type === 'income' ? '+' : '-'}{tx.amount.toFixed(2)} zł
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 });
@@ -250,7 +327,7 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1,
     borderColor: c.accent.green + '55', backgroundColor: c.accent.green + '18',
   },
-  reimbBadgeText: { fontSize: 9, fontWeight: '700', color: c.accent.green },
+  reimbBadgeText: { fontSize: 9, fontWeight: '700', color: c.accent.green, maxWidth: 170 },
   chevronBtn: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
@@ -297,4 +374,27 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
     alignItems: 'center',
   },
   detailBtnText: { fontSize: 11, fontWeight: '600', color: c.accent.blue },
+
+  // Connector zwrotu — rozwinięty wiersz(e) drugiej strony linku (2026-10-01).
+  reimbList: {
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[2], gap: spacing[1],
+  },
+  reimbSummary: { fontSize: 10.5, color: c.text.muted, marginBottom: 2 },
+  reimbRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: spacing[1],
+  },
+  // "Łokieć" (└) — rysowany dwiema krawędziami jednego małego View, wizualnie podpina
+  // wiersz pod kartę zamiast zostawiać go jako zwykły, oderwany element listy.
+  reimbElbow: {
+    width: 10, height: 16, marginLeft: 2,
+    borderLeftWidth: 1.5, borderBottomWidth: 1.5,
+    borderColor: c.accent.green + '70',
+    borderBottomLeftRadius: 6,
+  },
+  reimbRowInfo: { flex: 1 },
+  reimbRowTitle: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary },
+  reimbRowMeta: { fontSize: 9.5, color: c.text.muted, marginTop: 1 },
+  reimbRowAmount: { fontSize: 12, fontWeight: '700' },
 }));
