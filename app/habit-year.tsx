@@ -13,8 +13,9 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useCounters, matchesAvoid, matchedEatDays, resolveAvoidKeyword, type Counter } from '@/store/countersStore';
 import { useFoodStore } from '@/store/foodStore';
 import { expensesService } from '@/services/expensesService';
-import { spacing, radius, fonts } from '@/theme';
+import { spacing, radius } from '@/theme';
 import { plPlural } from '@/utils/plural';
+import DisplayText from '@/components/ui/DisplayText';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 
@@ -225,7 +226,7 @@ export default function HabitYear() {
         <View style={[s.hero, { borderColor: doneColor + '3A', backgroundColor: doneColor + '12' }]}>
           <Flame size={26} color={doneColor} fill={stats.current > 0 ? doneColor : 'transparent'} />
           <View style={{ flex: 1 }}>
-            <Text style={s.heroNum}>{stats.current} <Text style={s.heroUnit}>{stats.current === 1 ? 'dzień' : 'dni'}{isCounter ? ' czysto' : ''} z rzędu</Text></Text>
+            <DisplayText style={s.heroNum}>{stats.current} <Text style={s.heroUnit}>{stats.current === 1 ? 'dzień' : 'dni'}{isCounter ? ' czysto' : ''} z rzędu</Text></DisplayText>
             <Text style={s.heroSub}>najdłuższa: {stats.longest} {plPlural(stats.longest, 'dzień', 'dni', 'dni')} · {view === 'month' ? 'ostatnie 5 tyg.' : 'rok'}</Text>
           </View>
         </View>
@@ -289,20 +290,20 @@ export default function HabitYear() {
 
         {/* statystyki */}
         <View style={s.statsRow}>
-          <View style={s.stat}><Text style={s.statVal}>{stats.doneDays}</Text><Text style={s.statKey}>{isCounter ? 'dni czysto' : 'dni zrobione'}</Text></View>
+          <View style={s.stat}><DisplayText style={s.statVal}>{stats.doneDays}</DisplayText><Text style={s.statKey}>{isCounter ? 'dni czysto' : 'dni zrobione'}</Text></View>
           <View style={s.statDiv} />
           <View style={s.stat}>
             {isCounter ? (
-              <><Text style={[s.statVal, { color: BREAK }]}>{stats.altDays}</Text><Text style={s.statKey}>wpadki</Text></>
+              <><DisplayText style={[s.statVal, { color: BREAK }]}>{stats.altDays}</DisplayText><Text style={s.statKey}>wpadki</Text></>
             ) : (
               <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Snowflake size={14} color={ICE} /><Text style={[s.statVal, { color: ICE }]}>{stats.altDays}</Text></View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Snowflake size={14} color={ICE} /><DisplayText style={[s.statVal, { color: ICE }]}>{stats.altDays}</DisplayText></View>
                 <Text style={s.statKey}>zamrożenia użyte</Text>
               </>
             )}
           </View>
           <View style={s.statDiv} />
-          <View style={s.stat}><Text style={s.statVal}>{freqPct}%</Text><Text style={s.statKey}>frekwencja</Text></View>
+          <View style={s.stat}><DisplayText style={s.statVal}>{freqPct}%</DisplayText><Text style={s.statKey}>frekwencja</Text></View>
         </View>
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -322,7 +323,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3] },
 
   hero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], borderRadius: radius.xl, borderWidth: 1, padding: spacing[4] },
-  heroNum: { fontFamily: fonts.display, fontSize: 32, color: c.text.primary, letterSpacing: -0.5 },
+  heroNum: { fontSize: 32, color: c.text.primary, letterSpacing: -0.5 },
   heroUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
   heroSub: { fontSize: 12, color: c.text.secondary, marginTop: 2 },
 
@@ -335,7 +336,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, paddingVertical: spacing[3] },
   stat: { flex: 1, alignItems: 'center', gap: 2 },
-  statVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary },
+  statVal: { fontSize: 20, color: c.text.primary },
   statKey: { fontSize: 10.5, fontWeight: '600', color: c.text.muted },
   statDiv: { width: 1, height: 30, backgroundColor: c.border.subtle },
 }));

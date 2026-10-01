@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Counter } from '@/store/countersStore';
 import { streakTier, streakColor } from '@/components/counters/StreakFlame';
 import RadialGlow from '@/components/ui/RadialGlow';
+import DisplayText from '@/components/ui/DisplayText';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -75,7 +76,7 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
               <View style={s.sinceGlowWrap} pointerEvents="none">
                 <RadialGlow size={110} color={tc} opacity={0.18} />
               </View>
-              <Text style={[s.sinceNum, { color: tc }]}>{days}</Text>
+              <DisplayText style={[s.sinceNum, { color: tc }]}>{days}</DisplayText>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
                 <Text style={s.sinceMeta} numberOfLines={1}>{metaTxt}</Text>
@@ -105,7 +106,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingVertical: spacing[3], paddingHorizontal: spacing[3], overflow: 'hidden', position: 'relative',
   },
   sinceGlowWrap: { position: 'absolute', left: -26, top: '50%', marginTop: -55 },
-  sinceNum: { fontFamily: fonts.display, fontSize: 30, letterSpacing: -1, minWidth: 46 },
+  sinceNum: { fontSize: 30, letterSpacing: -1, minWidth: 46 },
   sinceName: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   sinceMeta: { fontSize: 11, fontWeight: '600', color: c.text.muted, marginTop: 1 },
 }));

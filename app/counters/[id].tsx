@@ -10,6 +10,7 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
+import DisplayText from '@/components/ui/DisplayText';
 import RingCountdown from '@/components/counters/RingCountdown';
 import { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import {
@@ -20,7 +21,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
 import { useTasks } from '@/hooks/useTasks';
 import { Note, getAllNotes, createNote, updateNote } from '@/utils/notesStorage';
-import { spacing, radius, typography, fonts } from '@/theme';
+import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -176,7 +177,7 @@ export default function CounterDetail() {
                   SinceCountersCard.tsx) — duża liczba + próg tieru, ten sam wzorzec co wiersz
                   na dashboardzie, bez ikony płomienia i paska dni tygodnia/miesiąca. */}
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], marginTop: spacing[1] }}>
-                <Text style={[s.sinceHeroNum, { color: streakColor(sinceN) }]}>{sinceN}</Text>
+                <DisplayText style={[s.sinceHeroNum, { color: streakColor(sinceN) }]}>{sinceN}</DisplayText>
                 <Text style={s.sinceUnit}>{sinceN === 1 ? 'dzień' : 'dni'}</Text>
               </View>
               <Text style={s.cardMeta}>
@@ -312,7 +313,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardBig: { fontSize: 15, fontWeight: '800', color: c.text.primary },
   cardTopLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   cardMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 6 },
-  sinceHeroNum: { fontFamily: fonts.display, fontSize: 44, letterSpacing: -1.5 },
+  sinceHeroNum: { fontSize: 44, letterSpacing: -1.5 },
   sinceUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[2] },

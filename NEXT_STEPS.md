@@ -3,7 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Kafel serii logowań pupila: pełny gradient zamiast tintu (2026-10-01)
+## 🆕 Propagacja fixu "kropek zamiast cyfr" na WSZYSTKIE miejsca z `fonts.display` (2026-10-01)
+
+User: "Dawaj" (na propozycję dokończenia §222). Pełny opis w ARCHITECTURE.md §228. Nowy
+`src/components/ui/DisplayText.tsx` — jeden wrapper nad `Text` zamiast kopiowania tego
+samego `fontsLoaded && {fontFamily}` wzorca; podmieniony w 12 plikach / ~30 miejscach
+(`RingCountdown.tsx` przepisany na niego też, zamiast trzymać duplikat logiki). Jedyny
+wyjątek: 2 `TextInput` w `food/add.tsx` (nie da się owinąć `DisplayText`), warunkowy styl
+inline. **Cała znana powierzchnia buga "kropek zamiast cyfr" jest teraz załatana** —
+DO ZROBIENIA z poprzedniego wpisu jest zamknięte. `tsc`/`jest` czyste (91/91 suite, 1172
+testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — niski** (trudne do wymuszenia na żądanie, zależy od
+timingu cold-startu): jeśli kiedyś złapiesz "kropki" gdziekolwiek w appce przy starcie,
+to sygnał że coś PRZEOCZONO w tej rundzie, nie że fix nie zadziałał.
+
+## ✅ Kafel serii logowań pupila: pełny gradient zamiast tintu (2026-10-01)
 
 User: "jak skończysz tam gdzie pupil ma streak to zamień wizualnie ten streak na mały
 kafelek z gradientem i liczba". Pełny opis w ARCHITECTURE.md §227. Prawy panel kafla
@@ -75,7 +90,7 @@ górze). Link z Finanse → Filtry → "Rachunki" → "Zobacz wykres zmian". `ts
 **🆕 Priorytet testu na urządzeniu — niski** (wymaga >=2 zapłaconych rachunków tego samego
 typu): sprawdź czy wykres czytelnie pokazuje wahania prądu.
 
-## 🆕 Fix: RingCountdown czasem pokazywał "kropki" zamiast liczby dni (2026-09-30)
+## ✅ Fix: RingCountdown czasem pokazywał "kropki" zamiast liczby dni (2026-09-30)
 
 User zrzutem: "ten czasami pokazuje kropki zamiast dni ile" (kafelek "Odliczania"). Pełny
 opis w ARCHITECTURE.md §222. Root cause: `fonts.display` (Archivo Black) ładuje się
@@ -83,13 +98,8 @@ NIEBLOKUJĄCO w tle — komponent renderujący liczbę TĄ czcionką zanim się 
 na Androidzie tofu-glify zamiast cyfr, i ten stan potrafi ZOSTAĆ na stałe (brak kolejnego
 re-renderu). Naprawione w `RingCountdown.tsx` przez nowy `fontsStore.ts` (flaga
 `fontsLoaded`) — przed załadowaniem fonta liczba spada na systemowy font (nigdy tofu),
-po załadowaniu przeskakuje na docelowy. **UWAGA**: `fonts.display` używany w 15+ innych
-miejscach z TĄ SAMĄ, niezałataną wadą (patrz DO ZROBIENIA niżej). `tsc`/`jest` czyste
-(91/91 suite, 1172 testów, bez zmiany).
-
-**🆕 DO ZROBIENIA**: jeśli problem z "kropkami"/tofu pojawi się gdzie indziej (rekordy
-życiowe, serie, DailyRings, TopPill, habit-year, food — wszystkie używają `fonts.display`),
-zastosować TEN SAM fix (`useFontsStore` + warunkowy `fontFamily`) tam też.
+po załadowaniu przeskakuje na docelowy. `tsc`/`jest` czyste (91/91 suite, 1172 testów, bez
+zmiany). DO ZROBIENIA (pozostałe 15+ miejsc z `fonts.display`) → zamknięte w §228 wyżej.
 
 **Priorytet testu na urządzeniu — średni**: trudne do wymuszenia na żądanie (zależy od
 timingu cold-startu appki).

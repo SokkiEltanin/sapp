@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
+import { View, Animated, StyleSheet, Easing } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
-import { fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
-import { useFontsStore } from '@/store/fontsStore';
+import DisplayText from '@/components/ui/DisplayText';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -17,7 +16,6 @@ export default function RingCountdown({ progress, color, days, size = 64, stroke
   progress: number; color: string; days: number; size?: number; strokeWidth?: number;
 }) {
   const c = useColors();
-  const fontsLoaded = useFontsStore(s => s.loaded);
   const p = Math.min(1, Math.max(0, progress));
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
@@ -50,14 +48,10 @@ export default function RingCountdown({ progress, color, days, size = 64, stroke
       </Svg>
       <View style={StyleSheet.absoluteFillObject as any}>
         <View style={st.center}>
-          <Text
-            style={[
-              st.num,
-              { fontSize: size * 0.3, color: c.text.primary },
-              fontsLoaded && { fontFamily: fonts.display },
-            ]}
+          <DisplayText
+            style={[st.num, { fontSize: size * 0.3, color: c.text.primary }]}
             numberOfLines={1}
-          >{days}</Text>
+          >{days}</DisplayText>
         </View>
       </View>
     </View>
@@ -66,8 +60,8 @@ export default function RingCountdown({ progress, color, days, size = 64, stroke
 
 const st = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // `fontFamily` NIE tu — dopisywane warunkowo w komponencie dopiero gdy `fontsLoaded`
-  // (patrz `useFontsStore`), żeby przed załadowaniem fonta spadać na systemowy zamiast
-  // pokazywać tofu-glify (2026-09-30, user: "czasami pokazuje kropki zamiast dni ile").
+  // `fontFamily` NIE tu — `DisplayText` dopisuje go warunkowo dopiero gdy `fontsLoaded`,
+  // żeby przed załadowaniem fonta spadać na systemowy zamiast pokazywać tofu-glify
+  // (2026-09-30, user: "czasami pokazuje kropki zamiast dni ile").
   num: { letterSpacing: -0.5 },
 });

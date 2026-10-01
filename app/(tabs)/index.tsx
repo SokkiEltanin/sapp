@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import DisplayText from '@/components/ui/DisplayText';
 import DashEditRow from '@/components/dashboard/DashEditRow';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -2784,7 +2785,7 @@ export default function DashboardScreen() {
                           <View style={s.petLoginFlame} pointerEvents="none">
                             <StreakFlameGlow days={petLoginStreak} size={44} />
                           </View>
-                          <Text style={[s.petLoginNum, { color: '#fff' }]}>{petLoginStreak}</Text>
+                          <DisplayText style={[s.petLoginNum, { color: '#fff' }]}>{petLoginStreak}</DisplayText>
                           <Text style={[s.petLoginLabel, { color: 'rgba(255,255,255,0.78)' }]} numberOfLines={1}>{petLoginStreak === 1 ? 'dzień logowań' : 'dni logowań'}</Text>
                           <Text style={[s.petLoginNext, { color: 'rgba(255,255,255,0.65)' }]} numberOfLines={1}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
                         </LinearGradient>
@@ -3191,7 +3192,7 @@ export default function DashboardScreen() {
                 <View style={s.cardHeader}>
                   <Store size={13} color={accentColor} />
                   <Text style={s.cardTitle}>Kolekcja sklepów</Text>
-                  <Text style={s.shopTotal}>{shopsCollection.total}</Text>
+                  <DisplayText style={s.shopTotal}>{shopsCollection.total}</DisplayText>
                 </View>
                 {shopsCollection.fav && (
                   <Text style={s.statSub}>
@@ -3447,12 +3448,12 @@ export default function DashboardScreen() {
 
               <View style={s.finRow}>
                 <View style={s.finStat}>
-                  <Text style={s.finVal}>{displayTotal.toFixed(0)}</Text>
+                  <DisplayText style={s.finVal}>{displayTotal.toFixed(0)}</DisplayText>
                   <Text style={s.finKey}>zł wydatki</Text>
                 </View>
                 <View style={s.finDivider} />
                 <View style={s.finStat}>
-                  <Text style={s.finVal}>{displayFood.toFixed(0)}</Text>
+                  <DisplayText style={s.finVal}>{displayFood.toFixed(0)}</DisplayText>
                   <Text style={s.finKey}>zł jedzenie</Text>
                   {displayTotal > 0 && (
                     <Text style={s.finPct}>{((displayFood / displayTotal) * 100).toFixed(0)}%</Text>
@@ -3460,7 +3461,7 @@ export default function DashboardScreen() {
                 </View>
                 <View style={s.finDivider} />
                 <View style={s.finStat}>
-                  <Text style={s.finVal}>{displaySweets.toFixed(0)}</Text>
+                  <DisplayText style={s.finVal}>{displaySweets.toFixed(0)}</DisplayText>
                   <Text style={s.finKey}>zł słodycze</Text>
                   {displayFood > 0 && (
                     <Text style={s.finPct}>{((displaySweets / displayFood) * 100).toFixed(0)}% jed.</Text>
@@ -3640,19 +3641,19 @@ export default function DashboardScreen() {
                   </View>
                   <View style={s.finRow}>
                     <View style={s.finStat}>
-                      <Text style={[s.finVal, { color: accentColor }]}>{monthDone}</Text>
+                      <DisplayText style={[s.finVal, { color: accentColor }]}>{monthDone}</DisplayText>
                       <Text style={s.finKey}>ukończone</Text>
                     </View>
                     <View style={s.finDivider} />
                     <View style={s.finStat}>
-                      <Text style={[s.finVal, { color: colors.accent.blue }]}>{monthActive}</Text>
+                      <DisplayText style={[s.finVal, { color: colors.accent.blue }]}>{monthActive}</DisplayText>
                       <Text style={s.finKey}>aktywne</Text>
                     </View>
                     {todayTasks.length > 0 && (
                       <>
                         <View style={s.finDivider} />
                         <View style={s.finStat}>
-                          <Text style={[s.finVal, { color: accentColor }]}>{todayTasks.length}</Text>
+                          <DisplayText style={[s.finVal, { color: accentColor }]}>{todayTasks.length}</DisplayText>
                           <Text style={s.finKey}>na dziś</Text>
                         </View>
                       </>
@@ -3877,7 +3878,7 @@ export default function DashboardScreen() {
                         <View style={s.wpLiveDot} />
                         <Text style={s.wpLiveTag}>NA ŻYWO W PRACY{workEarnings.activeEventTitle ? ` · ${workEarnings.activeEventTitle}` : ''}</Text>
                       </View>
-                      <Text style={[s.wpLiveBig, { color: WORK_ACCENT }]}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
+                      <DisplayText style={[s.wpLiveBig, { color: WORK_ACCENT }]}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></DisplayText>
                       <Text style={s.wpLiveSub}>
                         +{(workEarnings.perSecond * 100).toFixed(2)} gr/s
                         {workEarnings.perSecond > 0 ? `  ·  ${Math.round(workEarnings.perSecond * 3600).toLocaleString('pl-PL')} zł/h` : ''}
@@ -4752,7 +4753,7 @@ const buildStyles = (c: any) => StyleSheet.create({
     overflow: 'hidden', position: 'relative', justifyContent: 'flex-end',
   },
   petLoginFlame: { position: 'absolute', right: -10, bottom: -8 },
-  petLoginNum: { fontFamily: fonts.display, fontSize: 20, letterSpacing: -0.5, lineHeight: 22 },
+  petLoginNum: { fontSize: 20, letterSpacing: -0.5, lineHeight: 22 },
   petLoginLabel: { fontFamily: fonts.label, fontSize: 8.5, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase', marginTop: 1, color: c.text.secondary },
   petLoginNext: { fontSize: 9.5, fontWeight: '700', color: c.text.muted, marginTop: 2 },
 
@@ -5152,7 +5153,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpLiveTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   wpLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2AC68F' },
   wpLiveTag: { flex: 1, fontSize: 10.5, fontWeight: '800', color: '#2AC68F', letterSpacing: 0.5, textTransform: 'uppercase' },
-  wpLiveBig: { fontFamily: fonts.display, fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
+  wpLiveBig: { fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
   wpLiveUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
   wpLiveSub: { fontSize: 12, fontWeight: '700', color: c.text.secondary, marginTop: 2, fontVariant: ['tabular-nums'] },
   wpEmpty: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.lg, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
@@ -5187,7 +5188,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // ── Finance stats row ──────────────────────────────────────────────────────
   finRow: { flexDirection: 'row', alignItems: 'flex-start' },
   finStat: { flex: 1, alignItems: 'center', gap: 2 },
-  finVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
+  finVal: { fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
   finKey: { fontSize: 10, color: c.text.muted },
   finPct: { fontSize: 10, color: c.accent.blue, fontWeight: '600' },
   finDivider: { width: 1, height: 40, backgroundColor: c.border.subtle, alignSelf: 'center' },
@@ -5239,7 +5240,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   foodItemAmt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
   notFoodBtn: { paddingVertical: 8, paddingLeft: spacing[2] },
   // "Kolekcja sklepów"
-  shopTotal: { marginLeft: 'auto', fontFamily: fonts.display, fontSize: 16, color: c.text.primary },
+  shopTotal: { marginLeft: 'auto', fontSize: 16, color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
   shopHint: { fontSize: 10.5, color: c.text.muted, marginTop: spacing[2] },
   shopChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.bg.elevated, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, paddingLeft: spacing[3], paddingRight: 4, paddingVertical: 3, maxWidth: '100%' },
