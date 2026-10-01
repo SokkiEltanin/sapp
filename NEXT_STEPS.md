@@ -3,7 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Formularz zadania: zbita jedna karta zamiast 6 (+ świadome tygodnie) + widget dziś/jutro/dalej (2026-10-01)
+## 🆕 "Usuń wszystkie" zajęcia planu — z pełną listą do wglądu przed kasowaniem (2026-10-01)
+
+User: "jak mi się zmieni plan... żebym mógł usunąć wszystkie eventy z kalendarza jednym
+przyciskiem... i przed usunięciem pokazuje jakie usunie dla potwierdzenia". Pełny opis w
+ARCHITECTURE.md §230. **UWAGA — to prawdziwe, nieodwracalne kasowanie** eventów z
+Google Calendar użytkownika (plan zajęć = filtr po prefiksie tytułu nad `gcalEvents`, nie
+osobny model danych — appka nigdy nie tworzyła tych eventów, więc "wgranie nowych" zostaje
+poza appką, ręcznie w GCal). Nowy przycisk (kosz) w nagłówku `/class-schedule` → modal z
+PEŁNĄ, pogrupowaną po dacie listą eventów do skasowania → dopiero po potwierdzeniu
+`Promise.allSettled` nad `googleCalendarService.deleteEvent()` per event (brak bulk-delete
+w API GCal), tylko faktycznie usunięte id-ki znikają z lokalnego store'u. `tsc`/`jest`
+czyste (92/92 suite, 1180 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (prawdziwe kasowanie danych, nie kosmetyka):
+Plan zajęć → kosz w nagłówku → sprawdź że lista w modalu DOKŁADNIE zgadza się z
+widokiem tygodnia/miesiąca → przetestuj najpierw na 1-2 testowych eventach, nie na całym
+semestrze za pierwszym razem → sprawdź że zniknęły i w appce, i w prawdziwym Google
+Calendar.
+
+## ✅ Formularz zadania: zbita jedna karta zamiast 6 (+ świadome tygodnie) + widget dziś/jutro/dalej (2026-10-01)
 
 User: "zrob go bardziej zbity może bez napisów typu 'tutaj są terminy'... wszystkie
 kafelki zbić może w jednym... I w tym tygodniu jak zaznaczam żeby pokazywało ten tydzień
