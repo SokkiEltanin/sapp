@@ -7,13 +7,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  X, Check, CalendarDays, Flag, AlignLeft, Timer,
-  Bell, BellOff, ChevronUp, ChevronDown, ListChecks, Plus,
+  X, Check, CalendarDays, Flag, Timer,
+  Bell, BellOff, ChevronUp, ChevronDown, Plus,
   Zap, Target, Hourglass,
 } from 'lucide-react-native';
 
 import { EventPriority, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
 import { KIND_META, KIND_ORDER, inferKind } from '@/utils/taskKind';
+import { weekChipInfo } from '@/utils/weekChips';
 import { tasksService } from '@/services/calendarService';
 import DatePickerField from '@/components/ui/DatePickerField';
 import TimePickerField from '@/components/ui/TimePickerField';
@@ -47,14 +48,26 @@ function offsetDate(days: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// ─── Quick deadline chips ──────────────────��──────────────────────────────────
-
-const DEADLINE_CHIPS = [
-  { label: 'Bez terminu', value: null },
-  { label: 'Dziś',        value: 0 },
-  { label: 'Jutro',       value: 1 },
-  { label: 'Ten tydz.',   value: 7 },
-] as const;
+// ─── Quick deadline chips ──────────────────────────────────────────────────────
+// Etykiety ZOSTAJĄ widoczne (2026-10-01, user: "coś innego może być z napisem dzisiaj
+// jutro w tym tyg." — w przeciwieństwie do usuniętych nagłówków sekcji, te chipy SĄ
+// swoją własną treścią, nie dekoracją nad treścią). Zakresy tygodni (`weekChipInfo`,
+// @/utils/weekChips.ts — wydzielone stamtąd żeby dało się je przetestować w Jest) liczone
+// na żywo przy każdym renderze, ten sam wzorzec co `offsetDate()` niżej — user: "jak
+// zaznaczam [ten tydzień] żeby pokazywało ten tydzień przyszły tydzień i w nawiasie który"
+// — poprzednia wersja miała JEDEN chip "Ten tydz." = +7 dni, co nie było ani "tym
+// tygodniem" ani jednoznaczne; teraz dwa chipy z czytelnym zakresem dat w nawiasie.
+function buildDeadlineChips(): { label: string; date: string | null }[] {
+  const thisWeek = weekChipInfo(0);
+  const nextWeek = weekChipInfo(1);
+  return [
+    { label: 'Bez terminu', date: null },
+    { label: 'Dziś', date: todayStr() },
+    { label: 'Jutro', date: offsetDate(1) },
+    { label: `Ten tydz. (${thisWeek.range})`, date: thisWeek.sundayStr },
+    { label: `Przyszły tydz. (${nextWeek.range})`, date: nextWeek.sundayStr },
+  ];
+}
 
 // ─── Priority chips ───────────────────────────────────────────────────��───────
 
@@ -69,34 +82,7 @@ const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
 // TimePicker/makeTp (chevron ±1/±5 stepper) removed 2026-08-09 — replaced by
 // TimePickerField (scroll wheel, src/components/ui/TimePickerField.tsx).
 
-// ─── Section card ────────────────────��───────────────────────────────────���────
-
-function SectionCard({ label, icon, children }: {
-  label: string; icon: React.ReactNode; children: React.ReactNode;
-}) {
-  const colors = useColors();
-  const sc = useMemo(() => makeSc(colors), [colors]);
-  return (
-    <View style={sc.card}>
-      <View style={sc.header}>
-        {icon}
-        <Text style={sc.label}>{label}</Text>
-      </View>
-      {children}
-    </View>
-  );
-}
-
-const makeSc = (c: any) => StyleSheet.create({
-  card: {
-    backgroundColor: c.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: G.cardBorder, padding: spacing[4], gap: spacing[3],
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  label: { fontSize: 10, fontWeight: '700', color: G.muted, textTransform: 'uppercase', letterSpacing: 1.1 },
-});
-
-// ─── Screen ───────────────────────────��──────────────────────────────��────────
+// ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function AddTaskScreen() {
   const colors = useColors();
@@ -139,13 +125,17 @@ export default function AddTaskScreen() {
   const titleRef = useRef<TextInput>(null);
 
   // ── Deadline chips logic ─────────────────────────────────────────────────
-  const selectDeadlineChip = (offset: number | null) => {
+  // Liczone na żywo przy KAŻDYM renderze (`buildDeadlineChips`), nie memo — zakresy
+  // tygodni muszą zostać poprawne nawet jeśli ekran zostanie otwarty przez zmianę dnia,
+  // ten sam wzorzec co istniejące `offsetDate()` wywoływane świeżo w `activeChip`.
+  const deadlineChips = buildDeadlineChips();
+  const selectDeadlineChip = (date: string | null) => {
     haptic.tap();
-    setDeadline(offset === null ? '' : offsetDate(offset));
+    setDeadline(date ?? '');
   };
-  const activeChip = (offset: number | null): boolean => {
-    if (offset === null) return !deadline;
-    return deadline === offsetDate(offset);
+  const activeChip = (date: string | null): boolean => {
+    if (date === null) return !deadline;
+    return deadline === date;
   };
 
   // ── Tags ──────��──────────────────────────────────────────────────────────
@@ -266,30 +256,42 @@ export default function AddTaskScreen() {
             />
           </View>
 
-          {/* ── Typ zadania (auto-zgadnięty, klikalny) ── */}
-          <SectionCard label="Typ" icon={<Zap size={12} color={G.muted} />}>
-            <View style={s.priorityRow}>
-              {KIND_ORDER.map(k => {
-                const m = KIND_META[k];
-                const Icon = KIND_ICON[k];
-                const active = kind === k;
-                return (
-                  <TouchableOpacity
-                    key={k}
-                    style={[s.kindChip, active && { borderColor: m.color, backgroundColor: m.color + '18' }]}
-                    onPress={() => { haptic.tap(); setKind(k); setKindTouched(true); }}
-                    activeOpacity={0.8}
-                  >
-                    <Icon size={16} color={active ? m.color : colors.text.muted} strokeWidth={2.2} />
-                    <Text style={[s.kindChipText, active && { color: m.color, fontWeight: '800' }]}>{m.short}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+          {/* ── Wszystko w jednej karcie (2026-10-01, user: "zrob go bardziej zbity, może
+              bez napisów typu 'tutaj są terminy'... wszystkie kafelki zbić może w jednym")
+              — poprzednio 6 osobnych kart, każda z powtórzonym nagłówkiem WIELKIMI
+              LITERAMI ("TYP"/"TERMIN"/"PRIORYTET"/"POWIADOMIENIE"/"OPIS"/"ROZBIJ NA
+              KROKI"). Te nagłówki były czystą dekoracją nad treścią, która i tak mówi sama
+              za siebie (chipy priorytetu, placeholder pola opisu, toggle powiadomienia z
+              własną ikoną) — usunięte, zostaje mała ikona-znacznik tam gdzie rząd chipów
+              inaczej nie miałby żadnego kontekstu (Typ/Termin/Priorytet). Etykiety chipów
+              terminu ("Dziś"/"Jutro"/...) ZOSTAJĄ — to nie dekoracja, to sama treść. */}
+          <View style={s.mergedCard}>
+            {/* Typ zadania (auto-zgadnięty, klikalny) */}
+            <View style={s.fieldRow}>
+              <Zap size={14} color={G.muted} />
+              <View style={[s.priorityRow, { flex: 1 }]}>
+                {KIND_ORDER.map(k => {
+                  const m = KIND_META[k];
+                  const Icon = KIND_ICON[k];
+                  const active = kind === k;
+                  return (
+                    <TouchableOpacity
+                      key={k}
+                      style={[s.kindChip, active && { borderColor: m.color, backgroundColor: m.color + '18' }]}
+                      onPress={() => { haptic.tap(); setKind(k); setKindTouched(true); }}
+                      activeOpacity={0.8}
+                    >
+                      <Icon size={16} color={active ? m.color : colors.text.muted} strokeWidth={2.2} />
+                      <Text style={[s.kindChipText, active && { color: m.color, fontWeight: '800' }]}>{m.short}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
             <Text style={s.kindHint}>{KIND_META[kind].hint}</Text>
 
             {kind === 'waiting' && (
-              <View style={{ gap: spacing[3], marginTop: spacing[1] }}>
+              <View style={{ gap: spacing[3] }}>
                 <TextInput
                   value={waitingFor}
                   onChangeText={setWaitingFor}
@@ -312,71 +314,68 @@ export default function AddTaskScreen() {
                 {wakeAt ? <Text style={s.deadlineDate}>wróci jako aktywne: {wakeAt}</Text> : null}
               </View>
             )}
-          </SectionCard>
 
-          {/* ── Deadline ── */}
-          <SectionCard
-            label="Termin"
-            icon={<CalendarDays size={12} color={G.muted} />}
-          >
-            <View style={s.chipRow}>
-              {DEADLINE_CHIPS.map(chip => {
-                const active = activeChip(chip.value);
-                return (
-                  <TouchableOpacity
-                    key={chip.label}
-                    style={[s.deadlineChip, active && s.deadlineChipActive]}
-                    onPress={() => selectDeadlineChip(chip.value)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>
-                      {chip.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={s.fieldDivider} />
+
+            {/* Termin */}
+            <View style={s.fieldRow}>
+              <CalendarDays size={14} color={G.muted} />
+              <View style={[s.chipRow, { flex: 1 }]}>
+                {deadlineChips.map(chip => {
+                  const active = activeChip(chip.date);
+                  return (
+                    <TouchableOpacity
+                      key={chip.label}
+                      style={[s.deadlineChip, active && s.deadlineChipActive]}
+                      onPress={() => selectDeadlineChip(chip.date)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>
+                        {chip.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-            {/* Chipy pokrywają tylko dziś/jutro/+7 dni — dowolna inna data wymagała
-                ręcznego wpisywania (user, 2026-08-11: "niewygodnie"). Ten sam
+            {/* Chipy pokrywają dziś/jutro/ten tydz./przyszły tydz. — dowolna inna data
+                wymagała ręcznego wpisywania (user, 2026-08-11: "niewygodnie"). Ten sam
                 DatePickerField co przy przypomnieniu niżej, dowolny dzień z kalendarza. */}
             <DatePickerField
               value={deadline}
               onChange={(d) => { haptic.tap(); setDeadline(d); }}
               placeholder="Wybierz dowolny dzień"
-              style={{ marginTop: spacing[2] }}
             />
-          </SectionCard>
 
-          {/* ── Priority ── */}
-          <SectionCard
-            label="Priorytet"
-            icon={<Flag size={12} color={G.muted} />}
-          >
-            <View style={s.priorityRow}>
-              {PRIORITIES.map(p => {
-                const active = priority === p.value;
-                return (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[s.priorityChip, active && { borderColor: p.color, backgroundColor: p.color + '18' }]}
-                    onPress={() => { haptic.tap(); setPriority(p.value); }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[s.priorityChipText, active && { color: p.color, fontWeight: '700' }]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={s.fieldDivider} />
+
+            {/* Priorytet */}
+            <View style={s.fieldRow}>
+              <Flag size={14} color={G.muted} />
+              <View style={[s.priorityRow, { flex: 1 }]}>
+                {PRIORITIES.map(p => {
+                  const active = priority === p.value;
+                  return (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={[s.priorityChip, active && { borderColor: p.color, backgroundColor: p.color + '18' }]}
+                      onPress={() => { haptic.tap(); setPriority(p.value); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.priorityChipText, active && { color: p.color, fontWeight: '700' }]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </SectionCard>
 
-          {/* ── Reminder ── */}
-          <SectionCard
-            label="Powiadomienie"
-            icon={<Bell size={12} color={reminderOn ? G.accent : G.muted} />}
-          >
-            {/* Toggle */}
+            <View style={s.fieldDivider} />
+
+            {/* Powiadomienie — toggle ma już własną ikonę (Bell/BellOff) i opisowy tekst
+                ("Dodaj przypomnienie" / "Przypomnienie DATA o GODZINIE"), osobny nagłówek
+                był czystym powtórzeniem. */}
             <TouchableOpacity
               style={[s.reminderToggle, reminderOn && s.reminderToggleOn]}
               onPress={() => { haptic.tap(); setReminderOn(v => !v); }}
@@ -427,30 +426,24 @@ export default function AddTaskScreen() {
                 />
               </>
             )}
-          </SectionCard>
 
-          {/* ── Description ── */}
-          <SectionCard
-            label="Opis"
-            icon={<AlignLeft size={12} color={G.muted} />}
-          >
+            <View style={s.fieldDivider} />
+
+            {/* Opis — placeholder tłumaczy pole, osobny nagłówek "OPIS" był zbędny */}
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Szczegóły, notatki..."
+              placeholder="Opis / szczegóły, notatki..."
               placeholderTextColor={G.muted}
               style={s.descInput}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
             />
-          </SectionCard>
 
-          {/* ── Milestones — break it into small steps ── */}
-          <SectionCard
-            label="Rozbij na kroki"
-            icon={<ListChecks size={12} color={milestones.length > 0 ? G.accent : G.muted} />}
-          >
+            <View style={s.fieldDivider} />
+
+            {/* Rozbij na kroki — placeholder + ikona Plus w rzędzie inputu tłumaczą pole */}
             {milestones.length > 0 && (
               <View style={{ gap: spacing[2] }}>
                 {milestones.map((m, i) => (
@@ -483,7 +476,7 @@ export default function AddTaskScreen() {
               )}
             </View>
             <Text style={s.msHint}>Za każdy odhaczony krok pupil dostaje +4 XP.</Text>
-          </SectionCard>
+          </View>
 
           {/* ── Advanced options (collapsed) ── */}
           <TouchableOpacity
@@ -502,89 +495,87 @@ export default function AddTaskScreen() {
           </TouchableOpacity>
 
           {showAdvanced && (
-            <>
+            <View style={s.mergedCard}>
               {/* Pomodoros */}
-              <View style={s.advCard}>
-                <Text style={s.advLabel}>SZAC. CZAS (× 25 MIN)</Text>
-                <View style={s.stepperRow}>
-                  <TouchableOpacity
-                    style={[s.stepBtn, pomodoros === 0 && { opacity: 0.35 }]}
-                    onPress={() => setPomodoros(p => Math.max(0, p - 1))}
-                    disabled={pomodoros === 0}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.stepBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={s.stepVal}>{pomodoros}</Text>
-                  <TouchableOpacity
-                    style={s.stepBtn}
-                    onPress={() => setPomodoros(p => Math.min(12, p + 1))}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.stepBtnText}>+</Text>
-                  </TouchableOpacity>
-                  {pomodoros > 0 && (
-                    <Text style={s.stepHint}>{pomodoros * 25} min łącznie</Text>
-                  )}
-                </View>
+              <Text style={s.advLabel}>SZAC. CZAS (× 25 MIN)</Text>
+              <View style={s.stepperRow}>
+                <TouchableOpacity
+                  style={[s.stepBtn, pomodoros === 0 && { opacity: 0.35 }]}
+                  onPress={() => setPomodoros(p => Math.max(0, p - 1))}
+                  disabled={pomodoros === 0}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.stepBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={s.stepVal}>{pomodoros}</Text>
+                <TouchableOpacity
+                  style={s.stepBtn}
+                  onPress={() => setPomodoros(p => Math.min(12, p + 1))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.stepBtnText}>+</Text>
+                </TouchableOpacity>
+                {pomodoros > 0 && (
+                  <Text style={s.stepHint}>{pomodoros * 25} min łącznie</Text>
+                )}
               </View>
+
+              <View style={s.fieldDivider} />
 
               {/* Recurring */}
-              <View style={s.advCard}>
-                <Text style={s.advLabel}>POWTARZANIE</Text>
-                <View style={s.chipRow}>
-                  {(['none', 'daily', 'weekly', 'monthly'] as TaskRecurring[]).map(r => {
-                    const label = { none: 'Brak', daily: 'Dziennie', weekly: 'Tygodniowo', monthly: 'Miesięcznie' }[r];
-                    const active = recurring === r;
-                    return (
-                      <TouchableOpacity
-                        key={r}
-                        style={[s.deadlineChip, active && s.deadlineChipActive]}
-                        onPress={() => setRecurring(r)}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>{label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+              <Text style={s.advLabel}>POWTARZANIE</Text>
+              <View style={s.chipRow}>
+                {(['none', 'daily', 'weekly', 'monthly'] as TaskRecurring[]).map(r => {
+                  const label = { none: 'Brak', daily: 'Dziennie', weekly: 'Tygodniowo', monthly: 'Miesięcznie' }[r];
+                  const active = recurring === r;
+                  return (
+                    <TouchableOpacity
+                      key={r}
+                      style={[s.deadlineChip, active && s.deadlineChipActive]}
+                      onPress={() => setRecurring(r)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
+              <View style={s.fieldDivider} />
+
               {/* Tags */}
-              <View style={s.advCard}>
-                <Text style={s.advLabel}>TAGI</Text>
-                {tags.length > 0 && (
-                  <View style={s.tagsRow}>
-                    {tags.map(t => (
-                      <TouchableOpacity
-                        key={t} onPress={() => setTags(prev => prev.filter(x => x !== t))}
-                        style={s.tagChip} activeOpacity={0.8}
-                      >
-                        <Text style={s.tagText}>#{t}</Text>
-                        <X size={9} color={G.muted} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                <View style={s.tagInputRow}>
-                  <TextInput
-                    value={tagInput}
-                    onChangeText={setTagInput}
-                    onSubmitEditing={addTag}
-                    placeholder="Dodaj tag..."
-                    placeholderTextColor={G.muted}
-                    style={s.tagInput}
-                    returnKeyType="done"
-                    blurOnSubmit={false}
-                  />
-                  {tagInput.trim().length > 0 && (
-                    <TouchableOpacity onPress={addTag} style={s.tagAddBtn} activeOpacity={0.8}>
-                      <Check size={13} color={G.accent} strokeWidth={3} />
+              <Text style={s.advLabel}>TAGI</Text>
+              {tags.length > 0 && (
+                <View style={s.tagsRow}>
+                  {tags.map(t => (
+                    <TouchableOpacity
+                      key={t} onPress={() => setTags(prev => prev.filter(x => x !== t))}
+                      style={s.tagChip} activeOpacity={0.8}
+                    >
+                      <Text style={s.tagText}>#{t}</Text>
+                      <X size={9} color={G.muted} />
                     </TouchableOpacity>
-                  )}
+                  ))}
                 </View>
+              )}
+              <View style={s.tagInputRow}>
+                <TextInput
+                  value={tagInput}
+                  onChangeText={setTagInput}
+                  onSubmitEditing={addTag}
+                  placeholder="Dodaj tag..."
+                  placeholderTextColor={G.muted}
+                  style={s.tagInput}
+                  returnKeyType="done"
+                  blurOnSubmit={false}
+                />
+                {tagInput.trim().length > 0 && (
+                  <TouchableOpacity onPress={addTag} style={s.tagAddBtn} activeOpacity={0.8}>
+                    <Check size={13} color={G.accent} strokeWidth={3} />
+                  </TouchableOpacity>
+                )}
               </View>
-            </>
+            </View>
           )}
 
           <View style={{ height: 20 }} />
@@ -644,6 +635,15 @@ const makeS = (c: any) => StyleSheet.create({
     fontSize: 20, fontWeight: '700', color: c.text.primary,
     lineHeight: 28, letterSpacing: -0.3, padding: 0,
   },
+
+  // Jedna karta dla Typ/Termin/Priorytet/Powiadomienie/Opis/Rozbij-na-kroki (2026-10-01,
+  // §229) zamiast 6 osobnych — `fieldDivider` zastępuje osobne obramowania/odstępy kart.
+  mergedCard: {
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder, padding: spacing[4], gap: spacing[3],
+  },
+  fieldDivider: { height: 1, backgroundColor: G.cardBorder },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   deadlineChip: {
@@ -715,11 +715,6 @@ const makeS = (c: any) => StyleSheet.create({
   },
   advancedToggleText: { flex: 1, fontSize: 12, color: G.muted, fontWeight: '600' },
 
-  advCard: {
-    backgroundColor: c.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: G.cardBorder,
-    padding: spacing[4], gap: spacing[3],
-  },
   advLabel: {
     fontSize: 9, fontWeight: '700', color: G.muted,
     letterSpacing: 1.1, textTransform: 'uppercase',

@@ -13137,6 +13137,74 @@ na cold-starcie w którymkolwiek z tych miejsc (rekordy życiowe, "Twoje serie",
 "ile dni temu", Finanse/Zdrowie/Jedzenie/plan-roku nawyku, TopPill, dodawanie jedzenia) —
 to już NIE powinno się zdarzyć, cała znana powierzchnia tego buga jest teraz załatana.
 
+## 229. Formularz zadania: zbita jedna karta zamiast 6 (+ świadome tygodnie) + widget dziś/jutro/dalej (2026-10-01)
+
+User: "zrob go bardziej zbity może bez napisów typu 'tutaj są terminy'... wszystkie
+kafelki zbić może w jednym... coś innego może być z napisem dzisiaj jutro w tym tydz. I
+dodatkowo w tym tygodniu jak zaznaczam żeby pokazywało ten tydzień przyszły tydzień i w
+nawiasie który... i może na widgecie zrobić bardziej czytelniej które dzisiaj a które na
+jutro i dalej". Trzy osobne, powiązane zmiany.
+
+**`app/tasks/add.tsx` — jedna karta zamiast 6**: `SectionCard` (6×: Typ/Termin/
+Priorytet/Powiadomienie/Opis/Rozbij-na-kroki), każda z własnym obramowaniem i powtórzonym
+nagłówkiem WIELKIMI LITERAMI, zastąpiona JEDNĄ `mergedCard` z cienkimi `fieldDivider`
+(1px linia) między sekcjami. Nagłówki usunięte — treść już mówi sama za siebie (chipy
+priorytetu, placeholder "Opis / szczegóły...", toggle powiadomienia z własną ikoną Bell/
+BellOff). Mała ikona-znacznik ZOSTAJE tylko tam gdzie rząd samych chipów inaczej nie miałby
+żadnego kontekstu (Zap/CalendarDays/Flag przy Typ/Termin/Priorytet). Komponent `SectionCard`
++ `makeSc` usunięte całkowicie (martwe po podmianie wszystkich 6 wywołań), razem z
+nieużywanymi już importami `AlignLeft`/`ListChecks`. Sekcja zaawansowana (Pomodoro/
+Powtarzanie/Tagi, zwijana) analogicznie scalona z 3 kart w 1 (`advCard` — teraz identyczny
+kształt co `mergedCard`, duplikat stylu usunięty, oba miejsca dzielą `mergedCard`).
+
+**Chipy terminu — etykiety ZOSTAJĄ** (user explicite: "coś innego może być z napisem
+dzisiaj jutro w tym tydz.") — w przeciwieństwie do usuniętych nagłówków sekcji, same chipy
+SĄ treścią, nie dekoracją nad treścią.
+
+**Nowy `src/utils/weekChips.ts`** (czysta funkcja, bez importu `react-native` — ten sam
+powód co `taskReward.ts`/`billTrends.ts`, żeby dało się przetestować w Jest) —
+`weekChipInfo(weeksFromNow, now = new Date())` liczy poniedziałek→niedzielę tygodnia N
+tygodni od `now` i zwraca czytelny zakres (`"28 wrz–4 paź"` / `"12–18 paź"` gdy w tym samym
+miesiącu) + datę niedzieli jako deadline. Zastępuje stary pojedynczy chip "Ten tydz." (był
+to po prostu `+7 dni`, co nie było ani jednoznacznie "tym tygodniem" ani "przyszłym" —
+zależnie od dnia tygodnia mogło wskazywać w dowolne miejsce) dwoma chipami: "Ten tydz.
+(zakres)" i "Przyszły tydz. (zakres)", każdy z jawnym zakresem dat w nawiasie — dokładnie
+to, o co user prosił ("w nawiasie który"). `activeChip`/`selectDeadlineChip` w `add.tsx`
+przepisane z offsetów dni (`number | null`) na gotowe stringi dat (`string | null`), bo
+chipy tygodniowe nie dają się już wyrazić jako prosty offset.
+
+**Testy**: nowy `__tests__/weekChips.test.ts` (8 testów) — `mondayOf` dla środy/poniedziałku/
+niedzieli (niedziela → poniedziałek POPRZEDNIEGO tygodnia, nie następnego — najłatwiejsze
+miejsce na błąd o jeden tydzień), zakres przecinający/nieprzecinający granicę miesiąca, ten
+i przyszły tydzień nigdy się nie pokrywają. `tsc --noEmit`/`jest` czyste (92/92 suite, 1180
+testów, +8).
+
+**`app/(tabs)/index.tsx` — widget `today-tasks`: dziś/jutro/dalej czytelnie rozdzielone**:
+widget dotąd pokazywał WYŁĄCZNIE zaległe+dziś (`todayTasks`/`overdueTasks`) — "jutro i
+dalej" nie było tam widoczne wcale, mimo że user o to prosił wprost. Nowy `upcomingTasks`
+memo (pendingTasks z `deadline`/`scheduledDate` w oknie dziś+1 … dziś+6, czyli reszta
+tygodnia — ograniczone świadomie, żeby widget nie zamienił się w pełną listę zadań, od
+tego jest zakładka Zadania) doklejony na końcu `combined` listy. Każdy wiersz jutro/dalej
+dostaje nową, neutralną plombę dnia (`dayPill`: "JUTRO" albo skrót dnia tygodnia z
+`DOW_SHORT_IDX`, np. "ŚR") — dziś zostaje BEZ plomby (czytelne przez eliminację: ma
+ZALEGŁE → zaległe, ma JUTRO/dzień tyg. → później, nic z tego → dziś), zaległe zatrzymuje
+swoją istniejącą czerwoną plombę. Nagłówek karty: "ZALEGŁE & DZIŚ" (zaległe obecne) /
+"DZIŚ" (są dzisiejsze) / "NADCHODZĄCE" (tylko jutro/dalej, zero dziś/zaległych — nowy
+przypadek, dotąd karta była wtedy całkiem ukryta). Widoczność karty rozszerzona o
+`upcomingTasks.length > 0`.
+
+**Testy**: brak nowych dla widgetu — czysto UI nad już istniejącymi, przetestowanymi
+polami (`deadline`/`scheduledDate`), plomba dnia to prosta funkcja porównania dat bez
+nowej logiki biznesowej. `tsc --noEmit`/`jest` czyste (92/92, 1180, jak wyżej).
+
+**Priorytet testu na urządzeniu — średni** (dwie powiązane, ale niezależne zmiany UI):
+1. Zadania → dodaj nowe → sprawdź że formularz jest jedną zbitą kartą z cienkimi liniami
+   zamiast 6 osobnych pudełek, chipy "Ten tydz."/"Przyszły tydz." pokazują poprawny,
+   różny zakres dat w nawiasie.
+2. Dashboard → kafel zadań → jeśli masz zadanie z terminem jutro/za kilka dni (bez
+   zaległych/dzisiejszych), sprawdź że karta w ogóle się pokazuje ("NADCHODZĄCE") i że
+   każdy taki wiersz ma czytelną plombę dnia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
