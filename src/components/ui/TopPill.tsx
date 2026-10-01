@@ -18,7 +18,8 @@ import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
-import { colors, fonts } from '@/theme';
+import { colors } from '@/theme';
+import DisplayText from '@/components/ui/DisplayText';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
@@ -611,7 +612,7 @@ export default function TopPill() {
       >
         <View style={[s.badge, { backgroundColor: item.color }]}>
           <Icon size={12} color={on} strokeWidth={2.6} />
-          <Text style={[s.badgeText, { color: on }]} numberOfLines={1}>{item.badge}</Text>
+          <DisplayText style={[s.badgeText, { color: on }]} numberOfLines={1}>{item.badge}</DisplayText>
         </View>
         <Text style={s.text} numberOfLines={1}>{item.text}</Text>
         {live && (
@@ -671,7 +672,8 @@ const makeS = (t: any) => StyleSheet.create({
     width: 7, height: 7, borderRadius: 3.5, marginLeft: 2,
   },
   badgeText: {
-    fontFamily: fonts.display,   // Archivo Black — punchy liczba/krótki badge
+    // `fontFamily` NIE tu — `DisplayText` dopisuje Archivo Black warunkowo dopiero po
+    // załadowaniu fonta (patrz `DisplayText`), żeby nie pokazać tofu-glifów na Androidzie.
     fontSize: 11,
     color: '#FFFFFF',
     letterSpacing: 0.2,

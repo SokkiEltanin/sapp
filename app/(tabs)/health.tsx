@@ -11,6 +11,7 @@ import { feedWaterHabit, getWaterHabit, getCounts, setCounts, getHabits, saveHab
 import { useHabitsSync } from '@/store/habitsSync';
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
+import DisplayText from '@/components/ui/DisplayText';
 import WaterGauge from '@/components/health/WaterGauge';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
@@ -628,27 +629,27 @@ export default function HealthScreen() {
         <View style={styles.summaryRow}>
           <View style={[styles.summaryTile, { backgroundColor: '#38BDF818', borderColor: '#38BDF840' }]}>
             <Footprints size={15} color="#38BDF8" fill="#38BDF8" />
-            <Text style={styles.summaryVal}>{steps > 0 ? (steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps) : '—'}</Text>
+            <DisplayText style={styles.summaryVal}>{steps > 0 ? (steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps) : '—'}</DisplayText>
             <Text style={styles.summaryLabel}>kroki</Text>
           </View>
           <View style={[styles.summaryTile, { backgroundColor: '#A78BFA18', borderColor: '#A78BFA40' }]}>
             <Moon size={15} color="#A78BFA" fill="#A78BFA" />
-            <Text style={styles.summaryVal}>{sleepH === 0 && sleepM === 0 ? '—' : `${sleepH}:${pad(sleepM)}`}</Text>
+            <DisplayText style={styles.summaryVal}>{sleepH === 0 && sleepM === 0 ? '—' : `${sleepH}:${pad(sleepM)}`}</DisplayText>
             <Text style={styles.summaryLabel}>sen</Text>
           </View>
           <View style={[styles.summaryTile, { backgroundColor: '#FF6B6B18', borderColor: '#FF6B6B40' }]}>
             <Heart size={15} color="#FF6B6B" fill="#FF6B6B" />
-            <Text style={styles.summaryVal}>{(hcExtra.heartRateAvg as number) > 0 ? hcExtra.heartRateAvg : '—'}</Text>
+            <DisplayText style={styles.summaryVal}>{(hcExtra.heartRateAvg as number) > 0 ? hcExtra.heartRateAvg : '—'}</DisplayText>
             <Text style={styles.summaryLabel}>tętno</Text>
           </View>
           <View style={[styles.summaryTile, { backgroundColor: '#FB923C18', borderColor: '#FB923C40' }]}>
             <Flame size={15} color="#FB923C" fill="#FB923C" />
-            <Text style={styles.summaryVal}>{(hcExtra.activeCalories as number) > 0 ? hcExtra.activeCalories : '—'}</Text>
+            <DisplayText style={styles.summaryVal}>{(hcExtra.activeCalories as number) > 0 ? hcExtra.activeCalories : '—'}</DisplayText>
             <Text style={styles.summaryLabel}>kcal</Text>
           </View>
           <View style={[styles.summaryTile, { backgroundColor: '#34D39918', borderColor: '#34D39940' }]}>
             <Activity size={15} color="#34D399" fill="#34D399" />
-            <Text style={styles.summaryVal}>{(weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : '—'}</Text>
+            <DisplayText style={styles.summaryVal}>{(weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : '—'}</DisplayText>
             <Text style={styles.summaryLabel}>waga</Text>
           </View>
         </View>
@@ -711,11 +712,11 @@ export default function HealthScreen() {
               )}
               <ChevronRight size={15} color={colors.text.muted} style={{ marginLeft: 4 }} />
             </View>
-            <Text style={[styles.heroNum, {
+            <DisplayText style={[styles.heroNum, {
               color: steps <= 0 ? colors.text.muted : (steps >= stepGoal ? T.accent : colors.text.primary),
             }]}>
               {steps > 0 ? steps.toLocaleString() : '—'}
-            </Text>
+            </DisplayText>
             <Text style={styles.heroSub}>
               {steps > 0
                 ? `cel ${stepGoal.toLocaleString()} · ${(steps * 0.00075).toFixed(1)} km · ${Math.round(stepPct * 100)}% · szczegóły`
@@ -949,21 +950,21 @@ export default function HealthScreen() {
                   </View>
                   <View style={styles.analysisGrid}>
                     <View style={styles.analysisTile}>
-                      <Text style={styles.analysisVal}>{avgWin.toLocaleString()}</Text>
+                      <DisplayText style={styles.analysisVal}>{avgWin.toLocaleString()}</DisplayText>
                       <Text style={styles.analysisLabel}>śr. kroki · {stepsRange} dni</Text>
                     </View>
                     <View style={styles.analysisTile}>
-                      <Text style={styles.analysisVal}>{healthStats.goalHit}%</Text>
+                      <DisplayText style={styles.analysisVal}>{healthStats.goalHit}%</DisplayText>
                       <Text style={styles.analysisLabel}>dni z celem (30d)</Text>
                     </View>
                     <View style={styles.analysisTile}>
-                      <Text style={styles.analysisVal}>{(avgWin * 0.00075).toFixed(1)} km</Text>
+                      <DisplayText style={styles.analysisVal}>{(avgWin * 0.00075).toFixed(1)} km</DisplayText>
                       <Text style={styles.analysisLabel}>śr. dystans · {stepsRange} dni</Text>
                     </View>
                     <View style={styles.analysisTile}>
-                      <Text style={[styles.analysisVal, { color: healthStats.trendPct > 0 ? T.accent : healthStats.trendPct < 0 ? colors.accent.red : colors.text.primary }]}>
+                      <DisplayText style={[styles.analysisVal, { color: healthStats.trendPct > 0 ? T.accent : healthStats.trendPct < 0 ? colors.accent.red : colors.text.primary }]}>
                         {healthStats.trendPct > 0 ? '+' : ''}{healthStats.trendPct}%
-                      </Text>
+                      </DisplayText>
                       <Text style={styles.analysisLabel}>vs poprz. tydzień</Text>
                     </View>
                   </View>
@@ -1614,7 +1615,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   cardLabel: { fontFamily: fonts.label, fontSize: 10, color: t.muted, letterSpacing: 1.2 },
 
-  heroNum: { fontFamily: fonts.display, fontSize: 44, letterSpacing: -1, lineHeight: 50 },
+  heroNum: { fontSize: 44, letterSpacing: -1, lineHeight: 50 },
   heroSub: { ...typography.caption, color: c.text.muted },
 
   progressTrack: { height: 8, backgroundColor: c.fill.medium, borderRadius: radius.full, overflow: 'hidden' },
@@ -1683,7 +1684,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   stageText: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
   summaryRow: { flexDirection: 'row', gap: spacing[2] },
   summaryTile: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: spacing[3], backgroundColor: t.card, borderRadius: radius.lg, borderWidth: 1, borderColor: t.cardBorder },
-  summaryVal: { fontFamily: fonts.display, fontSize: 17, color: c.text.primary, letterSpacing: -0.4 },
+  summaryVal: { fontSize: 17, color: c.text.primary, letterSpacing: -0.4 },
   summaryLabel: { fontSize: 9.5, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
 
   qualityBadge: {
@@ -1754,7 +1755,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   },
   analysisGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing[3] },
   analysisTile: { width: '50%', paddingVertical: spacing[2], gap: 1 },
-  analysisVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
+  analysisVal: { fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
   analysisLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted },
   analysisNote: {
     fontSize: 11, color: c.text.secondary, fontStyle: 'italic',

@@ -23,6 +23,7 @@ export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
+import DisplayText from '@/components/ui/DisplayText';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useDayKey } from '@/hooks/useDayKey';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -451,9 +452,9 @@ export default function FinancesScreen() {
                 </View>
                 <PressableScale onPress={() => { haptic.tap(); setShowDetails(v => !v); }}>
                   <View style={st.heroAmountRow}>
-                    <Text style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
+                    <DisplayText style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
                       {balance < 0 ? '−' : ''}{Math.abs(balance).toFixed(2)}
-                    </Text>
+                    </DisplayText>
                     <Text style={st.heroCurrency}> PLN</Text>
                   </View>
                   <Text style={st.heroSub}>
@@ -527,9 +528,9 @@ export default function FinancesScreen() {
                     </View>
                     <View style={st.flowNetRow}>
                       <Text style={st.flowNetLabel}>Zostało (bez stałych)</Text>
-                      <Text style={[st.flowNet, { color: net >= 0 ? '#2AC68F' : '#E43434' }]}>
+                      <DisplayText style={[st.flowNet, { color: net >= 0 ? '#2AC68F' : '#E43434' }]}>
                         {net >= 0 ? '+' : '−'}{Math.abs(net).toFixed(0)} zł
-                      </Text>
+                      </DisplayText>
                     </View>
 
                     {/* Two clean insight lines (was a busy 2×2 grid nobody read) */}
@@ -578,7 +579,7 @@ export default function FinancesScreen() {
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <View style={st.bkTop}>
                             <Text style={st.bkLabel} numberOfLines={1}>{meta.label || cat}</Text>
-                            <Text style={st.bkAmt}>{amt.toFixed(0)} zł</Text>
+                            <DisplayText style={st.bkAmt}>{amt.toFixed(0)} zł</DisplayText>
                           </View>
                           <View style={st.bkTrack}>
                             <View style={[st.bkFill, { width: `${Math.max(3, Math.round(pct * 100))}%`, backgroundColor: meta.color }]} />
@@ -902,7 +903,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   heroPillVal: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
   heroDate:      { fontFamily: fonts.label, fontSize: 10, color: c.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroAmount:    { fontFamily: fonts.display, fontSize: 40, color: c.text.primary, letterSpacing: -1, lineHeight: 46 },
+  heroAmount:    { fontSize: 40, color: c.text.primary, letterSpacing: -1, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
   heroSplit:     { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 3, marginBottom: 2 },
   heroSub:       { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 4 },
@@ -949,7 +950,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   bkDot: { width: 10, height: 10, borderRadius: 5 },
   bkTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 },
   bkLabel: { fontSize: 13, fontWeight: '700', color: c.text.primary, flex: 1, marginRight: spacing[2] },
-  bkAmt: { fontFamily: fonts.display, fontSize: 13, color: c.text.primary },
+  bkAmt: { fontSize: 13, color: c.text.primary },
   bkTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, overflow: 'hidden' },
   bkFill: { height: '100%', borderRadius: 3 },
   bkPct: { width: 34, textAlign: 'right', fontSize: 11, fontWeight: '700', color: c.text.muted, fontVariant: ['tabular-nums'] },
@@ -990,7 +991,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   flowNetLabel: { fontSize: 12, color: c.text.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  flowNet: { fontFamily: fonts.display, fontSize: 18 },
+  flowNet: { fontSize: 18 },
   flowFixedNote: { fontSize: 10.5, color: c.text.muted, marginTop: 2 },
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },

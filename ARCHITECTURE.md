@@ -13093,6 +13093,50 @@ tekstu, nie kolorowego.
 kafel pupila z aktywną serią logowań → sprawdź że prawy panel ma pełny, nasycony gradient
 (nie subtelny tint) w kolorze progu serii, liczba i etykiety czytelne na jasnym tekście.
 
+## 228. Propagacja fixu "kropek zamiast cyfr" na WSZYSTKIE miejsca z `fonts.display` (2026-10-01)
+
+User: "Dawaj" — potwierdzenie na propozycję dokończenia §222 (RingCountdown, jedyne
+naprawione miejsce w tamtej rundzie, reszta zalogowana jako "DO ZROBIENIA" w
+NEXT_STEPS.md). `fonts.display` (Archivo Black) ładuje się nieblokująco w tle — tekst
+renderowany TĄ czcionką zanim się załaduje dostaje na Androidzie tofu-glify (jak kropki)
+zamiast cyfr, i stan potrafi zostać na stałe bez kolejnego re-renderu.
+
+**Nowy `src/components/ui/DisplayText.tsx`** — zamiast kopiować ten sam
+`fontsLoaded && {fontFamily: fonts.display}` w kolejnych 12 plikach (wzorzec z §222),
+jeden wrapper nad `Text`: czyta `useFontsStore`, dopisuje `fontFamily` TYLKO gdy
+`fontsLoaded`, w pozostałych propsach przezroczysty (`{...props}`). `RingCountdown.tsx`
+(§222) przepisany na ten komponent zamiast trzymać osobną kopię logiki — jedno miejsce
+prawdy zamiast dwóch.
+
+**Podmienione na `DisplayText` (12 plików, ~30 wystąpień)**: `SinceCountersCard.tsx`,
+`DailyRings.tsx`, `StreakWallCard.tsx`, `PersonalRecordsCard.tsx`, `StreakFlame.tsx`
+(domyślny eksport `StreakFlame`, NIE `StreakFlameGlow` — ten drugi nie renderuje liczby),
+`TopPill.tsx` (`badgeText`), `app/counters.tsx`, `app/counters/[id].tsx`,
+`app/(tabs)/health.tsx` (9 miejsc), `app/(tabs)/food.tsx`, `app/(tabs)/finances.tsx`,
+`app/habit-year.tsx`, `app/food/add.tsx` (7 `Text`), plus `app/(tabs)/index.tsx` — w tym
+`petLoginNum` (kafel streaka pupila z §227, przegapiony przy tamtej zmianie, ta sama wada).
+Z każdego podmienionego stylu usunięty `fontFamily: fonts.display` (teraz dopisywany przez
+`DisplayText` warunkowo) — kilka plików straciło przez to ostatnie użycie `fonts` i import
+został usunięty (`counters.tsx`, `counters/[id].tsx`, `food.tsx`, `habit-year.tsx`,
+`TopPill.tsx`, `StreakFlame.tsx`, `DailyRings.tsx`); reszta zachowuje import (dalej używany
+przez `fonts.label` gdzie indziej w tych plikach).
+
+**Wyjątek — 2 `TextInput` w `app/food/add.tsx` (`bigInput`, `qtyValInput`)**:
+`DisplayText` owija `Text`, nie da się go użyć na `TextInput` (inny komponent natywny).
+Zamiast osobnego `DisplayTextInput` dla jedynych dwóch przypadków w całym repo —
+`fontsLoaded` odczytany wprost w komponencie (`useFontsStore`) i warunkowy styl dopisany
+inline w JSX, ten sam efekt bez nowej abstrakcji dla dwóch wystąpień.
+
+**Testy**: brak nowych — czysto mechaniczna podmiana istniejącego, działającego
+komponentu/wzorca na reużywalny wrapper, zero zmiany logiki/danych. `tsc --noEmit`/`jest`
+czyste (91/91, 1172, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski** (trudne do wymuszenia na żądanie — zależy od
+timingu cold-startu, dokładnie ten sam powód co w §222). Jeśli kiedyś ktoś złapie "kropki"
+na cold-starcie w którymkolwiek z tych miejsc (rekordy życiowe, "Twoje serie", liczniki
+"ile dni temu", Finanse/Zdrowie/Jedzenie/plan-roku nawyku, TopPill, dodawanie jedzenia) —
+to już NIE powinno się zdarzyć, cała znana powierzchnia tego buga jest teraz załatana.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

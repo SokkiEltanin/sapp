@@ -12,6 +12,8 @@ import {
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import DatePickerField from '@/components/ui/DatePickerField';
+import DisplayText from '@/components/ui/DisplayText';
+import { useFontsStore } from '@/store/fontsStore';
 import { normalizeProductName } from '@/utils/productMemory';
 import { purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -71,6 +73,9 @@ interface LibEntry {
 export default function FoodAdd() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // `TextInput` nie da się owinąć `DisplayText` (inny komponent) — te dwa pola liczbowe
+  // stosują ten sam warunkowy `fontFamily` ręcznie (patrz `DisplayText` dla kontekstu buga).
+  const fontsLoaded = useFontsStore(st => st.loaded);
 
   const products            = useFoodStore(st => st.products);
   const findProductByName   = useFoodStore(st => st.findProductByName);
@@ -609,7 +614,7 @@ export default function FoodAdd() {
                     </Text>
                   </View>
                 </TouchableOpacity>
-                <Text style={s.itemKcal}>{it.kcal}</Text>
+                <DisplayText style={s.itemKcal}>{it.kcal}</DisplayText>
                 <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setItems(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
               </View>
               );
@@ -619,7 +624,7 @@ export default function FoodAdd() {
               <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setSaveP(true); }}>
                 <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
               </TouchableOpacity>
-              <Text style={s.totalVal}>{total}<Text style={s.totalUnit}> kcal</Text></Text>
+              <DisplayText style={s.totalVal}>{total}<DisplayText style={s.totalUnit}> kcal</DisplayText></DisplayText>
             </View>
           </View>
         )}
@@ -784,7 +789,7 @@ export default function FoodAdd() {
                     /* grams straight from the scale */
                     <View style={s.fieldRow}>
                       <Text style={s.fieldLabel}>Ile gramów</Text>
-                      <TextInput style={s.bigInput} value={gramsOverride} onChangeText={setGramsOverride}
+                      <TextInput style={[s.bigInput, fontsLoaded && { fontFamily: fonts.display }]} value={gramsOverride} onChangeText={setGramsOverride}
                         keyboardType="numeric" placeholder="np. 15" placeholderTextColor={c.text.muted} autoFocus />
                       <Text style={s.fieldUnit}>g</Text>
                     </View>
@@ -793,7 +798,7 @@ export default function FoodAdd() {
                       <View style={s.qtyRow}>
                         <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(-1); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
                         <View style={s.qtyCenter}>
-                          <TextInput style={s.qtyValInput} value={qtyText} onChangeText={t => setQtyText(t.replace(/[^0-9.,]/g, ''))} keyboardType="numeric" selectTextOnFocus />
+                          <TextInput style={[s.qtyValInput, fontsLoaded && { fontFamily: fonts.display }]} value={qtyText} onChangeText={t => setQtyText(t.replace(/[^0-9.,]/g, ''))} keyboardType="numeric" selectTextOnFocus />
                           <Text style={s.qtyUnit}>{unitLabel(unit)}</Text>
                         </View>
                         <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(1); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
@@ -816,7 +821,7 @@ export default function FoodAdd() {
                     <Text style={s.fieldHint}>{sel.kcalPer100g != null ? 'znane — możesz poprawić' : 'zapamięta się'}</Text>
                   </View>
 
-                  <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {density() || '—'}/100g</Text></View>
+                  <View style={s.sheetKcal}><DisplayText style={s.sheetKcalVal}>{pickerKcal()} kcal</DisplayText><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {density() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerKcal() > 0 || pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0 && (density() > 0 || sel.kcalPerPortion != null))} onPress={confirmPicker}>
                     <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>{editItemIndex != null ? 'Zapisz zmianę' : 'Dodaj do posiłku'}</Text>
@@ -881,7 +886,7 @@ export default function FoodAdd() {
                     <View style={s.qtyRow}>
                       <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setDishPortions(q => Math.max(0.5, +(q - 0.5).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
                       <View style={s.qtyCenter}>
-                        <Text style={s.qtyVal}>{dishPortions % 1 === 0 ? dishPortions : dishPortions.toFixed(1)}</Text>
+                        <DisplayText style={s.qtyVal}>{dishPortions % 1 === 0 ? dishPortions : dishPortions.toFixed(1)}</DisplayText>
                         <Text style={s.qtyUnit}>z {applying.yields} porcji</Text>
                       </View>
                       <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setDishPortions(q => Math.min(applying.yields!, +(q + 0.5).toFixed(1))); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
@@ -894,13 +899,13 @@ export default function FoodAdd() {
                       return (
                         <TouchableOpacity key={n} onPress={() => { haptic.tap(); setMult(n); }}
                           style={[s.multChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
-                          <Text style={[s.multTxt, on && { color: ACCENT }]}>×{n}</Text>
+                          <DisplayText style={[s.multTxt, on && { color: ACCENT }]}>×{n}</DisplayText>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
                 )}
-                <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{kcalNow} kcal</Text></View>
+                <View style={s.sheetKcal}><DisplayText style={s.sheetKcalVal}>{kcalNow} kcal</DisplayText></View>
                 <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={applyPreset}>
                   <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
                 </TouchableOpacity>
@@ -1009,7 +1014,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   partsHint: { fontSize: 11, color: c.text.muted, paddingHorizontal: spacing[2], paddingTop: 2 },
   multRow:  { flexDirection: 'row', gap: spacing[2], justifyContent: 'center' },
   multChip: { minWidth: 60, alignItems: 'center', paddingVertical: 10, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
-  multTxt:  { fontFamily: fonts.display, fontSize: 16, color: c.text.secondary },
+  multTxt:  { fontSize: 16, color: c.text.secondary },
 
   mealHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   mealHeadTxt:   { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 1 },
@@ -1022,11 +1027,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   kindTagTxt: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
   itemName:   { fontSize: 14.5, fontWeight: '700', color: c.text.primary },
   itemMeta:   { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  itemKcal:   { fontFamily: fonts.display, fontSize: 15, color: c.text.primary, fontVariant: ['tabular-nums'] },
+  itemKcal:   { fontSize: 15, color: c.text.primary, fontVariant: ['tabular-nums'] },
   totalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.default },
   totalLabel: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
-  totalVal:   { fontFamily: fonts.display, fontSize: 32, color: ACCENT, letterSpacing: -0.5 },
-  totalUnit:  { fontFamily: fonts.display, fontSize: 14, color: c.text.muted },
+  totalVal:   { fontSize: 32, color: ACCENT, letterSpacing: -0.5 },
+  totalUnit:  { fontSize: 14, color: c.text.muted },
 
   searchBox:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 50 },
   searchInput: { flex: 1, fontSize: 15.5, color: c.text.primary },
@@ -1084,8 +1089,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   qtyRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
   qtyBtn:    { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, alignItems: 'center', justifyContent: 'center' },
   qtyCenter: { alignItems: 'center', minWidth: 96 },
-  qtyVal:    { fontFamily: fonts.display, fontSize: 32, color: c.text.primary },
-  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontFamily: fonts.display, fontSize: 30, color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyVal:    { fontSize: 32, color: c.text.primary },
+  // `fontFamily` NIE tu — `TextInput` nie da się owinąć `DisplayText`, więc warunkowy
+  // font jest dopisywany inline w JSX (`fontsLoaded && {...}`, patrz komponent wyżej).
+  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 30, color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
   qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
   qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
@@ -1093,14 +1100,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
   fieldUnit:  { fontSize: 14, fontWeight: '700', color: c.text.muted },
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
-  bigInput:   { flex: 1, height: 54, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontFamily: fonts.display, fontSize: 24, color: c.text.primary },
+  bigInput:   { flex: 1, height: 54, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 24, color: c.text.primary },
   smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '800', color: c.text.primary },
 
   addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, borderStyle: 'dashed', backgroundColor: c.fill.subtle },
   addNewTxt: { fontSize: 13, fontWeight: '800', color: c.text.primary, flex: 1 },
 
   sheetKcal:    { alignItems: 'center', gap: 1 },
-  sheetKcalVal: { fontFamily: fonts.display, fontSize: 28, color: ACCENT, letterSpacing: -0.5 },
+  sheetKcalVal: { fontSize: 28, color: ACCENT, letterSpacing: -0.5 },
   sheetKcalSub: { fontSize: 11.5, color: c.text.muted },
   sheetAdd:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: radius.full },
   sheetAddTxt:  { fontSize: 14.5, fontWeight: '900', color: '#1A1206' },

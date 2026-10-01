@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useColors } from '@/theme/useColors';
-import { fonts } from '@/theme';
+import DisplayText from '@/components/ui/DisplayText';
 
 export interface RingSpec {
   key: string;
@@ -36,7 +36,7 @@ function Ring({ spec, size }: { spec: RingSpec; size: number }) {
           <spec.Icon size={17} color={col} />
         </View>
       </View>
-      <Text style={[s.val, { color: c.text.primary }]} numberOfLines={1}>{spec.display}</Text>
+      <DisplayText style={[s.val, { color: c.text.primary }]} numberOfLines={1}>{spec.display}</DisplayText>
       <Text style={[s.label, { color: c.text.muted }]} numberOfLines={1}>{spec.label}</Text>
     </View>
   );
@@ -54,6 +54,6 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6, marginTop: 6 },
   ringWrap: { flex: 1, alignItems: 'center', gap: 3 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  val: { fontFamily: fonts.display, fontSize: 12.5, letterSpacing: -0.2 },
+  val: { fontSize: 12.5, letterSpacing: -0.2 },
   label: { fontSize: 9.5, fontWeight: '600' },
 });

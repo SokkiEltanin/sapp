@@ -12,7 +12,8 @@ import { getHealthGoals, saveHealthGoals, bmrMifflin, ACTIVITY_FACTOR, ACTIVITY_
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { spacing, radius, colors, fonts } from '@/theme';
+import DisplayText from '@/components/ui/DisplayText';
+import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -335,21 +336,21 @@ export default function Food() {
               />
             </Svg>
             <View style={s.ringCenter} pointerEvents="none">
-              <Text style={s.ringEaten}>{eaten.toLocaleString('pl-PL')}</Text>
+              <DisplayText style={s.ringEaten}>{eaten.toLocaleString('pl-PL')}</DisplayText>
               <Text style={s.ringOf}>z {target.toLocaleString('pl-PL')} kcal</Text>
             </View>
           </View>
 
           <View style={s.heroStats}>
             <View style={s.heroStat}>
-              <Text style={[s.heroStatVal, { color: remaining >= 0 ? colors.accent.green : colors.accent.red }]}>
+              <DisplayText style={[s.heroStatVal, { color: remaining >= 0 ? colors.accent.green : colors.accent.red }]}>
                 {remaining >= 0 ? remaining.toLocaleString('pl-PL') : `+${Math.abs(remaining).toLocaleString('pl-PL')}`}
-              </Text>
+              </DisplayText>
               <Text style={s.heroStatLabel}>{remaining >= 0 ? 'zostało' : 'ponad cel'}</Text>
             </View>
             <View style={s.heroDivider} />
             <View style={s.heroStat}>
-              <View style={s.heroBurnRow}><Flame size={13} color={ACCENT} /><Text style={s.heroStatVal}>{dayBurn > 0 ? dayBurn.toLocaleString('pl-PL') : '—'}</Text></View>
+              <View style={s.heroBurnRow}><Flame size={13} color={ACCENT} /><DisplayText style={s.heroStatVal}>{dayBurn > 0 ? dayBurn.toLocaleString('pl-PL') : '—'}</DisplayText></View>
               <Text style={s.heroStatLabel}>spalone</Text>
             </View>
           </View>
@@ -440,12 +441,12 @@ export default function Food() {
           <View style={[s.card, { gap: spacing[2] }]}>
             <Text style={s.balTitle}>Średnie (30 dni)</Text>
             <View style={s.avgRow}>
-              <View style={s.avgItem}><Text style={s.avgVal}>{avgStats.avgBurn.toLocaleString('pl-PL')}</Text><Text style={s.avgLbl}>spalasz/dzień</Text></View>
+              <View style={s.avgItem}><DisplayText style={s.avgVal}>{avgStats.avgBurn.toLocaleString('pl-PL')}</DisplayText><Text style={s.avgLbl}>spalasz/dzień</Text></View>
               <View style={s.avgDivider} />
-              <View style={s.avgItem}><Text style={s.avgVal}>{avgStats.avgEaten > 0 ? avgStats.avgEaten.toLocaleString('pl-PL') : '—'}</Text><Text style={s.avgLbl}>jesz/dzień</Text></View>
+              <View style={s.avgItem}><DisplayText style={s.avgVal}>{avgStats.avgEaten > 0 ? avgStats.avgEaten.toLocaleString('pl-PL') : '—'}</DisplayText><Text style={s.avgLbl}>jesz/dzień</Text></View>
               <View style={s.avgDivider} />
               <View style={s.avgItem}>
-                <Text style={[s.avgVal, { color: avgStats.avgBal >= 0 ? colors.accent.green : colors.accent.red }]}>{avgStats.eatDays > 0 ? `${avgStats.avgBal >= 0 ? '−' : '+'}${Math.abs(avgStats.avgBal).toLocaleString('pl-PL')}` : '—'}</Text>
+                <DisplayText style={[s.avgVal, { color: avgStats.avgBal >= 0 ? colors.accent.green : colors.accent.red }]}>{avgStats.eatDays > 0 ? `${avgStats.avgBal >= 0 ? '−' : '+'}${Math.abs(avgStats.avgBal).toLocaleString('pl-PL')}` : '—'}</DisplayText>
                 <Text style={s.avgLbl}>{avgStats.avgBal >= 0 ? 'deficyt/dzień' : 'nadwyżka/dzień'}</Text>
               </View>
             </View>
@@ -670,13 +671,13 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   heroCard:   { alignItems: 'center', gap: spacing[3] },
   ringWrap:   { alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center' },
-  ringEaten:  { fontFamily: fonts.display, fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
+  ringEaten:  { fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
   ringOf:     { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 1 },
 
   heroStats:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
   heroStat:    { alignItems: 'center', gap: 2, minWidth: 72 },
   heroBurnRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  heroStatVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary },
+  heroStatVal: { fontSize: 20, color: c.text.primary },
   heroStatLabel: { fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   heroDivider: { width: 1, height: 30, backgroundColor: c.border.subtle },
 
@@ -736,7 +737,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   avgRow:     { flexDirection: 'row', alignItems: 'center' },
   avgItem:    { flex: 1, alignItems: 'center', gap: 2 },
-  avgVal:     { fontFamily: fonts.display, fontSize: 18, color: c.text.primary, letterSpacing: -0.4 },
+  avgVal:     { fontSize: 18, color: c.text.primary, letterSpacing: -0.4 },
   avgLbl:     { fontSize: 10, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
   avgDivider: { width: 1, height: 28, backgroundColor: c.border.default },
   avgRec:     { fontSize: 12, color: c.text.secondary, lineHeight: 17, marginTop: 2 },

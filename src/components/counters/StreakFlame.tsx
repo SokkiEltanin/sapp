@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
+import { View, Animated, StyleSheet, Easing } from 'react-native';
 import { Flame } from 'lucide-react-native';
-import { fonts } from '@/theme';
+import DisplayText from '@/components/ui/DisplayText';
 // Progi serii WYDZIELONE do streakTiers.ts (2026-09-22, patrz komentarz tam — testowalność
 // w Jest, ten plik importuje 'react-native' więc sam nie może być). Re-eksport zachowuje
 // wsteczną zgodność — 5 miejsc w apce importuje `streakTier`/`streakColor`/`StreakTier` stąd.
@@ -119,7 +119,7 @@ export default function StreakFlame({ days, size = 48 }: { days: number; size?: 
         <Flame size={fSize} color={color} fill={alive ? color : 'transparent'} strokeWidth={2} />
       </Animated.View>
       {/* Number on TOP of the flame — white + shadow so it never gets buried. */}
-      <Text style={[st.count, { fontSize: size * 0.36, top: size * 0.34, color: alive ? '#FFFFFF' : '#8A93A8' }]}>{days}</Text>
+      <DisplayText style={[st.count, { fontSize: size * 0.36, top: size * 0.34, color: alive ? '#FFFFFF' : '#8A93A8' }]}>{days}</DisplayText>
     </View>
   );
 }
@@ -127,7 +127,7 @@ export default function StreakFlame({ days, size = 48 }: { days: number; size?: 
 const st = StyleSheet.create({
   count: {
     position: 'absolute', left: 0, right: 0, textAlign: 'center',
-    fontFamily: fonts.display, letterSpacing: -0.5,
+    letterSpacing: -0.5,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 });

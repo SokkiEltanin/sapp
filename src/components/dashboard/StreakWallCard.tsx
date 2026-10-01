@@ -9,6 +9,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { StreakFlameGlow, streakTier, streakColor } from '@/components/counters/StreakFlame';
+import DisplayText from '@/components/ui/DisplayText';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -131,7 +132,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
         <View style={s.tileFlame} pointerEvents="none">
           <StreakFlameGlow days={r.days} size={64} />
         </View>
-        <Text style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</Text>
+        <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</DisplayText>
         <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
         {tierProgress != null && (
           <View style={s.tierBarTrack} pointerEvents="none">
@@ -191,7 +192,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // ma. Ten sam wzorzec co WSZĘDZIE indziej z fonts.display (TopPill/StreakCard/
   // PersonalRecordsCard/DailyRings) — tileNum był jedynym miejscem z dodanym fontWeight,
   // user (2026-08-13): "Twoje serie używają cienkiej czcionki dla LICZBY".
-  tileNum: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.5, lineHeight: 26 },
+  tileNum: { fontSize: 24, letterSpacing: -0.5, lineHeight: 26 },
   tileLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
 }));
 
