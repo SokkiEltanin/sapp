@@ -13259,6 +13259,36 @@ sprawdź że lista w modalu pokazuje DOKŁADNIE te eventy które faktycznie zost
 najpierw (nie na całym semestrze za pierwszym razem) → sprawdź że zniknęły zarówno w
 appce jak i w prawdziwym Google Calendar.
 
+## 231. Nowe logo appki — podmiana ikony + adaptive icon (2026-10-01)
+
+User wrzucił `assets/L_WhiteBcg_Color.png` (bezpośrednio przez GitHub web upload na
+`master`, nie przez tę sesję — stąd osobny `git fetch`/resync zanim plik się pojawił
+lokalnie) i poprosił o podmianę logo appki. Sprawdzone grepem: żaden plik `.tsx/.ts/.js`
+nie referencuje logo-PNG-ów bezpośrednio — JEDYNE miejsce gdzie logo jest realnie użyte to
+`app.json` (`icon` + `android.adaptiveIcon.foregroundImage`), oba dotąd wskazywały na
+`LOGONOWEpupildoapki.png` (ta sama sylwetka kota, kolory odwrócone: stare = białe na
+niebieskim tle, nowe = gradient fiolet→błękit na BIAŁYM tle). Oba pola podmienione na nowy
+plik.
+
+**UWAGA — jak w CLAUDE.md zasada 2**: ikona wchodzi TYLKO przez nowy build APK, nie przez
+OTA — zmiana w `app.json` sama w sobie nic nie pokaże na już zainstalowanej appce, dopóki
+nie powstanie nowy build.
+
+**Nie dotknięte świadomie**: splash screen (`splash-blank.png`, osobny plik, już pusty/
+przezroczysty placeholder, niepowiązany z tym logo) oraz `backgroundColor` adaptive icon
+(`#14171A`) — nowy plik ma własne, OPAQUE białe tło (nie przezroczyste), więc na Androidzie
+i tak w pełni zasłoni to tło, dokładnie tak samo jak stary plik (opaque niebieski) je
+zasłaniał — brak regresji, tylko zmiana koloru tła ikony z niebieskiego na biały, zgodnie z
+nowym logo.
+
+**Testy**: brak — zmiana czysto w `app.json` (konfiguracja builda, nie kod runtime), `tsc
+--noEmit`/`jest` niewzruszone, uruchomione dla pewności (92/92, 1180, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski, ALE wymaga nowego builda APK** (nie wystarczy
+sam restart appki): po zainstalowaniu nowego builda sprawdź ikonę na ekranie głównym
+Androida (zarówno zwykłą jak i wymuszony kształt np. koło w niektórych launcherach,
+żeby sprawdzić że biały margines nie wygląda źle na zaokrąglonej masce adaptive icon).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

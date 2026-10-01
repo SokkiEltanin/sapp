@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Usuń wszystkie" zajęcia planu — z pełną listą do wglądu przed kasowaniem (2026-10-01)
+## 🆕 Nowe logo appki — podmiana ikony + adaptive icon (2026-10-01)
+
+User wrzucił `assets/L_WhiteBcg_Color.png` bezpośrednio przez GitHub (nie przez tę sesję)
+i poprosił o podmianę. Pełny opis w ARCHITECTURE.md §231. `app.json`'s `icon` i
+`android.adaptiveIcon.foregroundImage` (jedyne miejsca gdzie logo jest realnie używane —
+żaden plik kodu go nie referencuje) podmienione ze starego `LOGONOWEpupildoapki.png` na
+nowy plik. Splash screen i `backgroundColor` adaptive icon nietknięte — nowy plik ma
+własne opaque białe tło, więc i tak w pełni je zasłania (brak regresji vs stary, opaque
+niebieski). `tsc`/`jest` niewzruszone (92/92, 1180, bez zmiany — to config builda, nie
+kod).
+
+**🆕 WYMAGA NOWEGO BUILDA APK** (sama zmiana w `app.json` nic nie pokaże na już
+zainstalowanej appce — OTA nie dotyka ikon). Po zbudowaniu sprawdź ikonę na ekranie
+głównym Androida, w tym w launcherach z zaokrągloną/kołową maską adaptive icon (białe tło
+nowego logo na krawędziach maski).
+
+## ✅ "Usuń wszystkie" zajęcia planu — z pełną listą do wglądu przed kasowaniem (2026-10-01)
 
 User: "jak mi się zmieni plan... żebym mógł usunąć wszystkie eventy z kalendarza jednym
 przyciskiem... i przed usunięciem pokazuje jakie usunie dla potwierdzenia". Pełny opis w
