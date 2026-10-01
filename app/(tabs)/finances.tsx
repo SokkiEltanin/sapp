@@ -385,6 +385,28 @@ export default function FinancesScreen() {
   const handleExpensePress = useCallback((e: Expense) => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }, []);
   const handleExpenseLongPress = useCallback((e: Expense) => { haptic.medium(); router.navigate(`/expenses/${e.id}?edit=1` as any); }, []);
 
+  // Mapa id → "druga strona zwrotu" (2026-10-01, user: "żeby bylo widać połączenie").
+  // Budowana RAZ po całej (niefiltrowanej) liście, nie w ExpenseItem — ten nie zna reszty
+  // listy, a `reimbursedFromId` może wskazywać na przychód daleko poza bieżącym filtrem/
+  // sekcją daty. Klucz działa w OBIE strony: wydatek → [przychód z którego zwrot pochodzi],
+  // przychód → [wszystkie wydatki które pokrywa] (może być kilka, stąd tablica).
+  const reimbCounterparts = useMemo(() => {
+    const byId = new Map(expenses.map(e => [e.id, e]));
+    const map = new Map<string, Expense[]>();
+    const add = (id: string, tx: Expense) => {
+      if (!map.has(id)) map.set(id, []);
+      map.get(id)!.push(tx);
+    };
+    for (const e of expenses) {
+      if (!e.reimbursedFromId) continue;
+      const income = byId.get(e.reimbursedFromId);
+      if (!income) continue;
+      add(e.id, income);
+      add(income.id, e);
+    }
+    return map;
+  }, [expenses]);
+
   return (
     <SafeAreaView style={st.root} edges={[]}>
       <View style={{ flex: 1 }}>
@@ -615,6 +637,7 @@ export default function FinancesScreen() {
             <View style={st.itemPad}>
               <ExpenseItem
                 expense={item}
+                linkedReimb={reimbCounterparts.get(item.id)}
                 onPress={handleExpensePress}
                 // 2026-09-17, user: "jak przytrzymuje kafelek z tranzakcja jakaś od razu sie
                 // przenosi na panel edycji" — `onLongPress` już istniał w ExpenseItem, ale

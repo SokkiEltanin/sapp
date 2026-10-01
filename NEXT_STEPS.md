@@ -3,7 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix #2: siatka nastrój×energia NADAL wąska mimo §218 — liczona wprost z okna (2026-09-30)
+## 🆕 Connector zwrotu pokazuje REALNY wiersz drugiej transakcji, nie tylko plombę+toast (2026-10-01)
+
+User zrzutem listy Finansów (dwie zielone "OLESIA NEZHUHA" podpięte jako zwrot do PGE i
+Lidl): "nie możemy jakoś zrobić żeby one się realnie podpisały pod płatnością, żeby było
+widać połączenie i nie musiał tej dziwnej ikonki?" — plomba "zwrot" po tapnięciu pokazywała
+tylko `toast.info` z kwotą, bez informacji Z CZYM jest połączone; przychód (zielona karta)
+nie miał żadnego śladu, że jest czyimś źródłem zwrotu. Pełny opis w ARCHITECTURE.md §226.
+
+Fix: tap na plombie teraz rozwija pod kartą PRAWDZIWY wiersz drugiej transakcji (ikona-
+łącznik "└", nazwa, data, kwota) zamiast toasta — symetrycznie: wydatek pokazuje przychód
+źródłowy, przychód pokazuje WSZYSTKIE wydatki które pokrywa (każdy osobnym, podpisanym
+wierszem — user dopytywał o przypadek "kilka naraz"). Lista nie jest fizycznie przenoszona
+obok siebie (sztywne grupowanie po dacie w `finances.tsx` to uniemożliwia bez mieszania z
+resztą listy) — zamiast tego connector przypięty do każdej karty osobno. `tsc`/`jest`
+czyste (91/91 suite, 1172 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Finanse → tapnij "zwrot" na wydatku ze
+zwrotem → sprawdź rozwinięty wiersz przychodu (kwota/data poprawne, tap przenosi do
+szczegółów). Potem na samym przychodzie → plomba "pokrywa: ..." → sprawdź że przy kilku
+podpiętych wydatkach każdy ma osobny, poprawny wiersz.
+
+## ✅ Fix #2: siatka nastrój×energia NADAL wąska mimo §218 — liczona wprost z okna (2026-09-30)
 
 User zrzutem: "A naprawisz to? Żeby była ta siatka na całej szerokości?" — TEN SAM problem
 co wcześniejszy fix (§218) tego samego dnia, wciąż widoczny na urządzeniu mimo że był
