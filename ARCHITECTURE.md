@@ -13389,6 +13389,43 @@ funkcja appki całkowicie martwa od §225): check-in humoru → sprawdź że kro
 podąża za palcem PO CAŁEJ szerokości i wysokości pudełka (w tym rogi), że tap w dowolnym
 miejscu natychmiast ustawia wartość, i że odczyt pod spodem aktualizuje się na bieżąco.
 
+## 234. Usunięcie auto-dopasowania zwrotu — zostaje wyłącznie ręczne podpięcie (2026-10-02)
+
+User zrzutem dashboardu z kartą "To zwrot za zakup?": "co to kurwa jest ze mnie pyta czy
+to zwrot tego nie chciałem wgle... na dashboardzie ja sam przypinam". Auto-dopasowanie
+(§B z 2026-09-28) dopasowywało przychodzący przelew do wcześniejszego wydatku i pytało
+na dashboardzie "Tak, połącz" / "Nie, zwykły przychód" — user go nigdy nie chciał w tej
+formie i woli wyłącznie ręczny picker (§219/§226, "Podepnij zwrot" w `expenses/[id].tsx`
++ connector w `ExpenseItem.tsx`), niezależny od tej automatyki i NIETKNIĘTY tą zmianą.
+
+**Usunięte całkowicie** (zweryfikowane że nic innego z tego nie korzysta — ani grep
+repo-wide, ani manualny picker, który operuje wyłącznie na polach `Expense.reimbursedAmount`/
+`reimbursedFromId`, bez żadnego importu stąd):
+- **`src/utils/reimbursementMatch.ts`** — cały plik (heurystyka dopasowania `findReimbursementCandidate`
+  + kolejka `queueReimbursementConfirm`/`loadReimbursementConfirms`/`removeReimbursementConfirm`
+  persystowana w AsyncStorage pod `pending_reimbursement_confirm`).
+- **`__tests__/reimbursementMatch.test.ts`** — testy heurystyki (martwe bez funkcji którą testowały).
+- **`src/services/bankCommit.ts`** — import + cały blok `if (!p.jd) { ... }` wywołujący
+  dopasowanie przy każdym nowym przychodzącym przelewie z banku (ten sam trigger co
+  rozpoznawanie subskrypcji/pensji w tej samej funkcji, NIETKNIĘTE).
+- **`app/(tabs)/index.tsx`** — import, stan `reimbConfirms`, handlery `confirmReimbursement`/
+  `dismissReimbursement`, wywołanie `loadReimbursementConfirms()` w `useFocusEffect`, i cała
+  karta `nodes['reimbursement-confirm']`.
+- **`src/store/dashboardLayout.ts`** — `'reimbursement-confirm'` usunięty z
+  `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP`/`AUTO_SECTIONS`
+  (5 miejsc — ten sam playbook co dodawanie nowej sekcji dashboardu, ARCHITECTURE §12, tylko
+  w drugą stronę).
+- **`src/types/index.ts`** — komentarz przy `Expense.reimbursedAmount` zaktualizowany (nie
+  wspomina już usuniętej auto-heurystyki); samo pole ZOSTAJE (wciąż czytane przez ręczny
+  picker i wyświetlanie efektywnego kosztu).
+
+**Testy**: 10 testów usuniętych razem z plikiem który testowały (nic do zastąpienia — to
+nie była logika biznesowa potrzebna gdzie indziej). `tsc --noEmit`/`jest` czyste (91/91
+suite, 1170 testów, -10 vs poprzedni stan — zgodnie z oczekiwaniem).
+
+**Priorytet testu na urządzeniu — niski** (czyste usunięcie, zero nowej logiki do
+zweryfikowania — jeśli przelew przychodzący już nie pokazuje tej karty, działa).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

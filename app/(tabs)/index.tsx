@@ -115,7 +115,6 @@ import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill, advanceNextBillingDate, isDurationExpired, rollOverdueSubscription } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, queueSubConfirm, PendingSubConfirm, DEAD_SUB_THRESHOLD } from '@/utils/subscriptionAuto';
-import { loadReimbursementConfirms, removeReimbursementConfirm, PendingReimbursement } from '@/utils/reimbursementMatch';
 import { fixedVariableMonths, fixedDeviations, topVariableContributors, workFixedProgress, FvBucket } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFloor, EarnedMap } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
@@ -388,7 +387,6 @@ export default function DashboardScreen() {
   const dishesCreated = useMemo(() => foodProducts.filter(isRecipeProduct).length, [foodProducts]);
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
-  const [reimbConfirms, setReimbConfirms] = useState<PendingReimbursement[]>([]);
   const bankPendingCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 0 : 1), 0)); // manual review only
   const bankAutoCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 1 : 0), 0));
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
@@ -726,30 +724,6 @@ export default function DashboardScreen() {
     toast.success(`Wyłączono „${c.subName}"`);
   }, [updateSub]);
 
-  // Auto-dopasowanie zwrotu (2026-09-28) — user potwierdza, że przychodzący przelew to
-  // zwrot za wcześniejszy wydatek: informacyjny `reimbursedAmount` na TYM wydatku, kwoty/
-  // statystyki się nie zmieniają (przelew jako przychód już jest zaksięgowany, zostaje).
-  const confirmReimbursement = useCallback(async (c: PendingReimbursement) => {
-    haptic.success();
-    setReimbConfirms(list => list.filter(x => x.id !== c.id));
-    removeReimbursementConfirm(c.id).catch(() => {});
-    try {
-      // Handler zapisujący do expenses — żywy store, NIE snapshot `expenses` (patrz
-      // CLAUDE.md §3): snapshot mógłby być spóźniony względem tego co realnie jest w bazie.
-      const st = useExpensesStore.getState();
-      const current = st.expenses.find(e => e.id === c.expenseId);
-      const next = (current?.reimbursedAmount ?? 0) + c.incomingAmount;
-      st.updateExpense(c.expenseId, { reimbursedAmount: next });
-      await expensesService.update(c.expenseId, { reimbursedAmount: next });
-      toast.success('Połączono ze zwrotem');
-    } catch {}
-  }, []);
-  const dismissReimbursement = useCallback((c: PendingReimbursement) => {
-    haptic.tap();
-    setReimbConfirms(list => list.filter(x => x.id !== c.id));
-    removeReimbursementConfirm(c.id).catch(() => {});
-  }, []);
-
   // First open, due, not-yet-dismissed debt → the dashboard asks about it.
   const dueDebt = useMemo(() => {
     const t = todayISO();
@@ -951,7 +925,6 @@ export default function DashboardScreen() {
     getTagBudgetRules().then(setTagRules).catch(() => {});
     getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
     loadSubConfirms().then(setSubConfirms).catch(() => {});
-    loadReimbursementConfirms().then(setReimbConfirms).catch(() => {});
     if (editRequested) { setEditingDash(true); clearEditRequest(); }
   }, [loadPomSessions, editRequested]));
 
@@ -2738,32 +2711,6 @@ export default function DashboardScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => isPossiblyDead ? keepUsingSub(c) : dismissSub(c)}>
                         <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>{isPossiblyDead ? 'Nadal korzystam' : isPriceChange ? 'Zignoruj' : 'Nie'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })();
-
-              // Auto-dopasowanie zwrotu (2026-09-28, user zaakceptował pomysł) — przychodzący
-              // przelew, który wygląda na zwrot/dopłatę za wcześniejszy wydatek (np. partnerka
-              // oddaje część za wspólne zakupy).
-              nodes['reimbursement-confirm'] = reimbConfirms.length > 0 && (() => {
-                const c = reimbConfirms[0];
-                return (
-                  <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                    <View style={s.cardHeader}>
-                      <Wallet size={13} color={colors.accent.green} />
-                      <Text style={s.cardTitle}>To zwrot za zakup?</Text>
-                    </View>
-                    <Text style={[s.factText, { marginTop: spacing[1] }]}>
-                      Otrzymałeś <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.incomingAmount.toFixed(2)} {c.currency}</Text> od „{c.sender}" — to zwrot za <Text style={{ fontWeight: '800', color: colors.text.primary }}>„{c.expenseNote}"</Text> ({c.expenseAmount.toFixed(2)} zł, {c.expenseDate.split('-').reverse().join('.')})?
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
-                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => confirmReimbursement(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak, połącz</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => dismissReimbursement(c)}>
-                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie, zwykły przychód</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

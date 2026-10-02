@@ -3,7 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: siatka nastrój×energia była CAŁKOWICIE martwa po §225 (dwa osobne bugi) (2026-10-02)
+## 🆕 Usunięcie auto-dopasowania zwrotu — zostaje wyłącznie ręczne podpięcie (2026-10-02)
+
+User zrzutem: "co to kurwa jest ze mnie pyta czy to zwrot tego nie chciałem wgle... na
+dashboardzie ja sam przypinam". Pełny opis w ARCHITECTURE.md §234. Karta "To zwrot za
+zakup?" (auto-dopasowanie przychodzącego przelewu do wcześniejszego wydatku, pytająca na
+dashboardzie) usunięta CAŁKOWICIE — plik `reimbursementMatch.ts`, trigger w
+`bankCommit.ts`, karta+stan+handlery w `index.tsx`, wpis w `dashboardLayout.ts`, testy.
+Ręczny picker "Podepnij zwrot" (`expenses/[id].tsx`) i connector (`ExpenseItem.tsx`)
+NIETKNIĘTE — to jedyny sposób podpinania zwrotu teraz. `tsc`/`jest` czyste (91/91 suite,
+1170 testów, -10 vs poprzedni stan — testy usuniętej heurystyki).
+
+**🆕 Priorytet testu na urządzeniu — niski**: przychodzący przelew pasujący do
+wcześniejszego wydatku NIE powinien już pokazać żadnej karty na dashboardzie.
+
+## ✅ Fix: siatka nastrój×energia była CAŁKOWICIE martwa po §225 (dwa osobne bugi) (2026-10-02)
 
 User zrzutami: "zepsułeś mi... wpisywanie humoru". Pełny opis w ARCHITECTURE.md §233. §225
 (fix szerokości) złamał dwie rzeczy naraz: (1) `gridSize`/wysokość utknięty na `0` bo

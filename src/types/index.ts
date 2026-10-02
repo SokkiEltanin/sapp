@@ -67,12 +67,11 @@ export interface Expense {
   fvOverride?: 'fixed' | 'variable' | 'food' | null;
   paymentMethod?: PaymentMethod; // cash vs card; undefined treated as 'card'
   viaScan?: boolean;        // added by pasting+parsing a receipt (expenses/scan.tsx), not typed
-  // Auto-dopasowanie zwrotu (2026-09-28, user zaakceptował pomysł: "dziewczyna oddaje mi
-  // część za zakupy") — suma przychodów (zwrot od sklepu, zwrot od współlokatora/partnera za
-  // wspólny zakup) dopasowanych do TEJ transakcji przez `findReimbursementCandidate`
-  // (reimbursementMatch.ts) i zatwierdzonych na dashboardzie. Czysto informacyjne: NIE zmienia
-  // `amount` ani żadnych sum/statystyk (świadomy, wąski zakres — netowanie wydatków to inna,
-  // znacznie większa zmiana) — tylko pokazuje efektywny koszt na ekranie szczegółów.
+  // Zwrot za TĘ transakcję (2026-09-28, user: "dziewczyna oddaje mi część za zakupy";
+  // auto-dopasowanie na dashboardzie usunięte 2026-10-02, user: "ja sam przypinam" — zostaje
+  // wyłącznie ręczne podpięcie, patrz `reimbursedFromId` niżej). Czysto informacyjne: NIE
+  // zmienia `amount` ani żadnych sum/statystyk (świadomy, wąski zakres — netowanie wydatków
+  // to inna, znacznie większa zmiana) — tylko pokazuje efektywny koszt na ekranie szczegółów.
   reimbursedAmount?: number;
   // Ręczne podpięcie zwrotu DO KONKRETNEJ transakcji (2026-09-30, user: "musi być wybierz
   // zwrot jakby z transakcji, żebym mógł realnie podpiąć" — dotąd `reimbursedAmount` szedł
