@@ -3,7 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Siatka humoru: otoczka = energia; skrzynki: nagroda po animacji, nie przed (2026-10-02)
+## 🆕 Fix: eventy Google Calendar dalej niż ~60 dni w przód nie wczytywały się (2026-10-02)
+
+User: "nie ładują mi się eventy dalej np z grudnia na kalendarzu google". Pełny opis w
+ARCHITECTURE.md §237. Root cause: `googleCalendarService.fetchEvents(daysBack, daysForward)`
+miało `daysForward = 60` jako domyślne — to parametr zapytania DO Google Calendar API
+(`timeMax`), nie filtr appki, więc Google po prostu nie zwracał nic po tej dacie w
+odpowiedzi; żadne miejsce dalej w łańcuchu (store/UI) nie mogło tego pokazać niezależnie
+od nawigacji po miesiącach. Na 2026-10-02 cutoff wypadał ~1 grudnia. Zbadane i wykluczone:
+cache (gcalEvents jawnie NIE jest trwałe, zawsze pełny refetch), UI (zero dodatkowego
+obcinania zakresu). Fix: `daysForward` 60→365 (ten sam rząd co `daysBack = 730`) —
+jeden punkt zmiany naprawia wszystkie 4 miejsca wołające (nikt nie nadpisywał
+domyślnej). `tsc`/`jest` czyste (91/91 suite, 1170 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na zgłoszony
+problem): Kalendarz → przejdź do grudnia (i dalej) → sprawdź że eventy z Google Calendar
+faktycznie się tam pojawiają, nie tylko lokalne wpisy appki.
+
+## ✅ Siatka humoru: otoczka = energia; skrzynki: nagroda po animacji, nie przed (2026-10-02)
 
 Dwa zlecenia naraz, pełny opis w ARCHITECTURE.md §236. (1) `MoodEnergyGrid.tsx` — kolor
 kropki/otoczki szedł z `mood` (tak jak emotka), energia nigdzie nie była widoczna mimo
@@ -21,7 +38,7 @@ handlerów kliknięcia. `CrateModal.tsx` (skrzynka z pieszczenia kota) miał ju�
 poprawnie, posłużył jako referencja. `tsc`/`jest` czyste (91/91 suite, 1170 testów, bez
 zmiany).
 
-**🆕 Priorytet testu na urządzeniu — średni**: (a) Humor → sprawdź że kolor kropki idzie
+Priorytet testu na urządzeniu — średni: (a) Humor → sprawdź że kolor kropki idzie
 za przesuwaniem góra/dół (energia), emotka za lewo/prawo (nastrój). (b) Pupil → otwórz
 Skrzynkę dnia/kupioną → obserwuj licznik monet w nagłówku PODCZAS kręcenia reela — nie
 powinien drgnąć aż reel się zatrzyma.

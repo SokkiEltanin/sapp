@@ -13538,6 +13538,41 @@ wyniku.
 
 ---
 
+## 237. Fix: eventy Google Calendar dalej niż ~60 dni w przód nigdy się nie pobierały (2026-10-02)
+
+User: "nie ładują mi się eventy dalej np z grudnia na kalendarzu google". Zbadane PRZED
+zmianą (`src/services/googleCalendarService.ts`, `src/store/calendarStore.ts`,
+`app/(tabs)/calendar.tsx`) — żeby wykluczyć bug cache'u albo UI-owego obcinania zakresu
+zanim coś ruszę.
+
+**Root cause**: `fetchEvents(daysBack = 730, daysForward = 60)` — `timeMax` wysyłany do
+Google Calendar API liczy się jako `now + 60 dni`. To jest parametr ZAPYTANIA do API, nie
+filtr po stronie appki — Google **w ogóle nie zwraca** eventów po tej dacie w odpowiedzi,
+więc nic dalej w łańcuchu (store, UI) nie ma szansy ich pokazać niezależnie od
+nawigacji/odświeżania. Na 2026-10-02 cutoff wypadał ~2026-12-01 — stąd grudniowe
+wydarzenia (zwłaszcza cykliczne zajęcia z planu lekcji wgrywane na cały
+semestr/rok naprzód, patrz §230/§232) padały poza oknem.
+
+Potwierdzone BEZ winy: paginacja (`nextPageToken`) jest poprawnie śledzona do końca
+(limit 10 stron/25k eventów, nieistotny tu); `gcalEvents` w `calendarStore.ts` jest
+PEŁNI nadpisywane co fetch (`setGcalEvents`) i jawnie WYŁĄCZONE z `partialize` (nie
+trwałe) — zero stale-cache z węższego okna; UI (`calendar.tsx`) renderuje `gcalEvents`
+bez żadnego dodatkowego obcinania zakresu dat.
+
+**Fix**: `daysForward` domyślne 60→365 (ten sam rząd wielkości co `daysBack` 730, z tym
+samym uzasadnieniem — pokryć planowanie na cały rok naprzód, nie tylko 2 miesiące). Brak
+wywołań z jawnym `daysForward` (wszystkie 4 miejsca: `calendar.tsx`, `index.tsx` ×2,
+`stats.tsx`'s `syncGcal`) — zmiana samej wartości domyślnej naprawia wszystkie naraz.
+
+**Testy**: brak (serwis API, nie czysta logika — zero istniejących testów do
+zaktualizowania). `tsc --noEmit`/`jest` czyste (91/91 suite, 1170 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na zgłoszony problem):
+Kalendarz → przejdź do grudnia (albo dalej) → sprawdź że wydarzenia z Google Calendar
+faktycznie się tam pojawiają, nie tylko lokalne.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
