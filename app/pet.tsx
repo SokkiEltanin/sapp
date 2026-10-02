@@ -225,9 +225,18 @@ export default function Pet() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, lvl.level, ownedCombatItems);
     // 2026-09-11: 'color'/'startup'/'freeze' USUNIĘTE z BoxReward (patrz petBoxes.ts) — te
     // gałęzie miały ich obsłużyć, teraz rollBox() nigdy ich nie zwraca.
+    const reward = rollBox(DAILY_BOX, lvl.level, ownedCombatItems);
+    haptic.success();
+    setBoxReveal({ box: DAILY_BOX, reward });
+  };
+  // Przyznanie nagrody PRZESUNIĘTE do odsłony reela (2026-10-02, patrz komentarz przy
+  // `onRevealed` w BoxRevealModal.tsx) — `boxReveal` jest stabilne od `onDailyBox` do
+  // `onClose`, nic innego go po drodze nie zmienia, więc bezpiecznie czytać tu `reward`/`box`.
+  const onDailyBoxRevealed = () => {
+    if (!boxReveal) return;
+    const { reward } = boxReveal;
     if (reward.type === 'coins') addCoins(reward.coins);
     // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
     // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
@@ -240,8 +249,6 @@ export default function Pet() {
       at: Date.now(), boxId: DAILY_BOX.id, daily: true, cost: 0, rewardType: reward.type,
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
     });
-    haptic.success();
-    setBoxReveal({ box: DAILY_BOX, reward });
   };
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
@@ -756,6 +763,7 @@ export default function Pet() {
         boxColor={boxReveal?.box.color ?? '#FBBF24'}
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         boxIcon={boxReveal?.box.icon}
+        onRevealed={onDailyBoxRevealed}
         onClose={() => setBoxReveal(null)}
       />
       <PetCustomizeModal

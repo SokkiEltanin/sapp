@@ -13475,6 +13475,69 @@ klikania.
 
 ---
 
+## 236. Siatka humoru: otoczka = energia, emotka = nastrój; skrzynki: nagroda przyznaje się po animacji (2026-10-02)
+
+Dwa osobne zlecenia usera naraz, niepowiązane funkcjonalnie, połączone w jeden PR bo oba
+małe i dotyczą pupila/humoru zgłoszonych w tej samej wiadomości.
+
+**1. `src/components/mood/MoodEnergyGrid.tsx` — kolor kropki-wskaźnika.** User: "Humor
+spoko tylko powinien zmieniać kolor otoczki bazując gora dol na to ile mam energii a
+emotka w środku na humor". Dotąd I kolor obwódki/wypełnienia kropki (`dotColor`) I
+emotka w środku (`MOOD_EMOJIS[mood]`) były liczone z `mood` — energia nigdzie wizualnie
+nie była widoczna, mimo że `ENERGY_COLORS` (`src/types/index.ts`) już istniało w kodzie,
+całkowicie nieużywane (martwy kod, najwyraźniej przygotowany pod tę właśnie zmianę i
+nigdy niepodpięty). Fix: `dotColor` → `ringColor = ENERGY_COLORS[energy]`, emotka
+zostaje `MOOD_EMOJIS[mood]` bez zmian. Tekst odczytu pod siatką (`"{emoji moodu} {etykieta
+moodu} · {emoji energii} {etykieta energii}"`) też przekolorowany na `ringColor` (energia)
+dla spójności z kropką — wcześniej był na kolorze moodu.
+Dashboard-owe miejsca kolorujące WYŁĄCZNIE moodem (`moodColor()` w
+`utils/dashboard/format.ts`, `colorFor()` w `YearPixels.tsx`, `MOOD_COLORS` bezpośrednio w
+`CompletionMoodModal.tsx`) **celowo nietknięte** — user mówił konkretnie o siatce
+check-inu ("ten", liczba pojedyncza), nie o historii/pixel-roku, gdzie nie ma osi energii
+do pokazania (to tylko dzienna wartość nastroju).
+
+**2. Skrzynki pupila — nagroda przyznawana PRZED animacją losowania, nie po.** User:
+"musimy w skrzynkach zrobic zeby nagroda przyznaywala sie po animacji losowania bo tak to
+widac od razu po zlocie czy dostalem co i czy nie bo np sie zwiększa bardzo czy cos".
+POTWIERDZONY bug: `onDailyBox` (`app/pet.tsx`) i `onBuyBox` (`app/pet-shop.tsx`) wołały
+`addCoins`/`grantGear`/`grantOrLevelCombatItem` (mutacja store'u `petStore.ts`)
+SYNCHRONICZNIE w handlerze kliknięcia, DOPIERO POTEM otwierały `BoxRevealModal` z
+~4-sekundową animacją reela (`doOpen` w `BoxRevealModal.tsx` — shake→flash→spin→reveal).
+Licznik monet w nagłówku obu ekranów (`<Text>{coins}</Text>`) czyta ten sam store i
+renderuje się na żywo — więc widocznie "skakał" w tle całe 4 sekundy PRZED tym jak reel
+się zatrzymał i karta wyniku się pojawiła, zdradzając wynik na długo przed odsłoną.
+`CrateModal.tsx` (skrzynka ze paszczenia kota) już miał poprawny wzorzec —
+`openCrate()` wołane DOPIERO wewnątrz `.start(callback)` animacji potrząsania, nie przy
+kliknięciu — posłużył jako wzorzec referencyjny, nie trzeba było wymyślać nowego
+mechanizmu.
+
+Fix: nowy prop `onRevealed?: () => void` na `BoxRevealModal` — odpala się w jedynym
+właściwym miejscu, DOKŁADNIE tam gdzie dotąd stało samo `setPhase('revealed')` (koniec
+`.start()` callbacku po dojechaniu reela), czyli w momencie gdy wynik faktycznie jest
+widoczny na ekranie. `reward` (wylosowany PRZEZ `rollBox()`, czysta funkcja bez efektów)
+nadal trzeba znać PRZED animacją — żeby reel wiedział na czym się zatrzymać — ale sama
+MUTACJA store'u (przyznanie) czeka na ten callback. `onDailyBox`/`onBuyBox` teraz tylko
+rollują + otwierają modal; cała logika `addCoins`/`grantGear`/`grantOrLevelCombatItem` +
+`recordBoxOpen` (log do `boxStatsStore`) przeniesiona do nowych `onDailyBoxRevealed`/
+`onBoxRevealed`, podanych jako `onRevealed` do `BoxRevealModal`, czytających `boxReveal`/
+`reveal` ze stanu komponentu (stabilne od otwarcia modala do `onClose`, nic innego go nie
+zmienia w tym czasie — bezpieczne bez dodatkowego przekazywania `reward` przez callback).
+`spendCoins(box.cost)` w `onBuyBox` ZOSTAJE przy kliknięciu "Otwórz" bez zmian — to koszt
+zakupu, znany i potwierdzony PRZED animacją w `ConfirmDialog`, nie nagroda, nic tu nie
+spoileruje.
+
+**Testy**: brak nowych — czysto UI-timing nad już przetestowaną logiką `rollBox()`/
+store-mutatorów. `tsc --noEmit`/`jest` czyste (91/91 suite, 1170 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: (a) Humor → zaznacz różne kombinacje
+nastrój/energia na siatce, sprawdź że kolor kropki idzie za przesuwaniem W GÓRĘ/DÓŁ
+(energia), a emotka w środku za przesuwaniem W LEWO/PRAWO (nastrój). (b) Pupil → otwórz
+Skrzynkę dnia (albo kupioną w Rynku) → obserwuj licznik monet w nagłówku PODCZAS kręcenia
+reela — nie powinien się zmienić ani drgnąć, aż reel się zatrzyma i pokaże się karta
+wyniku.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
