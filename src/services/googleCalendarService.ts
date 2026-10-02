@@ -159,7 +159,12 @@ export const googleCalendarService = {
   // Oct 2025) count toward hours/earnings, and pages through results so nothing is
   // dropped by the per-request cap. (Confirmed months also lock their hours in
   // settings permanently, so this window only needs to cover the recent history.)
-  async fetchEvents(daysBack = 730, daysForward = 60): Promise<CalendarEvent[]> {
+  // Forward side 60→365 (2026-10-02, user: "nie ładują mi sie eventy dalej np z
+  // grudnia na kalendarzu google" — `timeMax` capped at +60 dni EXCLUDES those events
+  // server-side, Google's API never returns them at all; nie to bug cache'u/UI, samo
+  // okno pobierania było za wąskie, zwłaszcza dla cyklicznych zajęć z planu lekcji
+  // (class-schedule.tsx) wgranych na cały semestr/rok naprzód).
+  async fetchEvents(daysBack = 730, daysForward = 365): Promise<CalendarEvent[]> {
     let token = await this.getStoredToken();
     if (!token) {
       token = await this.refreshToken();
