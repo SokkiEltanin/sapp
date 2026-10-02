@@ -3,7 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Usuń zajęcia" — checklista PRZEDMIOTÓW zamiast tylko "wszystko albo nic" (2026-10-02)
+## 🆕 Fix: siatka nastrój×energia była CAŁKOWICIE martwa po §225 (dwa osobne bugi) (2026-10-02)
+
+User zrzutami: "zepsułeś mi... wpisywanie humoru". Pełny opis w ARCHITECTURE.md §233. §225
+(fix szerokości) złamał dwie rzeczy naraz: (1) `gridSize`/wysokość utknięty na `0` bo
+czekał na `onLayout`, które w natywnym `Modal`-u (osobna hierarchia) bywa spóźnione/nie
+przychodzi — bramkowało TO SAMO i render kropki, i gest dotyku, więc siatka wyglądała
+pusto i nie reagowała; (2) po przestaniu być kwadratem (szerokość≠wysokość na typowym
+telefonie) jeden wspólny `cell` dalej liczony z wysokości był błędnie używany dla OBU osi
+— mapowanie dotyku na kolumnę nastroju było ściśnięte. Oba naprawione: rozmiar liczony
+wprost (bez stanu/callbacku), osobne `cellX`/`cellY`. `tsc`/`jest` czyste (92/92 suite,
+1180 testów, bez zmiany).
+
+Osobny temat z tego samego zgłoszenia (NIE naprawiony tu, wymaga weryfikacji na
+urządzeniu): pixelyear nastroju na dashboardzie pokazywał prawie puste dane. Zweryfikowane
+przez `git log` że żaden plik tej ścieżki danych nie był dotykany w żadnej niedawnej
+sesji — `moodService.getAll()` czyta z Firestore (chmura), dane nie są kasowane przez
+appkę. Najbardziej prawdopodobne: świeży build czyści lokalny AsyncStorage, a jednorazowy
+fallback-fetch z chmury przy starcie nie zdążył/nie udał się. **DO ZROBIENIA (czeka na
+usera)**: zamknij appkę całkowicie, otwórz ponownie z dobrym internetem, sprawdź czy dane
+wracają — jeśli NIE wrócą, to dopiero wtedy realny bug do zbadania.
+
+**🆕 Priorytet testu na urządzeniu — KRYTYCZNY** (trzecia próba tego samego fixu,
+podstawowa funkcja appki całkowicie martwa): check-in humoru → kropka musi podążać za
+palcem po CAŁEJ szerokości/wysokości (w tym rogi), tap w dowolnym miejscu musi od razu
+działać.
+
+## ✅ "Usuń zajęcia" — checklista PRZEDMIOTÓW zamiast tylko "wszystko albo nic" (2026-10-02)
 
 User: "czy konkretne lekcje... np mam 20x event fizyka kwantowa i żebym mógł usunąć tylko
 go". Pełny opis w ARCHITECTURE.md §232. Modal z §230 przebudowany: checklista przedmiotów

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
@@ -40,7 +40,6 @@ interface Props {
 export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
   const c = useColors();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const [gridSize, setGridSize] = useState(0);
   const lastKey = useSharedValue(-1);
   // Szerokość liczona WPROST z okna (2026-09-30, user DALEJ zgłaszał wąską siatkę mimo
   // wcześniejszego fixu przez `width:'100%'` + `marginHorizontal: -spacing[5]` — ten trik
@@ -54,6 +53,24 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
   // wystawała POZA zaokrąglony arkusz.
   const { width: winWidth } = useWindowDimensions();
   const gridBleedWidth = winWidth - 2;
+  // `gridHeight` POLICZONY WPROST (2026-10-02, user zrzutem: cała siatka pusta/martwa —
+  // ani kropka, ani przeciąganie). Poprzednia wersja trzymała rozmiar w stanie
+  // ustawianym TYLKO przez `onLayout` natywnego widoku — ale ten widok żyje wewnątrz
+  // natywnego `Modal`-a, portowanego do OSOBNEJ natywnej hierarchii (patrz komentarz w
+  // MoodCheckInModal.tsx przy `GestureHandlerRootView`); `onLayout` w takim oknie bywa
+  // spóźniony albo w ogóle nie dochodzi na czas, więc stan zostawał na `0` na stałe — a
+  // zarówno render kropki jak i gest Pana są bramkowane tym warunkiem: efekt to martwa,
+  // niewidoczna siatka. Skoro `gridBleedWidth` jest już znane SYNCHRONICZNIE z tego
+  // samego hooka co szerokość widoku, wysokość liczy się wprost z niego — bez żadnego
+  // pośredniego stanu/callbacku, zero ryzyka wyścigu z layoutem.
+  const gridHeight = Math.min(260, gridBleedWidth);
+  // Siatka NIE JEST kwadratem gdy `gridBleedWidth > 260` (typowy telefon: ~360-410dp
+  // szerokości, więc szerokość > wysokość) — DRUGI bug tego samego pochodzenia: wcześniej
+  // jeden wspólny `cell = gridSize/5` liczony z WYSOKOŚCI był błędnie stosowany też do osi
+  // X (`evt.x / cell`), więc mapowanie dotyku na kolumnę nastroju było ściśnięte/przesunięte
+  // względem realnej szerokości pudełka — osobne `cellX`/`cellY` dla każdej osi.
+  const cellX = gridBleedWidth / 5;
+  const cellY = gridHeight / 5;
 
   const commit = (m: MoodLevel, e: MoodLevel) => {
     haptic.medium();
@@ -77,17 +94,15 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
     .minDistance(0)
     .onUpdate(evt => {
       'worklet';
-      if (gridSize <= 0) return;
-      const cell = gridSize / 5;
-      const col = Math.min(4, Math.max(0, Math.floor(evt.x / cell)));
-      const row = Math.min(4, Math.max(0, Math.floor(evt.y / cell)));
+      const col = Math.min(4, Math.max(0, Math.floor(evt.x / cellX)));
+      const row = Math.min(4, Math.max(0, Math.floor(evt.y / cellY)));
       const key = row * 5 + col;
       if (key !== lastKey.value) {
         lastKey.value = key;
         runOnJS(commit)((col + 1) as MoodLevel, (5 - row) as MoodLevel);
       }
     }),
-  [gridSize]);
+  [cellX, cellY]);
 
   // Kropka-wskaźnik animowana w PIKSELACH (nie indeksach) — prościej i spójniej ze stylem
   // reszty pliku (`Animated` z 'react-native', jak w MoodPicker.tsx), bez węzłów `multiply`
@@ -95,17 +110,14 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
   const dotX = useRef(new Animated.Value(0)).current;
   const dotY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (gridSize <= 0) return;
-    const cell = gridSize / 5;
     const col = mood ? mood - 1 : 2;
     const row = energy ? 5 - energy : 2;
-    Animated.spring(dotX, { toValue: col * cell, useNativeDriver: true, damping: 16, stiffness: 220 }).start();
-    Animated.spring(dotY, { toValue: row * cell, useNativeDriver: true, damping: 16, stiffness: 220 }).start();
-  }, [mood, energy, gridSize]);
+    Animated.spring(dotX, { toValue: col * cellX, useNativeDriver: true, damping: 16, stiffness: 220 }).start();
+    Animated.spring(dotY, { toValue: row * cellY, useNativeDriver: true, damping: 16, stiffness: 220 }).start();
+  }, [mood, energy, cellX, cellY]);
 
   const hasValue = !!mood && !!energy;
   const dotColor = mood ? MOOD_COLORS[mood] : c.text.muted;
-  const cell = gridSize / 5;
 
   return (
     <View style={styles.container}>
@@ -120,10 +132,7 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
           ujemny margines TYLKO ten box, nie całą sekcję (etykieta/hint/odczyt zostają
           wyrównane z resztą treści przez `.inset`, inaczej ich lewy brzeg nie zgadzałby
           się z "Co czujesz?" pod spodem). */}
-      <View
-        style={[styles.gridWrap, { width: gridBleedWidth, height: Math.min(260, gridBleedWidth) }]}
-        onLayout={e => setGridSize(e.nativeEvent.layout.width)}
-      >
+      <View style={[styles.gridWrap, { width: gridBleedWidth, height: gridHeight }]}>
         <LinearGradient
           colors={[c.bg.elevated, MOOD_COLORS[5] + '22']}
           start={{ x: 0, y: 1 }}
@@ -143,22 +152,20 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
           <View style={StyleSheet.absoluteFill} />
         </GestureDetector>
 
-        {gridSize > 0 && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.dot,
-              { width: cell, height: cell, transform: [{ translateX: dotX }, { translateY: dotY }] },
-            ]}
-          >
-            <View style={[
-              styles.dotInner,
-              { borderColor: dotColor, backgroundColor: hasValue ? dotColor + '33' : c.bg.card },
-            ]}>
-              <Text style={styles.dotEmoji}>{mood ? MOOD_EMOJIS[mood] : '·'}</Text>
-            </View>
-          </Animated.View>
-        )}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.dot,
+            { width: cellX, height: cellY, transform: [{ translateX: dotX }, { translateY: dotY }] },
+          ]}
+        >
+          <View style={[
+            styles.dotInner,
+            { borderColor: dotColor, backgroundColor: hasValue ? dotColor + '33' : c.bg.card },
+          ]}>
+            <Text style={styles.dotEmoji}>{mood ? MOOD_EMOJIS[mood] : '·'}</Text>
+          </View>
+        </Animated.View>
       </View>
 
       <Text style={[styles.readout, styles.inset, { color: hasValue ? dotColor : c.text.muted }]} numberOfLines={1}>
