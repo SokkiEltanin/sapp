@@ -9,7 +9,6 @@ import { subscriptionsService } from '@/services/subscriptionsService';
 import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged, queueSubConfirm } from '@/utils/subscriptionAuto';
 import { advanceNextBillingDate } from '@/utils/recurringBills';
 import { rememberPaycheckSender } from '@/utils/paycheckSenders';
-import { findReimbursementCandidate, queueReimbursementConfirm } from '@/utils/reimbursementMatch';
 
 // A bank payment that settles a subscription: if it's a CONFIDENT match (same
 // currency + close amount) advance the billing date silently, so the "zapłaciłeś?"
@@ -127,20 +126,6 @@ export async function commitBankTx(
       // Teach the paycheck-sender memory so next month's transfer from this employer
       // auto-flags as [JD] even without a "wynagrodzenie" keyword.
       if (p.jd) rememberPaycheckSender(p.storeKey).catch(() => {});
-      // Auto-dopasowanie zwrotu (2026-09-28, user zaakceptował pomysł) — pensja/wypłata
-      // nigdy nie jest zwrotem za zakup, więc pomiń (i tak by nie trafiła — kwoty rzędu
-      // tysięcy nigdy nie zmieszczą się w "remaining" żadnego pojedynczego wydatku).
-      if (!p.jd) {
-        const cand = findReimbursementCandidate({ amount: finalAmount, dateISO: p.dateISO }, st.expenses);
-        if (cand) {
-          queueReimbursementConfirm({
-            expenseId: cand.expense.id, expenseNote: cand.expense.note || cand.expense.storeName || 'wydatek',
-            expenseAmount: cand.expense.amount, expenseDate: (cand.expense.date ?? '').slice(0, 10),
-            incomingAmount: finalAmount, currency: finalCurrency, sender: p.store || 'nadawca',
-            date: p.dateISO.slice(0, 10),
-          }).catch(() => {});
-        }
-      }
       return { ok: true, matched: false };
     } catch {
       return { ok: false, matched: !!dup };
