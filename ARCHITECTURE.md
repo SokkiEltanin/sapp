@@ -13331,6 +13331,64 @@ Calendar): Plan zajęć → kosz → sprawdź że lista grupuje się poprawnie p
 jeden przedmiot → rozwiń żeby zweryfikować dokładne daty → usuń → sprawdź że TYLKO ten
 przedmiot zniknął (reszta planu nietknięta) zarówno w appce jak i w Google Calendar.
 
+## 233. Fix: siatka nastrój×energia była CAŁKOWICIE martwa po §225 (dwa osobne bugi) (2026-10-02)
+
+User zrzutami (modal check-inu + dashboard): "zepsułeś mi... wpisywanie humoru". §225
+(fix szerokości na całą szerokość ekranu) ZŁAMAŁ funkcjonalność, którą miał tylko
+poszerzyć. Dwa NIEZALEŻNE bugi, oba pochodzące z tej samej zmiany:
+
+**Bug #1 — `gridSize` nigdy nie wychodził z `0`.** §225 liczyło szerokość WPROST z
+`useWindowDimensions()`, ale WYSOKOŚĆ/`gridSize` dalej był trzymany w `useState(0)`
+ustawianym WYŁĄCZNIE przez `onLayout` natywnego widoku. Ten widok żyje wewnątrz
+natywnego `Modal`-a, który portuje swoją zawartość do OSOBNEJ natywnej hierarchii (nowe
+okno na Androidzie) — `onLayout` w takim oknie bywa spóźniony albo w ogóle nie dochodzi
+na czas. Zarówno render kropki (`{gridSize > 0 && <kropka/>}`) JAK I gest przeciągania
+(`if (gridSize <= 0) return;` w `pan.onUpdate`) są bramkowane tym samym warunkiem — efekt:
+siatka wygląda pusto (bez kropki) I nie reaguje na dotyk, dokładnie to co user zgłosił.
+**Fix**: `gridHeight = Math.min(260, gridBleedWidth)` liczony WPROST z tego samego hooka
+co szerokość — zero pośredniego stanu, zero wyścigu z natywnym layoutem.
+
+**Bug #2 — siatka przestała być kwadratem, ale matematyka gestu tego nie uwzględniała.**
+Stara wersja była kwadratowa (`aspectRatio:1`), więc jeden wspólny `cell = gridSize/5`
+poprawnie opisywał OBIE osie. §225 ustawiło `width: gridBleedWidth` (zwykle 360-410dp) i
+`height: Math.min(260, gridBleedWidth)` — na typowym telefonie szerokość > wysokość,
+więc box PRZESTAŁ być kwadratem, ale `cell` dalej był liczony TYLKO z wysokości i
+używany dla OBU osi (`evt.x / cell` I `evt.y / cell`). Efekt: mapowanie dotyku na kolumnę
+nastroju (oś X) było ściśnięte względem realnej, szerszej siatki — przeciąganie do
+prawej krawędzi "lądowało" w ostatniej kolumnie dużo wcześniej niż wizualna krawędź
+pudełka, więc trafienie w zamierzoną komórkę było nieintuicyjne/niemożliwe w części
+zakresu. **Fix**: osobne `cellX = gridBleedWidth/5` i `cellY = gridHeight/5`, użyte
+konsekwentnie w geście (`pan.onUpdate`), animacji kropki (`dotX`/`dotY` toValue) i
+rozmiarze samej kropki (`width: cellX, height: cellY` zamiast jednego `cell` na oba).
+
+**Dlaczego nie złapałem tego wcześniej**: §225 było budowane i wysyłane BEZ dostępu do
+urządzenia (patrz CLAUDE.md/standing ritual — `tsc`/`jest` nie łapią błędów wizualnych/
+interakcji dotykowej), a priorytet testu na urządzeniu był świadomie oznaczony jako
+"WYSOKI, drugi raz zgłoszone" właśnie dlatego że poprzednia wersja TEGO SAMEGO fixu już
+raz zawiodła w praktyce mimo poprawnej matematyki na papierze — i trzecia wersja znowu
+ujawniła coś, co dało się zweryfikować wyłącznie przez realny dotyk na realnym ekranie.
+
+**Pixelyear nastroju na dashboardzie (osobny temat w tym samym zgłoszeniu)**:
+zweryfikowane przez `git log` — ŻADEN plik z tej ścieżki danych (`src/store/moodStore.ts`,
+`src/components/dashboard/YearPixels.tsx`, `src/utils/statWidgets.ts`) nie był dotykany
+w tej ani żadnej niedawnej sesji. `moodService.getAll()` czyta z Firestore (chmura), nie
+z lokalnego stanu — dane NIE są kasowane przez nic co appka robi przy zapisie. Najbardziej
+prawdopodobne wyjaśnienie: świeży build/instalacja APK czyści lokalny `AsyncStorage`
+(w tym `moodStore`'s persist), a dashboard dociąga z Firestore TYLKO gdy lokalny store
+jest pusty PRZY STARCIE (`index.tsx:625`, jednorazowy fallback) — jeśli to dociągnięcie
+nie zdążyło/nie udało się przy pierwszym uruchomieniu (słabe łącze przy starcie), lokalny
+store zostaje pusty aż appka znów wystartuje z siecią. Nie jest to coś naprawionego w tym
+PR — wymaga weryfikacji na urządzeniu (zamknij appkę całkowicie, otwórz ponownie z
+dobrym internetem, sprawdź czy dane wracają) zanim potraktujemy to jako realny bug kodu.
+
+**Testy**: brak nowych — czysto geometria/gesty nad już istniejącą, przetestowaną logiką
+zapisu (`onChange`→`commit`). `tsc --noEmit`/`jest` czyste (92/92, 1180, bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY** (trzecia próba tego samego fixu, podstawowa
+funkcja appki całkowicie martwa od §225): check-in humoru → sprawdź że kropka faktycznie
+podąża za palcem PO CAŁEJ szerokości i wysokości pudełka (w tym rogi), że tap w dowolnym
+miejscu natychmiast ustawia wartość, i że odczyt pod spodem aktualizuje się na bieżąco.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
