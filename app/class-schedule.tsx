@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL, ChevronDown, ChevronUp, Trash2, Square, CheckSquare } from 'lucide-react-native';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, ClassType } from '@/utils/classSchedule';
@@ -63,12 +63,65 @@ export default function ClassSchedule() {
       .filter(e => isClassEvent(e.title, classPrefix))
       .sort((a, b) => (a.date + (a.startTime ?? '')).localeCompare(b.date + (b.startTime ?? '')));
   }, [gcalEvents, classPrefix]);
+
+  // Klucz grupowania PO PRZEDMIOCIE (2026-10-02, user: "mam np 20x event fizyka kwantowa
+  // i żebym mógł zrobić tak że usunę tylko go" — konkretny przedmiot, nie cały plan). Ten
+  // sam `parseClassEvent`'s `subject` co w `renderEventRow` niżej — typ (W/C/L/P) NIE wchodzi
+  // w klucz, więc wykład i ćwiczenia tego samego przedmiotu trafiają do jednej grupy (user
+  // myśli o "fizyce kwantowej" jako jednej rzeczy, nie osobno po typie zajęć).
+  const subjectKeyOf = (e: CalendarEvent) => parseClassEvent(e.title, classPrefix)?.subject ?? e.title;
+  const subjectGroups = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const e of allClassEvents) {
+      const key = subjectKeyOf(e);
+      const arr = map.get(key);
+      if (arr) arr.push(e); else map.set(key, [e]);
+    }
+    return Array.from(map.entries()).map(([subject, events]) => ({ subject, events }));
+  }, [allClassEvents, classPrefix]);
+
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(new Set());
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
+  const openWipeModal = () => {
+    haptic.tap();
+    // Domyślnie WSZYSTKO zaznaczone (zachowuje stare "usuń wszystkie" jako zero-wysiłkową
+    // ścieżkę: otwórz → usuń, bez konieczności zaznaczania) — user odznacza to czego NIE
+    // chce skasować, albo odznacza wszystko i zaznacza tylko jeden przedmiot.
+    setSelectedSubjects(new Set(subjectGroups.map(g => g.subject)));
+    setExpandedSubjects(new Set());
+    setConfirmWipe(true);
+  };
+  const toggleSubject = (subject: string) => {
+    haptic.tap();
+    setSelectedSubjects(prev => {
+      const next = new Set(prev);
+      if (next.has(subject)) next.delete(subject); else next.add(subject);
+      return next;
+    });
+  };
+  const toggleExpanded = (subject: string) => {
+    haptic.tap();
+    setExpandedSubjects(prev => {
+      const next = new Set(prev);
+      if (next.has(subject)) next.delete(subject); else next.add(subject);
+      return next;
+    });
+  };
+  const allSelected = selectedSubjects.size === subjectGroups.length;
+  const toggleSelectAll = () => {
+    haptic.tap();
+    setSelectedSubjects(allSelected ? new Set() : new Set(subjectGroups.map(g => g.subject)));
+  };
+  const wipeTargets = useMemo(
+    () => allClassEvents.filter(e => selectedSubjects.has(subjectKeyOf(e))),
+    [allClassEvents, selectedSubjects, classPrefix],
+  );
   const doWipe = async () => {
     haptic.medium();
     setWiping(true);
-    const targets = allClassEvents;
+    const targets = wipeTargets;
     const results = await Promise.allSettled(targets.map(e => googleCalendarService.deleteEvent(e.id)));
     const deletedIds = targets.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<boolean>).value).map(e => e.id);
     if (deletedIds.length > 0) deleteEvents(deletedIds);
@@ -155,7 +208,7 @@ export default function ClassSchedule() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Plan zajęć</Text>
         {allClassEvents.length > 0 ? (
-          <TouchableOpacity onPress={() => { haptic.tap(); setConfirmWipe(true); }} hitSlop={10}>
+          <TouchableOpacity onPress={openWipeModal} hitSlop={10}>
             <Trash2 size={20} color={colors.accent.red} />
           </TouchableOpacity>
         ) : (
@@ -253,36 +306,66 @@ export default function ClassSchedule() {
         </ScrollView>
       )}
 
-      {/* Potwierdzenie "usuń wszystkie" — pełna lista eventów do wglądu PRZED kasowaniem
-          (user explicite: "przed usunięciem pokazuje jakie usunie żeby dla potwierdzenia"),
-          nie sam `ConfirmDialog` (jego `message` to goły string, nie nadaje się do listy
-          dziesiątek eventów) — ten sam język wizualny (overlay+karta), własny scrollowalny
-          środek. */}
+      {/* Potwierdzenie usuwania — checklista PRZEDMIOTÓW (2026-10-02, user: "mam np 20x
+          event fizyka kwantowa i żebym mógł usunąć tylko go") zamiast samej płaskiej listy
+          dat — tak dociera zarówno "usuń wszystko" (domyślnie wszystko zaznaczone, od razu
+          tap Usuń) jak i "usuń tylko jeden przedmiot" (odznacz resztę albo "Odznacz
+          wszystko" + zaznacz jeden). Każda grupa rozwijalna (tap poza checkboxem) pokazuje
+          dokładną listę dat/godzin tego przedmiotu — user explicite: "pokazuje jakie usunie
+          dla potwierdzenia", to wciąż musi być widoczne, nie tylko sama liczba. */}
       <Modal visible={confirmWipe} transparent animationType="fade" statusBarTranslucent onRequestClose={() => !wiping && setConfirmWipe(false)}>
         <Pressable style={s.wipeOverlay} onPress={() => !wiping && setConfirmWipe(false)}>
           <Pressable style={s.wipeCard} onPress={() => {}}>
-            <Text style={s.wipeTitle}>Usunąć wszystkie zajęcia?</Text>
+            <Text style={s.wipeTitle}>Usuń zajęcia</Text>
             <Text style={s.wipeSub}>
-              Usunie {allClassEvents.length} {plPlural(allClassEvents.length, 'event', 'eventy', 'eventów')} z Kalendarza Google (prefiks „{classPrefix}”) — nieodwracalne.
+              Z Kalendarza Google (prefiks „{classPrefix}”) — nieodwracalne. Odznacz przedmioty których NIE chcesz usuwać.
             </Text>
-            <ScrollView style={s.wipeList} contentContainerStyle={{ gap: spacing[2] }}>
-              {groupByDate(allClassEvents).map(({ ymd, events }) => (
-                <View key={ymd}>
-                  <Text style={s.wipeDateHead}>
-                    {DAY_SHORT[(new Date(ymd + 'T12:00:00').getDay() + 6) % 7]}, {Number(ymd.split('-')[2])} {MONTH_SHORT_GEN[Number(ymd.split('-')[1]) - 1]}
-                  </Text>
-                  {events.map(renderEventRow)}
-                </View>
-              ))}
+            <TouchableOpacity onPress={toggleSelectAll} style={s.wipeSelectAllRow} activeOpacity={0.7}>
+              {allSelected ? <CheckSquare size={15} color="#A78BFA" /> : <Square size={15} color={c.text.muted} />}
+              <Text style={s.wipeSelectAllTxt}>{allSelected ? 'Odznacz wszystko' : 'Zaznacz wszystko'}</Text>
+            </TouchableOpacity>
+            <ScrollView style={s.wipeList} contentContainerStyle={{ gap: spacing[1] }}>
+              {subjectGroups.map(({ subject, events }) => {
+                const selected = selectedSubjects.has(subject);
+                const expanded = expandedSubjects.has(subject);
+                return (
+                  <View key={subject} style={s.wipeGroup}>
+                    <View style={s.wipeGroupHead}>
+                      <TouchableOpacity onPress={() => toggleSubject(subject)} hitSlop={8} style={s.wipeCheckbox}>
+                        {selected ? <CheckSquare size={16} color="#A78BFA" /> : <Square size={16} color={c.text.muted} />}
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.wipeGroupLabel} onPress={() => toggleExpanded(subject)} activeOpacity={0.7}>
+                        <Text style={s.wipeGroupSubject} numberOfLines={1}>{subject}</Text>
+                        <Text style={s.wipeGroupCount}>{events.length} {plPlural(events.length, 'termin', 'terminy', 'terminów')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => toggleExpanded(subject)} hitSlop={8}>
+                        {expanded ? <ChevronUp size={16} color={c.text.muted} /> : <ChevronDown size={16} color={c.text.muted} />}
+                      </TouchableOpacity>
+                    </View>
+                    {expanded && (
+                      <View style={s.wipeGroupDates}>
+                        {groupByDate(events).map(({ ymd, events: dayEvs }) => (
+                          <View key={ymd}>
+                            <Text style={s.wipeDateHead}>
+                              {DAY_SHORT[(new Date(ymd + 'T12:00:00').getDay() + 6) % 7]}, {Number(ymd.split('-')[2])} {MONTH_SHORT_GEN[Number(ymd.split('-')[1]) - 1]}
+                            </Text>
+                            {dayEvs.map(renderEventRow)}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </ScrollView>
             <View style={s.wipeRow}>
               <TouchableOpacity style={s.wipeCancelBtn} onPress={() => setConfirmWipe(false)} activeOpacity={0.8} disabled={wiping}>
                 <Text style={s.wipeCancelTxt}>Anuluj</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.wipeConfirmBtn} onPress={doWipe} activeOpacity={0.8} disabled={wiping}>
+              <TouchableOpacity style={[s.wipeConfirmBtn, wipeTargets.length === 0 && s.wipeConfirmBtnDisabled]} onPress={doWipe} activeOpacity={0.8} disabled={wiping || wipeTargets.length === 0}>
                 {wiping
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={s.wipeConfirmTxt}>Usuń wszystkie ({allClassEvents.length})</Text>}
+                  : <Text style={s.wipeConfirmTxt}>Usuń zaznaczone ({wipeTargets.length})</Text>}
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -378,7 +461,28 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   wipeTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   wipeSub: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17 },
-  wipeList: { maxHeight: 320, marginTop: spacing[1] },
+  wipeSelectAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: spacing[1], marginTop: spacing[1],
+  },
+  wipeSelectAllTxt: { fontSize: 12, fontWeight: '700', color: '#A78BFA' },
+  wipeList: { maxHeight: 360, marginTop: spacing[1] },
+  // Checklista przedmiotów — jeden `wipeGroup` per unikalny przedmiot, rozwijalny do
+  // dokładnej listy dat (ten sam `wipeDateHead`+`renderEventRow` co poprzednio, tylko
+  // teraz zagnieżdżone pod nagłówkiem przedmiotu zamiast płaskie na poziomie modala).
+  wipeGroup: {
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle,
+    backgroundColor: c.bg.card, overflow: 'hidden',
+  },
+  wipeGroupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
+  wipeCheckbox: { padding: 2 },
+  wipeGroupLabel: { flex: 1, minWidth: 0 },
+  wipeGroupSubject: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  wipeGroupCount: { fontSize: 10.5, color: c.text.muted, marginTop: 1 },
+  wipeGroupDates: {
+    paddingHorizontal: spacing[2], paddingBottom: spacing[2],
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+  },
   wipeDateHead: {
     fontFamily: fonts.label, fontSize: 10.5, color: c.text.muted, textTransform: 'uppercase',
     letterSpacing: 0.6, fontWeight: '700', paddingBottom: spacing[1], marginTop: spacing[1],
@@ -393,5 +497,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center', height: 46,
     borderRadius: radius.lg, backgroundColor: colors.accent.red,
   },
+  wipeConfirmBtnDisabled: { backgroundColor: colors.accent.red + '40' },
   wipeConfirmTxt: { fontSize: 13.5, fontWeight: '800', color: '#fff' },
 }));
