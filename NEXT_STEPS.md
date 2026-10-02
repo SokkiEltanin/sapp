@@ -3,7 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Nowe logo appki — podmiana ikony + adaptive icon (2026-10-01)
+## 🆕 "Usuń zajęcia" — checklista PRZEDMIOTÓW zamiast tylko "wszystko albo nic" (2026-10-02)
+
+User: "czy konkretne lekcje... np mam 20x event fizyka kwantowa i żebym mógł usunąć tylko
+go". Pełny opis w ARCHITECTURE.md §232. Modal z §230 przebudowany: checklista przedmiotów
+(grupowanie po `parseClassEvent(...)?.subject`, typ W/C/L/P nie wchodzi w klucz) zamiast
+płaskiej listy dat — każdy przedmiot ma checkbox + licznik + rozwijanie do dokładnych dat.
+Domyślnie WSZYSTKO zaznaczone (stare "usuń wszystko" zostaje zero-wysiłkowe), można
+odznaczyć pojedynczo albo "Odznacz wszystko" + zaznaczyć jeden przedmiot. `tsc`/`jest`
+czyste (92/92 suite, 1180 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (prawdziwe kasowanie danych): Plan zajęć →
+kosz → sprawdź grupowanie po przedmiocie (wykład+ćwiczenia razem) → odznacz wszystko,
+zaznacz jeden przedmiot → usuń → sprawdź że TYLKO on zniknął, reszta planu nietknięta,
+zarówno w appce jak i w Google Calendar.
+
+## ✅ Nowe logo appki — podmiana ikony + adaptive icon (2026-10-01)
 
 User wrzucił `assets/L_WhiteBcg_Color.png` bezpośrednio przez GitHub (nie przez tę sesję)
 i poprosił o podmianę. Pełny opis w ARCHITECTURE.md §231. `app.json`'s `icon` i

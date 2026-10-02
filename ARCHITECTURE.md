@@ -13289,6 +13289,48 @@ sam restart appki): po zainstalowaniu nowego builda sprawdź ikonę na ekranie g
 Androida (zarówno zwykłą jak i wymuszony kształt np. koło w niektórych launcherach,
 żeby sprawdzić że biały margines nie wygląda źle na zaokrąglonej masce adaptive icon).
 
+## 232. "Usuń zajęcia" — checklista PRZEDMIOTÓW zamiast tylko "wszystko albo nic" (2026-10-02)
+
+User: "czy konkretne lekcje... np mam 20x event fizyka kwantowa i żebym mógł zrobić tak
+że usunę tylko go". §230 dało wyłącznie dwie opcje: usuń jeden event (przez zakładkę
+Kalendarz) albo usuń WSZYSTKIE naraz — nic pomiędzy. Brakujący środek: "usuń WSZYSTKIE
+wystąpienia JEDNEGO konkretnego przedmiotu" (typowy przypadek: cykliczny wykład co
+tydzień pod tym samym tytułem, user chce skasować tylko ten jeden przedmiot bo np.
+zmienił się termin, zostawiając resztę planu nietkniętą).
+
+**`app/class-schedule.tsx`** — modal z §230 przebudowany z płaskiej, zawsze-pełnej listy
+dat na **checklistę przedmiotów**: `subjectGroups` (nowy `useMemo`) grupuje
+`allClassEvents` po `parseClassEvent(...)?.subject` (typ W/C/L/P NIE wchodzi w klucz —
+wykład i ćwiczenia tego samego przedmiotu to dla usera "jedna rzecz", nie dwie osobne
+grupy). Każda grupa to wiersz: checkbox + nazwa przedmiotu + licznik terminów +
+chevron-rozwijanie (tap poza checkboxem) do dokładnej listy dat/godzin tego przedmiotu
+(ten sam `groupByDate`+`renderEventRow` co w §230, tylko teraz zagnieżdżony pod
+nagłówkiem przedmiotu zamiast płaski na poziomie modala) — rozwijanie zostaje
+NIEZALEŻNE od zaznaczenia, żeby dało się zobaczyć dokładne terminy bez psucia wyboru.
+
+**Domyślny stan — WSZYSTKO zaznaczone** przy otwarciu modala (`openWipeModal`) —
+zachowuje starą ścieżkę "usuń wszystko" jako zero-wysiłkową (otwórz → tap Usuń, bez
+zaznaczania), zamiast wymuszać ręczne zaznaczanie za każdym razem. Dwa sposoby zawężenia
+do jednego przedmiotu: odznacz pojedynczo resztę, albo "Odznacz wszystko" (nowy toggle
+nad listą) + zaznacz jeden. Przycisk potwierdzenia pokazuje realną liczbę
+(`wipeTargets.length`, nie `allClassEvents.length`) i jest wyłączony gdy nic nie
+zaznaczono (zero-event delete to no-op, nie powinien wyglądać na dostępną akcję).
+
+**`doWipe`** — bez zmian logiki kasowania (`Promise.allSettled` nad
+`googleCalendarService.deleteEvent`, tylko faktycznie usunięte do `deleteEvents`), różnica
+to WYŁĄCZNIE wejściowa lista: `wipeTargets` (odfiltrowana przez `selectedSubjects`)
+zamiast zawsze `allClassEvents`.
+
+**Testy**: brak nowych — czysto UI nad już istniejącym, zweryfikowanym mechanizmem
+kasowania (§230); grupowanie to prosty `Map` nad już przetestowanym pośrednio
+`parseClassEvent`. `tsc --noEmit`/`jest` czyste (92/92, 1180, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (dalej prawdziwe kasowanie danych w Google
+Calendar): Plan zajęć → kosz → sprawdź że lista grupuje się poprawnie po przedmiocie
+(wykład+ćwiczenia tego samego przedmiotu w JEDNEJ grupie) → odznacz wszystko, zaznacz
+jeden przedmiot → rozwiń żeby zweryfikować dokładne daty → usuń → sprawdź że TYLKO ten
+przedmiot zniknął (reszta planu nietknięta) zarówno w appce jak i w Google Calendar.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
