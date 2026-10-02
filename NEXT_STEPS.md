@@ -3,7 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Usunięcie auto-dopasowania zwrotu — zostaje wyłącznie ręczne podpięcie (2026-10-02)
+## 🆕 Ekwipunek pupila: płynne rozwijanie + widoczne porównanie bez klikania (2026-10-02)
+
+User: "Skacze strasznie jest nie wygodny... nie widać co lepsze przed kliknieciem i moze
+sprzedać wszystkie niezałozone??". Pełny opis w ARCHITECTURE.md §235. Trzy zarzuty, trzy
+różne wnioski: (1) rozwijanie karty itemu BEZ animacji → dodany `LayoutAnimation`, ten sam
+wzorzec co `ExpenseItem.tsx`; (2) POTWIERDZONY gap — zwinięta karta pokazywała tylko
+wartość najlepszej kopii, nie założonej → nowa złota plomba "lepsza dostępna" + porównanie
+"Założona: X · Najlepsza: Y" widoczne BEZ rozwijania, gdy się różnią; (3) "sprzedaj
+wszystkie niezałożone" JUŻ ISTNIEJE (przycisk nad listą, cały slot naraz) — na zrzutach
+usera akurat nic nie kwalifikowało się do sprzedaży w danym momencie, stąd wrażenie że go
+nie ma. Nic nowego nie dodane tam, duplikat byłby martwym kodem. `tsc`/`jest` czyste
+(91/91 suite, 1170 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Pupil → slot z kilkoma kopiami tego samego
+itemu → rozwiń/zwiń, sprawdź płynność. Jeśli masz lepszą niezałożoną kopię niż ta na
+kotku, sprawdź plombę "lepsza dostępna" na zwiniętej karcie.
+
+## ✅ Usunięcie auto-dopasowania zwrotu — zostaje wyłącznie ręczne podpięcie (2026-10-02)
 
 User zrzutem: "co to kurwa jest ze mnie pyta czy to zwrot tego nie chciałem wgle... na
 dashboardzie ja sam przypinam". Pełny opis w ARCHITECTURE.md §234. Karta "To zwrot za

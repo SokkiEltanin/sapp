@@ -1,6 +1,6 @@
 import { ReactNode, useMemo, useState } from 'react';
-import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native';
-import { X, Check, ChevronDown, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, Minus, Plus, LucideIcon } from 'lucide-react-native';
+import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { X, Check, ChevronDown, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, Minus, Plus, ArrowUp, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,6 +15,10 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { plPlural } from '@/utils/plural';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const SLOT_ICON: Record<GearSlot, LucideIcon> = {
   helm: HardHat, zbroja: Shield, buty: Footprints, obroza: Link2, talizman: Gem, kolczyki: Coins,
@@ -143,7 +147,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                 ([id, inst]) => inst && id !== slEquippedId && gearById(inst.itemId)?.slot === sl,
               );
               return (
-                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
+                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
                   <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />
                   {hasDot && <View style={s.tabDot} />}
                 </TouchableOpacity>
@@ -176,16 +180,27 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
               {groups.map(group => {
                 const isExpanded = expandedItemId === group.item.id;
                 const count = group.instances.length;
-                const groupHasEquipped = group.instances.some(i => i.id === equippedId);
+                const equippedEntry = group.instances.find(i => i.id === equippedId);
+                const groupHasEquipped = !!equippedEntry;
                 const best = group.instances[0].inst;
                 const bestMeta = RARITY_META[best.rarity];
                 const nonEquippedInGroup = group.instances.filter(i => i.id !== equippedId);
+                // Lepsza NIEzałożona kopia niż ta, którą masz na kotku — widoczne BEZ
+                // rozwijania (2026-10-02, user: "nie widać co lepsze przed kliknięciem" —
+                // dotąd kafel zawsze pokazywał tylko wartość najlepszej kopii, bez względu na
+                // to czy to WŁAŚNIE ta jest założona, więc nie dało się ocenić "czy warto
+                // zmienić" bez rozwinięcia i czytania delt przy każdej kopii z osobna).
+                const hasUpgrade = !!equippedEntry && best.value > equippedEntry.inst.value;
                 return (
                   <View key={group.item.id} style={[s.itemGroup, { borderColor: bestMeta.color + '55' }]}>
                     <TouchableOpacity
                       style={s.itemGroupHead}
                       activeOpacity={0.8}
-                      onPress={() => { haptic.tap(); setExpandedItemId(isExpanded ? null : group.item.id); }}
+                      onPress={() => {
+                        haptic.tap();
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setExpandedItemId(isExpanded ? null : group.item.id);
+                      }}
                     >
                       <Image source={group.item.icon} style={[s.itemImg, { borderColor: bestMeta.color + '55' }]} resizeMode="contain" />
                       <View style={{ flex: 1 }}>
@@ -200,9 +215,26 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                           {groupHasEquipped && (
                             <View style={s.equippedBadge}><Check size={10} color="#2AC68F" /></View>
                           )}
+                          {hasUpgrade && (
+                            <View style={s.upgradeBadge}>
+                              <ArrowUp size={10} color="#FBBF24" />
+                              <Text style={s.upgradeBadgeTxt}>lepsza dostępna</Text>
+                            </View>
+                          )}
                         </View>
-                        <Text style={[s.itemRarity, { color: bestMeta.color }]}>{bestMeta.label}{count > 1 ? ' (najlepsza)' : ''}</Text>
-                        <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, best.value)}{stat === 'flatHp' ? ' HP' : ''}</Text>
+                        {hasUpgrade ? (
+                          // Dwie wartości naraz — założona i najlepsza nierozpakowana — zamiast
+                          // jednej liczby która milczy o tym że to NIE jest ta co masz na kotku.
+                          <Text style={s.itemStat}>
+                            Założona: <Text style={s.itemStatEquipped}>{fmtGearStat(stat, equippedEntry!.inst.value)}</Text>
+                            {'  ·  '}Najlepsza: <Text style={[s.itemStatBest, { color: bestMeta.color }]}>{fmtGearStat(stat, best.value)}</Text>
+                          </Text>
+                        ) : (
+                          <>
+                            <Text style={[s.itemRarity, { color: bestMeta.color }]}>{bestMeta.label}{count > 1 ? ' (najlepsza)' : ''}</Text>
+                            <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, best.value)}{stat === 'flatHp' ? ' HP' : ''}</Text>
+                          </>
+                        )}
                       </View>
                       <ChevronDown size={18} color={c.text.muted} style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
                     </TouchableOpacity>
@@ -395,6 +427,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   countBadge: { backgroundColor: '#FBBF2426', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 1 },
   countBadgeTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
   equippedBadge: { backgroundColor: '#2AC68F26', borderRadius: radius.full, padding: 3 },
+  // "Masz lepszą niezałożoną kopię" — widoczne na kafelku BEZ rozwijania (2026-10-02).
+  upgradeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2426', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 1 },
+  upgradeBadgeTxt: { fontSize: 9.5, fontWeight: '800', color: '#FBBF24' },
+  itemStatEquipped: { fontWeight: '800', color: c.text.primary },
+  itemStatBest: { fontWeight: '800' },
   instanceList: { paddingHorizontal: spacing[3], paddingBottom: spacing[3], gap: spacing[2] },
   itemInstanceLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 

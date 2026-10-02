@@ -13426,6 +13426,53 @@ suite, 1170 testów, -10 vs poprzedni stan — zgodnie z oczekiwaniem).
 **Priorytet testu na urządzeniu — niski** (czyste usunięcie, zero nowej logiki do
 zweryfikowania — jeśli przelew przychodzący już nie pokazuje tej karty, działa).
 
+## 235. Ekwipunek pupila: płynne rozwijanie + widoczne porównanie bez klikania (2026-10-02)
+
+User zrzutami ekranu + opisem: "Skacze strasznie jest nie wygodny ciezko cie używa go
+ogólnie i nie widać co lepsze przed kliknieciem i moze sprzedać wszystkie
+niezałozone??". Trzy osobne zarzuty, zweryfikowane osobno w `src/components/pet/GearPanel.tsx`
+(jedyny komponent modala "Ekwipunek", ~431 linii) zanim cokolwiek ruszyłem.
+
+**1. "Skacze" — rozwijanie karty itemu BEZ animacji.** `expandedItemId` przełączał się
+gołym `setState`, a rozwinięta lista kopii (`isExpanded && <View style={s.instanceList}>`)
+to zwykły warunkowy mount/unmount zmiennowysokościowej treści wewnątrz `ScrollView` —
+RN po prostu "przeskakuje" layout natychmiast, bez animacji. Fix: `LayoutAnimation`
+(ten sam wzorzec co `ExpenseItem.tsx`/`MoodCheckInModal.tsx` — moduł-level
+`UIManager.setLayoutAnimationEnabledExperimental(true)` na Androidzie,
+`LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)` tuż przed
+`setExpandedItemId(...)`) — zarówno przy rozwijaniu pojedynczej karty jak i przy
+przełączaniu zakładki slotu (które resetuje `expandedItemId` do `null`, też skakało).
+
+**2. "Nie widać co lepsze przed kliknięciem" — POTWIERDZONY realny gap.** Zwinięty
+nagłówek karty pokazywał WYŁĄCZNIE wartość najlepszej posiadanej kopii (`best.value`,
+`group.instances[0]`, posortowane malejąco) — NIEZALEŻNIE od tego czy to akurat ta kopia
+jest założona na kotku. Jeśli założona kopia NIE była najlepszą (np. masz 3 egzemplarze,
+najlepszy leży w plecaku), nie dało się tego ocenić bez rozwinięcia i czytania delt przy
+KAŻDEJ kopii z osobna. Fix: nowy `hasUpgrade = equippedEntry && best.value >
+equippedEntry.inst.value` — gdy true, zwinięty nagłówek pokazuje OBIE wartości naraz
+("Założona: X · Najlepsza: Y") PLUS złotą plombę "⬆ lepsza dostępna" w rzędzie nazwy,
+widoczną od razu przy przewijaniu listy bez czytania liczb. Gdy założona = najlepsza (albo
+nic nie jest jeszcze założone), zachowanie bez zmian (sama najlepsza wartość, jak dotąd).
+
+**3. "Sprzedaj wszystkie niezałożone" — JUŻ ISTNIEJE, nie dodane ponownie.**
+`allNonEquipped`/przycisk "Sprzedaj {N} niezałożonych" (nad listą grup, cały slot naraz)
+już jest w kodzie (sprzed tej zmiany) i poprawnie pokazuje się TYLKO gdy
+`allNonEquipped.length > 0`. Na obu zrzutach usera akurat nic nie kwalifikowało się do
+sprzedaży w danym momencie (Talizman: jedyna kopia już założona; Obroża: jedyna kopia
+też założona) — stąd wrażenie że przycisku "nie ma", a nie że jest ukryty. Nic do
+zrobienia tutaj poza wyjaśnieniem — dodawanie duplikatu tej samej funkcji byłoby
+martwym kodem.
+
+**Testy**: brak nowych — czysto UI/animacja nad już istniejącymi, przetestowanymi
+pośrednio danymi (`value`/`equippedGear` w `petStore.ts`). `tsc --noEmit`/`jest` czyste
+(91/91 suite, 1170 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: Pupil → dowolny slot z kilkoma kopiami tego
+samego itemu → rozwiń/zwiń → sprawdź że przejście jest płynne, nie skacze. Jeśli masz
+(albo zdobędziesz) lepszą niezałożoną kopię niż ta na kotku, sprawdź że złota plomba
+"lepsza dostępna" i porównanie Założona/Najlepsza pokazują się na zwiniętej karcie, BEZ
+klikania.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
