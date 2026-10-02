@@ -3,7 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Ekwipunek pupila: płynne rozwijanie + widoczne porównanie bez klikania (2026-10-02)
+## 🆕 Siatka humoru: otoczka = energia; skrzynki: nagroda po animacji, nie przed (2026-10-02)
+
+Dwa zlecenia naraz, pełny opis w ARCHITECTURE.md §236. (1) `MoodEnergyGrid.tsx` — kolor
+kropki/otoczki szedł z `mood` (tak jak emotka), energia nigdzie nie była widoczna mimo
+gotowego, nieużywanego `ENERGY_COLORS` w `types/index.ts` → teraz otoczka = energia,
+emotka w środku = nastrój (user: "zmieniać kolor otoczki bazując gora dol na ile mam
+energii a emotka w środku na humor"). Dashboard/pixel-rok NIETKNIĘTE (tam nie ma osi
+energii, user mówił o samej siatce check-inu). (2) Skrzynki pupila (`onDailyBox` w
+`app/pet.tsx`, `onBuyBox` w `app/pet-shop.tsx`) — `addCoins`/`grantGear`/
+`grantOrLevelCombatItem` były wołane PRZED otwarciem `BoxRevealModal`, więc licznik monet
+w nagłówku skakał widocznie w tle całe ~4s kręcenia reela, spoilerując wynik na długo
+przed odsłoną (user: "nagroda powinna przyznawać się po animacji losowania bo tak to widać
+od razu po zlocie czy dostałem co"). Fix: nowy `onRevealed` prop na `BoxRevealModal`,
+odpalany DOKŁADNIE gdy reel się zatrzymuje — cała logika przyznania przeniesiona tam z
+handlerów kliknięcia. `CrateModal.tsx` (skrzynka z pieszczenia kota) miał już ten wzorzec
+poprawnie, posłużył jako referencja. `tsc`/`jest` czyste (91/91 suite, 1170 testów, bez
+zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: (a) Humor → sprawdź że kolor kropki idzie
+za przesuwaniem góra/dół (energia), emotka za lewo/prawo (nastrój). (b) Pupil → otwórz
+Skrzynkę dnia/kupioną → obserwuj licznik monet w nagłówku PODCZAS kręcenia reela — nie
+powinien drgnąć aż reel się zatrzyma.
+
+## ✅ Ekwipunek pupila: płynne rozwijanie + widoczne porównanie bez klikania (2026-10-02)
 
 User: "Skacze strasznie jest nie wygodny... nie widać co lepsze przed kliknieciem i moze
 sprzedać wszystkie niezałozone??". Pełny opis w ARCHITECTURE.md §235. Trzy zarzuty, trzy
@@ -16,7 +39,7 @@ usera akurat nic nie kwalifikowało się do sprzedaży w danym momencie, stąd w
 nie ma. Nic nowego nie dodane tam, duplikat byłby martwym kodem. `tsc`/`jest` czyste
 (91/91 suite, 1170 testów, bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — średni**: Pupil → slot z kilkoma kopiami tego samego
+Priorytet testu na urządzeniu — średni: Pupil → slot z kilkoma kopiami tego samego
 itemu → rozwiń/zwiń, sprawdź płynność. Jeśli masz lepszą niezałożoną kopię niż ta na
 kotku, sprawdź plombę "lepsza dostępna" na zwiniętej karcie.
 

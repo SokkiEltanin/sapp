@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated, useWindowDimensions } from 'react-nat
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS } from '@/types';
+import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -117,7 +117,10 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
   }, [mood, energy, cellX, cellY]);
 
   const hasValue = !!mood && !!energy;
-  const dotColor = mood ? MOOD_COLORS[mood] : c.text.muted;
+  // Otoczka = energia, emotka w środku = nastrój (2026-10-02, user: kolor samego kółka
+  // mylił się z emotką — obie niosły informację o nastroju, energia nigdzie nie była
+  // widoczna wizualnie mimo że `ENERGY_COLORS` już istniało w types/index.ts, nieużywane).
+  const ringColor = energy ? ENERGY_COLORS[energy] : c.text.muted;
 
   return (
     <View style={styles.container}>
@@ -161,14 +164,14 @@ export default function MoodEnergyGrid({ mood, energy, onChange }: Props) {
         >
           <View style={[
             styles.dotInner,
-            { borderColor: dotColor, backgroundColor: hasValue ? dotColor + '33' : c.bg.card },
+            { borderColor: ringColor, backgroundColor: hasValue ? ringColor + '33' : c.bg.card },
           ]}>
             <Text style={styles.dotEmoji}>{mood ? MOOD_EMOJIS[mood] : '·'}</Text>
           </View>
         </Animated.View>
       </View>
 
-      <Text style={[styles.readout, styles.inset, { color: hasValue ? dotColor : c.text.muted }]} numberOfLines={1}>
+      <Text style={[styles.readout, styles.inset, { color: hasValue ? ringColor : c.text.muted }]} numberOfLines={1}>
         {hasValue
           ? `${MOOD_EMOJIS[mood!]} ${MOOD_LABELS[mood!]}  ·  ${ENERGY_EMOJIS[energy!]} ${ENERGY_LABELS[energy!]}`
           : 'Jeszcze nie zaznaczono'}

@@ -77,15 +77,23 @@ function buildReel(reward: BoxReward): ReelCell[] {
   return cells;
 }
 
-// Odsłona nagrody ze skrzynki. Nagroda jest JUŻ wylosowana i przyznana — tu tylko celebracja:
-// "Otwórz" → reel przelatuje i zwalnia na wylosowanym itemie → wybuch + cząstki + karta.
+// Odsłona nagrody ze skrzynki. Nagroda jest JUŻ WYLOSOWANA (`reward` prop), ale NIE jeszcze
+// przyznana do store'u — `onRevealed` (2026-10-02, user: "nagroda powinna przyznawać się po
+// animacji losowania bo tak to widać od razu po zlocie czy dostałem co, np. się zwiększa
+// bardzo czy coś" — licznik monet w nagłówku `pet.tsx`/`pet-shop.tsx` czytał TEN SAM store,
+// który wcześniej był mutowany w momencie kliknięcia "Otwórz", więc skakał widocznie w tle
+// przez całe ~4s kręcenia reela, spoilerując wynik na wiele sekund przed jego odsłonięciem)
+// odpala się DOKŁADNIE w momencie gdy reel się zatrzymuje i karta wyniku pojawia się na
+// ekranie — wołający (pet.tsx/pet-shop.tsx) dopiero TU wykonuje `addCoins`/`grantGear`/
+// `grantOrLevelCombatItem`, nie wcześniej.
 //
 // Dawny prop `dupeCoins` USUNIĘTY (2026-09-18) — od `grantGear`'s przejścia na trwałe
 // instancje (patrz `GearInstance` w gear.ts) KAŻDY wylosowany gear jest zawsze naprawdę
 // przyznany, nigdy po cichu kompensowany/odrzucany, więc karta "EKWIPUNEK! <nazwa>" już
 // zawsze mówi prawdę — nie potrzeba osobnej "uczciwej" wersji na duplikat.
-export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, onClose }: {
-  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any; onClose: () => void;
+export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, onRevealed, onClose }: {
+  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any;
+  onRevealed?: () => void; onClose: () => void;
 }) {
   // Nowa faza `opening` (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
   // powiększyć bo jest malutka i zrobic takie epickie przejście po kliknięciu otworz do
@@ -157,6 +165,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
         Animated.timing(reelX, {
           toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
         }).start(() => {
+          onRevealed?.();
           setPhase('revealed');
           haptic.success();
           Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();

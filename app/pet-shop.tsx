@@ -295,22 +295,29 @@ export default function PetShop() {
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
       const reward = rollBox(box, petLevel, ownedCombatItems);
-      if (reward.type === 'coins') addCoins(reward.coins);
-      // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
-      // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
-      else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
-      else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
-      // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — czysta obserwacja wyniku
-      // `rollBox()`, żadna wartość ekonomii się tu nie zmienia. `daily:false` bo to
-      // PŁATNA skrzynka (patrz onDailyBox w pet.tsx dla darmowej, ten sam BoxId 'sardine'
-      // musi zostać odróżniony żeby statystyki się nie zlały).
-      recordBoxOpen({
-        at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
-        coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
-      });
       haptic.success();
       setReveal({ box, reward });
     }, 'Otwórz', odds);
+  };
+  // Przyznanie nagrody PRZESUNIĘTE do odsłony reela (2026-10-02, patrz komentarz przy
+  // `onRevealed` w BoxRevealModal.tsx) — `reveal` jest stabilne od `onBuyBox` do `onClose`,
+  // nic innego go po drodze nie zmienia, więc bezpiecznie czytać tu `reward`/`box`.
+  const onBoxRevealed = () => {
+    if (!reveal) return;
+    const { box, reward } = reveal;
+    if (reward.type === 'coins') addCoins(reward.coins);
+    // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
+    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
+    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
+    else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
+    // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — czysta obserwacja wyniku
+    // `rollBox()`, żadna wartość ekonomii się tu nie zmienia. `daily:false` bo to
+    // PŁATNA skrzynka (patrz onDailyBox w pet.tsx dla darmowej, ten sam BoxId 'sardine'
+    // musi zostać odróżniony żeby statystyki się nie zlały).
+    recordBoxOpen({
+      at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
+      coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+    });
   };
 
   // Darmowa skrzynka dnia (2026-09-08) — USUNIĘTA z tego ekranu (user: "zostawiłeś skrzynkę
@@ -579,6 +586,7 @@ export default function PetShop() {
         boxColor={reveal?.box.color ?? '#9AA6B2'}
         boxEmoji={reveal?.box.emoji ?? '🎁'}
         boxIcon={reveal?.box.icon}
+        onRevealed={onBoxRevealed}
         onClose={() => setReveal(null)}
       />
 
