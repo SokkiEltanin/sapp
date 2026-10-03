@@ -3,7 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: wklejka nie wypełniała wagi (fitatu "ml") + przycisk niewidoczny (2026-10-03)
+## 🆕 Fix: kalendarz wody — tap na dzień blokował całą appkę (2026-10-03)
+
+User zrzutem kalendarza z §240/wyżej: "Jak kliknąłem edyt wodę to nic nie mogę klikać
+wtf" — tapnięcie dnia nie otwierało edycji i blokowało interakcję z resztą ekranu. Pełny
+opis w ARCHITECTURE.md §242. Przyczyna (najbardziej prawdopodobna): `onPress` wprost na
+elementach SVG (`<G>`) — pierwsze w całej appce takie użycie, nigdy nieprzetestowane;
+hit-testing w react-native-svg przy skalowanym viewBox jest znanym źródłem problemów.
+Usunięte na rzecz siatki zwykłych, przezroczystych `Pressable` z 'react-native'
+nałożonych NA SVG (position:absolute w procentach, liczonych z tych samych stałych co
+rysowanie). Przy okazji, prewencyjnie: modal edycji miał zagnieżdżone Pressable-w-Pressable
+(wzorzec nieużywany nigdzie indziej) — przebudowany na sprawdzony wzorzec z modala
+ustawień wody w health.tsx (overlay+arkusz jako rodzeństwo). `tsc`/`jest` czyste (93/93
+suite, 1195 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — KRYTYCZNY** (ten sam ekran zgłoszony jako
+całkowicie zablokowany): Zdrowie → "Kalendarz wody" → stuknij DOWOLNY dzień → sprawdź że
+otwiera się modal edycji (nie blokuje ekranu) i że po Zapisz reszta ekranu dalej reaguje
+na dotyk.
+
+## ✅ Fix: wklejka nie wypełniała wagi (fitatu "ml") + przycisk niewidoczny (2026-10-03)
 
 User zrzutem — pierwszy realny test wklejki od usera (Kinder Niespodzianka, §238/239):
 kcal/100g i wszystkie 4 makra wypełniły się poprawnie, ALE "Waga (g/szt)" zostało puste
@@ -17,7 +36,7 @@ produktem". Oba fixy w `product.tsx` I `food/add.tsx` (identyczny kod skopiowany
 miejscach w §238/239). `tsc`/`jest` czyste (93/93 suite, 1195 testów, bez zmiany — czysty
 UI/warunek).
 
-**🆕 Priorytet testu na urządzeniu — WYSOKI**: Baza jedzenia → "+" → wklej TĘ SAMĄ
+Priorytet testu na urządzeniu — WYSOKI: Baza jedzenia → "+" → wklej TĘ SAMĄ
 wklejkę Kinder Niespodzianka → sprawdź że TERAZ "Waga" = 20, i że przycisk jest wyraźnie
 widoczny jako pigułka.
 

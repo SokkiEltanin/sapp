@@ -176,7 +176,7 @@ export default function WaterCalendar() {
                     const alpha = tierAlpha(cell.count, goal);
                     const fill = alpha ? ACCENT + alpha : c.fill.subtle;
                     return (
-                      <G key={i} onPress={() => openDay(cell.ds, cell.count)}>
+                      <G key={i}>
                         <Rect x={x} y={y} width={MC} height={MC} rx={7} fill={fill}
                           stroke={cell.froz ? ICE : cell.isToday ? c.text.primary : undefined}
                           strokeWidth={cell.froz ? 2 : cell.isToday ? 2.2 : 0} />
@@ -186,6 +186,28 @@ export default function WaterCalendar() {
                     );
                   })}
                 </Svg>
+                {/* Nakładka dotykowa ZWYKŁYMI `Pressable` z 'react-native', NIE `onPress` na
+                    elementach SVG (2026-10-03, user: "jak kliknąłem edyt wodę to nic nie mogę
+                    klikać" — pierwsze w tej appce użycie onPress wprost na `<G>`/`<Rect>`,
+                    nigdzie wcześniej nieprzetestowane; hit-testing w react-native-svg przy
+                    skalowanym `viewBox`/`preserveAspectRatio` jest znanym źródłem problemów —
+                    zamiast dalej zgadywać dlaczego, zamieniony na sprawdzony w całej appce
+                    wzorzec: zwykłe RN-owe `Pressable` w przestrzeni ekranu (%), position
+                    liczona z tych samych stałych co rysowanie SVG, więc zawsze pokrywa się
+                    z narysowaną komórką). */}
+                {cells.map((cell, i) => (
+                  <Pressable
+                    key={`t${i}`}
+                    onPress={() => openDay(cell.ds, cell.count)}
+                    style={{
+                      position: 'absolute',
+                      left: `${(cell.wd * (MC + MG)) / mW * 100}%`,
+                      top: `${(MHEAD + cell.wk * (MC + MG)) / mH * 100}%`,
+                      width: `${MC / mW * 100}%`,
+                      height: `${MC / mH * 100}%`,
+                    }}
+                  />
+                ))}
               </View>
             ) : (
               <View style={{ width: '100%', aspectRatio: yW / yH }}>
@@ -218,27 +240,27 @@ export default function WaterCalendar() {
         <View style={{ height: 30 }} />
       </ScrollView>
 
-      {/* edycja/backfill dnia */}
+      {/* edycja/backfill dnia — overlay i arkusz jako RODZEŃSTWO (nie zagnieżdżone Pressable),
+          ten sam wzorzec co modal ustawień wody w health.tsx (wm.overlay/wm.sheet). */}
       <Modal visible={!!editDate} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditDate(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setEditDate(null)}>
-            <Pressable style={s.sheet} onPress={() => {}}>
-              <Text style={s.sheetTitle}>{editDate ? fmtDay(editDate, todayKey) : ''}</Text>
-              <Text style={s.sheetSub}>Ile szklanek wody wypiłeś tego dnia</Text>
-              <TextInput
-                style={s.sheetInput} value={editValue} onChangeText={setEditValue}
-                keyboardType="number-pad" placeholder="0" placeholderTextColor={c.text.muted}
-                autoFocus selectTextOnFocus
-              />
-              <Text style={s.sheetMl}>
-                {(() => { const n = Math.max(0, Math.round(parseFloat(editValue.replace(',', '.')) || 0)); return `≈ ${(n * glassMl / 1000).toFixed(2).replace('.', ',')} l`; })()}
-              </Text>
-              <TouchableOpacity style={s.sheetSave} onPress={saveDay} activeOpacity={0.85}>
-                <Check size={17} color="#07160F" />
-                <Text style={s.sheetSaveTxt}>Zapisz</Text>
-              </TouchableOpacity>
-            </Pressable>
-          </Pressable>
+          <Pressable style={s.overlay} onPress={() => setEditDate(null)} />
+          <View style={s.sheet}>
+            <Text style={s.sheetTitle}>{editDate ? fmtDay(editDate, todayKey) : ''}</Text>
+            <Text style={s.sheetSub}>Ile szklanek wody wypiłeś tego dnia</Text>
+            <TextInput
+              style={s.sheetInput} value={editValue} onChangeText={setEditValue}
+              keyboardType="number-pad" placeholder="0" placeholderTextColor={c.text.muted}
+              autoFocus selectTextOnFocus
+            />
+            <Text style={s.sheetMl}>
+              {(() => { const n = Math.max(0, Math.round(parseFloat(editValue.replace(',', '.')) || 0)); return `≈ ${(n * glassMl / 1000).toFixed(2).replace('.', ',')} l`; })()}
+            </Text>
+            <TouchableOpacity style={s.sheetSave} onPress={saveDay} activeOpacity={0.85}>
+              <Check size={17} color="#07160F" />
+              <Text style={s.sheetSaveTxt}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -276,8 +298,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   statKey: { fontSize: 10.5, fontWeight: '600', color: c.text.muted },
   statDiv: { width: 1, height: 30, backgroundColor: c.border.subtle },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  sheet: { width: 280, backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[5], gap: spacing[2], alignItems: 'center' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: c.border.default, padding: spacing[5], paddingBottom: spacing[8], gap: spacing[2], alignItems: 'center' },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   sheetSub: { fontSize: 12, color: c.text.muted, marginBottom: spacing[1] },
   sheetInput: { width: 110, height: 56, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', fontSize: 28, fontWeight: '800', color: c.text.primary },
