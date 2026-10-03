@@ -157,7 +157,13 @@ export function workFixedProgress(earnings: number, fvMonths: FVMonth[]): FixedP
   const target = Math.round(prev.length ? prev.reduce((a, m) => a + m.fixed, 0) / prev.length : (cur ? cur.fixed : 0));
   const earned = Math.max(0, earnings);
   const filled = Math.round(Math.min(earned, target));
-  return { target, filled, pct: target > 0 ? filled / target : 1, above: Math.round(Math.max(0, earned - target)) };
+  // pct=0 (nie 1) gdy target=0 — brak historii stałych wydatków to "nie da się ocenić", nie
+  // "w pełni pokryte". Dziś jedyny consumer (`app/(tabs)/index.tsx`) i tak chowa cały widget za
+  // `workFixed.target > 0`, więc to się nie renderuje — ale sama funkcja powinna zwracać sensowną
+  // wartość niezależnie od tego czy akurat ten jeden wołający akurat przed nią ochrania (code
+  // review 2026-10-03, poprawka defensywna: `fixedVariable.ts:127` historycznie — przed
+  // §przemianowaniem na `workFixedProgress` — miał ten sam fallback na `1`).
+  return { target, filled, pct: target > 0 ? filled / target : 0, above: Math.round(Math.max(0, earned - target)) };
 }
 
 export interface FixedItem { label: string; amount: number; }

@@ -13833,6 +13833,41 @@ sprawdź że kafelek się przekolorował i że cała reszta ekranu dalej reaguje
 
 ---
 
+## 243. Audyt kodu z tej sesji (wydajność + logika) — jeden realny, defensywny fix (2026-10-03)
+
+User: "Dawaj testy optymalizacji i logiki" — po doprecyzowaniu (pytanie bez jasnej
+preferencji) uruchomiony `/code-review` na `master~25..master` (zakres tej sesji) na
+poziomie `high`.
+
+**Wynik**: kod z tej sesji okazał się nietypowo samo-skorygowany — kilka commitów w tym
+zakresie jawnie naprawia błędy znalezione we WCZEŚNIEJSZYCH commitach tej samej sesji
+(np. wyścig `getEmployers()`/`getActiveEmployerId()`, bug "parsed={}" w
+`saveProductCategories`, zły stan ikonki w `BoxRevealModal` przy fazie `closed`).
+Zweryfikowane i uznane za CZYSTE (bez dalszej akcji): migracje selektorów `useShallow` w
+`boss-fight.tsx`/`pet.tsx`/`pet-shop.tsx` (pole-po-polu, żadne nie zgubione), usunięcie
+`color`/`startup`/`freeze` z `BoxReward` (zero wiszących referencji), przepisanie
+`throttledAsyncStorage`→`throttledPersistStorage` (format + pokrycie testami), odpięcie
+sekcji dashboardu `sleep-chart` (w pełni zgodne z playbookiem z ARCHITECTURE.md).
+
+**Jedyny przeżywający weryfikację finding**: `workFixedProgress()`
+(`src/utils/fixedVariable.ts`) zwracało `pct: target > 0 ? filled/target : 1` — dla
+target=0 (świeży user bez HISTORII stałych wydatków) dawało pct=1 ("w pełni pokryte"),
+mylące. ZWERYFIKOWANE jako NIE powodujące dziś widocznego buga — jedyny wołający
+(`app/(tabs)/index.tsx:1670`) chowa CAŁY widget za `workFixed.target > 0`
+(`index.tsx:3922`), więc target=0 nigdy się nie renderuje. Mimo to naprawione
+DEFENSYWNIE — czysta funkcja powinna mieć sensowny kontrakt niezależnie od tego czy akurat
+JEDYNY dziś wołający przypadkiem ją chroni (przyszły wołający mógłby nie chronić). Fix:
+`pct` dla target=0 → `0` zamiast `1`. Nowy test w `__tests__/fixedVariable.test.ts`
+(target=0 z zerową historią → pct=0).
+
+**Testy**: `tsc --noEmit`/`jest` czyste (93/93 suite, 1196 testów, +1 nowy).
+
+**Priorytet testu na urządzeniu — niski** (fix defensywny, nie naprawia widocznego
+buga — nic nie powinno się wizualnie zmienić, bo guard u wołającego i tak chował ten
+przypadek): brak konkretnego scenariusza do sprawdzenia na urządzeniu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
