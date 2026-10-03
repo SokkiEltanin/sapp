@@ -256,4 +256,14 @@ describe('fixedVariable — workFixedProgress', () => {
     expect(out.target).toBe(1050);
     expect(Number.isFinite(out.pct)).toBe(true);
   });
+
+  // 2026-10-03, code review — target=0 (zupełnie świeży user, zero historii stałych wydatków)
+  // dawniej dawało pct=1 ("w pełni pokryte"), mylące gdyby kiedyś coś to wyrenderowało mimo
+  // `target > 0` guarda u jedynego dziś wołającego (index.tsx).
+  test('target=0 (brak jakiejkolwiek historii stałych) → pct=0, nie 1', () => {
+    const out = workFixedProgress(500, [{ month: '2026-08', fixed: 0, variable: 0, food: 0 }]);
+    expect(out.target).toBe(0);
+    expect(out.filled).toBe(0);
+    expect(out.pct).toBe(0);
+  });
 });

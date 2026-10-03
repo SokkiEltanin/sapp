@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Audyt kodu z tej sesji (wydajność + logika) — jeden defensywny fix (2026-10-03)
+
+User: "Dawaj testy optymalizacji i logiki" — `/code-review` na `master~25..master`
+(poziom `high`). Pełny opis w ARCHITECTURE.md §243. Kod z tej sesji okazał się
+nietypowo czysty (kilka commitów samo-koryguje wcześniejsze w tym samym zakresie).
+Jedyny finding: `workFixedProgress()` dawało `pct=1` dla `target=0` (świeży user bez
+historii stałych wydatków) — ZWERYFIKOWANE jako nie powodujące dziś widocznego buga
+(jedyny wołający chowa cały widget za `target > 0`), naprawione defensywnie mimo to
+(`pct=0`). Nowy test w `fixedVariable.test.ts`. `tsc`/`jest` czyste (93/93 suite, 1196
+testów). Brak scenariusza do testu na urządzeniu — fix nie zmienia niczego widocznego.
+
 ## 🆕 Fix: kalendarz wody — tap na dzień blokował całą appkę (2026-10-03)
 
 User zrzutem kalendarza z §240/wyżej: "Jak kliknąłem edyt wodę to nic nie mogę klikać
