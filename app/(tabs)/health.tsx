@@ -1253,6 +1253,19 @@ export default function HealthScreen() {
               <Text style={wm.saveBtnText}>Zapisz</Text>
             </TouchableOpacity>
 
+            {/* Kalendarz wody (2026-10-03, user: "żebym widział szczegółowe dane picia wody
+                ile dziennie... kalendarz z zaznaczoną ilością wypitą... i żebym mógł
+                modyfikować wstecz") — `ensureWaterHabit()` gwarantuje że habit istnieje (ID
+                zawsze znane), zanim przejdziemy, żeby water-calendar.tsx nie musiało
+                duplikować logiki tworzenia nawyku "Woda". */}
+            <TouchableOpacity
+              style={wm.diagBtn}
+              activeOpacity={0.8}
+              onPress={async () => { haptic.tap(); const id = await ensureWaterHabit(); setWaterCfgOpen(false); router.push(`/water-calendar?id=${id ?? ''}`); }}
+            >
+              <Text style={wm.diagBtnText}>Kalendarz wody / popraw wsteczny dzień</Text>
+            </TouchableOpacity>
+
             {/* Cofnij ostatnie dodanie (2026-08-24, user: "a po kliknięciu otwiera sie z
                 edycja cupsize lub cofnij dodanie") — zastępuje dawny stały przycisk minus
                 obok gauge'a (usunięty, patrz komentarz przy kompaktowym widgecie wyżej) —

@@ -13684,6 +13684,76 @@ makro się wypełniają.
 
 ---
 
+## 240. Kalendarz wody w Zdrowiu — ilość per dzień, freeze, edycja wstecz (2026-10-03)
+
+User (dalszy ciąg §236-237-239, "dawaj to z wodą"): "żebym widział w zakładce zdrowie
+szczegółowe dane picia wody ile dziennie itp np kalendarz z zaznaczoną tylko wodą i ilością
+wypitą (i że zużytych freezami) i żebym mógł modyfikować np wczoraj wypiłem ale nie było
+internetu i mi nie złapało". Wcześniej odłożone jako 📋 ZAPLANOWANE w NEXT_STEPS — teraz
+zrealizowane w całości.
+
+**Zbadane PRZED kodem** (pełny research subagentem): woda żyje jako zwykły `Habit`
+(`kind:'water'`) w generycznym systemie habitów (`src/utils/habits.ts`) — `getCounts(date)`/
+`setCounts(date, counts)`/`getCountsRange(dates)` WSZYSTKIE już przyjmują dowolną datę, nie
+tylko dziś (backfill był już możliwy na poziomie danych, brakowało tylko UI).
+`streakFreezeStore.applyFreeze(habitId, date)` jest WOŁANE AUTOMATYCZNIE (jedyne miejsce:
+`useHabits.ts`'s efekt, auto-chroni wczoraj gdy streak ≥2 i są freezy w zapasie) — nie ma
+żadnej akcji usera do odtworzenia, tylko ODCZYT `isFrozen(habitId, date)` do pokazania.
+Istniejący `app/habit-year.tsx` (dzielony przez WSZYSTKIE nawyki/liczniki) ma już kalendarz
+miesiąc/rok w SVG, ale kolorowanie binarne (zrobione/zamrożone/pominięte, nie ILOŚĆ) i BEZ
+tap-to-edit dla żadnego nawyku — pierwszy ekran w appce z edycją wstecz dnia nawyku.
+
+**Decyzja: nowy, osobny `app/water-calendar.tsx`** (nie rozszerzenie `habit-year.tsx`) —
+`habit-year.tsx` jest dzielony przez wszystkie nawyki/liczniki (streak tygodniowy, liczniki
+"bez X" itd.), amount-aware kolorowanie + tap-to-edit tylko dla wody na razie; rozszerzanie
+wspólnego ekranu ryzykowałoby złamanie innych nawyków dla funkcji której na razie chce tylko
+dla wody. Ten sam wzorzec okna rolkowego co `habit-year.tsx` (35 dni kończących się DZIŚ
+dla widoku miesiąca, 371 dla roku — NIE prawdziwa nawigacja po kalendarzowych miesiącach),
+więc WSZYSTKIE komórki siatki są ≤ dziś — zero potrzeby osobnego guardu na "nie edytuj
+przyszłości".
+
+**Kolorowanie wg ilości, nie tylko zrobione/nie**: `tierAlpha(count, goal)` — 5 kwintyli
+alpha koloru akcentu (`#46B0DE`, ten sam co gauge wody w `health.tsx`) wg stosunku
+wypita/cel, capped na pełną alpha przy ≥100% (wzorzec jak `YearPixels.tsx`, ale per-day
+zamiast per-tier-progu). Freeze NIE podmienia wypełnienia na płaski kolor (jak w
+`habit-year.tsx`) — dostaje OSOBNY sygnał wizualny, niebieska obwódka (`stroke`), żeby
+ilość i freeze były czytelne NIEZALEŻNIE (dzień może mieć i wypitą ilość, i być
+zamrożonym — to dwa różne fakty, nie jeden).
+
+**Tap-to-edit/backfill**: `onPress` bezpośrednio na `<G>`/`<Rect>` w react-native-svg (bez
+precedensu w repo, ale biblioteka to wspiera naokoło Touchable responder system — brak
+sensu budować osobną siatkę przezroczystych `TouchableOpacity` nałożoną na SVG). Otwiera
+mały modal (wzorzec jak pozostałe w `health.tsx`/`BoxRevealModal.tsx`) z liczbowym polem
+(szklanki) + podgląd w litrach (`glassMl` z `getHealthGoals()`). Zapis idzie przez
+`getCounts(date)`+`setCounts(date, {...})` BEZPOŚREDNIO, **NIE** `feedWaterHabit()` — ta
+ostatnia robi `Math.max(stare, nowe)` (celowo, żeby sync z zegarka nigdy nie cofnął
+ręcznego wpisu), co by UNIEMOŻLIWIŁO zmniejszenie błędnie zawyżonej wartości — korekta
+wsteczna musi móc zarówno zwiększyć, jak i zmniejszyć.
+
+**Wejście z Health tab**: w istniejącym modalu ustawień wody (`waterCfgOpen` w
+`health.tsx`, otwieranym tapnięciem nagłówka "NAWODNIENIE") nowy przycisk "Kalendarz wody /
+popraw wsteczny dzień" — woła `ensureWaterHabit()` (gwarantuje że habit istnieje, ID
+zawsze znane) PRZED nawigacją, więc `water-calendar.tsx` nie musi duplikować logiki
+tworzenia nawyku "Woda".
+
+**Nowy czysty `src/utils/waterCalendar.ts`** (`ymd`, `fmtDay`, `tierAlpha`) — wydzielony z
+komponentu (ten importuje `react-native-svg`/`expo-router`, nie da się go przetestować bez
+mockowania RN), ten sam wzorzec co `weekChips.ts`/`taskReward.ts` z wcześniejszych sesji.
+Nowy `__tests__/waterCalendar.test.ts`, 12 testów (granice kwintyli `tierAlpha`, "Dziś"/
+"Wczoraj" na przełomie miesiąca/roku w `fmtDay`, cel=0 nie dzieli przez zero).
+
+**Testy**: `tsc --noEmit`/`jest` czyste (93/93 suite, 1195 testów, +12 nowych).
+
+**Priorytet testu na urządzeniu — WYSOKI** (nowa, nieprzetestowana na żywym urządzeniu
+funkcja z realnym zapisem danych): Zdrowie → tapnij nagłówek "NAWODNIENIE" → "Kalendarz
+wody" → sprawdź że siatka pokazuje realne dane z ostatnich dni (różne odcienie wg ilości,
+nie tylko pełny/pusty) → stuknij dowolny dzień (np. wczorajszy) → wpisz inną liczbę
+szklanek → Zapisz → sprawdź że kafelek się przekolorował I że to NIE wpłynęło na dzisiejszy
+licznik na głównym ekranie Zdrowia (osobne dni). Jeśli masz jakiś dzień z użytym
+freeze'em (seria ≥2 dni + zapas freezy), sprawdź niebieską obwódkę.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
