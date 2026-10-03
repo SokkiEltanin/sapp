@@ -13647,6 +13647,43 @@ kalorie).
 
 ---
 
+## 239. Parser wklejonej nutrycji trafił do złego ekranu — dociągnięty na właściwy (2026-10-03)
+
+User, po §238: zrzutami ekranu + "Nie mam tego nigdzie :(" — pokazał `app/food/product.tsx`
+("Baza jedzenia" → "+" → "Nowy produkt"), ekran z JUŻ WIDOCZNYMI polami Nazwa/Waga/kcal/
+Białko/Węgle/Tłuszcz/cukry, ale BEZ przycisku wklejki. §238 dodał parser do
+`app/food/add.tsx`'s pickera (modal otwierany z poziomu budowania posiłku, "Dodaj nowy:
+„{query}”") — osobny, mniej oczywisty ekran niż ten, którego user faktycznie szukał i
+używa do ręcznego katalogowania produktów.
+
+Nie błąd parsera ani logiki — `src/utils/foodNutritionParser.ts` zostaje nietknięty, w
+pełni reużyty. Tylko DRUGIE podpięcie, w `product.tsx`, analogiczne do §238 ale PROŚCIEJ —
+ten ekran ma już widoczne pola tekstowe dla WSZYSTKICH makro (nie tylko kcal/100g jak w
+add.tsx), więc `applyPastedNutrition()` tu ustawia stan bezpośrednio (`setKcal`/`setProt`/
+`setCarb`/`setFat`/`setSugar`), bez żadnej z pułapek dot. `sel`/`confirmPicker` z §238 (nie
+ma tu odpowiednika "porównaj do oryginału z bazy" — to zawsze albo nowy produkt, albo
+`editing` z jawnym `updateProduct` na Zapisz). Dodatkowo: `parsed.servingGrams` (gdy
+jednostka 'g') wypełnia pole "Waga (g/szt)" jeśli puste — np. dla "Kinder Niespodzianka"
+(1 szt = 20 g) ta sama wklejka ustawia OD RAZU i makro per-100g, i wagę sztuki. `parsed.name`
+(tylko fitatu) wypełnia Nazwę TYLKO gdy pole jest puste (w przeciwieństwie do pól
+liczbowych, które paste zawsze nadpisuje — nazwa zwykle już jest wpisana/wklejona wcześniej
+przez usera, nie chcemy jej nadpisywać niepewnym regexem).
+
+**Przy okazji** (zlecone w tej samej wiadomości, osobne pytanie): "gdzie jest to dodanie z
+jedzenia parser?" — odpowiedziane w czacie ścieżką w `app/food/add.tsx` (dalej też
+działa, zostaje jako drugie wejście z poziomu budowania posiłku) — oba ekrany mają teraz tę
+samą funkcję, nie trzeba było jej duplikować, tylko podpiąć po raz drugi.
+
+**Testy**: bez zmian (ten sam, już przetestowany `parsePastedNutrition`, żadnej nowej
+logiki parsującej). `tsc --noEmit`/`jest` czyste (92/92 suite, 1183 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na "nie mam tego
+nigdzie"): Baza jedzenia → "+" (Nowy produkt) → "Wklej dane z neta" → wklej tekst z
+fitatu.com albo odpowiedź AI → sprawdź że Nazwa (jeśli pusta)/Waga/kcal/wszystkie 4 pola
+makro się wypełniają.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
