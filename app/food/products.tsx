@@ -182,6 +182,12 @@ export default function FoodBase() {
             </TouchableOpacity>
           ) : productList.map(p => {
             const meta = p.cat ? FOOD_SUBCAT_META[p.cat] : null;
+            // Sygnał "domknij mnie" (2026-10-03, "Co zjadłem" friction audit) — produkty
+            // dodane szybką ścieżką (wpisz nazwę w add.tsx → "Dodaj nowy") często zostają BEZ
+            // makr i/lub kategorii na stałe, bo nic wcześniej tego nie flagowało — trzeba było
+            // pamiętać które i wracać tu ręcznie żeby je znaleźć. Brak kategorii = szary dot
+            // (już był, ale cichy/łatwy do przeoczenia) + teraz jawny tekstowy tag w meta.
+            const incomplete = !p.cat || (p.protein100 == null && p.carbs100 == null && p.fat100 == null);
             return (
               <TouchableOpacity key={p.id} style={s.row} activeOpacity={0.75} onPress={() => { haptic.tap(); router.push(`/food/product?id=${p.id}` as any); }}>
                 <View style={[s.dot, { backgroundColor: meta?.color ?? '#9CA3AF' }]} />
@@ -191,6 +197,7 @@ export default function FoodBase() {
                     {p.kcalPer100g != null ? `${p.kcalPer100g} kcal/100g` : p.kcalPerPortion != null ? `${p.kcalPerPortion} kcal/porcja` : '—'}
                     {p.protein100 != null || p.carbs100 != null || p.fat100 != null ? `  ·  B${p.protein100 ?? 0} W${p.carbs100 ?? 0} T${p.fat100 ?? 0}` : ''}
                     {p.unitGrams?.szt ? `  ·  ${p.unitGrams.szt} g/szt` : ''}
+                    {incomplete ? <Text style={s.incompleteTag}>  ·  uzupełnij makra/kategorię</Text> : null}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -273,6 +280,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { fontSize: 14.5, fontWeight: '700', color: c.text.primary, flexShrink: 1 },
   meta: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
+  incompleteTag: { color: '#FBBF24', fontWeight: '700' },
 
   empty:      { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[8] },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },

@@ -13928,6 +13928,65 @@ wyraźnie wyższa niż przed zmianą (T5 mityczna ok. 3x więcej niż wcześniej
 
 ---
 
+## 245. "Co zjadłem" — 4 poprawki z audytu tarcia (picker/limit/sygnał/wklejka) (2026-10-03)
+
+User poprosił o mapę + analizę całej funkcji "Co zjadłem" ("zrob mapę całej zakładki i
+funkcji co zjadlem przeanalizuj i daj znać co do poprawy i co sugerujesz żeby było jeszcze
+prościej dodawać jedzenie"). Pełna mapa (6 ekranów: `food.tsx`/`food/add.tsx`/
+`food/products.tsx`/`food/product.tsx`/`food/recipe.tsx`/`food/library.tsx`) + flow
+end-to-end + 10 znalezionych tarć zrobiona subagentem, przedstawiona w czacie z 4
+konkretnymi sugestiami (reszta świadomie NIE zaproponowana — konsolidacja dwóch
+bibliotek-list `products.tsx`/`add.tsx` i spłaszczenie drill-down były już wcześniej
+świadomie zrobione/odrzucone, patrz historia w ARCHITECTURE). User: "Zgadzam się dawaj
+ogarniaj to co zjadlem tak jak mówiłeś" — zrealizowane wszystkie 4:
+
+**1. Picker domyślna jednostka = nauczona, nie zawsze gramy** (`app/food/add.tsx`,
+`openPicker()`). Dawniej: KAŻDY produkt z `kcalPer100g` (density-based) otwierał picker na
+'g', ignorując nauczony `unitGrams[defaultUnit]` (np. "plasterek ≈15g" z `learnPortion`).
+Fix: gdy produkt ma jawnie nauczoną, NIE-gramową jednostkę (`cand.defaultUnit !== 'g' &&
+cand.unitGrams?.[cand.defaultUnit] != null`), picker startuje na NIEJ zamiast zmuszać do
+ponownego ważenia ulubionego produktu za każdym razem.
+
+**2. Limit przeglądania własnych produktów 10→60** (`app/food/add.tsx`, `candidates`
+memo, gałąź pustego query). Ta gałąź karmi WYŁĄCZNIE kafelek "Produkty" (jedyny konsument
+z pustym query) — user z >10 własnymi produktami widział tylko 10
+najświeższszych/najczęstszych przy przeglądaniu, resztę tylko przez trafne wyszukiwanie
+(które ma OSOBNĄ, nieucinaną gałąź). Podniesione do 60 — lista dalej niewirtualizowana
+(`ScrollView`+`.map()`, nie `FlatList`), stąd jakiś sufit zostaje zamiast usuwać go całkiem.
+
+**3. Sygnał "domknij mnie" dla produktów bez makr/kategorii** (`app/food/products.tsx`,
+zakładka Produkty). Produkty dodane szybką ścieżką (`add.tsx`'s "Dodaj nowy") często
+zostają trwale bez makr/kategorii — nic wcześniej tego nie flagowało, trzeba było pamiętać
+które i szukać ręcznie. Nowy warunek `incomplete = !p.cat || (protein100==null &&
+carbs100==null && fat100==null)` → żółty (`#FBBF24`) tekstowy tag "uzupełnij
+makra/kategorię" w wierszu listy, dopisany do istniejącej linii `meta`.
+
+**4. Wklejka nutrycji dociągnięta do `food/recipe.tsx`** (budowanie dania ze
+składników) — miała ją już `add.tsx`/`product.tsx` (§238/239/241), ale NIE ten trzeci
+ekran, mimo identycznej potrzeby ("wpisz kcal/makro dla nowego składnika"). Ten sam
+`parsePastedNutrition`, ten sam (już poprawiony w §241) widoczny styl pigułki z ACCENT —
+zbudowany od razu z DOBRYM stylem, nie trzeba było go osobno naprawiać jak w poprzednich
+dwóch. `sugar100` z parsera świadomie pomijane — ten ekran w ogóle nie śledzi cukru per
+składnik (`Candidate`/`computeItemMacros` tu mają tylko B/W/T, nie ma pola na cukier).
+
+**Celowo NIE zrobione** (zostały we friction-liście, ale nie w 4 zaakceptowanych
+sugestiach): konsolidacja logiki biblioteki `products.tsx`⟷`add.tsx` (duplikacja realna,
+ale to refaktor, nie odczuwalna zmiana UX), auto-zapis kombinacji "Dodaj dodatki" bez
+tapnięcia "Zapisz jako preset", usunięcie martwego kodu typu posiłku (`typeRow` style w
+`add.tsx`, `MEAL_TYPES` zaimportowane ale nieużywane w body).
+
+**Testy**: bez nowych — czyste UI/warunki/limit, żadnej nowej logiki parsującej (ten sam,
+już przetestowany `parsePastedNutrition`). `tsc --noEmit`/`jest` czyste (93/93 suite, 1196
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: (a) Jedzenie → dodaj ulubiony produkt z
+nauczoną jednostką (np. coś co zwykle jesz "na sztuki") → sprawdź że picker NIE startuje
+na gramach. (b) Baza jedzenia → Produkty → sprawdź że produkt bez makr ma żółty tag
+"uzupełnij". (c) Baza jedzenia → Nowy przepis → dodaj nowy składnik → sprawdź "Wklej dane
+z neta" działa tak samo jak w pozostałych dwóch miejscach.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

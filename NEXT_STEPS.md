@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Rebalans zbroi: T2-T5 stromiej, mityczna T5 realnie coś znaczy późno (2026-10-03)
+## 🆕 "Co zjadłem" — 4 poprawki z audytu tarcia (2026-10-03)
+
+User poprosił o mapę + analizę "Co zjadłem" i sugestie jak uprościć dodawanie jedzenia —
+po zaakceptowaniu listy zrealizowane wszystkie 4. Pełny opis w ARCHITECTURE.md §245.
+(1) Picker w `add.tsx` domyślnie startuje na NAUCZONEJ jednostce zamiast zawsze gramach,
+gdy produkt ma już `unitGrams[defaultUnit]` z poprzedniego logowania. (2) Limit
+przeglądania własnych produktów (kafelek "Produkty") 10→60. (3) Żółty tag "uzupełnij
+makra/kategorię" w `products.tsx` dla niepełnych produktów. (4) Wklejka nutrycji
+(`parsePastedNutrition`) dociągnięta do trzeciego ekranu, `food/recipe.tsx` — miała ją już
+`add.tsx`/`product.tsx`. `tsc`/`jest` czyste (93/93 suite, 1196 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: (a) dodaj ulubiony produkt z nauczoną
+jednostką → sprawdź że picker NIE startuje na gramach; (b) Baza jedzenia → Produkty →
+sprawdź żółty tag przy niepełnym produkcie; (c) Nowy przepis → dodaj składnik → sprawdź że
+"Wklej dane z neta" działa.
+
+## ✅ Rebalans zbroi: T2-T5 stromiej, mityczna T5 realnie coś znaczy późno (2026-10-03)
 
 User: "zbroje dawały trochę więcej per level bo legendarna +14 hp na późnym stage jest
 turbo niczym jak ciosy po 300 dmg". Pełny opis w ARCHITECTURE.md §244. Zbadane: +14 to nie
@@ -16,7 +32,7 @@ NIEtknięte — 195 HP dalej ginie tam w 1-2 ciosach, zgodnie z zamierzeniem. `R
 (dzielony przez wszystkie 6 slotów ekwipunku) też nietknięty — zmiana tylko zbroi.
 `tsc`/`jest` czyste (93/93 suite, 1196 testów — 1 asercja przepisana na nowy sufit).
 
-**🆕 Priorytet testu na urządzeniu — niski** (liczbowy rebalans, trudny do zweryfikowania
+Priorytet testu na urządzeniu — niski (liczbowy rebalans, trudny do zweryfikowania
 bez długiej progresji): jeśli masz pupila wysoko z mityczną/legendarną zbroją T4/T5,
 sprawdź w ekwipunku że HP jest wyraźnie wyższe niż wcześniej (T5 mityczna ~3x).
 

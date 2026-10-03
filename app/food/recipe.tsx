@@ -11,11 +11,13 @@ import {
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
+import { parsePastedNutrition } from '@/utils/foodNutritionParser';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 
@@ -83,6 +85,34 @@ export default function RecipeBuilder() {
   const [qtyText, setQtyText]   = useState('1');       // wpisywana ilość (0,5 / 1,5 szklanki)
   const [gramsOverride, setGramsOverride] = useState('');
   const [kcal100, setKcal100]   = useState('');
+  // Wklejka z neta → auto-wypełnienie (2026-10-03, "Co zjadłem" friction audit: user miał już
+  // ten skrót w food/add.tsx i food/product.tsx, ale nie tutaj — przy budowaniu dania ze
+  // składników wpisywanie kcal/makro ręcznie dla KAŻDEGO nowego składnika było tym samym
+  // tarciem). Ten sam parser co tam, patrz foodNutritionParser.ts. `sugar100` pomijane —
+  // ten ekran w ogóle nie śledzi cukru per składnik (patrz `Candidate`/`computeItemMacros`
+  // call w `confirmPicker` niżej, tylko B/W/T).
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const applyPastedNutrition = () => {
+    const parsed = parsePastedNutrition(pasteText.trim());
+    if (!parsed) { haptic.error(); toast.error('Nie rozpoznano wartości — wklej fragment z kcal/100g albo info o porcji'); return; }
+    haptic.success();
+    if (parsed.kcalPer100g != null) setKcal100(String(parsed.kcalPer100g));
+    setSel(prev => prev ? {
+      ...prev,
+      protein100: parsed.protein100 ?? prev.protein100,
+      carbs100: parsed.carbs100 ?? prev.carbs100,
+      fat100: parsed.fat100 ?? prev.fat100,
+    } : prev);
+    const bits = [
+      parsed.kcalPer100g != null ? `${parsed.kcalPer100g} kcal/100g` : null,
+      parsed.protein100 != null ? `B ${parsed.protein100}` : null,
+      parsed.fat100 != null ? `T ${parsed.fat100}` : null,
+      parsed.carbs100 != null ? `W ${parsed.carbs100}` : null,
+    ].filter(Boolean).join(' · ');
+    toast.success(`Wypełniono: ${bits}`);
+    setPasteOpen(false); setPasteText('');
+  };
   const qty = parseFloat(qtyText.replace(',', '.')) || 0;
   const bumpQty = (dir: 1 | -1) => setQtyText(prev => {
     const q = parseFloat(prev.replace(',', '.')) || 0;
@@ -180,6 +210,7 @@ export default function RecipeBuilder() {
     const u: FoodUnit = cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g';
     setSel(cand); setPickRole(role); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
+    setPasteOpen(false); setPasteText('');
   };
   const addNew = () => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); };
 
@@ -537,6 +568,26 @@ export default function RecipeBuilder() {
                     <Text style={s.fieldHint}>{sel.kcalPer100g != null ? 'znane — możesz poprawić' : 'zapamięta się'}</Text>
                   </View>
 
+                  <TouchableOpacity style={s.pasteToggle} onPress={() => { haptic.tap(); setPasteOpen(o => !o); }}>
+                    <Copy size={14} color={ACCENT} />
+                    <Text style={s.pasteToggleTxt}>{pasteOpen ? 'Zwiń' : 'Wklej dane z neta (fitatu, AI...)'}</Text>
+                  </TouchableOpacity>
+                  {pasteOpen && (
+                    <View style={s.pasteBox}>
+                      <TextInput
+                        style={s.pasteInput} value={pasteText} onChangeText={setPasteText} multiline
+                        placeholder={'Wklej tu skopiowany tekst z wartościami odżywczymi — ze strony typu fitatu.com albo z odpowiedzi AI'}
+                        placeholderTextColor={c.text.muted}
+                      />
+                      <TouchableOpacity
+                        style={[s.pasteBtn, { backgroundColor: pasteText.trim() ? ACCENT : c.fill.subtle }]}
+                        disabled={!pasteText.trim()} onPress={applyPastedNutrition}
+                      >
+                        <Text style={[s.pasteBtnTxt, { color: pasteText.trim() ? '#1A1206' : c.text.muted }]}>Wypełnij z tekstu</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {dens() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0)} onPress={confirmPicker}>
@@ -658,6 +709,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
   bigInput:   { flex: 1, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 22, fontWeight: '800', color: c.text.primary },
   smInput:    { width: 76, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
+
+  // wklejka z neta (kcal/makro) — paste parser, patrz applyPastedNutrition
+  pasteToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: 8, marginTop: spacing[1], borderRadius: radius.full, borderWidth: 1, borderColor: ACCENT + '55', backgroundColor: ACCENT + '14' },
+  pasteToggleTxt: { fontSize: 12.5, fontWeight: '800', color: ACCENT },
+  pasteBox: { gap: spacing[2], marginTop: 2, marginBottom: spacing[1] },
+  pasteInput: { minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, padding: spacing[3], fontSize: 12.5, lineHeight: 17, color: c.text.primary, textAlignVertical: 'top' },
+  pasteBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.md },
+  pasteBtnTxt: { fontSize: 12.5, fontWeight: '800' },
 
   sheetKcal:    { alignItems: 'center', gap: 1 },
   sheetKcalVal: { fontSize: 22, fontWeight: '800', color: ACCENT },

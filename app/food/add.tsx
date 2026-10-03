@@ -363,13 +363,19 @@ export default function FoodAdd() {
   const candidates: Candidate[] = useMemo(() => {
     const q = query.trim();
     if (!q) {
-      // recent / fresh first, then base staples to fill
+      // Ta gałąź (q puste) karmi WYŁĄCZNIE kafelek "Produkty" (browseCat==='_products',
+      // jedyny konsument z pustym query — szukanie z wpisanym tekstem idzie inną gałęzią
+      // niżej, bez capu). 2026-10-03, user ("Co zjadłem" friction audit): dawny cap 10 ucinał
+      // przeglądanie WŁASNEGO katalogu — ktoś z >10 produktami widział tylko 10
+      // najświeższych/najczęstszych, resztę tylko przez trafne wyszukiwanie. Podniesiony do
+      // 60 (lista nadal niewirtualizowana — zwykły `.map()` w `ScrollView`, nie `FlatList` —
+      // stąd jakiś rozsądny sufit zostaje, zamiast usuwać go całkiem).
       const sorted = [...curated].sort((a, b) => b._rank - a._rank);
       const seen = new Set(curated.map(x => x._norm));
       const base: Candidate[] = searchFoodBase('', 14)
         .filter(f => !seen.has(normalizeProductName(f.name)))
         .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
-      return [...sorted.slice(0, 10), ...base];
+      return [...sorted.slice(0, 60), ...base];
     }
     const nq = normalizeProductName(q);
     const curatedMatch = curated.filter(x => x._norm.includes(nq));
@@ -391,8 +397,16 @@ export default function FoodAdd() {
   const openPicker = (cand: Candidate, editIndex: number | null = null) => {
     haptic.tap();
     // With a kitchen scale the grams path is the accurate one, so default to 'g' when
-    // the food is density-based (kcal/100g); otherwise its household unit.
-    const u: FoodUnit = cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g');
+    // the food is density-based (kcal/100g) — UNLESS this exact product already has a
+    // LEARNED household portion (`unitGrams[defaultUnit]`, written by `learnPortion` in
+    // confirmPicker below the first time you log it in a non-gram unit). 2026-10-03,
+    // user ("Co zjadłem" friction audit): forcing a re-weigh every single time for a
+    // favorite you already know as "2 plasterki" was pure friction — the learned unit is
+    // then MORE convenient than the scale, not less accurate, since the conversion is
+    // already known.
+    const learnedUnit = cand.defaultUnit && cand.defaultUnit !== 'g' && cand.unitGrams?.[cand.defaultUnit] != null
+      ? cand.defaultUnit : undefined;
+    const u: FoodUnit = learnedUnit ?? (cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g'));
     setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
     setPasteOpen(false); setPasteText('');
