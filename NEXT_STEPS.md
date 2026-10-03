@@ -3,32 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 📋 ZAPLANOWANE (user: "dodaj mi później") — szczegółowy tracker wody w Zdrowiu (2026-10-03)
+## 🆕 Kalendarz wody w Zdrowiu — ilość per dzień, freeze, edycja wstecz (2026-10-03)
 
-User: "żebym widział w zakładce zdrowie szczegółowe dane picia wody ile dziennie itp np
-kalendarz z zaznaczoną tylko wodą i ilością wypitą (i że zużytych freezami) i żebym mógł
-modyfikować np wczoraj wypiłem ale nie było internetu i mi nie złapało". User explicite
-poprosił o ODŁOŻENIE ("później") — NIE implementowane teraz, zostaje jako zaplanowane.
+User ("dawaj to z wodą"): "żebym widział w zakładce zdrowie szczegółowe dane picia wody
+ile dziennie itp np kalendarz z zaznaczoną tylko wodą i ilością wypitą (i że zużytych
+freezami) i żebym mógł modyfikować np wczoraj wypiłem ale nie było internetu". Pełny opis
+w ARCHITECTURE.md §240. Wcześniej odłożone jako 📋 ZAPLANOWANE, teraz zrealizowane.
 
-Zbadane (bez zmian w kodzie), żeby notatka była trafna przy realizacji: woda żyje jako
-zwykły habit "Woda" w ogólnym systemie habitów (`src/utils/habits.ts`), odczytywany w
-`app/(tabs)/health.tsx` (`loadWater`/`weekWater` — tylko bieżący tydzień jako pasek, nie
-pełny kalendarz). Dane PER DZIEŃ już istnieją w warstwie danych — `getCounts(date)` /
-`setCounts(date, counts)` / `getCountsRange(dates)` i `feedWaterHabit(glasses, date)`
-WSZYSTKIE już przyjmują konkretną datę, nie tylko "dziś" — więc backfill przeszłego dnia
-("wczoraj wypiłem, nie złapało") jest już możliwy NA POZIOMIE DANYCH, brakuje tylko UI do
-tego. "Freeze" (`src/store/streakFreezeStore.ts`) jest już generyczny per `(habitId,
-date)` (`isFrozen`/`applyFreeze`), nie specyficzny dla jednego habitu — działa już dla
-wody bez zmian w tym store.
+Nowy `app/water-calendar.tsx` (osobny ekran, nie rozszerzenie dzielonego
+`habit-year.tsx`) — ten sam wzorzec okna rolkowego (35/371 dni kończących się dziś) +
+kolorowanie wg ILOŚCI wypitej wody (5 kwintyli alpha, nie tylko zrobione/pominięte), z
+OSOBNYM sygnałem (niebieska obwódka) dla dni gdzie auto-system użył freeze (dni mogą mieć
+oba fakty naraz, nie jeden). Tap na dzień → modal z polem liczbowym → zapis przez
+`getCounts`/`setCounts` BEZPOŚREDNIO (nie `feedWaterHabit`, która robi `Math.max` i nie
+pozwoliłaby zmniejszyć błędnie zawyżonej wartości). Wejście z Health tab: w modalu
+ustawień wody (tap nagłówka "NAWODNIENIE"), nowy przycisk "Kalendarz wody". Nowy czysty
+`src/utils/waterCalendar.ts` (`ymd`/`fmtDay`/`tierAlpha`) + `__tests__/waterCalendar.test.ts`
+(12 testów). `tsc`/`jest` czyste (93/93 suite, 1195 testów).
 
-Do zrobienia przy realizacji: (1) nowy ekran/sekcja w Zdrowiu z kalendarzem miesięcznym
-(wzorzec jak `habit-year.tsx`/`YearPixels.tsx` dla innych habitów) pokazującym per-dzień
-ilość wypitej wody, z oznaczeniem dni gdzie użyto freeze (`isFrozen(waterHabitId, date)`);
-(2) tap na dzień → edycja ilości wstecz, wołająca istniejące `setCounts`/`feedWaterHabit`
-z TĄ datą (dane już to wspierają, trzeba tylko UI + przeliczenie wpływu na streak/freeze
-jeśli korekta zmienia czy dzień "się liczy").
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (nowa funkcja z realnym zapisem danych):
+Zdrowie → "NAWODNIENIE" → "Kalendarz wody" → sprawdź realne dane z różnymi odcieniami wg
+ilości → stuknij wczorajszy dzień → zmień liczbę szklanek → Zapisz → sprawdź że NIE
+wpłynęło to na dzisiejszy licznik na głównym ekranie.
 
-## 🆕 Parser wklejonej nutrycji dociągnięty na właściwy ekran (2026-10-03)
+## ✅ Parser wklejonej nutrycji dociągnięty na właściwy ekran (2026-10-03)
 
 User po §238: "Nie mam tego nigdzie :(" + zrzuty `app/food/product.tsx` ("Baza jedzenia"
 → "+" → "Nowy produkt") — to WŁAŚCIWY, bardziej oczywisty ekran którego user szukał,
@@ -40,7 +38,7 @@ makro + wagi sztuki, więc paste ustawia stan bezpośrednio, bez żadnych pułap
 gdy puste. `tsc`/`jest` czyste (92/92 suite, 1183 testów, bez zmiany — ta sama logika
 parsująca).
 
-**🆕 Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na "nie mam tego
+Priorytet testu na urządzeniu — WYSOKI (bezpośrednia reakcja na "nie mam tego
 nigdzie"): Baza jedzenia → "+" (Nowy produkt) → "Wklej dane z neta" → wklej tekst z
 fitatu.com albo odpowiedź AI → sprawdź że Nazwa/Waga/kcal/wszystkie 4 pola makro się
 wypełniają.
