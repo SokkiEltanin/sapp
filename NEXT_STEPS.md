@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 📋 ZAPLANOWANE (user: "dodaj mi później") — szczegółowy tracker wody w Zdrowiu (2026-10-03)
+
+User: "żebym widział w zakładce zdrowie szczegółowe dane picia wody ile dziennie itp np
+kalendarz z zaznaczoną tylko wodą i ilością wypitą (i że zużytych freezami) i żebym mógł
+modyfikować np wczoraj wypiłem ale nie było internetu i mi nie złapało". User explicite
+poprosił o ODŁOŻENIE ("później") — NIE implementowane teraz, zostaje jako zaplanowane.
+
+Zbadane (bez zmian w kodzie), żeby notatka była trafna przy realizacji: woda żyje jako
+zwykły habit "Woda" w ogólnym systemie habitów (`src/utils/habits.ts`), odczytywany w
+`app/(tabs)/health.tsx` (`loadWater`/`weekWater` — tylko bieżący tydzień jako pasek, nie
+pełny kalendarz). Dane PER DZIEŃ już istnieją w warstwie danych — `getCounts(date)` /
+`setCounts(date, counts)` / `getCountsRange(dates)` i `feedWaterHabit(glasses, date)`
+WSZYSTKIE już przyjmują konkretną datę, nie tylko "dziś" — więc backfill przeszłego dnia
+("wczoraj wypiłem, nie złapało") jest już możliwy NA POZIOMIE DANYCH, brakuje tylko UI do
+tego. "Freeze" (`src/store/streakFreezeStore.ts`) jest już generyczny per `(habitId,
+date)` (`isFrozen`/`applyFreeze`), nie specyficzny dla jednego habitu — działa już dla
+wody bez zmian w tym store.
+
+Do zrobienia przy realizacji: (1) nowy ekran/sekcja w Zdrowiu z kalendarzem miesięcznym
+(wzorzec jak `habit-year.tsx`/`YearPixels.tsx` dla innych habitów) pokazującym per-dzień
+ilość wypitej wody, z oznaczeniem dni gdzie użyto freeze (`isFrozen(waterHabitId, date)`);
+(2) tap na dzień → edycja ilości wstecz, wołająca istniejące `setCounts`/`feedWaterHabit`
+z TĄ datą (dane już to wspierają, trzeba tylko UI + przeliczenie wpływu na streak/freeze
+jeśli korekta zmienia czy dzień "się liczy").
+
 ## 🆕 Parser wklejonego tekstu z wartościami odżywczymi (2026-10-03)
 
 User: dodawanie produktu spoza bazy (np. "Kinder Niespodzianka") wymagało ręcznego
