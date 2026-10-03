@@ -59,7 +59,13 @@ export default function FoodProductForm() {
     if (parsed.carbs100 != null) setCarb(String(parsed.carbs100));
     if (parsed.fat100 != null) setFat(String(parsed.fat100));
     if (parsed.sugar100 != null) setSugar(String(parsed.sugar100));
-    if (parsed.servingGrams != null && parsed.servingUnit === 'g' && !weightG.trim()) setWeightG(String(Math.round(parsed.servingGrams)));
+    // 2026-10-03, user: fitatu dla "Kinder Niespodzianka" podaje porcję jako "20 ml" (quirk
+    // UI fitatu — to w rzeczywistości lity produkt, nie płyn), ale SAM fitatu liczy po tej
+    // wartości jak po gramach (112kcal/20g*100 ≈ 561 "na 100g" — się zgadza). Warunek
+    // `servingUnit === 'g'` ignorował więc dokładnie ten (najczęstszy w fitatu) przypadek —
+    // pole "Waga" zostawało puste mimo że porcja BYŁA znana. Liczba się liczy niezależnie od
+    // etykietki jednostki, którą fitatu/AI akurat dobrały.
+    if (parsed.servingGrams != null && !weightG.trim()) setWeightG(String(Math.round(parsed.servingGrams)));
     const bits = [
       parsed.kcalPer100g != null ? `${parsed.kcalPer100g} kcal/100g` : null,
       parsed.protein100 != null ? `B ${parsed.protein100}` : null,
@@ -178,7 +184,7 @@ export default function FoodProductForm() {
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="np. Bułka z kiełkami żyta" placeholderTextColor={c.text.muted} />
 
           <TouchableOpacity style={s.pasteToggle} onPress={() => { haptic.tap(); setPasteOpen(o => !o); }}>
-            <Copy size={13} color={c.text.muted} />
+            <Copy size={14} color={ACCENT} />
             <Text style={s.pasteToggleTxt}>{pasteOpen ? 'Zwiń' : 'Wklej dane z neta (fitatu, AI...)'}</Text>
           </TouchableOpacity>
           {pasteOpen && (
@@ -272,8 +278,12 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   col:    { flex: 1 },
 
   // wklejka z neta (kcal/makro) — paste parser, patrz applyPastedNutrition
-  pasteToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
-  pasteToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  // 2026-10-03, user: "ten przycisk malo widoczny" — dawniej c.text.muted (ledwo widoczny
+  // szary tekst bez obrysu). Teraz pigułka z obrysem/tłem w ACCENT, ten sam wzorzec co
+  // "Powiąż z kupionym produktem" (linkHead/linkHeadTxt) niżej — czytelnie jako przycisk,
+  // nie jak wyszarzała etykieta.
+  pasteToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: 8, marginTop: spacing[2], borderRadius: radius.full, borderWidth: 1, borderColor: ACCENT + '55', backgroundColor: ACCENT + '14' },
+  pasteToggleTxt: { fontSize: 12.5, fontWeight: '800', color: ACCENT },
   pasteBox: { gap: spacing[2], marginBottom: spacing[1] },
   pasteInput: { minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card, padding: spacing[3], fontSize: 12.5, lineHeight: 17, color: c.text.primary, textAlignVertical: 'top' },
   pasteBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.md },
