@@ -13792,6 +13792,47 @@ jest wyraźnie widoczny jako pigułka, nie szary tekst.
 
 ---
 
+## 242. Fix: kalendarz wody — tap na dzień blokował całą appkę (2026-10-03)
+
+User zrzutem kalendarza z §240 (realne dane, 34-dniowa seria, kolory poprawne — sam
+ekran się renderował dobrze): "Jak kliknąłem edyt wodę to nic nie mogę klikać wtf" —
+tapnięcie dnia nie otwierało edycji i BLOKOWAŁO interakcję z resztą ekranu.
+
+**Przyczyna (najbardziej prawdopodobna, bez logów z urządzenia — ale usunięta
+niezależnie od dokładnego mechanizmu)**: `onPress` wprost na elementach SVG (`<G>`
+obejmującym `<Rect>`+`<SvgText>`) w `app/water-calendar.tsx` — **pierwsze w całej appce
+użycie onPress na kształcie SVG** (sprawdzone grepem po całym `src/`+`app/` — zero innych
+precedensów), nigdy nie przetestowane. Hit-testing w `react-native-svg` dla elementów
+renderowanych wewnątrz przeskalowanego `viewBox`/`preserveAspectRatio` jest znanym
+źródłem problemów (przesunięte/błędne współrzędne dotyku względem rzeczywistej pozycji na
+ekranie) — zamiast dalej zgadywać DOKŁADNY mechanizm awarii bez dostępu do urządzenia,
+usunięty CAŁKOWICIE na rzecz sprawdzonego w całej appce wzorca: siatka zwykłych, w pełni
+przezroczystych `Pressable` z 'react-native' (nie SVG), pozycjonowanych `position:
+'absolute'` w PROCENTACH (liczonych z tych samych stałych `MC`/`MG`/`MHEAD`/`mW`/`mH` co
+rysowanie SVG, więc zawsze dokładnie pokrywają narysowaną komórkę), nałożonych NA kontener
+`<Svg>` (który zostaje czysto wizualny, bez `onPress`).
+
+**Druga, prewencyjna poprawka (ta sama wiadomość, nie zgłoszona wprost, ale ten sam
+rodzaj ryzyka)**: modal edycji dnia miał zagnieżdżone `Pressable` w `Pressable` (overlay
+owijający arkusz, `onPress={() => {}}` na wewnętrznym żeby nie domykał się przy tapnięciu
+treści) — wzorzec NIEUŻYWANY nigdzie indziej w tej appce dla tego typu modala.
+Przebudowany na sprawdzony wzorzec z `health.tsx`'s modala ustawień wody
+(`wm.overlay`/`wm.sheet`) — overlay i arkusz jako RODZEŃSTWO (oba `position:'absolute'`
+wewnątrz wspólnego `KeyboardAvoidingView`), nie rodzic-dziecko. Czysto defensywne — nie
+potwierdzony jako przyczyna zgłoszonego buga, ale usuwa jeden więcej nieprzetestowany
+mechanizm skoro już naprawiam ten ekran.
+
+**Testy**: bez zmian — czysty UI/touch-handling, żadnej logiki do przetestowania
+(`tierAlpha`/`fmtDay`/`ymd` nietknięte). `tsc --noEmit`/`jest` czyste (93/93 suite, 1195
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY** (ten sam ekran zgłoszony jako całkowicie
+zablokowany): Zdrowie → "NAWODNIENIE" → "Kalendarz wody" → stuknij DOWOLNY dzień →
+sprawdź że otwiera się modal edycji (nie blokuje ekranu), zmień liczbę szklanek → Zapisz →
+sprawdź że kafelek się przekolorował i że cała reszta ekranu dalej reaguje na dotyk.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
