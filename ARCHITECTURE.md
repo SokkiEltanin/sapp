@@ -13573,6 +13573,80 @@ faktycznie się tam pojawiają, nie tylko lokalne.
 
 ---
 
+## 238. Parser wklejonego tekstu z wartościami odżywczymi (dodawanie jedzenia) (2026-10-03)
+
+User: wklejanie produktu spoza bazy (np. "Kinder Niespodzianka") wymagało przepisywania
+liczb RĘCZNIE ze strony typu fitatu.com albo z odpowiedzi AI (Gemini/Google AI search) —
+dał dwa realne przykłady wklejki do rozpoznania.
+
+**Zbadane PRZED zmianą** (`app/food/add.tsx`, `src/store/foodStore.ts`): ekran dodawania
+jedzenia nie jest osobnym formularzem — nowe produkty powstają inline w modalu "picker"
+(gramy + kcal/100g) albo w prostszym "manual" (nazwa + stały kcal, bez makro). Picker ma
+WIDOCZNE pole tylko dla `kcal100` — białko/tłuszcz/węgle/cukry (`FoodProduct.protein100` /
+`carbs100` / `fat100` / `sugar100`, wszystkie per-100g) już są w typie i już je czyta
+`computeItemMacros` (dla produktów z bazy curated/offline), ale picker nie miał ŻADNEGO
+sposobu ich WPISANIA przy tworzeniu nowego produktu — czysty gap we wejściu, nie w
+przetwarzaniu.
+
+**Nowy `src/utils/foodNutritionParser.ts`** — czysta funkcja (zero importów RN, wzorzec
+jak `receiptParser.ts`/`bankNotification.ts`) `parsePastedNutrition(text): ParsedNutrition
+| null`. Rozpoznaje DWA formaty naraz w jednym wywołaniu:
+- **fitatu.com**: `"Wartość energetyczna561\nBiałka8.40...\nTłuszcze34.90...\n
+  Węglowodany52.60Węglowodany netto52.60Cukry52.30"` — liczby zlepione z etykietą, bez
+  jednostki "g". Leftmost-match naturalnie wybiera pierwsze wystąpienie "Węglowodany"
+  (wartość główna), nie "Węglowodany netto" (drugie wystąpienie, dalej w tekście) — bez
+  potrzeby negative lookahead. Osobno łapie blok porcji `"Ile kalorii ma 1× opakowanie\n20
+  ml\n112 kcal"` (`1(?!\d)` żeby nie złapać "10×"/"12×" gdy akurat "1×" nie jest pierwszy
+  na liście, co bywa — fitatu czasem sortuje warianty różnie).
+- **Podsumowanie AI**: `"W 100 g produktu: ok. 552–560 kcal (tłuszcz: ok. 34 g,
+  węglowodany: ok. 52 g)."` + `"W 1 jajku (20 g): ok. 110–112 kcal, w tym ok. 6,8 g
+  tłuszczu i 10,4 g cukru..."` — zakresy liczbowe (`110–112`) liczone jako średnia, przecinek
+  jako separator dziesiętny. KRYTYCZNA pułapka tu: ten SAM makroskładnik (tłuszcz) bywa
+  wymieniony DWA razy w różnej skali (na porcję I na 100g) — `findMacro()` dla "na 100g"
+  jest zawężone do SAMEJ linii "100 g produktu" (gdy istnieje), inaczej złapałoby przypadkiem
+  wartość z linii porcji. Makra których NIE ma w linii "100g" (tu: cukier) są doliczane z
+  linii porcji, przeskalowane ×(100/gramy_porcji).
+- `findMacro()` próbuje DWIE konstrukcje językowe w ustalonej kolejności — "6,8 g
+  tłuszczu" (liczba PRZED słowem — AI) najpierw, "tłuszcz: ok. 34 g" / "Tłuszcze34.90"
+  (słowo PRZED liczbą — fitatu) jako fallback — odwrotna kolejność złapałaby przypadkiem
+  SĄSIEDNI makroskładnik (np. cukier) jako rzekomy tłuszcz w zdaniach typu "...6,8 g
+  tłuszczu i 10,4 g cukru...".
+
+**`app/food/add.tsx`** — w modalu pickera, pod polem "kcal / 100 g": zwijany `pasteToggle`
+("Wklej dane z neta") → `pasteBox` (multiline `TextInput` + przycisk "Wypełnij z tekstu"),
+wzorzec identyczny jak `scan.tsx`'s paste-paragonu. `applyPastedNutrition()`: parsuje,
+wpisuje `kcal100` (pole tekstowe, NIE `sel.kcalPer100g` — ważne, patrz niżej), merguje
+protein100/carbs100/fat100/sugar100 w `sel` (brak widocznych pól dla nich — mirror
+istniejącego wzorca, gdzie te 4 pola ZAWSZE płynęły "po cichu" z `sel` dla znanych
+produktów, nigdy nie były edytowalne osobno), toast z podsumowaniem co wypełniono.
+`openPicker()` czyści `pasteOpen`/`pasteText` przy otwarciu dla nowej pozycji.
+
+**Subtelna pułapka naprawiona PRZED wysłaniem**: pierwsza wersja też nadpisywała
+`sel.kcalPer100g` z paste'a — ale `confirmPicker()` dla JUŻ ISTNIEJĄCEGO produktu wykrywa
+user-owską korektę gęstości przez `k100 !== sel.kcalPer100g` (pole tekstowe vs oryginał z
+bazy); nadpisanie OBU tą samą wartością zgubiłoby tę różnicę i update nigdy by się nie
+zapisał. Naprawione: paste zostawia `sel.kcalPer100g` nietknięte, tylko `kcal100` (pole).
+
+**Domknięcie dead-endu przy okazji**: `confirmPicker()`'s ścieżka dla ISTNIEJĄCEGO
+produktu wcześniej zapisywała WYŁĄCZNIE poprawkę `kcalPer100g` — wklejone makro na
+istniejącym (częściowo znanym) produkcie by działało TYLKO dla tego jednego logowania
+(przez `sel`), nigdy nie trafiając do zapisanego `FoodProduct` na przyszłość. Rozszerzone
+na patch porównujący `sel.*` do faktycznie zapisanych wartości (`products.find(...)`, nie
+do `sel` — `sel` mógł już dostać wartości z paste'a wcześniej w tym samym renderze).
+
+**Testy**: nowy `__tests__/foodNutritionParser.test.ts`, 13 testów na DOKŁADNYCH
+przykładach podanych przez usera (oba formaty) + przypadki brzegowe (tekst bez danych →
+`null`, sama porcja bez "na 100g" wprost → dolicz). `tsc --noEmit`/`jest` czyste (92/92
+suite, 1183 testów, +13 nowych).
+
+**Priorytet testu na urządzeniu — średni**: Jedzenie → dodaj nowy produkt (np. coś czego
+nie masz w bazie) → w pickerze "Wklej dane z neta" → wklej tekst z fitatu.com albo
+odpowiedź AI o wartościach odżywczych → sprawdź że kcal/100g się wypełnia i że dodana
+pozycja ma policzone makro (białko/tłuszcz/węgle widoczne w rozpisce posiłku, nie tylko
+kalorie).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
