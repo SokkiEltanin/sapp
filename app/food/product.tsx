@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Check, Link2, Search, X, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Check, Link2, Search, X, Trash2, Copy } from 'lucide-react-native';
 
 import { useFoodStore, FoodUnit } from '@/store/foodStore';
 import { FOOD_SUBCATS, purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
 import { Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
+import { parsePastedNutrition } from '@/utils/foodNutritionParser';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const numOr0 = (s: string) => { const v = parseFloat(s.replace(',', '.')); return isNaN(v) ? 0 : v; };
@@ -42,6 +44,32 @@ export default function FoodProductForm() {
   const [linkQuery, setLinkQuery] = useState('');
   const [purchased, setPurchased] = useState<string[]>([]);
   const [purchasedExpenses, setPurchasedExpenses] = useState<Expense[]>([]);
+  // Wklejka z neta → auto-wypełnienie (2026-10-03, user szukał tego TU, na głównym ekranie
+  // "Nowy produkt" — pierwsza wersja trafiła przez pomyłkę do pickera w food/add.tsx zamiast
+  // tego ekranu, który ma już widoczne pola makro). Parser czysty, patrz foodNutritionParser.ts.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const applyPastedNutrition = () => {
+    const parsed = parsePastedNutrition(pasteText.trim());
+    if (!parsed) { haptic.error(); toast.error('Nie rozpoznano wartości — wklej fragment z kcal/100g albo info o porcji'); return; }
+    haptic.success();
+    if (parsed.name && !name.trim()) setName(parsed.name);
+    if (parsed.kcalPer100g != null) setKcal(String(parsed.kcalPer100g));
+    if (parsed.protein100 != null) setProt(String(parsed.protein100));
+    if (parsed.carbs100 != null) setCarb(String(parsed.carbs100));
+    if (parsed.fat100 != null) setFat(String(parsed.fat100));
+    if (parsed.sugar100 != null) setSugar(String(parsed.sugar100));
+    if (parsed.servingGrams != null && parsed.servingUnit === 'g' && !weightG.trim()) setWeightG(String(Math.round(parsed.servingGrams)));
+    const bits = [
+      parsed.kcalPer100g != null ? `${parsed.kcalPer100g} kcal/100g` : null,
+      parsed.protein100 != null ? `B ${parsed.protein100}` : null,
+      parsed.fat100 != null ? `T ${parsed.fat100}` : null,
+      parsed.carbs100 != null ? `W ${parsed.carbs100}` : null,
+      parsed.sugar100 != null ? `cukry ${parsed.sugar100}` : null,
+    ].filter(Boolean).join(' · ');
+    toast.success(`Wypełniono: ${bits}`);
+    setPasteOpen(false); setPasteText('');
+  };
 
   // prefill on edit / from a passed name
   useEffect(() => {
@@ -149,6 +177,26 @@ export default function FoodProductForm() {
           <Text style={s.label}>Nazwa</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="np. Bułka z kiełkami żyta" placeholderTextColor={c.text.muted} />
 
+          <TouchableOpacity style={s.pasteToggle} onPress={() => { haptic.tap(); setPasteOpen(o => !o); }}>
+            <Copy size={13} color={c.text.muted} />
+            <Text style={s.pasteToggleTxt}>{pasteOpen ? 'Zwiń' : 'Wklej dane z neta (fitatu, AI...)'}</Text>
+          </TouchableOpacity>
+          {pasteOpen && (
+            <View style={s.pasteBox}>
+              <TextInput
+                style={s.pasteInput} value={pasteText} onChangeText={setPasteText} multiline
+                placeholder={'Wklej tu skopiowany tekst z wartościami odżywczymi — ze strony typu fitatu.com albo z odpowiedzi AI'}
+                placeholderTextColor={c.text.muted}
+              />
+              <TouchableOpacity
+                style={[s.pasteBtn, { backgroundColor: pasteText.trim() ? ACCENT : c.fill.subtle }]}
+                disabled={!pasteText.trim()} onPress={applyPastedNutrition}
+              >
+                <Text style={[s.pasteBtnTxt, { color: pasteText.trim() ? '#1A1206' : c.text.muted }]}>Wypełnij z tekstu</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={s.twoCol}>
             <View style={s.col}>
               <Text style={s.label}>Waga (g/szt)</Text>
@@ -222,6 +270,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   twoCol: { flexDirection: 'row', gap: spacing[3] },
   col:    { flex: 1 },
+
+  // wklejka z neta (kcal/makro) — paste parser, patrz applyPastedNutrition
+  pasteToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
+  pasteToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  pasteBox: { gap: spacing[2], marginBottom: spacing[1] },
+  pasteInput: { minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card, padding: spacing[3], fontSize: 12.5, lineHeight: 17, color: c.text.primary, textAlignVertical: 'top' },
+  pasteBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.md },
+  pasteBtnTxt: { fontSize: 12.5, fontWeight: '800' },
 
   macroRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   macroCol:   { flexBasis: '47%', flexGrow: 1, gap: 4 },

@@ -28,7 +28,24 @@ ilość wypitej wody, z oznaczeniem dni gdzie użyto freeze (`isFrozen(waterHabi
 z TĄ datą (dane już to wspierają, trzeba tylko UI + przeliczenie wpływu na streak/freeze
 jeśli korekta zmienia czy dzień "się liczy").
 
-## 🆕 Parser wklejonego tekstu z wartościami odżywczymi (2026-10-03)
+## 🆕 Parser wklejonej nutrycji dociągnięty na właściwy ekran (2026-10-03)
+
+User po §238: "Nie mam tego nigdzie :(" + zrzuty `app/food/product.tsx` ("Baza jedzenia"
+→ "+" → "Nowy produkt") — to WŁAŚCIWY, bardziej oczywisty ekran którego user szukał,
+różny od `food/add.tsx`'s pickera gdzie parser trafił w §238. Pełny opis w
+ARCHITECTURE.md §239. Ten sam, już przetestowany `parsePastedNutrition` podpięty DRUGI
+RAZ — prościej niż w add.tsx, bo `product.tsx` ma już widoczne pola dla wszystkich 4
+makro + wagi sztuki, więc paste ustawia stan bezpośrednio, bez żadnych pułapek
+`sel`/`confirmPicker` z §238. Bonus: `parsed.servingGrams` wypełnia pole "Waga (g/szt)"
+gdy puste. `tsc`/`jest` czyste (92/92 suite, 1183 testów, bez zmiany — ta sama logika
+parsująca).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na "nie mam tego
+nigdzie"): Baza jedzenia → "+" (Nowy produkt) → "Wklej dane z neta" → wklej tekst z
+fitatu.com albo odpowiedź AI → sprawdź że Nazwa/Waga/kcal/wszystkie 4 pola makro się
+wypełniają.
+
+## ✅ Parser wklejonego tekstu z wartościami odżywczymi (2026-10-03)
 
 User: dodawanie produktu spoza bazy (np. "Kinder Niespodzianka") wymagało ręcznego
 przepisywania liczb ze strony typu fitatu.com albo z odpowiedzi AI. Pełny opis w
@@ -46,7 +63,7 @@ wklejone makro na JUŻ ISTNIEJĄCYM (częściowo znanym) produkcie teraz też si
 zapisuje, nie tylko liczy dla aktualnego logowania. `tsc`/`jest` czyste (92/92 suite, 1183
 testów, +13 nowych w `__tests__/foodNutritionParser.test.ts`).
 
-**🆕 Priorytet testu na urządzeniu — średni**: Jedzenie → dodaj nowy produkt → w
+Priorytet testu na urządzeniu — średni: Jedzenie → dodaj nowy produkt → w
 pickerze "Wklej dane z neta" → wklej tekst z fitatu.com albo odpowiedź AI → sprawdź że
 kcal/100g się wypełnia i że dodana pozycja ma policzone makro w rozpisce posiłku.
 
