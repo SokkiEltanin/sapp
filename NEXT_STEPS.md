@@ -3,7 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Kalendarz wody w Zdrowiu — ilość per dzień, freeze, edycja wstecz (2026-10-03)
+## 🆕 Fix: wklejka nie wypełniała wagi (fitatu "ml") + przycisk niewidoczny (2026-10-03)
+
+User zrzutem — pierwszy realny test wklejki od usera (Kinder Niespodzianka, §238/239):
+kcal/100g i wszystkie 4 makra wypełniły się poprawnie, ALE "Waga (g/szt)" zostało puste
+mimo że fitatu podaje porcję ("20 ml") — i "ten przycisk malo widoczny". Pełny opis w
+ARCHITECTURE.md §241. Bug #1: warunek `servingUnit === 'g'` ignorował porcję etykietowaną
+"ml" — fitatu akurat TEN produkt liczy jako ml mimo że to lity produkt (UI quirk, nie błąd
+parsera — fitatu SAM liczy kcal/100g z tej liczby jakby to były gramy). Warunek usunięty.
+Bug #2: przycisk "Wklej dane z neta" renderował się jako goły szary tekst — przebarwiony
+na pigułkę z obrysem w `ACCENT`, ten sam wzorzec co sąsiedni "Powiąż z kupionym
+produktem". Oba fixy w `product.tsx` I `food/add.tsx` (identyczny kod skopiowany w dwóch
+miejscach w §238/239). `tsc`/`jest` czyste (93/93 suite, 1195 testów, bez zmiany — czysty
+UI/warunek).
+
+**🆕 Priorytet testu na urządzeniu — WYSOKI**: Baza jedzenia → "+" → wklej TĘ SAMĄ
+wklejkę Kinder Niespodzianka → sprawdź że TERAZ "Waga" = 20, i że przycisk jest wyraźnie
+widoczny jako pigułka.
+
+## ✅ Kalendarz wody w Zdrowiu — ilość per dzień, freeze, edycja wstecz (2026-10-03)
 
 User ("dawaj to z wodą"): "żebym widział w zakładce zdrowie szczegółowe dane picia wody
 ile dziennie itp np kalendarz z zaznaczoną tylko wodą i ilością wypitą (i że zużytych
@@ -21,7 +39,7 @@ ustawień wody (tap nagłówka "NAWODNIENIE"), nowy przycisk "Kalendarz wody". N
 `src/utils/waterCalendar.ts` (`ymd`/`fmtDay`/`tierAlpha`) + `__tests__/waterCalendar.test.ts`
 (12 testów). `tsc`/`jest` czyste (93/93 suite, 1195 testów).
 
-**🆕 Priorytet testu na urządzeniu — WYSOKI** (nowa funkcja z realnym zapisem danych):
+Priorytet testu na urządzeniu — WYSOKI (nowa funkcja z realnym zapisem danych):
 Zdrowie → "NAWODNIENIE" → "Kalendarz wody" → sprawdź realne dane z różnymi odcieniami wg
 ilości → stuknij wczorajszy dzień → zmień liczbę szklanek → Zapisz → sprawdź że NIE
 wpłynęło to na dzisiejszy licznik na głównym ekranie.

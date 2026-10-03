@@ -13754,6 +13754,44 @@ freeze'em (seria ≥2 dni + zapas freezy), sprawdź niebieską obwódkę.
 
 ---
 
+## 241. Fix: wklejka nie wypełniała wagi (fitatu "ml") + przycisk wklejki niewidoczny (2026-10-03)
+
+User zrzutem (sprawdzony na żywo — pierwszy realny test wklejki od usera, Kinder
+Niespodzianka z §238/239): kcal/100g i wszystkie 4 makra wypełniły się PRAWIDŁOWO (561,
+B8.4, W52.6, T34.9, cukry52.3 — dokładnie jak w teście), ALE pole "Waga (g/szt)" zostało
+puste mimo że fitatu podaje porcję ("1× opakowanie = 20 ml"). Druga skarga: "ten przycisk
+malo widoczny" — przycisk "Wklej dane z neta".
+
+**Bug #1 — przyczyna**: `applyPastedNutrition()` w `product.tsx` warunkowało wypełnienie
+"Waga" na `parsed.servingUnit === 'g'` — świadome zawężenie przy pisaniu (żeby nie mylić ml
+cieczy z gramami stałego produktu), ale fitatu akurat DLA TEGO PRODUKTU etykietuje porcję
+jako "ml" mimo że to lita czekoladowa figurka (UI quirk fitatu, nie błąd parsera — patrz
+komentarz w §238 przy `ARCHITECTURE.md` o "chocolate egg measured oddly in ml"). Dowód że
+20 to naprawdę gramy: fitatu SAM liczy `"Wartość energetyczna561"` z `112 kcal / 20 "ml"
+× 100 ≈ 560` — dokładnie jakby 20 było gramami. Fix: warunek na `servingUnit` USUNIĘTY
+całkowicie — liczba się liczy niezależnie od etykietki jednostki, którą fitatu/AI akurat
+dobrały (ten sam fix zastosowany też w `food/add.tsx`, choć tam nie ma pola wagi do
+wypełnienia — nietknięte, tylko komentarz/styl przycisku ujednolicony, patrz niżej).
+
+**Bug #2 — przycisk niewidoczny**: `pasteToggle`/`pasteToggleTxt` renderowały się jako
+goły szary tekst (`c.text.muted`, bez tła/obrysu) — zbyt subtelne żeby user w ogóle
+zauważył że to przycisk, nie etykieta. Fix (w OBU miejscach — `product.tsx` I
+`food/add.tsx`, ten sam kod skopiowany w dwóch plikach w §238/239): pigułka z obrysem/tłem
+w kolorze `ACCENT` (ten sam wzorzec co sąsiedni "Powiąż z kupionym produktem" w
+`product.tsx`, który już używał `ACCENT` i był czytelny), ikona też przebarwiona z
+`c.text.muted` na `ACCENT`.
+
+**Testy**: bez zmian — czysty UI/warunek, żadnej nowej logiki parsującej (parser sam
+działał bezbłędnie, potwierdzone zrzutem usera). `tsc --noEmit`/`jest` czyste (93/93
+suite, 1195 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na zgłoszony problem,
+ten sam produkt co poprzednio): Baza jedzenia → "+" → wklej TĘ SAMĄ wklejkę Kinder
+Niespodzianka → sprawdź że TERAZ "Waga (g/szt)" = 20, i że przycisk "Wklej dane z neta"
+jest wyraźnie widoczny jako pigułka, nie szary tekst.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

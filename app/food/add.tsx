@@ -866,7 +866,7 @@ export default function FoodAdd() {
                   </View>
 
                   <TouchableOpacity style={s.pasteToggle} onPress={() => { haptic.tap(); setPasteOpen(o => !o); }}>
-                    <Copy size={13} color={c.text.muted} />
+                    <Copy size={14} color={ACCENT} />
                     <Text style={s.pasteToggleTxt}>{pasteOpen ? 'Zwiń' : 'Wklej dane z neta (fitatu, AI...)'}</Text>
                   </TouchableOpacity>
                   {pasteOpen && (
@@ -1169,8 +1169,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '800', color: c.text.primary },
 
   // wklejka z neta (kcal/makro) — paste parser, patrz applyPastedNutrition
-  pasteToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
-  pasteToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  // 2026-10-03, user na bliźniaczym przycisku w product.tsx: "ten przycisk malo widoczny" —
+  // dawniej c.text.muted bez obrysu. Pigułka z obrysem/tłem w ACCENT, czytelnie jako przycisk.
+  pasteToggle: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: 8, marginTop: spacing[2], borderRadius: radius.full, borderWidth: 1, borderColor: ACCENT + '55', backgroundColor: ACCENT + '14' },
+  pasteToggleTxt: { fontSize: 12.5, fontWeight: '800', color: ACCENT },
   pasteBox: { gap: spacing[2], marginTop: 2, marginBottom: spacing[1] },
   pasteInput: { minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, padding: spacing[3], fontSize: 12.5, lineHeight: 17, color: c.text.primary, textAlignVertical: 'top' },
   pasteBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.md },
