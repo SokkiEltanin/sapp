@@ -16,7 +16,9 @@ import DisplayText from '@/components/ui/DisplayText';
 import { useFontsStore } from '@/store/fontsStore';
 import { normalizeProductName } from '@/utils/productMemory';
 import { purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
+import { parsePastedNutrition } from '@/utils/foodNutritionParser';
 import { useExpensesStore } from '@/store/expensesStore';
+import { toast } from '@/store/toastStore';
 import { spacing, radius, colors } from '@/theme';
 import { fonts } from '@/theme/fonts';
 import { useColors } from '@/theme/useColors';
@@ -159,6 +161,36 @@ export default function FoodAdd() {
     return String(Math.max(0.5, +(q + dir * step).toFixed(2)));
   });
   const [kcal100, setKcal100]             = useState('');   // kcal per 100 g used for the calc (prefilled if known)
+  // Wklejka z neta → auto-wypełnienie (2026-10-03, user: zamiast ręcznie przepisywać kalorie/makro
+  // ze strony typu fitatu.com albo z odpowiedzi AI, wkleja cały skopiowany tekst, appka wyłapuje
+  // liczby sama). Parser czysty, patrz src/utils/foodNutritionParser.ts.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const applyPastedNutrition = () => {
+    const parsed = parsePastedNutrition(pasteText.trim());
+    if (!parsed) { haptic.error(); toast.error('Nie rozpoznano wartości — wklej fragment z kcal/100g albo info o porcji'); return; }
+    haptic.success();
+    // `kcal100` (pole tekstowe) niesie kcal/100g dalej — `sel.kcalPer100g` NIE jest tu nadpisywane,
+    // bo confirmPicker() dla ISTNIEJĄCEGO produktu wykrywa zmianę porównując k100 (z pola) z
+    // sel.kcalPer100g (oryginał z bazy); nadpisanie obu tą samą wartością zgubiłoby tę różnicę.
+    if (parsed.kcalPer100g != null) setKcal100(String(parsed.kcalPer100g));
+    setSel(prev => prev ? {
+      ...prev,
+      protein100: parsed.protein100 ?? prev.protein100,
+      carbs100: parsed.carbs100 ?? prev.carbs100,
+      fat100: parsed.fat100 ?? prev.fat100,
+      sugar100: parsed.sugar100 ?? prev.sugar100,
+    } : prev);
+    const bits = [
+      parsed.kcalPer100g != null ? `${parsed.kcalPer100g} kcal/100g` : null,
+      parsed.protein100 != null ? `B ${parsed.protein100}` : null,
+      parsed.fat100 != null ? `T ${parsed.fat100}` : null,
+      parsed.carbs100 != null ? `W ${parsed.carbs100}` : null,
+      parsed.sugar100 != null ? `cukry ${parsed.sugar100}` : null,
+    ].filter(Boolean).join(' · ');
+    toast.success(`Wypełniono: ${bits}`);
+    setPasteOpen(false); setPasteText('');
+  };
 
   // manual entry
   const [manual, setManual] = useState(false);
@@ -363,6 +395,7 @@ export default function FoodAdd() {
     const u: FoodUnit = cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g');
     setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
+    setPasteOpen(false); setPasteText('');
     setEditItemIndex(editIndex);   // null = dopisz nową; liczba = zamień istniejącą pozycję
   };
 
@@ -454,8 +487,19 @@ export default function FoodAdd() {
         ...(catSeed ? { cat: catSeed } : {}),
       });
       productId = p.id;
-    } else if (k100 > 0 && k100 !== sel.kcalPer100g) {
-      updateProduct(productId, { kcalPer100g: k100 });   // user set/corrected the density → remember it
+    } else {
+      // Poprawka/dopisanie gęstości i/lub makro na JUŻ istniejącym produkcie — np. wklejono dane
+      // z neta na produkt który miał tylko kcal/100g, bez makro (2026-10-03). Zapisujemy TYLKO
+      // pola które faktycznie się zmieniły względem już zapisanych (porównanie do `products`, nie
+      // do `sel` — `sel` mógł już dostać te wartości z paste'a wcześniej w tym samym renderze).
+      const existing = products.find(p => p.id === productId);
+      const patch: Partial<FoodProduct> = {};
+      if (k100 > 0 && k100 !== sel.kcalPer100g) patch.kcalPer100g = k100;
+      if (sel.protein100 != null && sel.protein100 !== existing?.protein100) patch.protein100 = sel.protein100;
+      if (sel.carbs100 != null && sel.carbs100 !== existing?.carbs100) patch.carbs100 = sel.carbs100;
+      if (sel.fat100 != null && sel.fat100 !== existing?.fat100) patch.fat100 = sel.fat100;
+      if (sel.sugar100 != null && sel.sugar100 !== existing?.sugar100) patch.sugar100 = sel.sugar100;
+      if (Object.keys(patch).length) updateProduct(productId, patch);
     }
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
@@ -821,6 +865,27 @@ export default function FoodAdd() {
                     <Text style={s.fieldHint}>{sel.kcalPer100g != null ? 'znane — możesz poprawić' : 'zapamięta się'}</Text>
                   </View>
 
+                  <TouchableOpacity style={s.pasteToggle} onPress={() => { haptic.tap(); setPasteOpen(o => !o); }}>
+                    <Copy size={13} color={c.text.muted} />
+                    <Text style={s.pasteToggleTxt}>{pasteOpen ? 'Zwiń' : 'Wklej dane z neta (fitatu, AI...)'}</Text>
+                  </TouchableOpacity>
+                  {pasteOpen && (
+                    <View style={s.pasteBox}>
+                      <TextInput
+                        style={[s.pasteInput, fontsLoaded && { fontFamily: fonts.display }]}
+                        value={pasteText} onChangeText={setPasteText} multiline
+                        placeholder={'Wklej tu skopiowany tekst z wartościami odżywczymi — ze strony typu fitatu.com albo z odpowiedzi AI'}
+                        placeholderTextColor={c.text.muted}
+                      />
+                      <TouchableOpacity
+                        style={[s.pasteBtn, { backgroundColor: pasteText.trim() ? ACCENT : c.fill.subtle }]}
+                        disabled={!pasteText.trim()} onPress={applyPastedNutrition}
+                      >
+                        <Text style={[s.pasteBtnTxt, { color: pasteText.trim() ? '#1A1206' : c.text.muted }]}>Wypełnij z tekstu</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   <View style={s.sheetKcal}><DisplayText style={s.sheetKcalVal}>{pickerKcal()} kcal</DisplayText><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {density() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerKcal() > 0 || pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0 && (density() > 0 || sel.kcalPerPortion != null))} onPress={confirmPicker}>
@@ -1102,6 +1167,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
   bigInput:   { flex: 1, height: 54, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 24, color: c.text.primary },
   smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '800', color: c.text.primary },
+
+  // wklejka z neta (kcal/makro) — paste parser, patrz applyPastedNutrition
+  pasteToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
+  pasteToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  pasteBox: { gap: spacing[2], marginTop: 2, marginBottom: spacing[1] },
+  pasteInput: { minHeight: 72, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, padding: spacing[3], fontSize: 12.5, lineHeight: 17, color: c.text.primary, textAlignVertical: 'top' },
+  pasteBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.md },
+  pasteBtnTxt: { fontSize: 12.5, fontWeight: '800' },
 
   addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, borderStyle: 'dashed', backgroundColor: c.fill.subtle },
   addNewTxt: { fontSize: 13, fontWeight: '800', color: c.text.primary, flex: 1 },

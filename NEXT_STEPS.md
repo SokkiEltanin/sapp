@@ -3,7 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: eventy Google Calendar dalej niż ~60 dni w przód nie wczytywały się (2026-10-02)
+## 🆕 Parser wklejonego tekstu z wartościami odżywczymi (2026-10-03)
+
+User: dodawanie produktu spoza bazy (np. "Kinder Niespodzianka") wymagało ręcznego
+przepisywania liczb ze strony typu fitatu.com albo z odpowiedzi AI. Pełny opis w
+ARCHITECTURE.md §238. Nowy czysty `src/utils/foodNutritionParser.ts` rozpoznaje OBA
+realne formaty naraz (fitatu "Wartość energetyczna561\nBiałka8.40..." ORAZ podsumowanie
+AI "W 100 g produktu: ok. 552–560 kcal (tłuszcz: ok. 34 g...)" + "W 1 jajku (20 g): ok.
+110–112 kcal, w tym 6,8 g tłuszczu i 10,4 g cukru") — zakresy liczone jako średnia,
+przecinek jako separator dziesiętny, uważa żeby nie pomylić wartości "na porcję" z
+wartością "na 100g" gdy TA SAMA nazwa makro występuje dwa razy w różnej skali. Podpięty w
+`app/food/add.tsx` jako zwijana sekcja "Wklej dane z neta" w pickerze (wzorzec jak
+paste-paragonu w `scan.tsx`) — wypełnia kcal/100g + białko/tłuszcz/węgle/cukry (te 4 pola
+już istniały w `FoodProduct`/już czytał je `computeItemMacros`, ale picker nie miał
+ŻADNEGO sposobu ich wpisania — czysty gap we wejściu). Przy okazji domknięty dead-end:
+wklejone makro na JUŻ ISTNIEJĄCYM (częściowo znanym) produkcie teraz też się trwale
+zapisuje, nie tylko liczy dla aktualnego logowania. `tsc`/`jest` czyste (92/92 suite, 1183
+testów, +13 nowych w `__tests__/foodNutritionParser.test.ts`).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Jedzenie → dodaj nowy produkt → w
+pickerze "Wklej dane z neta" → wklej tekst z fitatu.com albo odpowiedź AI → sprawdź że
+kcal/100g się wypełnia i że dodana pozycja ma policzone makro w rozpisce posiłku.
+
+## ✅ Fix: eventy Google Calendar dalej niż ~60 dni w przód nie wczytywały się (2026-10-02)
 
 User: "nie ładują mi się eventy dalej np z grudnia na kalendarzu google". Pełny opis w
 ARCHITECTURE.md §237. Root cause: `googleCalendarService.fetchEvents(daysBack, daysForward)`
@@ -16,7 +38,7 @@ obcinania zakresu). Fix: `daysForward` 60→365 (ten sam rząd co `daysBack = 73
 jeden punkt zmiany naprawia wszystkie 4 miejsca wołające (nikt nie nadpisywał
 domyślnej). `tsc`/`jest` czyste (91/91 suite, 1170 testów, bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — WYSOKI** (bezpośrednia reakcja na zgłoszony
+Priorytet testu na urządzeniu — WYSOKI (bezpośrednia reakcja na zgłoszony
 problem): Kalendarz → przejdź do grudnia (i dalej) → sprawdź że eventy z Google Calendar
 faktycznie się tam pojawiają, nie tylko lokalne wpisy appki.
 
