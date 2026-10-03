@@ -13868,6 +13868,66 @@ przypadek): brak konkretnego scenariusza do sprawdzenia na urządzeniu.
 
 ---
 
+## 244. Rebalans zbroi: T2-T5 stromiej, żeby mityczna T5 realnie coś znaczyła późno (2026-10-03)
+
+User: "ogarnij żeby zbroje dawały trochę więcej per level bo jednak legendarna zbroja +14 hp
+na późnym stage jest turbo niczym jak ciosy po 300 dmg xdd".
+
+**Zbadane PRZED zmianą** (code review subagentem, `src/utils/gear.ts` + `petStore.ts` +
+`bosses.ts` + `madBosses.ts`): +14 HP to NIE pech w losowaniu — to prawie dokładnie środek
+zakresu T1/T2 (dawne mythic T1=15, T2=22.5), bo cała krzywa `baseValue` T1→T5 rosła
+PŁASKO/liniowo (1→1.5→2→2.7→3.3, mnożniki ×1.5/1.33/1.35/1.22) podczas gdy kontratak
+bossa KAMPANII rośnie z `order` od ~14 dmg (order1, Lv2) do ~115-205 dmg (order16-21,
+Lv65-106) — nawet najlepszy teoretycznie możliwy rzut (mityczny, T5 Aegis Świtu, góra
+130% rolla) dawał dawniej tylko ~47 HP, ułamek jednego późnego ciosu kampanii.
+Cat max HP jest FLAT 100 na każdym poziomie (`CAT_BASE_MAX_HP`, `petStore.ts`) — NIE
+skaluje się automatycznie z levelem, rośnie tylko przez kupowany `catMaxHpBonus` (+20 HP
+za rosnący koszt monet) i zbroję — więc asymetria "obrażenia bossa rosną z postępem, HP
+kotka nie" jest strukturalna, nie przypadkowa.
+
+**WAŻNE ograniczenie zachowane**: MAD-bossy (`madBosses.ts`, tryb prestiżowy odblokowany
+na Lv15, HP kampanii×10, kontratak×3 na to) dają ~300-400 dmg PRZED unikiem — to
+ZAMIERZONE, udokumentowane wcześniej (user explicite: "pojebane wartości", tryb ma być
+prawie-jednohitowy, przetrwywalny przez unik/inwestycję, NIE przez tankowanie zbroją).
+User's "~300 dmg" pasuje dokładnie do tego trybu, nie do zwykłej kampanii — ale user
+poprosił o poprawkę per-level ogólnie ("zbroje dawały trochę więcej per level"), nie
+konkretnie o pokonanie MAD, więc fix celuje w KAMPANIĘ (gdzie realnie coś zmieni), a MAD
+zostaje świadomie nietknięty (195 HP z najlepszej zbroi dalej ginie w 1-2 ciosach MAD —
+zgodnie z zamierzeniem).
+
+**Fix w `src/utils/gear.ts`**: `baseValue` dla itemów slotu `zbroja` — **T1 ZOSTAJE
+nietknięty** (`baseValue: 1`, to był jawny "anchor od usera" z wcześniejszej sesji:
+common+1/rare+5/mythic+15 HP) — T2-T5 przekrzywione STROMIEJ, z geometrycznego ×1.5/1.33/
+1.35/1.22 na ×2/1.75/1.71/1.67:
+| Tier | unlockLevel | baseValue: stare→nowe | mythic HP (center): stare→nowe |
+|---|---|---|---|
+| T1 | 1 | 1 → 1 (bez zmian) | 15 → 15 |
+| T2 | 20 | 1.5 → 2 | 22.5 → 30 |
+| T3 | 40 | 2 → 3.5 | 30 → 52.5 |
+| T4 | 65 | 2.7 → 6 | 40.5 → 90 |
+| T5 | 90 | 3.3 → 10 | 49.5 → 150 |
+
+Mityczna T5 (Aegis Świtu) na górze rolla (×1.3, `GEAR_ROLL_SPREAD`) = **195 HP** —
+realnie wchłania jeden późny cios kampanii (115-205 dmg), zamiast być kosmetyką. Legendarna
+T5 center = 110 HP (dawniej 36.3) — user's zgłoszone "+14" (dawny T1/T2 legendarny) teraz
+odpowiada niskiemu/środkowemu tierowi, a top-tier legendarna/mityczna realnie coś znaczy.
+`RARITY_MULT` (dzielony przez WSZYSTKIE 6 slotów: helm/zbroja/buty/obroża/talizman/
+kolczyki) **celowo nietknięty** — zmiana tylko `baseValue` samej zbroi, więc crit%/dodge%/
+atk/energyMult%/gold% innych slotów bez zmian (user mówił konkretnie o "zbroje").
+
+**Testy**: `__tests__/gear.test.ts`'s test "mityczna T5 zbroja zostaje wyraźnie poniżej
+CAT_BASE_MAX_HP (100)" przepisany na odwrotną asercję (`>100, <250`) — dawny sufit 100 był
+CELOWO porzucony tym fixem, nie regresją. T1-owy test (common+1/rare+5/mythic+15) bez
+zmian (T1 nietknięty). `tsc --noEmit`/`jest` czyste (93/93 suite, 1196 testów, bez zmiany
+liczby — tylko przepisana 1 asercja).
+
+**Priorytet testu na urządzeniu — niski** (liczbowy rebalans, nie nowa funkcja/UI —
+trudne do zweryfikowania bez długiej progresji postaci): jeśli masz pupila na wysokim
+poziomie z mityczną/legendarną zbroją T4/T5, sprawdź w ekwipunku że wartość HP jest
+wyraźnie wyższa niż przed zmianą (T5 mityczna ok. 3x więcej niż wcześniej).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

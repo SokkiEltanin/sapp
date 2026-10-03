@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rebalans zbroi: T2-T5 stromiej, mityczna T5 realnie coś znaczy późno (2026-10-03)
+
+User: "zbroje dawały trochę więcej per level bo legendarna +14 hp na późnym stage jest
+turbo niczym jak ciosy po 300 dmg". Pełny opis w ARCHITECTURE.md §244. Zbadane: +14 to nie
+pech, to płaska krzywa `baseValue` (gear.ts) — kontratak bossa KAMPANII rośnie do ~115-205
+dmg późno, a nawet najlepsza dawna mityczna zbroja dawała ~47 HP. Fix: `baseValue` T2-T5
+podkręcone stromiej (T1 nietknięty — to był jawny anchor usera wcześniej); mityczna T5 na
+górze rolla teraz 195 HP (było ~47) — realnie tankuje jeden późny cios kampanii. MAD-bossy
+(~300-400 dmg, celowo prawie-jednohitowe, user wcześniej: "pojebane wartości") świadomie
+NIEtknięte — 195 HP dalej ginie tam w 1-2 ciosach, zgodnie z zamierzeniem. `RARITY_MULT`
+(dzielony przez wszystkie 6 slotów ekwipunku) też nietknięty — zmiana tylko zbroi.
+`tsc`/`jest` czyste (93/93 suite, 1196 testów — 1 asercja przepisana na nowy sufit).
+
+**🆕 Priorytet testu na urządzeniu — niski** (liczbowy rebalans, trudny do zweryfikowania
+bez długiej progresji): jeśli masz pupila wysoko z mityczną/legendarną zbroją T4/T5,
+sprawdź w ekwipunku że HP jest wyraźnie wyższe niż wcześniej (T5 mityczna ~3x).
+
 ## ✅ Audyt kodu z tej sesji (wydajność + logika) — jeden defensywny fix (2026-10-03)
 
 User: "Dawaj testy optymalizacji i logiki" — `/code-review` na `master~25..master`
