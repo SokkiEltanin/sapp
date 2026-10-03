@@ -180,11 +180,16 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
     expect(b.atk).toBe(0);
   });
 
-  test('gearFlatHp: mityczna T5 zbroja zostaje wyraźnie poniżej CAT_BASE_MAX_HP (100)', () => {
+  test('gearFlatHp: mityczna T5 zbroja PRZEKRACZA CAT_BASE_MAX_HP (100) — rebalans 2026-10-03', () => {
+    // Dawniej celowo < 100 — user: "legendarna zbroja +14 hp na późnym stage jest turbo
+    // niczym jak ciosy po 300 dmg". Teraz świadomie > CAT_BASE_MAX_HP, żeby mityczna T5 realnie
+    // tankowała jeden późny cios KAMPANII (115-205 dmg, patrz bosses.ts), ale zostaje WYRAŹNIE
+    // poniżej MAD-bossów (300-400 dmg przed unikiem, madBosses.ts — te zostają celowo
+    // prawie-jednohitowe, balans tam nietknięty).
     const zbrojaAegis = gearById('zbroja_aegis')!;
     const hp = gearFlatHp({ zbroja: 'zbroja_aegis' }, { zbroja_aegis: { rarity: 'mythic', value: gearStatValue(zbrojaAegis, 'mythic') } });
-    expect(hp).toBeLessThan(100);
-    expect(hp).toBeGreaterThan(0);
+    expect(hp).toBeGreaterThan(100);
+    expect(hp).toBeLessThan(250);
   });
   test('gearFlatHp: brak zbroi → 0', () => {
     expect(gearFlatHp({}, {})).toBe(0);

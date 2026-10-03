@@ -135,12 +135,25 @@ export const GEAR_ITEMS: GearItemDef[] = [
   { id: 'helm_krucza', slot: 'helm', name: 'Kruczy Diadem', unlockLevel: 65, baseValue: 0.006, icon: ICONS.helm_krucza },
   { id: 'helm_koronaBurzy', slot: 'helm', name: 'Korona Burzy', unlockLevel: 90, baseValue: 0.008, icon: ICONS.helm_koronaBurzy },
 
-  // ── Zbroja (flat HP) — T1 anchor od usera, mythic T5 = 3.3×15 ≈ 50 HP (~50% base 100) ──
+  // ── Zbroja (flat HP) — PRZEBALANSOWANE 2026-10-03 (user: "zbroje dawały trochę więcej
+  // per level bo legendarna +14 hp na późnym stage jest turbo niczym jak ciosy po 300 dmg").
+  // Zbadane (code review subagentem) PRZED zmianą: +14 to NIE pech w losowaniu — to prawie
+  // dokładnie środek zakresu T1/T2 (mythic T1=15, T2=22.5 wcześniej), bo CAŁA krzywa T1→T5
+  // rosła liniowo i płasko (baseValue 1→1.5→2→2.7→3.3, ×1.5/1.33/1.35/1.22) podczas gdy
+  // kontratak bossa kampanii rośnie z `order` od ~14 dmg (order1) do ~115-205 dmg (order16-21,
+  // patrz bosses.ts) — nawet najlepszy możliwy rzut (mityczny, T5, góra 130% rolla) dawał
+  // dawniej tylko ~47 HP, ułamek jednego późnego ciosu. T1 ZOSTAJE dokładnie jak ustalił user
+  // wcześniej (anchor: common+1/rare+5/mythic+15) — T2-T5 przekrzywione STROMIEJ (geometrycznie
+  // ×2/×1.75/×1.71/×1.67 zamiast dawnego ×1.5/1.33/1.35/1.22), żeby T5 mityczna zbroja na
+  // górze rolla (10×15×1.3=195 HP) realnie wchłaniała JEDEN późny cios kampanii (115-205 dmg)
+  // zamiast być kosmetyką. ŚWIADOMIE NIE dotyka MAD-bossów (300-400 dmg przed unikiem,
+  // madBosses.ts) — te zostają celowo prawie-jednohitowe (user wcześniej: "pojebane wartości"),
+  // 195 HP dalej ginie w 1-2 ciosach MAD, balans tam NIEtknięty.
   { id: 'zbroja_szmaciana', slot: 'zbroja', name: 'Szmaciana Kamizelka', unlockLevel: 1, baseValue: 1, icon: ICONS.zbroja_szmaciana },
-  { id: 'zbroja_skorzana', slot: 'zbroja', name: 'Wzmacniana Kamizelka', unlockLevel: 20, baseValue: 1.5, icon: ICONS.zbroja_skorzana },
-  { id: 'zbroja_kolczuga', slot: 'zbroja', name: 'Kolczuga Strażnika', unlockLevel: 40, baseValue: 2, icon: ICONS.zbroja_kolczuga },
-  { id: 'zbroja_smoczaLuska', slot: 'zbroja', name: 'Pancerz ze Smoczej Łuski', unlockLevel: 65, baseValue: 2.7, icon: ICONS.zbroja_smoczaLuska },
-  { id: 'zbroja_aegis', slot: 'zbroja', name: 'Aegis Świtu', unlockLevel: 90, baseValue: 3.3, icon: ICONS.zbroja_aegis },
+  { id: 'zbroja_skorzana', slot: 'zbroja', name: 'Wzmacniana Kamizelka', unlockLevel: 20, baseValue: 2, icon: ICONS.zbroja_skorzana },
+  { id: 'zbroja_kolczuga', slot: 'zbroja', name: 'Kolczuga Strażnika', unlockLevel: 40, baseValue: 3.5, icon: ICONS.zbroja_kolczuga },
+  { id: 'zbroja_smoczaLuska', slot: 'zbroja', name: 'Pancerz ze Smoczej Łuski', unlockLevel: 65, baseValue: 6, icon: ICONS.zbroja_smoczaLuska },
+  { id: 'zbroja_aegis', slot: 'zbroja', name: 'Aegis Świtu', unlockLevel: 90, baseValue: 10, icon: ICONS.zbroja_aegis },
 
   // ── Buty (dodge%) — mythic T5 = 0.013×15 = 19.5% (kampania: suma 72%, ale counterDamage
   // capuje redukcję na 90% niezależnie od źródła, więc endgame i tak zbliża się do sufitu) ──
