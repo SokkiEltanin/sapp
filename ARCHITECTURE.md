@@ -14056,6 +14056,34 @@ sprawdź że "legendary" (jackpot) jest złoty, nie różowy.
 
 ---
 
+## 247. Fix: nieaktualny komentarz balansu zbroi po §244 (2026-10-04)
+
+User: "dawaj audyty wtedy" — `/code-review` na `src/utils` (level high). Jedyny finding:
+komentarz nad `GEAR_ITEMS` w `gear.ts` (linie ~100-110, z pierwotnego balansu 2026-08-19)
+nadal twierdził że mityczna T5 zbroja "nie przekracza ~50% CAT_BASE_MAX_HP (100)" — ale
+§244 (2026-10-03) ŚWIADOMIE podniosło ją do 150 (center) / 195 (góra rolla), czyli 150-195%
+bazowego HP. Przyszły czytelnik (człowiek albo kolejny subagent audytu balansu) ufający
+temu starem zdaniu doszedłby do błędnych wniosków o aktualnym balansie. Fix: zdanie
+doprecyzowane — sufit ~50% nadal obowiązuje dla itemów procentowych (helm/buty/talizman/
+kolczyki, nietkniętych w §244), ale NIE dla zbroi, z odnośnikiem do pełnego, aktualnego
+komentarza przy samych wpisach `zbroja_*`. Czysto dokumentacyjne, zero zmiany w liczbach/
+logice.
+
+**Metoda**: `/code-review --target src/utils` w tym środowisku okazał się diff-scoped (nie
+pełny audyt treści katalogu) — przy czystym working tree bez rozbieżności od zdalnej gałęzi
+spadł do przejrzenia OSTATNIEGO commita dotykającego `src/utils` (czyli dokładnie §244) i
+znalazł tylko tę jedną niespójność. Dla faktycznie szerszego audytu (nie tylko diff) użyty
+osobno subagent czytający kod wprost pod kątem bugów logicznych walki z bossami (patrz
+następna sekcja jeśli coś znajdzie).
+
+**Testy**: bez zmian — czysty komentarz. `tsc --noEmit`/`jest` czyste (93/93 suite, 1196
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — brak** (komentarz w kodzie, nie ma żadnego efektu w
+appce).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
