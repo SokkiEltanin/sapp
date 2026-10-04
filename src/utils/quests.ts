@@ -4,6 +4,11 @@
 //  • milestone quests — one-time tiered payouts as a cumulative stat crosses thresholds
 //    (sweetless-days ladder, step-day record, habit streak, cards collected)
 
+// `matchedEatDays`/`AVOID_PRESETS` (2026-10-04) — `sweetlessDaysFrom` below needs the SAME
+// live "sweets" keyword/eat-matcher countersStore.ts/habits.ts already use for their "dni bez
+// X" trackers, see the big comment above that function.
+import { matchedEatDays, AVOID_PRESETS } from '@/store/countersStore';
+
 export interface QuestCtx {
   stepsToday: number;
   moodLoggedToday: boolean;
@@ -302,8 +307,22 @@ export function weekKeyOf(d = new Date()): string {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
 }
 
-// Days since the most recent sweet/snack receipt item (for the sweetless ladder).
-export function sweetlessDaysFrom(expenses: { type?: string; date: string; receiptItems?: { tags?: string[]; excluded?: boolean; kind?: string }[] }[]): number {
+// Days since the most recent sweet/snack — either a tagged PURCHASE or a matching food LOGGED
+// via „Co zjadłem" (2026-10-04, user: "jak zjem i wpisze toffieffie to mi nie lapie ze to
+// slodycz i nie zeruje streaka"). This feeds the pet quests `m_sweetless`/`mo_nosweet`, the
+// `sweetless` boss weakness AND `personalRecords.ts`'s "Najdłużej bez słodyczy" — but until now
+// only ever looked at receipt purchases, never at the food log. `countersStore.ts`/`habits.ts`'s
+// "dni bez X" trackers already got this exact eat-vs-buy fix (2026-08-31/09-08, see
+// `matchedEatDays` comment there) — this was the one place left that never got it, a dead end
+// the earlier fix missed. Reuses the SAME live `sweets` keyword/matcher as those trackers, so
+// any future keyword addition there (a new candy name) covers this automatically too.
+const SWEETS_KEYWORD = AVOID_PRESETS.find(p => p.key === 'sweets')!.keyword;
+
+export function sweetlessDaysFrom(
+  expenses: { type?: string; date: string; receiptItems?: { tags?: string[]; excluded?: boolean; kind?: string }[] }[],
+  meals: { date?: string; items?: { name?: string; productId?: string; parts?: { name?: string; productId?: string }[] }[] }[] = [],
+  products: { id: string; cat?: string }[] = [],
+): number {
   let last = '';
   for (const e of expenses) {
     if (e.type === 'income') continue;
@@ -315,6 +334,9 @@ export function sweetlessDaysFrom(expenses: { type?: string; date: string; recei
       }
     }
   }
+  const catByProductId: Record<string, string | undefined> = {};
+  for (const p of products) catByProductId[p.id] = p.cat;
+  for (const day of matchedEatDays(SWEETS_KEYWORD, meals, catByProductId)) if (day > last) last = day;
   if (!last) return 0;
   const ms = Date.now() - new Date(last + 'T00:00:00').getTime();
   return Math.max(0, Math.floor(ms / 86400000));

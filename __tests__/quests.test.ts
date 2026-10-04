@@ -146,6 +146,41 @@ describe('sweetlessDaysFrom', () => {
     ];
     expect(sweetlessDaysFrom(expenses)).toBe(3);
   });
+
+  // 2026-10-04, user: "jak zjem i wpisze toffieffie to mi nie lapie ze to slodycz i nie
+  // zeruje streaka" — `sweetlessDaysFrom` tylko patrzyło na tagowane ZAKUPY, nigdy na
+  // jedzenie zalogowane w "Co zjadłem" (ten sam eat-vs-buy gap co countersStore.ts/habits.ts
+  // miały przed fixem z 2026-08-31/09-08, patrz `matchedEatDays`).
+  test('zjedzenie słodycza DZIŚ (bez żadnego zakupu) zeruje streak — "toffieffie" łapie się przez "toffi"', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const meals = [{ date: today, items: [{ name: 'Toffieffie' }] }];
+    expect(sweetlessDaysFrom([], meals)).toBe(0);
+  });
+
+  test('najpóźniejszy z dwóch sygnałów (zakup STARSZY, jedzenie NOWSZE) wygrywa — streak liczy się od jedzenia', () => {
+    const now = new Date();
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const tenDaysAgo = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10));
+    const today = ymd(now);
+    const expenses = [{ date: tenDaysAgo + 'T10:00:00', receiptItems: [{ tags: ['słodycze'] }] }];
+    const meals = [{ date: today, items: [{ name: 'Czekolada' }] }];
+    expect(sweetlessDaysFrom(expenses, meals)).toBe(0);
+  });
+
+  test('produkt bez słowa-klucza w nazwie, ale OTAGOWANY słodyczem przez productId, też łapie się', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const meals = [{ date: today, items: [{ name: 'Milka', productId: 'p1' }] }];
+    expect(sweetlessDaysFrom([], meals, [{ id: 'p1', cat: 'słodycze' }])).toBe(0);
+  });
+
+  test('jedzenie NIE-słodkiego produktu nie zeruje streaka liczonego od starszego zakupu', () => {
+    const now = new Date();
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const threeDaysAgo = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3));
+    const expenses = [{ date: threeDaysAgo + 'T10:00:00', receiptItems: [{ tags: ['słodycze'] }] }];
+    const meals = [{ date: ymd(now), items: [{ name: 'Marchewka' }] }];
+    expect(sweetlessDaysFrom(expenses, meals)).toBe(3);
+  });
 });
 
 describe('buildQuests — questRewardMult (nagrody rosną z poziomem, 2026-08-14 balance audit)', () => {

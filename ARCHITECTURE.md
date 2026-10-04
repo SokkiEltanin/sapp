@@ -14174,6 +14174,54 @@ grafiki itemów są przez to lepiej widoczne na tle.
 
 ---
 
+## 250. Fix: "dni bez słodyczy" (pet quest + rekord) ignorowało jedzenie, tylko zakupy (2026-10-04)
+
+User: "I nadal ma problem z tym jak zjem i wpisze toffieffie to mi nie lapie ze to slodycz i
+nie zeruje streaka". Dochodzenie: w tej appce istnieją DWA niezależne systemy śledzące "dni
+bez słodyczy":
+
+1. **Liczniki/nawyki** (`src/store/countersStore.ts`'s `AVOID_PRESETS`/`matchedEatDays`,
+   używane przez dashboard "Twoje serie" i ekran Nawyków) — dostały fix "je się, nie kupuje"
+   już 2026-08-31/09-08 (`matchedEatDays`/`autoLastEatDate`, patrz obszerny komentarz tam) i
+   keyword `sweets` od dawna zawiera `toffi` — DZIAŁA poprawnie, złapałoby "toffieffie".
+2. **System questów pupila** (`src/utils/quests.ts`'s `sweetlessDaysFrom`, zasilający quest
+   `m_sweetless`/`mo_nosweet` ORAZ `src/utils/personalRecords.ts`'s "Najdłużej bez słodyczy")
+   — NIGDY nie dostał tego fixu. Patrzył WYŁĄCZNIE na tagowane pozycje paragonu
+   (`receiptItems[].tags`), zero świadomości food logu. User, który je zalogowane jedzenie
+   (nie zawsze kupione/zeskanowane — prezent, zapas, przekąska w pracy) nigdy nie zerował tej
+   konkretnej serii, mimo że identyczny scenariusz w Licznikach/Nawykach działał od miesiąca.
+   Klasyczny dead-end: wcześniejszy fix rozwiązał PROBLEM w jednym miejscu, ale nie został
+   podpięty we WSZYSTKICH miejscach liczących "dni bez słodyczy" (CLAUDE.md zasada 7).
+
+Fix: `sweetlessDaysFrom(expenses, meals?, products?)` (quests.ts) teraz bierze też datę
+NAJPÓŹNIEJSZEGO dnia z food logu pasującego do tego samego, ŻYWEGO keyworda `sweets` z
+`AVOID_PRESETS` (`matchedEatDays`, import z `countersStore.ts` — JEDNO źródło prawdy, każdy
+przyszły dopisek do listy słów-kluczy pokrywa automatycznie oba systemy). `meals`/`products`
+opcjonalne z domyślnym `[]` — stary 1-argumentowy wywołanie (istniejące testy) dalej działa
+bez zmian. Analogicznie `longestSweetless`/`buildRecords` w `personalRecords.ts` (ten sam
+import, ta sama logika — dodaje dni z food logu do tego samego `Set` dni-z-łamiącym-wydarzeniem
+zamiast tylko dni-z-zakupem). Oba call site'y zaktualizowane, żeby przekazywać `foodMeals`/
+`foodProducts`: `app/(tabs)/index.tsx` (dashboard quest ctx + `records`) i
+`src/hooks/usePetQuests.ts` (PEŁNY ekran Questów pupila — to ten, który user realnie widział).
+Sprawdzone: boss `weakness: 'sweetless'` to CZYSTA etykieta kosmetyczna od 2026-08-13→18
+(patrz komentarz w `bosses.ts`), nie realny bonus liczony z `sweetlessDays` — nie wymaga
+zmiany.
+
+**Testy**: nowe w `__tests__/quests.test.ts` (3: zjedzenie dziś bez zakupu zeruje streak —
+dokładnie scenariusz "toffieffie"/"toffi" substring; nowszy sygnał z jedzenia wygrywa nad
+starszym zakupem; produkt bez słowa-klucza w nazwie ale otagowany `cat` łapie się przez
+`productId`; niesłodki posiłek NIE zeruje) i `__tests__/personalRecords.test.ts` (1: ten sam
+wzorzec filler-dni co istniejący test zakupowy, ale luka kończy się na jedzeniu zamiast
+zakupu). `tsc --noEmit` czyste, `jest --silent` 94/94 suite, 1204/1199 testów (+5).
+
+**Priorytet testu na urządzeniu — wysoki**: Pupil → Questy → zapisz obecną wartość "Bez
+słodyczy"/"7 dni bez słodyczy z rzędu" → Co zjadłem → dodaj dowolny słodki produkt (np.
+"Toffifee" z bazy, albo wpisz ręcznie nazwę zawierającą "toffi"/"czekolad"/etc.) → wróć do
+Questów, sprawdzić że licznik faktycznie spadł do 0 (nie tylko w Licznikach na dashboardzie,
+które już działały).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

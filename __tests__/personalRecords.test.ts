@@ -53,6 +53,29 @@ describe('personalRecords — buildRecords', () => {
     expect(r!.num).toBeGreaterThan(0);
   });
 
+  // 2026-10-04, user: "jak zjem i wpisze toffieffie to mi nie lapie ze to slodycz i nie
+  // zeruje streaka" — `longestSweetless` tylko patrzyło na tagowane ZAKUPY, nigdy na jedzenie
+  // zalogowane w "Co zjadłem" (ten sam eat-vs-buy gap co quests.ts's `sweetlessDaysFrom`,
+  // naprawiony tym samym fixem).
+  test('najdłużej bez słodyczy — zjedzenie (bez zakupu) też przerywa serię', () => {
+    // Ten sam wzorzec co test zakupowy wyżej, ale luka kończy się na JEDZENIU (nie zakupie):
+    // zakup 2026-08-01, potem cisza, zjedzony (nigdy nie kupiony/zeskanowany) słodycz
+    // 2026-08-18 → luka 16 dni, kończąca się dzień przed tym jedzeniem. Reszta jedzenia co
+    // 10 dni AŻ DO WCZORAJ (ten sam filler-wzorzec co wyżej) — żeby żadna PÓŹNIEJSZA luka (w
+    // tym "seria wciąż trwa") nie wypadła przypadkiem dłuższa i nie wygrała zamiast tej.
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const filler: string[] = [];
+    const cursor = new Date('2026-08-18T00:00:00');
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    while (cursor < yesterday) { cursor.setDate(cursor.getDate() + 10); filler.push(fmt(cursor)); }
+    filler.push(fmt(yesterday));
+    const meals = ['2026-08-18', ...filler].map(date => ({ date, items: [{ name: 'Toffieffie' }] }));
+    const recs = buildRecords({}, [sweetsExpense('2026-08-01')], [], meals);
+    const r = recs.find(x => x.key === 'sweetless');
+    expect(r?.num).toBe(16);
+    expect(r?.date).toBe('2026-08-17');
+  });
+
   test('waga wymaga ≥2 odczytów', () => {
     const recs = buildRecords({ '2026-08-01': { steps: 0, sleepMinutes: 0, weightKg: 70 } }, [], []);
     expect(recs.find(r => r.key === 'weight')).toBeUndefined();

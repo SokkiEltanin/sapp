@@ -8,6 +8,7 @@ import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf }
 import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useFoodStore } from '@/store/foodStore';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
@@ -42,6 +43,14 @@ export function usePetQuests() {
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const expenses = useExpensesStore((s) => s.expenses);
+  // `foodMeals`/`foodProducts` (2026-10-04, user: "jak zjem i wpisze toffieffie to mi nie
+  // lapie ze to slodycz i nie zeruje streaka") — `sweetlessDays` niżej musi łapać też jedzenie
+  // zalogowane w "Co zjadłem", nie tylko tagowane zakupy, patrz komentarz przy
+  // `sweetlessDaysFrom` w quests.ts. Bez tego fixu zjedzenie słodycza bez jej KUPNA (np.
+  // dostał w prezencie, zjadł z zapasu) nigdy nie resetowało ani questów "Bez słodyczy"/"7 dni
+  // bez słodyczy z rzędu", ani słabości bossów "dni bez słodyczy".
+  const foodMeals = useFoodStore((s) => s.meals);
+  const foodProducts = useFoodStore((s) => s.products);
 
   const affToday = affectionDay === todayISO() ? affection : 0;
 
@@ -61,7 +70,7 @@ export function usePetQuests() {
       stepsToday: health.steps,
       moodLoggedToday: moodEntries.some(e => e.date === t),
       habitsDone: todayDone.length, habitsTotal: habits.length,
-      sweetlessDays: sweetlessDaysFrom(expenses),
+      sweetlessDays: sweetlessDaysFrom(expenses, foodMeals, foodProducts),
       bestStepDay: health.bestStepDay,
       habitBestStreak,
       cardsCollected,
@@ -88,7 +97,7 @@ export function usePetQuests() {
       stretchToday: stretchDay === t,
       bikeToday: bikeDay === t,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, foodMeals, foodProducts, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay]);
   const quests = useMemo(
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],

@@ -562,8 +562,13 @@ export default function DashboardScreen() {
     [counters, dayKey],
   );
 
-  // "Rekordy życiowe" widget — all-time bests from the data already loaded.
-  const records = useMemo(() => buildRecords(healthDays, expenses, moodEntries), [healthDays, expenses, moodEntries]);
+  // "Rekordy życiowe" widget — all-time bests from the data already loaded. `foodMeals`/
+  // `foodProducts` (2026-10-04) — "Najdłużej bez słodyczy" musi łapać też JEDZENIE zalogowane
+  // w "Co zjadłem", nie tylko tagowane zakupy, patrz komentarz przy `longestSweetless`.
+  const records = useMemo(
+    () => buildRecords(healthDays, expenses, moodEntries, foodMeals, foodProducts),
+    [healthDays, expenses, moodEntries, foodMeals, foodProducts],
+  );
   // „Rekord pobity!" — porównaj bieżące rekordy z zapisanym najlepszym wynikiem; pierwszy
   // raz = baseline (bez fajerwerków). Idempotentne (baseline w AsyncStorage tylko rośnie/
   // maleje na korzyść) + dedup w sesji, więc nie spamuje.
@@ -1785,7 +1790,7 @@ export default function DashboardScreen() {
       stepsToday: healthDays[tISO]?.steps ?? 0,
       moodLoggedToday: moodEntries.some(e => e.date === tISO),
       habitsDone: habitsDoneIds.length, habitsTotal: habits.length,
-      sweetlessDays: sweetlessDaysFrom(expenses),
+      sweetlessDays: sweetlessDaysFrom(expenses, foodMeals, foodProducts),
       bestStepDay: Object.values(healthDays).reduce((m, d) => Math.max(m, d.steps ?? 0), 0),
       habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
       cardsCollected: monthCards.filter(c => !c.inProgress).length,
@@ -1796,7 +1801,7 @@ export default function DashboardScreen() {
       moodDaysThisMonth: new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size,
       stepsThisMonth: Object.entries(healthDays).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0),
     }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }, petLevel).claimableCount;
-  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak, petLevel]);
+  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, foodMeals, foodProducts, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak, petLevel]);
   // Evening pupil nudge — content matches state (free chest → rewards → misses you).
   // Rescheduled on every open so it never nags about something already handled.
   useEffect(() => {
