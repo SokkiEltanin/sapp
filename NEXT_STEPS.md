@@ -3,7 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: dwa realne bugi walki z bossami — heal perk nie leczył, nemesis pasek cofał się (2026-10-04)
+## 🆕 Sloty ekwipunku: ciemne jednolite tło + delikatny gradient rzadkości na ramce (2026-10-04)
+
+User, patrząc na ekran Pupila: "te sloty... zrobmy jednak ciemne jednolite a jedyne co to
+lekko na ramce gradient bardzo delikatny ogarniający jaka to rzadkość zeby nie rzucało sie
+tak w oczy... zeby itemy było dobrze widac". Pełny opis w ARCHITECTURE.md §249. Dawne pełne
+kolorowe tło slotu (~10% wypełnienie koloru rzadkości + solid borderColor) zastąpione: tło
+ZAWSZE ciemne (`c.bg.card`), rzadkość tylko jako bardzo subtelny diagonalny gradient na
+1.5px "pierścieniu" ramki (`LinearGradient` pod spodem + mniejszy wewnętrzny kafel w kolorze
+tła na wierzchu). Czysto wizualne, `tsc`/`jest` czyste (94/94 suite, 1199 testów, bez
+zmiany).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: ekran Pupila → sprawdzić że 6 slotów
+ekwipunku ma ciemne jednolite tło z samym subtelnym kolorowym poblaskiem na ramce, grafiki
+itemów lepiej widoczne niż na dawnym kolorowym tle.
+
+## ✅ Fix: dwa realne bugi walki z bossami — heal perk nie leczył, nemesis pasek cofał się (2026-10-04)
 
 User: "dawaj audyty wtedy". Dedykowany subagent czytający CAŁĄ treść (nie diff) `boss-fight.tsx`/
 `bosses.ts`/`madBosses.ts`/`combatItems.ts`/bojowych pól `petStore.ts` znalazł 2 realne bugi.

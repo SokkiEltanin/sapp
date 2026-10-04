@@ -14141,6 +14141,39 @@ traci % mimo braku realnego ataku.
 
 ---
 
+## 249. Sloty ekwipunku: ciemne jednolite tło + delikatny gradient rzadkości na ramce (2026-10-04)
+
+User, patrząc na ekran Pupila: "te sloty ekwipunku (te 6 obok pupila) moze zrobmy jednak
+ciemne jednolite a jedyne co to lekko na ramce gradient bardzo delikatny ogarniający jaka to
+rzadkość zeby nie rzucało sie tak w oczy... zeby itemy było dobrze widac". Dawny `GearPanel`
+(`slotButton` w `src/components/pet/GearPanel.tsx`) renderował CAŁE tło slotu w kolorze
+rzadkości (`meta.color + '1A'`, czyli ~10% wypełnienie PEŁNEGO koloru + solid `borderColor:
+meta.color`) — przy 6 slotach na raz (zielone/niebieskie/różowe naraz) ekran rzucał się w
+oczy kolorami zamiast prowadzić wzrok do samych itemów.
+
+Fix: tło slotu TERAZ zawsze jednolicie ciemne (`c.bg.card`, niezależnie od rzadkości) —
+rzadkość żyje WYŁĄCZNIE jako bardzo subtelny diagonalny gradient na RAMCE. Mechanika (RN nie
+ma gradientowego `borderColor`, patrz CLAUDE.md zasada 6 o braku transform-origin — podobny
+brak natywnego prymitywu): `slotOuter` (70×70, `overflow:'hidden'`) ma `LinearGradient`
+(`expo-linear-gradient`, już używany wszędzie w apce) jako PEŁNE tło
+(`StyleSheet.absoluteFillObject`), kolory `[meta.color+'99', meta.color+'14']` (~60%→~8%
+alfa, diagonalnie top-left→bottom-right) — a NA WIERZCHU mniejszy `slotInner` (inset 1.5px z
+każdej strony, `borderRadius: radius.lg - 1.5`) w jednolitym `c.bg.card` przykrywa środek,
+zostawiając widoczny tylko 1.5px "pierścień" gradientu jako obramowanie. Pusty slot (brak
+założonego itemu, `meta === null`) dostaje płaski neutralny pierścień — oba kolory gradientu
+to ten sam `c.border.default` (brak widocznego przejścia), identyczny efekt jak dawne solid
+`borderColor`.
+
+**Testy**: czysto wizualne, bez logiki — `tsc --noEmit`/`jest --silent` czyste (94/94 suite,
+1199 testów, bez zmiany w liczbie).
+
+**Priorytet testu na urządzeniu — wysoki** (czysto wizualna zmiana widoczna na pierwszy rzut
+oka): ekran Pupila → sprawdzić że 6 slotów ekwipunku ma teraz ciemne, jednolite tło z samym
+subtelnym kolorowym poblaskiem na ramce (nie pełne kolorowe tło jak dawniej), i że same
+grafiki itemów są przez to lepiej widoczne na tle.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
