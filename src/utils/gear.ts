@@ -106,8 +106,13 @@ const ICONS: Record<string, ImageSourcePropType> = {
 // jawnie zepsuty balans — dotychczasowe tuningi bossów (COUNTER_PCT, MAD_HITS_MULT) zakładają
 // tę pulę jako sufit. Stąd niżej: baseValue dobrane tak, żeby mythic T5 (najlepszy możliwy
 // pojedynczy item) lądował w okolicach 20-30% TEJ sumy — zauważalny, ale nie dominujący
-// dodatek. zbroja (flatHp) T1 ZOSTAJE dokładnie jak podał user (common+1/rare+5/mythic+15) —
-// tylko T2-T5 dointerpolowane tak, żeby mythic T5 nie przekraczał ~50% CAT_BASE_MAX_HP (100).
+// dodatek. Dotyczy itemów PROCENTOWYCH (helm/buty/talizman/kolczyki) — ten sufit nadal
+// obowiązuje dla nich. zbroja (flatHp) miała TU pierwotnie ten sam ~50% CAT_BASE_MAX_HP (100)
+// sufit, ale PRZEBALANSOWANA PONOWNIE 2026-10-03 (§244, patrz pełny komentarz przy
+// GEAR_ITEMS niżej, przy wpisach `zbroja_*`) — mityczna T5 dziś celowo PRZEKRACZA 100
+// (center 150, góra rolla 195), żeby realnie tankować późny cios kampanii. Jeśli czytasz
+// to licząc balans zbroi, ZIGNORUJ "~50%" wyżej — nieaktualne dla zbroi, nadal aktualne
+// dla reszty slotów.
 //
 // ── Obroża przebudowana z % na FLAT (2026-09-22) ────────────────────────────────────────
 // User: "ogarnij ekwipunek — patrz jak teraz stoi z bossami". Zmierzone node'em (nie

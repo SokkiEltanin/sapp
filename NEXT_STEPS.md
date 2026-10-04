@@ -3,6 +3,15 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Fix: nieaktualny komentarz balansu zbroi po §244 (2026-10-04)
+
+User: "dawaj audyty wtedy". Pełny opis w ARCHITECTURE.md §247. `/code-review` na
+`src/utils` złapał jedną niespójność: komentarz w `gear.ts` nadal twierdził że mityczna T5
+zbroja zostaje poniżej 50% CAT_BASE_MAX_HP, mimo że §244 świadomie podniosło ją do
+150-195%. Doprecyzowane, żeby przyszły czytelnik nie wyciągnął błędnych wniosków. Czysto
+dokumentacyjne. `tsc`/`jest` czyste (93/93 suite, 1196 testów, bez zmiany). Brak
+scenariusza do testu na urządzeniu.
+
 ## 🆕 Skrzynki pupila: pula perków OK; kolor nazwy itemu naprawiony (2026-10-04)
 
 User poprosił o sprawdzenie dwóch rzeczy: czy zmaksowany perk znika z puli losowania, i
