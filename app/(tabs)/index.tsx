@@ -3242,7 +3242,12 @@ export default function DashboardScreen() {
             })();
 
             nodes['habits-nudge'] = habits.length > 0 && new Date().getHours() >= 17 && (() => {
-              const notDone = habits.filter(h => !habitsDoneIds.includes(h.id));
+              // Wyklucza `kind` 'avoid'/'water' (2026-10-04, ten sam fix co TopPill.tsx —
+              // user zrzutem pigułki "BEZ SŁODYCZY NIE ZAZNACZONY": oba kind'y są CAŁKOWICIE
+              // auto-śledzone (avoid z "Co zjadłem", water z Health Connect), nie ma tu nic
+              // do ręcznego zaznaczenia, więc nie mają co straszyć w liście "jeszcze do
+              // zrobienia" obok realnych, ręcznie odhaczanych nawyków).
+              const notDone = habits.filter(h => h.kind !== 'avoid' && h.kind !== 'water' && !habitsDoneIds.includes(h.id));
               if (notDone.length === 0) return null;
               const maxStreak = Math.max(...notDone.map(h => getStreak(h.id)));
               return (

@@ -3,7 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Ciekawostki: nowa kategoria "Zdrowie" + trzeci poziom "Jeszcze więcej" (2026-10-04)
+## 🆕 Fix: pigułki-nudge nawyków pokazywały auto-śledzone "BEZ SŁODYCZY NIE ZAZNACZONY" (2026-10-04)
+
+User zrzutem: "jaka seria ze słodyczami przecież to czy zjem czy nie sam nie zaznaczam jakby
+wtf?". Pełny opis w ARCHITECTURE.md §252. `TopPill.tsx` i kafelek `habits-nudge` w
+`app/(tabs)/index.tsx` (oba: lista "jeszcze nieodhaczonych dziś" nawyków po 17:00) liczyły do
+niej też `kind:'avoid'`/`'water'` habity — te są CAŁKOWICIE auto-śledzone (z "Co zjadłem"/
+Health Connect), user nigdy nic tu ręcznie nie zaznacza, więc tekst "NIE ZAZNACZONY" był
+wprost fałszywy. Fix: oba miejsca filtrują teraz `kind !== 'avoid' && kind !== 'water'`.
+`tsc`/`jest` czyste (94/94 suite, 1204 testów, bez zmiany).
+
+**🆕 ZNANY, nienaprawiony gap tej samej rodziny**: per-habitowe "Codzienne przypomnienie"
+(push, `app/habits.tsx` edytor → `notificationsService.scheduleHabitReminder`) wciąż da się
+ustawić na avoid/water habit, a treść notyfikacji ma tę samą błędną "zaznacz postęp" retorykę
+— świadomie nieruszone (wymaga przepchnięcia `habit.kind` i weryfikacji na urządzeniu).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: miej aktywny nawyk `avoid` (np. "Bez
+słodyczy") + zwykły nawyk, żaden nie zrobiony, poczekaj do po 17:00 → sprawdź że górna
+pigułka i kafelek "Jeszcze N nawyków" wspominają TYLKO zwykły nawyk.
+
+## ✅ Ciekawostki: nowa kategoria "Zdrowie" + trzeci poziom "Jeszcze więcej" (2026-10-04)
 
 User: "jak sie nudzisz ogarnij więcej lepszych ciekawostek, zwłaszcza lubie takie które uczą
 np jak z wodą ze picie wpływa na wiele zdrowie mózg itp... i jak mnie zaciekawi bardzo i

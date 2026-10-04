@@ -424,9 +424,14 @@ export default function TopPill() {
     // wyżej). Kolejność w tablicy NIE jest priorytetem — to tylko kolejność rotacji.
     const calmCandidates: PillItem[] = [];
 
-    // Habit streak at risk (after 17:00, any habit not done today)
+    // Habit streak at risk (after 17:00, any habit not done today). Wyklucza `kind`
+    // 'avoid'/'water' (2026-10-04, user zrzutem: "pokazuje... BEZ SŁODYCZY NIE ZAZNACZONY co
+    // jest bez sensu, przecież to czy zjem czy nie sam nie zaznaczam") — oba kind'y są
+    // CAŁKOWICIE auto-śledzone (avoid: "Co zjadłem" łamie dzień samo; water: Health Connect),
+    // patrz komentarz przy `Habit.kind` w types/index.ts. Nic tu nie ma do "zaznaczenia" —
+    // pigułka z napisem "NIE ZAZNACZONY" dla nich jest po prostu fałszywa, nie tylko myląca.
     if (hour >= 17) {
-      const undone = habits.filter(h => !todayDone.includes(h.id));
+      const undone = habits.filter(h => h.kind !== 'avoid' && h.kind !== 'water' && !todayDone.includes(h.id));
       if (undone.length > 0) {
         const first = undone[0];
         calmCandidates.push({
