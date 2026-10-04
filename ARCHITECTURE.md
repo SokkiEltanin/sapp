@@ -14268,6 +14268,48 @@ więcej/Zwiń, 2 stany).
 
 ---
 
+## 252. Fix: pigułki-nudge nawyków pokazywały auto-śledzone "BEZ SŁODYCZY NIE ZAZNACZONY" (2026-10-04)
+
+User zrzutem górnej pigułki: "I mi pokazuje tak na pillu co jest bez sensu jaka seria ze
+słodyczami przecież to czy zjem czy nie sam nie zaznaczam jakby wtf?". Dwa miejsca na
+dashboardzie ostrzegają po 17:00 o nawykach "nieodhaczonych dziś" — `TopPill.tsx` (górna
+pigułka rotująca różne powiadomienia) i osobny kafelek `nodes['habits-nudge']` w
+`app/(tabs)/index.tsx` — oba filtrowały `habits.filter(h => !todayDone.includes(h.id))` BEZ
+wykluczenia `Habit.kind` `'avoid'`/`'water'`. Oba te kindy są jednak CAŁKOWICIE
+auto-śledzone (`avoid`: dzień łamie się sam, gdy w "Co zjadłem" pojawi się pasujące jedzenie,
+patrz `computeAvoidCounts`/`useHabits.ts`; `water`: feed z Health Connect) — user nigdy nic
+tu ręcznie nie "zaznacza", patrz komentarz przy `Habit.kind` w `types/index.ts` i jawny
+komunikat w samym edytorze nawyku (`app/habits.tsx`: "Śledzone automatycznie z „Co
+zjadłem" — bez ręcznego odznaczania."). Tekst "NIE ZAZNACZONY"/listowanie w "jeszcze do
+zrobienia" dla takiego nawyku jest więc nie tylko mylące, ale wprost FAŁSZYWE — nie ma tu
+nic do zaznaczenia, a licznik i tak zareaguje sam, gdy user faktycznie coś zje.
+
+Fix: obie listy teraz filtrują `h.kind !== 'avoid' && h.kind !== 'water'` przed sprawdzeniem
+`!todayDone.includes(...)` — avoid/water habity nigdy nie trafiają do żadnej z tych dwóch
+"jeszcze do zrobienia" pigułek/kart; ich WŁASNY, poprawny UI (pasek/licznik "dni bez X") żyje
+gdzie indziej (kafelek habita na `/habits`, "Twoje serie" na dashboardzie) i tam zachowanie
+jest niezmienione.
+
+**Znany, NIE naprawiony teraz gap tej samej rodziny**: per-habitowe "Codzienne
+przypomnienie" (`Przypomnienie` sekcja w edytorze `app/habits.tsx`, `reminderTime` →
+`notificationsService.scheduleHabitReminder()`) NIE jest ukryte dla avoid/water habitów —
+user może ustawić godzinę przypomnienia nawet na "Bez słodyczy", a treść push notyfikacji
+("Czas na nawyk" / „{tytuł}" — zaznacz postęp na dziś!") ma TĘ SAMĄ błędną "zaznacz" retorykę.
+Świadomie nieruszone w tej sesji — wymaga przepchnięcia `habit.kind` przez
+`applyReminder`/`scheduleHabitReminder` i realnej weryfikacji treści na urządzeniu (push),
+nie coś do zgadywania na ślepo. Patrz NEXT_STEPS.md.
+
+**Testy**: brak dedykowanych — ani `TopPill.tsx`, ani ten blok w `index.tsx` nigdy nie miały
+pokrycia (ciężkie komponenty UI z dziesiątkami zależności store'owych, bez precedensu testu w
+całej bazie). `tsc --noEmit`/`jest --silent` czyste (94/94 suite, 1204 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: miej aktywny nawyk `kind:'avoid'` (np. "Bez
+słodyczy") i co najmniej jeden zwykły, ręcznie odhaczany nawyk, żaden z nich dziś jeszcze nie
+zrobiony/złamany → poczekaj do/ustaw zegar po 17:00 → sprawdzić że górna pigułka i kafelek
+"Jeszcze N nawyków dziś" na dashboardzie wspominają TYLKO ten zwykły nawyk, NIGDY avoid/water.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
