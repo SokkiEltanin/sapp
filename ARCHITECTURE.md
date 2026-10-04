@@ -14084,6 +14084,63 @@ appce).
 
 ---
 
+## 248. Fix: dwa realne bugi walki z bossami, znalezione audytem (2026-10-04)
+
+User: "dawaj audyty wtedy" — dedykowany `general-purpose` subagent, czytający CAŁĄ treść
+`app/boss-fight.tsx`, `src/utils/bosses.ts`, `src/utils/madBosses.ts`, `src/utils/combatItems.ts`
+i bojowych pól `petStore.ts` (nie diff, patrz metoda w §247) pod kątem realnych bugów
+logicznych (nie stylu/balansu). Dwa potwierdzone findingi, oba naprawione:
+
+**Bug 1 — "Uzdrowienie" (heal perk) nigdy realnie nie leczyło kota.** `simulateFight()`
+(bosses.ts) poprawnie liczy `round.catHealed` (perk: +5% maxHP raz na walkę gdy HP<50%) i
+poprawnie używa go WEWNĘTRZNIE do `catFainted`/`won` silnika. Ale replay rund w
+`boss-fight.tsx` (`counterBeat()`) tylko WYŚWIETLAŁ tę wartość (`setCatHit({..., healed:
+round.catHealed})` → toast/komunikat), nigdy nie mirrorował jej do żywego store'u —
+`healCat()` nie było nawet zaimportowane w tym pliku. Efekt: user WIDZIAŁ "+X HP uzdrowione"
+w komunikacie walki, ale `catHp` w store nigdy się realnie nie podniosło — perk był
+kosmetycznym placebo. Fix: `healCat` dociągnięte do obu destrukturyzacji store'u (useShallow
+selector + hook), wywołane `healCat(round.catHealed)` w OBU miejscach `counterBeat()` gdzie
+`round.catHealed > 0` (gałąź z kontratakiem bossa i gałąź bez niego).
+
+**Bug 2 — nemesis (`menaceMaxHp`) nie miał bankowanego sufitu, mimo komentarzy
+twierdzących że ma.** Raid bankuje `raidMaxHp` w store NA START tygodnia (`raidEnsure`,
+patrz §-komentarz przy `raidMaxHp` w petStore.ts) właśnie żeby level-up W TRAKCIE grindu nie
+cofał mianownika paska/%. Komentarze przy nemesis ("TRWAŁY bank HP, lustrzane
+raidMaxHp/raidRemaining", "ten sam trwały-bank wzorzec co raid") obiecywały IDENTYCZNY
+mechanizm — ale `menaceEnsure` bankowało TYLKO `menaceHp` (pozostałe HP), nie `menaceMaxHp`
+(sufit). Sam sufit (`menaceMaxHp` jako LOKALNA zmienna w `boss-fight.tsx`/`bosses.tsx`) był
+liczony NA ŻYWO z aktualnego poziomu (`menaceHpFor(level)`) przy KAŻDYM renderze — level-up
+w trakcie klepania tego samego nemesis podbijał mianownik bez podbicia licznika, pasek/%
+"cofał się" mimo że realny postęp (`menaceHp`) się nie zmienił. Czysto kosmetyczny bug (jak
+analogiczny stary raid-bug z §-audytu 2026-09-20) — warunek pokonania liczy się od
+`menaceHp===0`, niezależnie od wyświetlanego %.
+
+Fix, dokładnie wzorem `raidMaxHp`:
+- nowe pole `menaceMaxHp: number` w `petStore.ts` (obok `menaceId`/`menaceHp`), domyślnie 0;
+- `menaceEnsure(menaceId, hp)` teraz bankuje OBA pola razem: `{ menaceId, menaceHp: hp,
+  menaceMaxHp: hp }` (wciąż no-op gdy `menaceId` się nie zmienia — hp/maxHp nie dryfują);
+- `menaceMaxHp` dodane do `partialize` (persystencja) i migracji w `onRehydrateStorage`
+  (stary stan z trwającym starciem, bez tego pola, dostaje jednorazowe zbankowanie z
+  AKTUALNEGO poziomu w chwili migracji — identyczny wzorzec co migracja `raidMaxHp` z
+  2026-09-20);
+- `app/boss-fight.tsx` i `app/bosses.tsx`: lokalna zmienna `menaceMaxHp` teraz czyta
+  zbankowane `menaceMaxHpBanked` ze store'u gdy `menaceId === eventBoss.id` (starcie w
+  toku), a "żywą" `menaceHpFor(level)` TYLKO jako seed dla pierwszego `menaceEnsure()` przy
+  nowym nemesis (ten sam `liveX`/`xBanked` split co raid w obu plikach).
+
+**Testy**: nowy `__tests__/menaceEnsure.test.ts` (3 testy, wzorem `raidEnsure.test.ts`) —
+pierwsze zbankowanie ustawia oba pola, kolejne wywołanie z tym samym id jest no-opem (maxHp
+nie dryfuje mimo "żywej" wyższej wartości), nowy nemesis = nowe zbankowanie. `tsc --noEmit`
+czyste, `jest --silent` 94/94 suite, 1199/1199 testów (było 93/1196 przed tą sekcją).
+
+**Priorytet testu na urządzeniu**: (1) stoczyć walkę z nemesis mającym equipped perk
+Uzdrowienia, HP kota spadnij <50%, sprawdzić że `catHp` na pasku REALNIE się podnosi po
+rundzie z healem, nie tylko komunikat; (2) zacząć klepać nemesis, zrobić levelup (np.
+questami) W TRAKCIE tego samego starcia, sprawdzić że pasek HP nemesis NIE cofa się/nie
+traci % mimo braku realnego ataku.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
