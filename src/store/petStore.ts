@@ -6,7 +6,7 @@ import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/c
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
-import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
+import { MENACE_ITEM_DROP_CHANCE, menaceHpFor } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST, raidHpFor } from '@/utils/raid';
 import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, parseGearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
@@ -309,6 +309,12 @@ interface PetState {
   // ── nemesis (menace) — TRWAŁY bank HP, bez timera/limitu prób, lustrzane raidWeek/raidHp ──
   menaceId: string | null;   // id nemesis (overtime/sweettooth) dla którego menaceHp jest aktualne
   menaceHp: number;          // pozostałe HP bieżącego nemesis
+  // ZAMROŻONE przy `menaceEnsure` na start starcia z TYM nemesis (2026-10-04, audyt walki) —
+  // `menaceHpFor(level)` rośnie z AKTUALNYM poziomem gracza, więc bez tego pola boss-fight.tsx
+  // liczyło mianownik paska/% NA ŻYWO przy każdym renderze: level-up W TRAKCIE klepania tego
+  // samego nemesis podbijał mianownik bez podbicia licznika, pasek/procent "cofał się" mimo że
+  // realny postęp (menaceHp) się nie zmienił — ten sam bug i fix co `raidMaxHp` wyżej.
+  menaceMaxHp: number;
   // ── potki czasowe (2026-09-08, patrz `src/utils/potions.ts`) ──
   // TYLKO JEDNA naraz — kupienie nowej PODMIENIA poprzednią. `endsAt` sprawdzane leniwie
   // (jak `missionEndsAt`) wszędzie gdzie efekt jest czytany; `syncPotionExpiry()` czyści pole
@@ -463,6 +469,7 @@ export const usePetStore = create<PetState>()(
       eventWon: [],
       menaceId: null,
       menaceHp: 0,
+      menaceMaxHp: 0,
       activePotion: null,
       defeatedBosses: [],
       defeatedMadBosses: [],
@@ -834,7 +841,7 @@ export const usePetStore = create<PetState>()(
       // Nemesis (2026-08-18) — lustrzane raidEnsure/raidAttack: TRWAŁA pula HP (menaceHp),
       // bez deadline'u. Energia (2026-09-24, user: "ma zużywać energię jak walczę") — próba
       // ataku TERAZ realnie kosztuje: boss-fight.tsx woła spendEventEnergy() obok menaceAttack().
-      menaceEnsure: (menaceId, hp) => set((s) => (s.menaceId === menaceId ? s : { menaceId, menaceHp: hp })),
+      menaceEnsure: (menaceId, hp) => set((s) => (s.menaceId === menaceId ? s : { menaceId, menaceHp: hp, menaceMaxHp: hp })),
       menaceAttack: (damage) => {
         const s = get();
         const remaining = Math.max(0, s.menaceHp - damage);
@@ -1056,7 +1063,7 @@ export const usePetStore = create<PetState>()(
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidMaxHp: s.raidMaxHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventWon: s.eventWon,
-        menaceId: s.menaceId, menaceHp: s.menaceHp,
+        menaceId: s.menaceId, menaceHp: s.menaceHp, menaceMaxHp: s.menaceMaxHp,
         activePotion: s.activePotion,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
@@ -1115,6 +1122,15 @@ export const usePetStore = create<PetState>()(
         // po starcie samo go ustawi.
         state.menaceId = state.menaceId ?? null;
         state.menaceHp = state.menaceHp ?? 0;
+        // Migracja menaceMaxHp (2026-10-04, audyt walki) — ten sam wzorzec co raidMaxHp wyżej.
+        // Trwające starcie z nemesis (menaceId ustawiony) dostaje ZAMROŻONĄ wartość policzoną z
+        // AKTUALNEGO poziomu w chwili migracji — to co user widziałby TERAZ w starym, "na żywo"
+        // liczonym modelu — dalsze level-upy tego starcia już nie cofają paska/%.
+        if (state.menaceId && !state.menaceMaxHp) {
+          state.menaceMaxHp = menaceHpFor(levelFromXp(state.xp ?? 0).level);
+        } else {
+          state.menaceMaxHp = state.menaceMaxHp ?? 0;
+        }
         // Ekwipunek (2026-08-19) — nowe pola, brak = stary stan sprzed tej funkcji.
         // `onboarded` domyślnie TRUE na migracji (nie FALSE z initial state!) — to zapis
         // istniejącego, już nazwanego pupila, onboarding ma się pokazać TYLKO nowym pupilom

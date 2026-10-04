@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: dwa realne bugi walki z bossami — heal perk nie leczył, nemesis pasek cofał się (2026-10-04)
+
+User: "dawaj audyty wtedy". Dedykowany subagent czytający CAŁĄ treść (nie diff) `boss-fight.tsx`/
+`bosses.ts`/`madBosses.ts`/`combatItems.ts`/bojowych pól `petStore.ts` znalazł 2 realne bugi.
+Pełny opis w ARCHITECTURE.md §248. (1) Perk "Uzdrowienie" (`round.catHealed` z `simulateFight()`)
+był TYLKO wyświetlany w komunikacie walki w `boss-fight.tsx` — `healCat()` nigdy nie było
+wołane (nawet nie zaimportowane), więc `catHp` w store nigdy się realnie nie podnosiło. Fix:
+`healCat(round.catHealed)` dodane w obu miejscach `counterBeat()`. (2) Nemesis miał komentarze
+obiecujące "trwały bank jak raid", ale bankowane było tylko `menaceHp` (postęp), NIE
+`menaceMaxHp` (sufit) — sufit liczył się NA ŻYWO z aktualnego poziomu przy każdym renderze,
+więc level-up W TRAKCIE klepania tego samego nemesis cofał pasek/% mimo braku realnej straty
+postępu. Fix: nowe pole `menaceMaxHp` w `petStore.ts` (+ migracja dla trwających starć),
+bankowane w `menaceEnsure` razem z `menaceHp`, czytane (nie przeliczane) w `boss-fight.tsx` i
+`bosses.tsx`, wzorem istniejącego `raidMaxHp`. Nowy test `menaceEnsure.test.ts` wzorem
+`raidEnsure.test.ts`. `tsc`/`jest` czyste (94/94 suite, 1199 testów, +1 suite/+3 testy).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: (a) stoczyć walkę z nemesis z equipped perkiem
+Uzdrowienia, zejść <50% HP kota, sprawdzić że `catHp` REALNIE się podnosi po rundzie z healem
+(nie tylko komunikat "+X uzdrowione"); (b) klepać tego samego nemesis, zrobić level-up W
+TRAKCIE starcia (np. questami), sprawdzić że pasek HP nemesis NIE traci % mimo braku ataku.
+
 ## ✅ Fix: nieaktualny komentarz balansu zbroi po §244 (2026-10-04)
 
 User: "dawaj audyty wtedy". Pełny opis w ARCHITECTURE.md §247. `/code-review` na

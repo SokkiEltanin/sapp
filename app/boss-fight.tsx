@@ -145,11 +145,11 @@ export default function BossFight() {
   const {
     xp, energy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
-    catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
+    catHp, catMaxHpBonus, atkStatBonus, damageCat, healCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems, equippedGear, ownedGear, activePotion,
     raidWeek, raidHp, raidMaxHp: raidMaxHpBanked, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
-    menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
+    menaceId, menaceHp, menaceMaxHp: menaceMaxHpBanked, menaceEnsure, menaceAttack, menaceClaim,
     dayClaims, claimQuestFight, markTrainingDay,
     missionStartedAt, missionEndsAt, missionProfile, claimMission, cancelMission,
     catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
@@ -157,12 +157,12 @@ export default function BossFight() {
     xp: s.xp, energy: s.energy, eventEnergy: s.eventEnergy, ownedItems: s.ownedItems,
     defeatedBosses: s.defeatedBosses, defeatBoss: s.defeatBoss, defeatedMadBosses: s.defeatedMadBosses,
     defeatMadBoss: s.defeatMadBoss, logFightAttempt: s.logFightAttempt, catHp: s.catHp,
-    catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, damageCat: s.damageCat, resetCatHp: s.resetCatHp,
+    catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus, damageCat: s.damageCat, healCat: s.healCat, resetCatHp: s.resetCatHp,
     spendEnergy: s.spendEnergy, ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
     equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion, raidWeek: s.raidWeek,
     raidHp: s.raidHp, raidMaxHp: s.raidMaxHp, raidWon: s.raidWon, raidEnsure: s.raidEnsure, raidAttack: s.raidAttack,
     raidClaim: s.raidClaim, eventWon: s.eventWon, spendEventEnergy: s.spendEventEnergy, eventClaim: s.eventClaim,
-    menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure, menaceAttack: s.menaceAttack,
+    menaceId: s.menaceId, menaceHp: s.menaceHp, menaceMaxHp: s.menaceMaxHp, menaceEnsure: s.menaceEnsure, menaceAttack: s.menaceAttack,
     menaceClaim: s.menaceClaim, dayClaims: s.dayClaims, claimQuestFight: s.claimQuestFight,
     markTrainingDay: s.markTrainingDay, missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt,
     missionProfile: s.missionProfile, claimMission: s.claimMission, cancelMission: s.cancelMission,
@@ -255,11 +255,16 @@ export default function BossFight() {
   const eventDaysLeftN = eventBoss && !isMenace ? eventDaysLeft(eventBoss, now) : 0;
 
   // ── nemesis: TRWAŁY bank HP, lustrzane raidMaxHp/raidRemaining wyżej ──
-  const menaceMaxHp = isMenace ? menaceHpFor(level) : 0;
+  // `liveMenaceMaxHp` TYLKO do zasiania `menaceEnsure` na start starcia z TYM nemesis (musi być
+  // aktualne, żeby pierwsze zbankowanie złapało prawdziwy poziom gracza) — do WYŚWIETLANIA i
+  // jako `maxHp` celu walki niżej używamy zamrożonego `menaceMaxHpBanked` (patrz komentarz przy
+  // `menaceMaxHp` w petStore.ts), żeby level-up W TRAKCIE klepania tego nemesis nie cofał paska/%.
+  const liveMenaceMaxHp = isMenace ? menaceHpFor(level) : 0;
+  const menaceMaxHp = isMenace ? (menaceId === eventBoss!.id ? menaceMaxHpBanked : liveMenaceMaxHp) : 0;
   const menaceRemaining = isMenace ? (menaceId === eventBoss!.id ? menaceHp : menaceMaxHp) : 0;
   useEffect(() => {
-    if (kind === 'event' && isMenace && eventBoss) menaceEnsure(eventBoss.id, menaceMaxHp);
-  }, [kind, isMenace, eventBoss?.id, menaceMaxHp]);
+    if (kind === 'event' && isMenace && eventBoss) menaceEnsure(eventBoss.id, liveMenaceMaxHp);
+  }, [kind, isMenace, eventBoss?.id, liveMenaceMaxHp]);
 
   // ── quest-jako-walka (2026-08-14 v2) — zamiast zwykłego "Odbierz" na wykonanym queście,
   // pełna walka z minibossem przypisanym do TEGO questu na TEN dzień (patrz minibosses.ts).
@@ -643,10 +648,11 @@ export default function BossFight() {
           setCatHit({ dmg: round.counterDmg, healed: round.catHealed });
           playCatHitFx();
           damageCat(round.counterDmg);
+          if (round.catHealed > 0) healCat(round.catHealed);
           advance();
         }, THROW_MS);
       } else {
-        if (round.catHealed > 0) setCatHit({ dmg: 0, healed: round.catHealed });
+        if (round.catHealed > 0) { setCatHit({ dmg: 0, healed: round.catHealed }); healCat(round.catHealed); }
         advance();
       }
     };

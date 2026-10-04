@@ -70,13 +70,13 @@ export default function Bosses() {
   const {
     xp, energy, energyRegenAt, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncEventEnergy,
     raidWeek, raidHp, raidMaxHp: raidMaxHpBanked, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
-    menaceId, menaceHp, menaceEnsure, equippedGear, ownedGear,
+    menaceId, menaceHp, menaceMaxHp: menaceMaxHpBanked, menaceEnsure, equippedGear, ownedGear,
   } = usePetStore(useShallow((s) => ({
     xp: s.xp, energy: s.energy, energyRegenAt: s.energyRegenAt, eventEnergy: s.eventEnergy,
     ownedItems: s.ownedItems, defeatedBosses: s.defeatedBosses, syncEnergyRegen: s.syncEnergyRegen,
     syncEventEnergy: s.syncEventEnergy, raidWeek: s.raidWeek, raidHp: s.raidHp, raidMaxHp: s.raidMaxHp,
     raidWon: s.raidWon, raidEnsure: s.raidEnsure, eventWon: s.eventWon, defeatedMadBosses: s.defeatedMadBosses,
-    atkStatBonus: s.atkStatBonus, menaceId: s.menaceId, menaceHp: s.menaceHp, menaceEnsure: s.menaceEnsure,
+    atkStatBonus: s.atkStatBonus, menaceId: s.menaceId, menaceHp: s.menaceHp, menaceMaxHp: s.menaceMaxHp, menaceEnsure: s.menaceEnsure,
     equippedGear: s.equippedGear, ownedGear: s.ownedGear,
   })));
   // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja) — goły
@@ -213,9 +213,11 @@ export default function Bosses() {
   const isMenace = eventBoss?.kind === 'menace';
   // Sezonowe: HP resetuje się co próbę (jak kampania) — nie ma trwałego banku, patrz
   // eventAsBoss w seasonalEvents.ts. Nemesis (2026-08-18): TRWAŁY bank, lustrzane raidMaxHp/
-  // raidRemaining wyżej — patrz menaceHpFor/menaceAsBoss tam.
+  // raidRemaining wyżej — patrz menaceHpFor/menaceAsBoss tam. ZAMROŻONY na `menaceMaxHpBanked`
+  // (2026-10-04, audyt walki, ten sam fix co raidMaxHp) — bez tego level-up W TRAKCIE klepania
+  // tego nemesis cofał pasek/% tu identycznie jak w boss-fight.tsx przed fixem.
   const eventMaxHp = eventHpFor(level);
-  const menaceMaxHp = isMenace ? menaceHpFor(level) : 0;
+  const menaceMaxHp = isMenace ? (menaceId === eventBoss!.id ? menaceMaxHpBanked : menaceHpFor(level)) : 0;
   const menaceRemaining = isMenace ? (menaceId === eventBoss!.id ? menaceHp : menaceMaxHp) : 0;
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   const eventUnlocked = level >= 2;
