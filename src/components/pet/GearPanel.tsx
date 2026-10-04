@@ -1,5 +1,6 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { X, Check, ChevronDown, HardHat, Shield, Footprints, Link2, Gem, Coins, Trash2, Minus, Plus, ArrowUp, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -68,14 +69,28 @@ export default function GearPanel({ children }: { children: ReactNode }) {
       ([id, inst]) => inst && id !== equippedId && gearById(inst.itemId)?.slot === slot,
     );
     const Icon = SLOT_ICON[slot];
+    // Ciemny jednolity slot (2026-10-04, user: "sloty... ciemne jednolite a jedyne co to
+    // lekko na ramce gradient bardzo delikatny ogarniający jaka to rzadkość" — dawne pełne
+    // tło koloru rzadkości (`meta.color+'1A'`) rzucało się za bardzo w oczy i gubiło sam item
+    // na kolorowym tle). Tło ZAWSZE ciemne (`c.bg.card`), rzadkość żyje TYLKO jako bardzo
+    // subtelny diagonalny gradient na RAMCE — `LinearGradient` pod spodem + mniejszy
+    // wewnętrzny kafel w kolorze tła na wierzchu, 1.5px "pierścień" między nimi widoczny jako
+    // obramowanie. Pusty slot (brak `meta`) dostaje płaski, neutralny pierścień (oba kolory
+    // gradientu te same = brak widocznego przejścia), identyczny jak dawne `c.border.default`.
+    const ringColors: [string, string] = meta
+      ? [meta.color + '99', meta.color + '14']
+      : [c.border.default, c.border.default];
     return (
       <PressableScale key={slot} onPress={() => { haptic.tap(); setOpenSlot(slot); }}>
-        <View style={[s.slot, meta ? { borderColor: meta.color, backgroundColor: meta.color + '1A' } : { borderColor: c.border.default, backgroundColor: c.bg.card }]}>
-          {equippedItem ? (
-            <Image source={equippedItem.icon} style={s.slotImg} resizeMode="contain" />
-          ) : (
-            <Icon size={27} color={c.text.muted} strokeWidth={1.6} />
-          )}
+        <View style={s.slotOuter}>
+          <LinearGradient colors={ringColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+          <View style={[s.slotInner, { backgroundColor: c.bg.card }]}>
+            {equippedItem ? (
+              <Image source={equippedItem.icon} style={s.slotImg} resizeMode="contain" />
+            ) : (
+              <Icon size={27} color={c.text.muted} strokeWidth={1.6} />
+            )}
+          </View>
           {hasUnequippedInSlot && <View style={s.slotDot} />}
         </View>
       </PressableScale>
@@ -397,7 +412,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   catCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // Większe sloty + grafiki (2026-09-23, user: "ekwipunek... możemy zrobić to eq większe
   // ogólniej bardziej czytelne") — 62→70 / 44→52, żeby item od razu było widać, nie zgadywać.
-  slot: { width: 70, height: 70, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
+  // `slotOuter`/`slotInner` (2026-10-04) zastąpiły płaski `slot` z borderColor/backgroundColor
+  // rzadkości — patrz obszerny komentarz przy `ringColors` w `slotButton`.
+  slotOuter: { width: 70, height: 70, borderRadius: radius.lg, overflow: 'hidden', position: 'relative' },
+  slotInner: { position: 'absolute', top: 1.5, left: 1.5, right: 1.5, bottom: 1.5, borderRadius: radius.lg - 1.5, alignItems: 'center', justifyContent: 'center' },
   slotImg: { width: 52, height: 52 },
   slotDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#FBBF24' },
 
