@@ -13987,6 +13987,75 @@ z neta" działa tak samo jak w pozostałych dwóch miejscach.
 
 ---
 
+## 246. Skrzynki pupila: pula perków OK; nazwa itemu nie była kolorowana wg rzadkości (2026-10-04)
+
+User: sprawdzenie dwóch rzeczy w systemie skrzynek. (1) czy zmaksowany perk znika z puli
+losowania (nie da się go dropnąć drugi raz, chyba że ma jeszcze upgrade); (2) czy kolory
+itemów są poprawne — "ramka to kolor rzadkości samego itema, a nazwa i poświata z tyłu to
+jego wariant".
+
+**(1) Pula perków — ZBADANE, już działa poprawnie, NIC nie zmienione.** `rollBox()`
+(`petBoxes.ts`) buduje `candidates` z `!ownedCombatItems[id]` (wyklucza WSZYSTKO już
+posiadane, nie tylko zmaksowane) i osobno `upgradeable` z `level < maxLevel` — zmaksowany
+item (`level >= COMBAT_ITEMS[id].maxLevel`) nigdy nie trafia do żadnej z dwóch pul, więc
+fizycznie nie da się go dropnąć ponownie. Ponieważ wykluczone itemy po prostu nie są w
+tablicy kandydatów, "większa szansa na inne" wynika z samej matematyki (mniej kandydatów =
+większy udział każdego) — nie trzeba było nic dopisywać. Ten sam wzorzec w `openCrate()`/
+`menaceClaim()` (petStore.ts). Jedna nuansa (NIE poprawiona, bo to świadomy, udokumentowany
+design, nie bug): upgrade (`preferUpgrade`) jest dostępny tylko ze skrzyń gold/divine —
+tańsze skrzynie (sardine/iron) w ogóle nie oferują upgrade'u nawet dla itemu który GO MA
+jeszcze (niezmaksowanego), tylko nowe, nieposiadane. Zgłoszone usera jako FYI w czacie, nie
+zmienione bez pytania.
+
+**(2) Kolory — ZNALEZIONY i naprawiony realny gap.** Zbadane subagentem: `RARITY_META`
+(gear) i `CRATE_META` (monety/perki) to DWIE OSOBNE tabele kolorów z TYMI SAMYMI nazwami
+tierów (`rare`/`epic`/`legendary`) ale RÓŻNYMI kolorami (np. legendary: gear=różowy
+`#FF6FB5` vs skrzynie=złoty `#FBBF24`) — potwierdzone jako świadomy, osobny system (gear
+ma 5 tierów z mythic, skrzynie/perki mają 4 bez mythic), nie "wariant" jako osobne pole w
+modelu danych (sprawdzone grepem — `variant`/`wariant` nigdzie nie istnieje jako pole gear/
+perk/crate). User's "wariant" = to samo co "rarity", tylko inne słowo.
+
+Realny, potwierdzony fix: **ramka i poświata WSZĘDZIE już poprawnie kolorowały się wg
+rzadkości — ale NAZWA itemu nigdzie tego nie robiła**:
+- `BoxRevealModal.tsx` — `rewardName` (nazwa nagrody w karcie odsłony) miała na stałe
+  `color: '#fff'`, ignorując `meta.color` (który już kolorował ramkę/poświatę/tier-label w
+  TYM SAMYM komponencie). Fix: `[st.rewardName, { color: meta.color }]`.
+- `GearPanel.tsx` — `itemName` (nazwa w zwiniętej karcie grupy itemu) miała neutralny kolor
+  motywu, ignorując `bestMeta.color` (już używany przez ramkę karty tuż obok). Fix:
+  `[s.itemName, { color: bestMeta.color }]`.
+- `CrateModal.tsx` — nazwa dropniętego gearu (`result.gearDropped!.name`) miała na stałe
+  złoty `#FBBF24` zamiast koloru SWOJEJ rzadkości (`rarityMeta.color`, już użytego dla
+  obrysu ikonki i parentetycznej etykiety w tym samym wierszu). Fix: nazwa owinięta w
+  `<Text style={{color: rarityMeta.color}}>`. Linie samego PERKU (nie gearu) w tym
+  komponencie ZOSTAJĄ złote — `openCrate()`'s prostszy drop nie liczy `perkRarity` wcale
+  (inaczej niż `rollBox()`), więc nie ma czego pokolorować — udokumentowane komentarzem,
+  nie pominięty fix.
+
+**Dodatkowy realny bug znaleziony przy okazji**: `app/box-stats.tsx`'s `rarityLabel()`
+sprawdzało `RARITY_META` PRZED `CRATE_META` dla DOWOLNEJ nazwy tieru — więc wiersz
+"legendary" w rozkładzie RZADKOŚCI MONET (realnie `CrateTier`, powinien być złoty) dostawał
+różowy kolor GEARU, bo `'legendary'` jest kluczem w obu tabelach i gear sprawdzany był
+pierwszy. Fix: rozdzielone na `coinRarityLabel()`/`gearRarityLabel()`, każdy wołający
+(`coinRarityBreakdown` vs `gearRarityBreakdown`) wskazuje wprost właściwą tabelę zamiast
+zgadywania po kluczu.
+
+**Świadomie NIE ujednolicone**: kolory `RARITY_META` vs `CRATE_META` same w sobie zostają
+różne (gear różowy legendary vs skrzynie złoty legendary) — to by był szerszy, bardziej
+ryzykowny fix (dotyka UI sklepu/odds dla WSZYSTKICH skrzyń, nie tylko itemów z tego
+zgłoszenia) i user o to wprost nie prosił, tylko o spójność ramka/nazwa/poświata W OBRĘBIE
+jednego itemu — co teraz jest prawdą.
+
+**Testy**: bez zmian — czysty UI-kolor, żadnej logiki do przetestowania.
+`tsc --noEmit`/`jest` czyste (93/93 suite, 1196 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: (a) Pupil → otwórz dowolną skrzynkę z
+ekwipunkiem/perkiem w nagrodzie → sprawdź że nazwa nagrody w karcie odsłony ma kolor
+rzadkości (nie biały). (b) Ekwipunek → zwinięta karta itemu → sprawdź że nazwa ma kolor
+najlepszej posiadanej kopii. (c) Rynek → statystyki skrzynek → rozkład rzadkości monet →
+sprawdź że "legendary" (jackpot) jest złoty, nie różowy.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

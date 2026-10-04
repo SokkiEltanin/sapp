@@ -205,7 +205,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
                       <Image source={group.item.icon} style={[s.itemImg, { borderColor: bestMeta.color + '55' }]} resizeMode="contain" />
                       <View style={{ flex: 1 }}>
                         <View style={s.itemNameRow}>
-                          <Text style={s.itemName}>{group.item.name}</Text>
+                          <Text style={[s.itemName, { color: bestMeta.color }]}>{group.item.name}</Text>
                           {/* Znacznik "masz kilka" (2026-09-18, user: "jak sa takie same te
                               pierwsze kody to pokazuje ze mam kilka") — złota pigułka ×N,
                               tylko gdy realnie posiada więcej niż jedną kopię. */}

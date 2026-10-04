@@ -112,6 +112,9 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                   <Text style={[st.tier, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
                   <Text style={st.coins}>+{shown} 🪙</Text>
                   <Text style={st.fish2}>🐟</Text>
+                  {/* Perk ze skrzynki kota (openCrate) nie ma śledzonej rzadkości jak gear
+                      niżej/BoxRevealModal.tsx (ten prostszy drop nie liczy `perkRarity`) — stąd
+                      stały złoty kolor zamiast rarity-koloru, nie brakujący fix. */}
                   {result?.itemDropped && (
                     <Text style={st.itemDrop}>🎁 Nowa umiejętność: {COMBAT_ITEMS[result.itemDropped].name}!</Text>
                   )}
@@ -124,7 +127,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                     return (
                       <View style={st.gearDrop}>
                         {gearItem && <Image source={gearItem.icon} style={[st.gearDropImg, { borderColor: rarityMeta.color }]} resizeMode="contain" />}
-                        <Text style={st.itemDrop}>🎁 Ekwipunek: {result.gearDropped!.name} (<Text style={{ color: rarityMeta.color }}>{rarityMeta.label}</Text>)!</Text>
+                        <Text style={st.itemDrop}>🎁 Ekwipunek: <Text style={{ color: rarityMeta.color }}>{result.gearDropped!.name}</Text> (<Text style={{ color: rarityMeta.color }}>{rarityMeta.label}</Text>)!</Text>
                       </View>
                     );
                   })()}

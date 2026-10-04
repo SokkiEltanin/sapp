@@ -249,13 +249,13 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
                       {(() => { const g = gearById(reward.itemId); return g
                         ? <Image source={g.icon} style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />
                         : <Text style={{ fontSize: 40 }}>🎁</Text>; })()}
-                      <Text style={st.rewardName}>{reward.name}</Text>
+                      <Text style={[st.rewardName, { color: meta.color }]}>{reward.name}</Text>
                     </>
                   ) : reward?.type === 'combatItem' ? (
                     <>
                       <Image source={itemById(reward.itemId).icons[Math.min(reward.level, itemById(reward.itemId).icons.length) - 1]}
                         style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />
-                      <Text style={st.rewardName}>{reward.name} {reward.isUpgrade ? `Lv.${reward.level}` : ''}</Text>
+                      <Text style={[st.rewardName, { color: meta.color }]}>{reward.name} {reward.isUpgrade ? `Lv.${reward.level}` : ''}</Text>
                     </>
                   ) : (
                     <Text style={st.coins}>+{reward?.coins} 🪙</Text>
