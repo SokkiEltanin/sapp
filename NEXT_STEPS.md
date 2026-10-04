@@ -3,7 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Co zjadłem" — 4 poprawki z audytu tarcia (2026-10-03)
+## 🆕 Skrzynki pupila: pula perków OK; kolor nazwy itemu naprawiony (2026-10-04)
+
+User poprosił o sprawdzenie dwóch rzeczy: czy zmaksowany perk znika z puli losowania, i
+czy kolory itemów (ramka/nazwa/poświata) są poprawne. Pełny opis w ARCHITECTURE.md §246.
+(1) Pula perków: ZBADANE, już działało poprawnie — zmaksowany item wykluczony z obu pul
+(nowe + upgrade), nic nie zmienione. FYI przekazane userowi w czacie: upgrade dostępny
+tylko z gold/divine skrzyń, tańsze dają tylko nowe nieposiadane — świadomy design, nie bug.
+(2) Kolory: znaleziony realny gap — ramka i poświata wszędzie kolorowały się wg rzadkości,
+ale NAZWA itemu nigdzie (BoxRevealModal.tsx, GearPanel.tsx, CrateModal.tsx — wszystkie
+miały hardcoded/neutralny kolor nazwy). Naprawione we wszystkich trzech. Przy okazji
+znaleziony i naprawiony osobny bug: `box-stats.tsx`'s `rarityLabel()` myliło tabele
+RARITY_META(gear)/CRATE_META(monety) dla tych samych nazw tierów (legendary=różowy gear
+vs złoty skrzynie) — rozdzielone na dwie jawne funkcje. `tsc`/`jest` czyste (93/93 suite,
+1196 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: (a) otwórz skrzynkę z ekwipunkiem/perkiem
+→ sprawdź że nazwa nagrody ma kolor rzadkości, nie biały; (b) Ekwipunek → sprawdź że nazwa
+w zwiniętej karcie ma kolor; (c) Rynek → statystyki skrzynek → rozkład monet → "legendary"
+powinien być złoty, nie różowy.
+
+## ✅ "Co zjadłem" — 4 poprawki z audytu tarcia (2026-10-03)
 
 User poprosił o mapę + analizę "Co zjadłem" i sugestie jak uprościć dodawanie jedzenia —
 po zaakceptowaniu listy zrealizowane wszystkie 4. Pełny opis w ARCHITECTURE.md §245.
@@ -14,7 +34,7 @@ makra/kategorię" w `products.tsx` dla niepełnych produktów. (4) Wklejka nutry
 (`parsePastedNutrition`) dociągnięta do trzeciego ekranu, `food/recipe.tsx` — miała ją już
 `add.tsx`/`product.tsx`. `tsc`/`jest` czyste (93/93 suite, 1196 testów, bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — średni**: (a) dodaj ulubiony produkt z nauczoną
+Priorytet testu na urządzeniu — średni: (a) dodaj ulubiony produkt z nauczoną
 jednostką → sprawdź że picker NIE startuje na gramach; (b) Baza jedzenia → Produkty →
 sprawdź żółty tag przy niepełnym produkcie; (c) Nowy przepis → dodaj składnik → sprawdź że
 "Wklej dane z neta" działa.

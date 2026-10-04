@@ -27,10 +27,21 @@ function boxIconOf(boxId: BoxId, daily: boolean) {
   return daily ? DAILY_BOX_ICON : boxById(boxId).icon;
 }
 
-function rarityLabel(rarity: string): { label: string; color: string } {
-  if (rarity in RARITY_META) { const m = RARITY_META[rarity as GearRarity]; return { label: m.label, color: m.color }; }
-  if (rarity in CRATE_META) { const m = CRATE_META[rarity as CrateTier]; return { label: m.label, color: m.color }; }
-  return { label: rarity, color: colors.text.muted };
+// Fix (2026-10-04, user: "posprawdzaj czy na pewno dobrze kolory sie wyświetlają itemow"):
+// było JEDNO `rarityLabel()` zgadujące tabelę po samej nazwie tieru, sprawdzając
+// RARITY_META (gear) PRZED CRATE_META (monety/skrzynie) — ale `rare`/`epic`/`legendary`
+// istnieją w OBU, z zupełnie innymi kolorami (np. legendary: gear=różowy #FF6FB5 vs
+// skrzynie=złoty #FBBF24). Efekt: wiersz "legendary" w rozkładzie MONET (realnie CrateTier)
+// dostawał różowy kolor gearu zamiast właściwego złotego — mylące, mimo że sam gear
+// (GearRarity) renderował się poprawnie. Rozdzielone na dwie jawne funkcje, każdy wołający
+// (coin vs gear breakdown) wskazuje wprost właściwą tabelę zamiast zgadywania po kluczu.
+function coinRarityLabel(rarity: string): { label: string; color: string } {
+  const m = CRATE_META[rarity as CrateTier];
+  return m ? { label: m.label, color: m.color } : { label: rarity, color: colors.text.muted };
+}
+function gearRarityLabel(rarity: string): { label: string; color: string } {
+  const m = RARITY_META[rarity as GearRarity];
+  return m ? { label: m.label, color: m.color } : { label: rarity, color: colors.text.muted };
 }
 
 // Statystyki otwierania skrzynek Rynku (2026-09-15) — user: "niech mi tez da statystyki
@@ -142,7 +153,7 @@ function BoxCard({ g, s, c }: { g: BoxTypeStats; s: ReturnType<typeof makeStyles
         <View style={s.subSection}>
           <Text style={s.subSectionTitle}>Nagrody monetowe — rozkład rzadkości</Text>
           {g.coinRarityBreakdown.map(r => {
-            const meta = rarityLabel(r.rarity);
+            const meta = coinRarityLabel(r.rarity);
             return (
               <View key={r.rarity} style={s.rarityRow}>
                 <View style={[s.rarityDot, { backgroundColor: meta.color }]} />
@@ -159,7 +170,7 @@ function BoxCard({ g, s, c }: { g: BoxTypeStats; s: ReturnType<typeof makeStyles
         <View style={s.subSection}>
           <Text style={s.subSectionTitle}>Ekwipunek — rozkład rzadkości</Text>
           {g.gearRarityBreakdown.map(r => {
-            const meta = rarityLabel(r.rarity);
+            const meta = gearRarityLabel(r.rarity);
             return (
               <View key={r.rarity} style={s.rarityRow}>
                 <View style={[s.rarityDot, { backgroundColor: meta.color }]} />
