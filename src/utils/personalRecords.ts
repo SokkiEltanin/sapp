@@ -1,10 +1,15 @@
 import { Expense, MoodEntry } from '@/types';
+// `matchedEatDays`/`AVOID_PRESETS` (2026-10-04) — `longestSweetless` below needs the SAME live
+// "sweets" keyword/eat-matcher as `quests.ts`'s `sweetlessDaysFrom`, see the comment there for
+// why this record was purchase-only until now.
+import { matchedEatDays, AVOID_PRESETS } from '@/store/countersStore';
 
 // All-time personal bests, for the "Rekordy życiowe" collectible card. Pure functions of
 // the data the dashboard already holds — no new tracking. Each record is compared against
 // the previous best so the card can flag freshly-broken ones.
 
 const SWEET_TAGS = ['słodycze', 'przekąski'];
+const SWEETS_KEYWORD = AVOID_PRESETS.find(p => p.key === 'sweets')!.keyword;
 
 export interface RecordItem {
   key: string;
@@ -35,10 +40,16 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-// The longest run of days with NO sweet/snack purchase, ever — the max gap between
-// consecutive sweet-purchase days (plus the current run up to today). `endDate` = last day
-// of that run (day before the purchase that broke it, or today for the still-ongoing run).
-function longestSweetless(expenses: Expense[]): { days: number; endDate: string } | null {
+// The longest run of days with NO sweet/snack — a tagged PURCHASE or a matching food LOGGED
+// via „Co zjadłem" (2026-10-04, same eat-vs-buy fix as `quests.ts`'s `sweetlessDaysFrom`,
+// which this record used to disagree with: a day you ATE a sweet without ever buying/scanning
+// it broke the pet's streak but not this one). `endDate` = last day of the best run (day
+// before the sweet that broke it, or today for the still-ongoing run).
+function longestSweetless(
+  expenses: Expense[],
+  meals: { date?: string; items?: { name?: string; productId?: string; parts?: { name?: string; productId?: string }[] }[] }[] = [],
+  products: { id: string; cat?: string }[] = [],
+): { days: number; endDate: string } | null {
   const days = new Set<string>();
   for (const e of expenses) {
     if (e.type === 'income') continue;
@@ -50,6 +61,9 @@ function longestSweetless(expenses: Expense[]): { days: number; endDate: string 
       }
     }
   }
+  const catByProductId: Record<string, string | undefined> = {};
+  for (const p of products) catByProductId[p.id] = p.cat;
+  for (const d of matchedEatDays(SWEETS_KEYWORD, meals, catByProductId)) days.add(d);
   const sorted = [...days].sort();
   if (!sorted.length) return null;
   let best = 0; let bestEnd = '';
@@ -98,7 +112,11 @@ function bestMoodWeek(moodEntries: MoodEntry[]): { avg: number; endDate: string 
   return best > 0 ? { avg: best, endDate: bestEnd } : null;
 }
 
-export function buildRecords(healthDays: HealthDays, expenses: Expense[], moodEntries: MoodEntry[]): RecordItem[] {
+export function buildRecords(
+  healthDays: HealthDays, expenses: Expense[], moodEntries: MoodEntry[],
+  meals: { date?: string; items?: { name?: string; productId?: string; parts?: { name?: string; productId?: string }[] }[] }[] = [],
+  products: { id: string; cat?: string }[] = [],
+): RecordItem[] {
   const out: RecordItem[] = [];
 
   const stepEntries = Object.entries(healthDays).filter(([, d]) => d.steps > 0);
@@ -114,7 +132,7 @@ export function buildRecords(healthDays: HealthDays, expenses: Expense[], moodEn
     out.push({ key: 'sleep', icon: 'moon', label: 'Najdłuższy sen', value: `${Math.floor(m / 60)}h ${m % 60}m`, num: m, date });
   }
 
-  const sweetless = longestSweetless(expenses);
+  const sweetless = longestSweetless(expenses, meals, products);
   if (sweetless) out.push({ key: 'sweetless', icon: 'flame', label: 'Najdłużej bez słodyczy', value: `${sweetless.days} ${sweetless.days === 1 ? 'dzień' : 'dni'}`, num: sweetless.days, date: sweetless.endDate });
 
   const mood = bestMoodWeek(moodEntries);

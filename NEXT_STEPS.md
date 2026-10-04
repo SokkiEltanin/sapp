@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sloty ekwipunku: ciemne jednolite tło + delikatny gradient rzadkości na ramce (2026-10-04)
+## 🆕 Fix: "dni bez słodyczy" (pet quest + rekord) ignorowało jedzenie, tylko zakupy (2026-10-04)
+
+User: "I nadal ma problem z tym jak zjem i wpisze toffieffie to mi nie lapie ze to slodycz i
+nie zeruje streaka". Pełny opis w ARCHITECTURE.md §250. Znaleziono DWA niezależne systemy
+"dni bez słodyczy" — Liczniki/Nawyki (działały, dostały fix "je się nie kupuje" już w
+sierpniu/wrześniu) i System questów pupila (`sweetlessDaysFrom` w quests.ts, zasila quest
+"Bez słodyczy"/"7 dni bez słodyczy z rzędu" ORAZ rekord "Najdłużej bez słodyczy") — ten drugi
+NIGDY nie dostał tego fixu, patrzył wyłącznie na tagowane zakupy. Fix: oba miejsca teraz
+reużywają ten sam żywy `sweets` keyword/matcher z countersStore.ts co Liczniki, więc jedzenie
+zalogowane w "Co zjadłem" (nawet bez zakupu/skanu) poprawnie zeruje obie serie. Nowe testy w
+quests.test.ts (+3) i personalRecords.test.ts (+1). `tsc`/`jest` czyste (94/94 suite, 1204
+testów, +5).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: Pupil → Questy → zanotuj "Bez słodyczy" →
+Co zjadłem → dodaj słodki produkt → wróć do Questów, sprawdź że licznik SPADŁ do 0.
+
+## ✅ Sloty ekwipunku: ciemne jednolite tło + delikatny gradient rzadkości na ramce (2026-10-04)
 
 User, patrząc na ekran Pupila: "te sloty... zrobmy jednak ciemne jednolite a jedyne co to
 lekko na ramce gradient bardzo delikatny ogarniający jaka to rzadkość zeby nie rzucało sie
