@@ -14222,6 +14222,52 @@ które już działały).
 
 ---
 
+## 251. Ciekawostki: nowa kategoria "Zdrowie" + trzeci poziom "Jeszcze więcej" (2026-10-04)
+
+User: "jak sie nudzisz ogarnij więcej lepszych ciekawostek, zwłaszcza lubie takie które uczą
+np jak z wodą ze picie wpływa na wiele zdrowie mózg itp, z wieloma szczegółami i jak mnie
+zaciekawi bardzo i rozwinięcie mnie nie zadowoli to zeby byl jakis przycisk czytaj więcej
+więcej więcej". Audyt `src/data/trivia.ts` (369 wpisów, 3 kategorie: nauka/rozwój/świat)
+potwierdził lukę dokładnie tam, gdzie user wskazał — ZERO wpisów o nawodnieniu, i generalnie
+nic stricte "jak Twoje ciało/mózg realnie działa i co na to wpływa w praktyce".
+
+**Nowa kategoria `zdrowie`** (`TriviaCat` w `trivia.ts`, + ikona `HeartPulse`/kolor `#FB7185`
+w `META` w `TriviaCard.tsx`) — 10 nowych, starannie dobranych wpisów: nawodnienie a
+koncentracja/pamięć (flagowy, dokładnie przykład usera), przewodnienie/hiponatremia (świadomy
+kontrapunkt — nie tylko "pij więcej, zawsze"), społeczny jet lag (regularność snu > liczba
+godzin), mechanizm kofeiny/adenozyny i kawowy zjazd, zimna ekspozycja a dopamina/nerw błędny,
+oś jelito-mózg, spacer po posiłku a skok cukru, NEAT (ruch poza treningiem), niebieskie
+światło a melatonina (bez przesady — treść ekranu szkodzi bardziej niż sama barwa), wydłużony
+wydech a napięcie nerwu błędnego. Każdy fakt oparty na realnym, sprawdzalnym mechanizmie
+(zero pseudonauki/przesady) — dopasowane do rygoru reszty bazy.
+
+**Trzeci poziom rozwinięcia — pole `more?: string`** (opcjonalne, TYLKO na wpisach które
+realnie mają czym go wypełnić — 5 z 10 nowych wpisów, m.in. nawodnienie/kofeina/jet
+lag/zimna ekspozycja/oś jelito-mózg). `TriviaCard.tsx`: dawny boolean `expanded` (2 stany:
+text→detail) zastąpiony numerycznym `level` (0/1/2) + `maxLevel` liczonym z `!!t.more` —
+TEN SAM pojedynczy tap-target, każde stuknięcie idzie głębiej (`Czytaj więcej` → `Jeszcze
+więcej` → na dnie `Zwiń` z powrotem do 0), zamiast piętrzenia osobnych przycisków. Wpisy BEZ
+`more` (cała reszta bazy, 369 starych + 5 nowych bez `more`) zachowują się DOKŁADNIE jak
+dotąd — `maxLevel` wtedy =1, trzeci stan nigdy się nie pojawia. Nazwa zmiennej kolidowała z
+istniejącą, modułową funkcją `advance()` (dobór kolejnej ciekawostki) — lokalny handler
+nazwany `advanceLevel`, żeby jej nie przesłonić (ciche, ale realne zepsucie TS/logiki —
+złapane przez `tsc --noEmit`, nie przez testy, bo to pierwszy plik w tym komponencie w ogóle
+dotknięty przez testy).
+
+**Testy**: brak dedykowanych — `trivia.ts` to czyste dane, jak `foodBase.ts` (bez testu w
+całej bazie), a `TriviaCard.tsx` nigdy wcześniej też nie miał pokrycia. `tsc --noEmit`/`jest
+--silent` czyste (94/94 suite, 1204 testów, bez zmiany w liczbie — brak nowych testów, nie
+regresja).
+
+**Priorytet testu na urządzeniu — średni**: dashboard → kafelek "Ciekawostka dnia" → trafić
+na wpis z kategorii Zdrowie (różowy chip z ikoną serca) → sprawdzić że "Czytaj więcej" działa
+jak dotąd (pokazuje `detail`), a na wpisach z głębszą treścią pojawia się DRUGI stopień
+"Jeszcze więcej" (pokazuje `more`), kończący się "Zwiń" wracającym do stanu zwiniętego — a na
+wpisach BEZ trzeciego poziomu przycisk zachowuje się dokładnie jak wcześniej (Czytaj
+więcej/Zwiń, 2 stany).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
