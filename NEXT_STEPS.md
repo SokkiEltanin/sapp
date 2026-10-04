@@ -3,7 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: "dni bez słodyczy" (pet quest + rekord) ignorowało jedzenie, tylko zakupy (2026-10-04)
+## 🆕 Ciekawostki: nowa kategoria "Zdrowie" + trzeci poziom "Jeszcze więcej" (2026-10-04)
+
+User: "jak sie nudzisz ogarnij więcej lepszych ciekawostek, zwłaszcza lubie takie które uczą
+np jak z wodą ze picie wpływa na wiele zdrowie mózg itp... i jak mnie zaciekawi bardzo i
+rozwinięcie mnie nie zadowoli to zeby byl jakis przycisk czytaj więcej więcej więcej". Pełny
+opis w ARCHITECTURE.md §251. Nowa kategoria `zdrowie` w `trivia.ts` (różowa, ikona serca) —
+10 nowych wpisów o praktycznym działaniu ciała/mózgu (nawodnienie a koncentracja — flagowy,
+dokładnie przykład usera; kofeina/adenozyna; zimna ekspozycja; oś jelito-mózg; społeczny jet
+lag; i więcej). 5 z nich dostało NOWE, opcjonalne pole `more` — trzeci, głębszy poziom
+rozwinięcia. `TriviaCard.tsx` ten sam tap-target teraz cykluje przez do 3 poziomów (Czytaj
+więcej → Jeszcze więcej → Zwiń) zamiast dawnych 2 — stare wpisy bez `more` zachowują się
+identycznie jak wcześniej. `tsc`/`jest` czyste (94/94 suite, 1204 testów, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: dashboard → "Ciekawostka dnia" → poczekaj na
+wpis z kategorii Zdrowie (różowy chip) → sprawdź że głębsze wpisy mają dodatkowy stopień
+"Jeszcze więcej" przed "Zwiń", a reszta bazy działa jak wcześniej (2 stany).
+
+## ✅ Fix: "dni bez słodyczy" (pet quest + rekord) ignorowało jedzenie, tylko zakupy (2026-10-04)
 
 User: "I nadal ma problem z tym jak zjem i wpisze toffieffie to mi nie lapie ze to slodycz i
 nie zeruje streaka". Pełny opis w ARCHITECTURE.md §250. Znaleziono DWA niezależne systemy

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FlaskConical, Lightbulb, Globe, Sparkles, Check, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { FlaskConical, Lightbulb, Globe, HeartPulse, Sparkles, Check, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { haptic } from '@/utils/haptics';
 import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,9 +10,10 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 
 const META: Record<TriviaCat, { icon: any; label: string; color: string }> = {
-  nauka:   { icon: FlaskConical, label: 'Nauka',  color: '#46B0DE' },
-  rozwoj:  { icon: Lightbulb,    label: 'Rozwój', color: '#2AC68F' },
-  swiat:   { icon: Globe,        label: 'Świat',  color: '#E0A33A' },
+  nauka:   { icon: FlaskConical, label: 'Nauka',   color: '#46B0DE' },
+  rozwoj:  { icon: Lightbulb,    label: 'Rozwój',  color: '#2AC68F' },
+  swiat:   { icon: Globe,        label: 'Świat',   color: '#E0A33A' },
+  zdrowie: { icon: HeartPulse,   label: 'Zdrowie', color: '#FB7185' },
 };
 
 const KEY = 'trivia_state_v1';
@@ -106,14 +107,16 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
     return () => { alive = false; };
   }, []);
 
-  // Rozwiń/zwiń (2026-09-06, user: "jak kliknę w ciekawostkę to rozwija mi ją, więcej jest
-  // ładnie opisane i jest źródło na dole podane") — `text` zostaje krótkim teaserem jak
-  // dotąd, tap odsłania `detail` (i `src`, jeśli jest, TYLKO w stanie rozwiniętym — dawniej
-  // `src` był zawsze widoczny, teraz przeniósł się pod rozwinięcie). Resetuje się przy
-  // zmianie ciekawostki (nowy dzień / „To znam"), żeby nie zostać rozwinięty na kolejnym
-  // fakcie, który user jeszcze nie widział.
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => { setExpanded(false); }, [st?.currentKey]);
+  // Rozwiń/zwiń, TERAZ do 3 poziomów (2026-09-06 baza, rozszerzone 2026-10-04 — user: "jak
+  // mnie zaciekawi bardzo i rozwinięcie mnie nie zadowoli to zeby byl jakis przycisk czytaj
+  // więcej więcej więcej"). `level` 0=sam `text`, 1=+`detail` (+`src` jeśli nie ma `more`),
+  // 2=+`more` (tylko gdy wpis go ma) +`src`. Ten sam pojedynczy tap-target co dotąd — każde
+  // stuknięcie idzie o poziom głębiej, a na najgłębszym dostępnym poziomie zawija z powrotem
+  // do 0 ("Zwiń"), zamiast osobnych, piętrzących się przycisków. Resetuje się przy zmianie
+  // ciekawostki (nowy dzień / „To znam"), żeby nie zostać rozwinięty na kolejnym fakcie,
+  // który user jeszcze nie widział.
+  const [level, setLevel] = useState(0);
+  useEffect(() => { setLevel(0); }, [st?.currentKey]);
 
   const [confirmDismiss, setConfirmDismiss] = useState(false);
   const onKnowIt = () => {
@@ -159,6 +162,12 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
   const t = st?.currentKey ? (TRIVIA.find(x => keyOf(x) === st.currentKey) ?? TRIVIA[0]) : TRIVIA[0];
   const m = META[t.cat];
   const Ic = m.icon;
+  // maxLevel=2 TYLKO gdy wpis ma `more` — reszta bazy zostaje 2-poziomowa (text→detail) jak
+  // dotąd, żeby nie pokazywać pustego/zbędnego trzeciego kroku tam, gdzie nie ma czym go
+  // wypełnić.
+  const maxLevel = t.more ? 2 : 1;
+  const advanceLevel = () => { haptic.tap(); setLevel(l => (l >= maxLevel ? 0 : l + 1)); };
+  const moreLabel = level === 0 ? 'Czytaj więcej' : level < maxLevel ? 'Jeszcze więcej' : 'Zwiń';
 
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
@@ -172,13 +181,14 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
         </View>
       </View>
 
-      <TouchableOpacity onPress={() => { haptic.tap(); setExpanded(e => !e); }} activeOpacity={0.7}>
+      <TouchableOpacity onPress={advanceLevel} activeOpacity={0.7}>
         <Text style={s.text}>{t.text}</Text>
-        {expanded && <Text style={s.detail}>{t.detail}</Text>}
-        {expanded && t.src ? <Text style={s.src}>— {t.src}</Text> : null}
+        {level >= 1 && <Text style={s.detail}>{t.detail}</Text>}
+        {level >= 2 && t.more ? <Text style={s.detail}>{t.more}</Text> : null}
+        {level >= 1 && t.src ? <Text style={s.src}>— {t.src}</Text> : null}
         <View style={s.moreRow}>
-          {expanded ? <ChevronUp size={13} color={c.text.muted} /> : <ChevronDown size={13} color={c.text.muted} />}
-          <Text style={s.moreTxt}>{expanded ? 'Zwiń' : 'Czytaj więcej'}</Text>
+          {level === 0 ? <ChevronDown size={13} color={c.text.muted} /> : level < maxLevel ? <ChevronDown size={13} color={c.text.muted} /> : <ChevronUp size={13} color={c.text.muted} />}
+          <Text style={s.moreTxt}>{moreLabel}</Text>
         </View>
       </TouchableOpacity>
 
