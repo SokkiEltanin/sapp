@@ -15,7 +15,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import DisplayText from '@/components/ui/DisplayText';
 import { useFontsStore } from '@/store/fontsStore';
 import { normalizeProductName } from '@/utils/productMemory';
-import { purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
+import { purchasedCatForName, buildPurchasedCatIndex, suggestCatFromName } from '@/utils/food';
 import { parsePastedNutrition } from '@/utils/foodNutritionParser';
 import { useExpensesStore } from '@/store/expensesStore';
 import { toast } from '@/store/toastStore';
@@ -492,8 +492,15 @@ export default function FoodAdd() {
       // świadomego wyboru usera (i nigdy nie wysyła `cat: undefined`, bo `upsertProductByName`
       // aktualizujący JUŻ istniejący produkt spreaduje seed wprost na patch — jawny `undefined`
       // wyczyściłby istniejącą kategorię).
+      //
+      // Fallback na `suggestCatFromName` (2026-10-05, user: "Nadal nie lapie mi Kinder
+      // bueno... moze korzystać z tego co lapie baza produktow?") — `purchasedCatForName`
+      // zależy od tego, że user TEN PRODUKT już kiedyś kupił/zeskanował; coś zjedzone ale
+      // nigdy nie kupione (prezent, przekąska u znajomych) nie miało żadnej sugestii mimo że
+      // ten sam keyword matcher co paragony (`getFoodTags`) rozpoznałby je od razu. Patrz
+      // pełny komentarz przy `suggestCatFromName` w utils/food.ts.
       const existingByName = findProductByName(sel.name);
-      const catSeed = (!existingByName?.cat) ? purchasedCatForName(sel.name, purchasedCatIndex) : undefined;
+      const catSeed = (!existingByName?.cat) ? (purchasedCatForName(sel.name, purchasedCatIndex) ?? suggestCatFromName(sel.name)) : undefined;
       const p = upsertProductByName(sel.name, {
         kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
         protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100, sugar100: sel.sugar100,
@@ -540,7 +547,7 @@ export default function FoodAdd() {
     const kcal = Math.round(parseFloat(mKcal.replace(',', '.')));
     if (!name || !(kcal > 0)) return;
     const existingByName = findProductByName(name);
-    const catSeed = (!existingByName?.cat) ? purchasedCatForName(name, purchasedCatIndex) : undefined;
+    const catSeed = (!existingByName?.cat) ? (purchasedCatForName(name, purchasedCatIndex) ?? suggestCatFromName(name)) : undefined;
     const p = upsertProductByName(name, { kcalPerPortion: kcal, defaultUnit: 'porcja', ...(catSeed ? { cat: catSeed } : {}) });
     setItems(prev => [...prev, { name, productId: p.id, qty: 1, unit: 'porcja', grams: 0, kcal }]);
     setManual(false); setMName(''); setMKcal('');

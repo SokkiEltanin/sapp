@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Expense, ReceiptItem } from '@/types';
 import { looksLikeFood } from '@/utils/calories';
 import { normalizeProductName } from '@/utils/productMemory';
+import { getFoodTags } from '@/utils/receiptParser';
 
 // Food spend = FOOD items only, not the whole grocery receipt. Papier toaletowy /
 // chemia / higiena bought at Lidl must NOT count as jedzenie. Food sub-tags drive the
@@ -150,6 +151,27 @@ export function buildPurchasedCatIndex(expenses: Expense[]): Map<string, string>
 export function purchasedCatForName(name: string, index: Map<string, string>): string | undefined {
   const key = normalizeProductName(name);
   return key ? index.get(key) : undefined;
+}
+
+// Static, purchase-history-INDEPENDENT category guess (2026-10-05, user: "Nadal nie lapie
+// mi Kinder bueno, i wielu słodyczy jako slodycze wgle jak dodaje w co zjadlem... moze
+// korzystać z tego co lapie baza produktow?") — `purchasedCatForName` above only knows a
+// name if the user PERSONALLY bought/scanned it before (and it got tagged correctly at
+// scan time); a well-known product like "Kinder Bueno" that was only ever EATEN (gift,
+// snack from a friend, logged from the curated base, never bought as a tracked expense)
+// got no suggestion at all, forcing a manual category pick every single time — exactly the
+// friction the user described. Reuses `getFoodTags()` (receiptParser.ts), the SAME
+// comprehensive, already-tested keyword matcher (`FOOD_TAG_MAP`) that scan.tsx/manual.tsx/
+// expenses/add.tsx already use for purchases — "Kinder Bueno" → 'słodycze' is already an
+// existing receiptParser.test.ts assertion, this just reuses that proven matcher here too,
+// instead of maintaining a second, food-log-only keyword list that could drift out of sync.
+// Picks the FIRST tag in `FOOD_SUBCATS` priority order when a name matches several (same
+// "first match wins" convention as `foodSubcat`). Callers try `purchasedCatForName` FIRST
+// (the user's own history/corrections win when both would apply) and fall back to this.
+export function suggestCatFromName(name: string): string | undefined {
+  const tags = getFoodTags(name);
+  for (const s of FOOD_SUBCATS) if (tags.includes(s.tag)) return s.tag;
+  return undefined;
 }
 
 // How much of an expense is FOOD: with items → sum food lines; without items but the

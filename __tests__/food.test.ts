@@ -1,4 +1,4 @@
-import { purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
+import { purchasedCatForName, buildPurchasedCatIndex, suggestCatFromName } from '@/utils/food';
 import { Expense, ReceiptItem } from '@/types';
 
 const item = (o: Partial<ReceiptItem>): ReceiptItem => ({
@@ -63,5 +63,36 @@ describe('purchasedCatForName', () => {
   test('pusta nazwa lub brak wydatków → undefined', () => {
     expect(catFor('', [])).toBeUndefined();
     expect(catFor('cokolwiek', [])).toBeUndefined();
+  });
+});
+
+// 2026-10-05, user: "Nadal nie lapie mi Kinder bueno, i wielu słodyczy jako slodycze wgle
+// jak dodaje w co zjadlem... moze korzystać z tego co lapie baza produktow?" —
+// `purchasedCatForName` wyżej działa TYLKO dla nazw, które user już kiedyś KUPIŁ/zeskanował.
+// `suggestCatFromName` to purchase-history-NIEZALEŻNY fallback, reużywający ten sam
+// `getFoodTags`/`FOOD_TAG_MAP` co receiptParser.ts (paragony/wydatki) — "Kinder Bueno" →
+// 'słodycze' to już istniejąca asercja w receiptParser.test.ts, ta funkcja po prostu
+// udostępnia TEN SAM matcher dziennikowi jedzenia.
+describe('suggestCatFromName', () => {
+  test('rozpoznaje "Kinder Bueno" jako słodycze BEZ żadnej historii zakupów (dokładny przykład usera)', () => {
+    expect(suggestCatFromName('Kinder Bueno')).toBe('słodycze');
+  });
+
+  test('rozpoznaje inne popularne słodycze po samej nazwie', () => {
+    expect(suggestCatFromName('Czekolada Milka mleczna')).toBe('słodycze');
+    expect(suggestCatFromName('Baton Snickers 50g')).toBe('słodycze');
+  });
+
+  test('nie-słodycz nie łapie się fałszywie', () => {
+    expect(suggestCatFromName('Pierś z kurczaka')).toBe('mięso');
+    expect(suggestCatFromName('Mleko 2%')).toBe('nabiał');
+  });
+
+  test('brak dopasowania w ogóle → undefined, nigdy "inne"', () => {
+    expect(suggestCatFromName('Coś zupełnie nieznanego xyz123')).toBeUndefined();
+  });
+
+  test('pusta nazwa → undefined', () => {
+    expect(suggestCatFromName('')).toBeUndefined();
   });
 });

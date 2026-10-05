@@ -3,7 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Nagroda za głaskanie (skrzynka sardynek) skaluje się z poziomem (2026-10-04)
+## 🆕 "Co zjadłem": auto-kategoria produktu reużywa paragonowy keyword-matcher (2026-10-05)
+
+User: "Nadal nie lapie mi Kinder bueno, i wielu słodyczy jako slodycze wgle jak dodaje w co
+zjadlem... moze korzystać z tego co lapie baza produktow?". Pełny opis w ARCHITECTURE.md
+§254. Auto-sugestia kategorii nowego produktu (3 miejsca: `app/food/product.tsx`,
+`app/food/add.tsx` ×2) opierała się WYŁĄCZNIE na historii WŁASNYCH zakupów usera
+(`purchasedCatForName`) — coś zjedzone, ale nigdy nie kupione jako śledzony wydatek, nie
+miało żadnej sugestii, mimo że DOKŁADNIE ta sama nazwa od dawna poprawnie rozpoznaje się w
+module wydatków (`getFoodTags`/`FOOD_TAG_MAP` w receiptParser.ts — "Kinder Bueno"→słodycze
+to już istniejąca asercja tam). Nowa `suggestCatFromName()` w utils/food.ts reużywa TEN SAM
+matcher jako fallback, gdy historia zakupów nic nie wie. Nowe testy w food.test.ts (+5).
+`tsc`/`jest` czyste (95/95 suite, 1217 testów, +5).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: Co zjadłem → dodaj NOWY produkt "Kinder
+Bueno" (nigdy nie kupiony na paragonie w appce) → sprawdź że kategoria "Słodycze" ustawia
+się SAMA (ekran "Nowy produkt" ORAZ szybkie dodawanie), i że streak "Bez słodyczy" realnie
+się zeruje po zalogowaniu.
+
+## ✅ Nagroda za głaskanie (skrzynka sardynek) skaluje się z poziomem (2026-10-04)
 
 User: "to za glaskanie pupila tez powinno iść z levelem i dawać więcej... bo teraz dropi 1
 manetka na 26 lvl bez sensu bo to ponad 300 dni zeby upgrada zrobic". Pełny opis w
