@@ -1,3 +1,5 @@
+import { questRewardMult } from './quests';
+
 // Mini "sardynki" loot crate the cat gives you for petting it to a full affection
 // bar. Open it for coins at a random rarity — mostly small, rarely a jackpot.
 // 'legendary' (was 'mythic') is the UNIFIED top rarity shared with the shop's loot
@@ -47,11 +49,22 @@ export const CRATE_META: Record<CrateTier, { label: string; color: string }> = {
   legendary: { label: 'Legendarna',  color: '#FBBF24' },
 };
 
-// Roll a crate: legendary 2%, epic 10%, rare 28%, basic 60%.
-export function rollCrate(): { tier: CrateTier; coins: number } {
+// Roll a crate: legendary 2%, epic 10%, rare 28%, basic 60%. `level` (2026-10-04, user:
+// "glaskanie pupila tez powinno iść z levelem i dawać więcej" — doprecyzowane: "w tej daily
+// skrzynce za głaskanie mógł dropnac więcej XP i monet bo teraz dropi 1 monetka na 26 lvl bez
+// sensu") — dotąd skrzynka z głaskania była JEDYNĄ nagrodą w całej grze bez żadnego
+// skalowania poziomem (ani tiery, ani kwoty coinów nigdy się nie zmieniały od Lv1 do Lv999,
+// podczas gdy WSZYSTKIE inne nagrody — questy/misje/raid — rosną). Tiery (odds) zostają
+// nietknięte — rośnie TYLKO kwota coinów w obrębie wylosowanego tieru, tym samym
+// `questRewardMult` co zwykłe questy (ten sam, jeden już istniejący "jak nagrody rosną z
+// levelem" wzorzec w grze, nie nowa, osobna krzywa do zsynchronizowania). `level` domyślnie
+// 1 (mult=1×, identyczne jak stare testy/wywołania bez levela) — jedyny wołający to
+// `openCrate()` w petStore.ts, zawsze z realnym poziomem gracza.
+export function rollCrate(level: number = 1): { tier: CrateTier; coins: number } {
+  const mult = questRewardMult(level);
   const r = Math.random();
-  if (r < 0.02) return { tier: 'legendary', coins: 100 };
-  if (r < 0.12) return { tier: 'epic',   coins: 20 + Math.floor(Math.random() * 16) }; // 20–35
-  if (r < 0.40) return { tier: 'rare',   coins: 5 + Math.floor(Math.random() * 6) };   // 5–10
-  return { tier: 'basic', coins: 1 + Math.floor(Math.random() * 2) };                   // 1–2
+  if (r < 0.02) return { tier: 'legendary', coins: Math.round(100 * mult) };
+  if (r < 0.12) return { tier: 'epic',   coins: Math.round((20 + Math.floor(Math.random() * 16)) * mult) }; // 20–35 bazowo
+  if (r < 0.40) return { tier: 'rare',   coins: Math.round((5 + Math.floor(Math.random() * 6)) * mult) };   // 5–10 bazowo
+  return { tier: 'basic', coins: Math.round((1 + Math.floor(Math.random() * 2)) * mult) };                   // 1–2 bazowo
 }

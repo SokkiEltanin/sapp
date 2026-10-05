@@ -14310,6 +14310,53 @@ zrobiony/złamany → poczekaj do/ustaw zegar po 17:00 → sprawdzić że górna
 
 ---
 
+## 253. Nagroda za głaskanie (skrzynka sardynek) skaluje się z poziomem (2026-10-04)
+
+User: "I to za glaskanie pupila tez powinno iść z levelem i dawać więcej". Doprecyzowane po
+pytaniu o zakres: "chodziło zeby w tej daily skrzynce za glaskanie mógł dropnac więcej XP i
+monet bo teraz dropi 1 manetka na 26 lvl bez sensu bo to ponad 300 dni zeby upgrada zrobic".
+
+Audyt: nagroda za wypełnienie dziennego paska afekcji (głaskanie) ma DWA składniki, OBA były
+całkowicie statyczne, niezależne od poziomu gracza — jedyna taka nagroda w całej grze (misje,
+raid, questy — wszystko inne już skaluje się levelem, patrz `questRewardMult`/
+`missionRewardFor`):
+1. `petCat()` w `petStore.ts` — stałe +8 XP przy pierwszym wypełnieniu paska danego dnia.
+2. `rollCrate()` w `crates.ts` (JEDYNY wołający: `openCrate()` w `petStore.ts`, zasilane
+   WYŁĄCZNIE przez `pendingCrates` z głaskania — potwierdzone grep-em: zero innych miejsc w
+   kodzie incrementuje to pole, więc zmiana tu NIE dotyka sklepowych skrzynek, które żyją w
+   zupełnie osobnym systemie `petBoxes.ts`/`rollBox()`) — stałe kwoty coinów w obrębie
+   każdego tieru (basic 1-2, rare 5-10, epic 20-35, legendary 100), niezależnie od levela.
+
+Fix: oba miejsca mnożą teraz przez `questRewardMult(level)` — TEN SAM, już istniejący
+mnożnik co zwykłe questy (`1 + max(0, level-1) × 0.045`), zamiast wymyślać nową, osobną
+krzywą do zsynchronizowania (dokładnie problem który `missionRewardFor`'s komentarz
+historycznie już opisywał dla innego systemu). `rollCrate(level: number = 1)` — domyślny
+parametr, stare wywołania/testy bez levela zachowują się identycznie (mult=1×). Tiery
+(odds legendary/epic/rare/basic) ZOSTAJĄ nietknięte — skaluje się TYLKO kwota coinów w
+obrębie wylosowanego tieru. Przy Lv26 (`mult≈2.125×`): basic 1-2→2-4, legendary 100→213.
+`petCat()`'s +8 XP analogicznie → ~17 XP na Lv26, mnożnik levela składa się z istniejącym
+mnożnikiem potki (`xpWithPotion`), nie go zastępuje.
+
+Przy okazji: `openCrate()` miał DWIE osobne, identyczne kalkulacje `levelFromXp(s.xp).level`
+(jedna już istniała dla gatingu dropu ekwipunku, patrz komentarz "Ekwipunek ZE SKRZYNKI
+SARDYNEK" tamże) — zunifikowane do JEDNEJ, obliczonej na górze funkcji, reużywanej też przez
+nowe wywołanie `rollCrate(level)`.
+
+**Testy**: nowy `__tests__/petCat.test.ts` (4 testy: Lv1=stare +8 XP bez zmian, wyższy level
+= proporcjonalnie więcej XP tym samym mnożnikiem co questy, drugie wypełnienie tego samego
+dnia nie przyznaje XP ponownie, `pendingCrates` rośnie niezależnie od levela) + nowy opis w
+`__tests__/crates.test.ts` (4 testy: domyślny/jawny level=1 bez zmian, wyższy level
+proporcjonalnie więcej coinów w tym samym tierze, tiery/odds nietknięte levelem). `tsc
+--noEmit` czyste, `jest --silent` 95/95 suite, 1212/1204 testów (+8).
+
+**Priorytet testu na urządzeniu — wysoki**: na WYSOKIM poziomie pupila (najlepiej 20+) —
+głaszcz do pełnego paska afekcji → sprawdzić że nagroda XP jest zauważalnie wyższa niż na
+nowym koncie; otwórz zdobytą skrzynkę sardynek kilka razy → sprawdzić że kwoty coinów w
+tym samym tierze (np. kilka "Zwykła" z rzędu) są wyższe niż dawne 1-2, proporcjonalnie do
+poziomu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
