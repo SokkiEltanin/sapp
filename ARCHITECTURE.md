@@ -14357,6 +14357,52 @@ poziomu.
 
 ---
 
+## 254. "Co zjadłem": auto-kategoria produktu reużywa paragonowy keyword-matcher, nie tylko historię zakupów (2026-10-05)
+
+User: "Nadal nie lapie mi Kinder bueno, i wielu słodyczy jako slodycze wgle jak dodaje w co
+zjadlem możesz to poprawić moze korzystać z tego co lapie baza produktow? Nie wiem trzeba to
+ulepszyc żebym chciał dodawac to".
+
+Dochodzenie: auto-sugestia kategorii nowego `FoodProduct` (żeby user nie musiał ręcznie
+tagować KAŻDEGO nowego produktu — i żeby streak "Bez słodyczy"/§250 od razu łapał jedzenie)
+istniała już w TRZECH miejscach (`app/food/product.tsx`'s "Nowy produkt", `app/food/add.tsx`'s
+`confirmPicker`/`confirmManual`), ale WSZYSTKIE trzy polegały WYŁĄCZNIE na
+`purchasedCatForName` — indeksie zbudowanym z WŁASNEJ historii PARAGONÓW/wydatków usera.
+"Kinder Bueno" zjedzone, ale nigdy nie kupione jako śledzony wydatek (prezent, przekąska u
+znajomych, zjedzone zanim zaczął skanować paragony) nie miało ŻADNEJ sugestii — mimo że
+DOKŁADNIE ta sama nazwa od dawna poprawnie rozpoznaje się jako 'słodycze' w ZUPEŁNIE innym
+miejscu: `getFoodTags()`/`FOOD_TAG_MAP` w `receiptParser.ts` (użyty przez scan.tsx/
+manual.tsx/expenses/add.tsx przy DODAWANIU wydatku) — `getFoodTags('Kinder Bueno')` ma już
+własną asercję w `receiptParser.test.ts` od dawna. Dokładnie to user miał na myśli mówiąc
+"może korzystać z tego co łapie baza produktów" — te dwa systemy (dziennik jedzenia vs
+wydatki) miały DWIE niepołączone metody rozpoznawania kategorii, jedna dużo bogatsza
+(skalibrowana na setkach realnych paragonów, patrz historia `FOOD_TAG_MAP` w ARCHITECTURE),
+druga (food log) zależna wyłącznie od przypadkowego pokrycia z historią zakupów TEGO
+konkretnego usera.
+
+Fix: nowa, eksportowana `suggestCatFromName(name)` w `utils/food.ts` — czysty wrapper wołający
+`getFoodTags(name)` (import z `receiptParser.ts`, zero cyklu — `receiptParser.ts` importuje
+TYLKO z `@/types`) i wybierający PIERWSZY pasujący tag wg kolejności `FOOD_SUBCATS` (ten sam
+"pierwszy wygrywa" konwencja co `foodSubcat()`), `undefined` gdy nic nie pasuje (nigdy nie
+zgaduje "inne"). Wszystkie TRZY miejsca teraz łańcuchują: `purchasedCatForName(...) ??
+suggestCatFromName(...)` — WŁASNA historia usera (dokładniejsza/spersonalizowana, np. gdy user
+sam przez lata kupował "drożdżówkę" jako pieczywo, nie słodycz) wygrywa pierwsza, statyczny
+matcher to tylko fallback gdy historia nic nie wie. Przyszły dopisek do `FOOD_TAG_MAP`
+(receiptParser.ts) automatycznie pokrywa też food log — jeden wspólny słownik, nie dwa do
+zsynchronizowania.
+
+**Testy**: nowy opis w `__tests__/food.test.ts` (`suggestCatFromName`, 5 testów, w tym
+dokładny przykład usera `suggestCatFromName('Kinder Bueno') === 'słodycze'`). `tsc --noEmit`
+czyste, `jest --silent` 95/95 suite, 1217/1212 testów (+5).
+
+**Priorytet testu na urządzeniu — wysoki**: Co zjadłem → dodaj NOWY produkt "Kinder Bueno"
+(nigdy wcześniej nie kupiony/zeskanowany na żadnym paragonie w tej appce) → sprawdzić że
+kategoria "Słodycze" ustawia się SAMA, bez ręcznego wyboru, zarówno przez ekran "Nowy
+produkt" jak i przez szybkie dodawanie z poziomu "Co zjadłem"; sprawdzić że dzięki temu streak
+"Bez słodyczy" realnie się zeruje po zalogowaniu takiego produktu.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

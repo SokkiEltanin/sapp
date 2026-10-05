@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Check, Link2, Search, X, Trash2, Copy } from 'lucide-react-native';
 
 import { useFoodStore, FoodUnit } from '@/store/foodStore';
-import { FOOD_SUBCATS, purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
+import { FOOD_SUBCATS, purchasedCatForName, buildPurchasedCatIndex, suggestCatFromName } from '@/utils/food';
 import { Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
@@ -117,10 +117,16 @@ export default function FoodProductForm() {
   // odpala się na KAŻDE naciśnięcie klawisza w polu nazwy — user z dłuższą historią
   // paragonów dostawał realny freeze JS threada = "black screen" przy samym pisaniu nazwy
   // nowego produktu, patrz pełny opis przy `buildPurchasedCatIndex` w utils/food.ts).
+  //
+  // Fallback na `suggestCatFromName` (2026-10-05, user: "Nadal nie lapie mi Kinder bueno...
+  // moze korzystać z tego co lapie baza produktow?") — `purchasedCatForName` samo działa
+  // TYLKO dla nazw, które user już kiedyś KUPIŁ/zeskanował; coś zjedzone ale nigdy nie
+  // kupione (prezent, przekąska u znajomych) nie miało żadnej sugestii. Patrz pełny
+  // komentarz przy `suggestCatFromName` w utils/food.ts.
   const purchasedCatIndex = useMemo(() => buildPurchasedCatIndex(purchasedExpenses), [purchasedExpenses]);
   useEffect(() => {
     if (editing || cat || !name.trim()) return;
-    const suggested = purchasedCatForName(name, purchasedCatIndex);
+    const suggested = purchasedCatForName(name, purchasedCatIndex) ?? suggestCatFromName(name);
     if (suggested) setCat(suggested);
   }, [name, editing, cat, purchasedCatIndex]);
 
