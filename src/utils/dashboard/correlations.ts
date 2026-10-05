@@ -1,5 +1,12 @@
 // Silnik korelacji „co na Ciebie wpływa" — Pearson po dopasowanych dniach między metrykami
 // self-care (sen, energia, humor, słodycze, praca, kroki). Czysty → testowalny w node.
+//
+// Sama matematyka Pearsona żyje teraz w `statsPearson.ts` (2026-10-05, audyt) — współdzielona
+// z `../correlations.ts` (ten sam silnik, inne okno dni i inny zestaw metryk, więc MIN_N/MIN_R
+// NIŻEJ zostają własne, celowo: insightLinks patrzy tylko na ostatnie 30 dni, więc MIN_N=5
+// żeby cokolwiek w ogóle miało szansę się zakwalifikować; `../correlations.ts` ciągnie z
+// całej historii, więc może sobie pozwolić na MIN_N=8 bez ryzyka wiecznej pustki).
+import { pearsonCoeff } from '@/utils/statsPearson';
 
 export type MetricKey = 'sleep' | 'mood' | 'energy' | 'sweets' | 'work' | 'steps' | 'weather';
 
@@ -27,14 +34,8 @@ const MIN_R = 0.35;     // słabsze = szum, nie pokazujemy
 
 // Pearson po parach; null gdy za mało par lub brak wariancji (płaska seria).
 export function pearson(pairs: [number, number][]): number | null {
-  const n = pairs.length;
-  if (n < MIN_N) return null;
-  const mx = pairs.reduce((s, p) => s + p[0], 0) / n;
-  const my = pairs.reduce((s, p) => s + p[1], 0) / n;
-  let sxy = 0, sxx = 0, syy = 0;
-  for (const [x, y] of pairs) { const dx = x - mx, dy = y - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
-  if (sxx === 0 || syy === 0) return null;
-  return sxy / Math.sqrt(sxx * syy);
+  if (pairs.length < MIN_N) return null;
+  return pearsonCoeff(pairs.map(p => p[0]), pairs.map(p => p[1]));
 }
 
 // Pary, które mają sens (kierunek: a → wpływ na b).
