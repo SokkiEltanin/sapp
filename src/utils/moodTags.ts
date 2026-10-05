@@ -22,6 +22,13 @@ import { MoodEntry } from '@/types';
 // zostawienie go w obu zbiorach ZEROWAŁOBY jego trafność w tej właśnie kombinacji (-1 z
 // nastroju × +1 sygnał dobrego nastroju = -1, +(-1 energia × -1 sygnał niskiej energii) =
 // +1, suma 0 — dokładnie ten bug, który user zgłosił).
+// Rozbudowane 2026-10-05 (user: "rob to samo z humorem" — ta sama runda audytu/rozbudowy co
+// baza produktów w "Co zjadłem") — dawne 26 presetów pokrywało tylko najbardziej podstawowe
+// stany, brakowało sporo codziennych emocji (duma, wina, zazdrość, znudzenie, rozczarowanie,
+// wypalenie…). +30 nowych, każdy sprawdzony pod kątem NIE-dublowania istniejącego znaczenia
+// (np. świadomie POMINIĘTE: "kreatywny"/"roztargniony"/"wyluzowany"/"pogodny" — zbyt bliskie
+// już istniejącym "twórczy"/"rozproszony"/"zrelaksowany"/"radosny", dodanie ich tylko
+// rozwadniałoby listę kandydatów bez realnej nowej informacji).
 export const PRESET_TAGS = [
   'skupiony', 'zmęczony', 'niespokojny', 'radosny', 'smutny',
   'produktywny', 'rozproszony', 'spokojny', 'motywowany', 'przytłoczony',
@@ -29,28 +36,47 @@ export const PRESET_TAGS = [
   'podekscytowany', 'samotny', 'pełen energii', 'bez motywacji', 'zadowolony',
   'przygnębiony', 'towarzyski', 'twórczy', 'zaniepokojony', 'pewny siebie',
   'niewyspany',
+  'zirytowany', 'znudzony', 'zainspirowany', 'dumny', 'winny',
+  'zazdrosny', 'zawstydzony', 'spełniony', 'zrezygnowany', 'optymistyczny',
+  'pełen nadziei', 'przestraszony', 'zaskoczony', 'ciekawy', 'rozczarowany',
+  'wyczerpany', 'zrównoważony', 'niepewny siebie', 'naładowany', 'apatyczny',
+  'entuzjastyczny', 'żywiołowy', 'bezsilny', 'zdezorientowany', 'pod presją',
+  'wypalony', 'ambitny', 'leniwy', 'rozbity', 'niespełniony',
 ];
 
-// Oś NASTROJU (sentyment) — `zmęczony` świadomie NIE tu, patrz komentarz wyżej.
+// Oś NASTROJU (sentyment) — `zmęczony` świadomie NIE tu, patrz komentarz wyżej. "zaskoczony"
+// też świadomie w ŻADNYM z dwóch zbiorów — zaskoczenie bywa równie często miłe co przykre,
+// nie da się mu przypisać jednego kierunku bez kontekstu, więc zostaje neutralne (jak
+// nieobsadzone poziomy 3 w `levelSignal`).
 export const POSITIVE_TAGS = new Set([
   'skupiony', 'radosny', 'produktywny', 'spokojny', 'motywowany',
   'wdzięczny', 'szczęśliwy', 'zrelaksowany', 'podekscytowany',
   'pełen energii', 'zadowolony', 'towarzyski', 'twórczy', 'pewny siebie',
+  'zainspirowany', 'dumny', 'spełniony', 'optymistyczny', 'pełen nadziei',
+  'ciekawy', 'zrównoważony', 'naładowany', 'entuzjastyczny', 'żywiołowy', 'ambitny',
 ]);
 export const NEGATIVE_TAGS = new Set([
   'niespokojny', 'smutny', 'rozproszony', 'przytłoczony',
   'zestresowany', 'sfrustrowany', 'samotny', 'bez motywacji', 'przygnębiony',
   'zaniepokojony',
+  'zirytowany', 'znudzony', 'winny', 'zazdrosny', 'zawstydzony',
+  'zrezygnowany', 'przestraszony', 'rozczarowany', 'niepewny siebie', 'apatyczny',
+  'bezsilny', 'zdezorientowany', 'pod presją', 'wypalony', 'rozbity', 'niespełniony',
 ]);
 
 // Oś ENERGII — niezależna od nastroju. `niewyspany` to nowy tag (user go nazwał wprost
 // jako przykład) — brak snu ≠ ogólne zmęczenie (np. z wysiłku), więc osobny, konkretniejszy
-// wybór zamiast przeciążania jednego "zmęczony".
+// wybór zamiast przeciążania jednego "zmęczony". `wyczerpany`/`leniwy` (2026-10-05) tym samym
+// wzorem co `zmęczony` — czysto energetyczne, NIE w żadnym zbiorze nastroju (można być
+// wyczerpanym i w dobrym nastroju, np. po satysfakcjonującym treningu).
 export const HIGH_ENERGY_TAGS = new Set([
   'pełen energii', 'skupiony', 'produktywny', 'motywowany', 'podekscytowany',
+  'zainspirowany', 'ciekawy', 'naładowany', 'entuzjastyczny', 'żywiołowy', 'ambitny',
 ]);
 export const LOW_ENERGY_TAGS = new Set([
   'zmęczony', 'niewyspany', 'bez motywacji', 'rozproszony',
+  'znudzony', 'zrezygnowany', 'wyczerpany', 'apatyczny', 'bezsilny', 'wypalony',
+  'leniwy', 'rozbity',
 ]);
 
 // -1/0/+1 — jak bardzo dany poziom (nastroju LUB energii) ciągnie w stronę "źle"/"dobrze".

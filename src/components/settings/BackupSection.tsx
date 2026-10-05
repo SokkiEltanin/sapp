@@ -9,7 +9,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, exportExpensesToCsv, BackupMeta } from '@/services/backupService';
+import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, exportExpensesToCsv, exportMoodToCsv, BackupMeta } from '@/services/backupService';
 import { plPlural } from '@/utils/plural';
 
 function fmtWhen(iso: string): string {
@@ -35,7 +35,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [backups, setBackups] = useState<BackupMeta[]>([]);
-  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | 'csv' | null>('load');
+  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | 'csv' | 'moodcsv' | null>('load');
   const [showAll, setShowAll] = useState(false);
   const protectedByGoogle = !!googleUser;
 
@@ -86,6 +86,21 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
     } catch (e: any) {
       haptic.error();
       toast.error('Nie udało się wyeksportować wydatków');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onExportMoodCsv = async () => {
+    haptic.tap();
+    setBusy('moodcsv');
+    try {
+      const { count } = await exportMoodToCsv();
+      haptic.success();
+      toast.success(`Wyeksportowano ${count} wpisów humoru (CSV) — wybierz, gdzie wysłać`);
+    } catch (e: any) {
+      haptic.error();
+      toast.error('Nie udało się wyeksportować humoru');
     } finally {
       setBusy(null);
     }
@@ -178,6 +193,18 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
       </PressableScale>
       <Text style={s.exportHint}>
         Sama historia wydatków/przychodów — jedna transakcja na wiersz (data, kwota, kategoria, tagi, notatka…), do otwarcia w Excelu/Google Sheets.
+      </Text>
+
+      <PressableScale onPress={onExportMoodCsv} disabled={busy != null}>
+        <View style={[s.exportBtn, busy != null && { opacity: 0.5 }]}>
+          {busy === 'moodcsv'
+            ? <ActivityIndicator size="small" color={c.text.secondary} />
+            : <FileDown size={15} color={c.text.secondary} />}
+          <Text style={s.exportText}>{busy === 'moodcsv' ? 'Eksportuję…' : 'Eksportuj humor (CSV)'}</Text>
+        </View>
+      </PressableScale>
+      <Text style={s.exportHint}>
+        Sama historia humoru — jeden wpis na wiersz (data, nastrój, energia, tagi, notatka…), do otwarcia w Excelu/Google Sheets. Pełny JSON powyżej też to zawiera, ten CSV jest tylko łatwiejszy do przejrzenia.
       </Text>
 
       {busy === 'load' ? (

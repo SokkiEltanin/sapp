@@ -1,4 +1,4 @@
-import { sortMoodTags, tagRelevance, PRESET_TAGS, POSITIVE_TAGS, NEGATIVE_TAGS } from '@/utils/moodTags';
+import { sortMoodTags, tagRelevance, PRESET_TAGS, POSITIVE_TAGS, NEGATIVE_TAGS, HIGH_ENERGY_TAGS, LOW_ENERGY_TAGS } from '@/utils/moodTags';
 import { MoodEntry } from '@/types';
 
 // 2026-09-10, user: "przyjrzyj się wpisywaniu humoru... żeby te tagi ulepszyć na bazie tego
@@ -109,5 +109,51 @@ describe('moodTags — sortMoodTags/tagRelevance', () => {
     ];
     const sorted = sortMoodTags(undefined, undefined, entries, NOW);
     expect(sorted.indexOf('radosny')).toBeLessThan(sorted.indexOf('szczęśliwy'));
+  });
+});
+
+// 2026-10-05, user: "rob to samo z humorem" (ta sama runda rozbudowy co baza produktów w "Co
+// zjadłem") — PRESET_TAGS 26→56. Regression-guardy analogiczne do `foodBase.test.ts`'s
+// duplicate-check: pilnują integralności danych, nie samej treści (żeby kolejna rozbudowa nie
+// mogła po cichu wprowadzić kolizji między zbiorami, które `tagRelevance` zakłada jako
+// rozłączne — patrz komentarz przy `tagRelevance` w moodTags.ts).
+describe('moodTags — integralność rozszerzonej listy (2026-10-05, 26→56 presetów)', () => {
+  test('brak zduplikowanych tagów w PRESET_TAGS', () => {
+    expect(new Set(PRESET_TAGS).size).toBe(PRESET_TAGS.length);
+  });
+
+  test('POSITIVE_TAGS i NEGATIVE_TAGS się nie przecinają (tag nie może ciągnąć w obie strony naraz)', () => {
+    const overlap = [...POSITIVE_TAGS].filter(t => NEGATIVE_TAGS.has(t));
+    expect(overlap).toEqual([]);
+  });
+
+  test('HIGH_ENERGY_TAGS i LOW_ENERGY_TAGS się nie przecinają', () => {
+    const overlap = [...HIGH_ENERGY_TAGS].filter(t => LOW_ENERGY_TAGS.has(t));
+    expect(overlap).toEqual([]);
+  });
+
+  test('każdy tag z 4 zbiorów sentymentu/energii realnie istnieje w PRESET_TAGS (literówka łatwo rozjeżdża zbiór od listy)', () => {
+    const preset = new Set(PRESET_TAGS);
+    for (const t of [...POSITIVE_TAGS, ...NEGATIVE_TAGS, ...HIGH_ENERGY_TAGS, ...LOW_ENERGY_TAGS]) {
+      expect(preset.has(t)).toBe(true);
+    }
+  });
+
+  test('nowe tagi z tej rundy (duma, wina, znudzenie, wypalenie…) realnie są presetami', () => {
+    for (const t of ['dumny', 'winny', 'znudzony', 'wypalony', 'zrezygnowany', 'ambitny']) {
+      expect(PRESET_TAGS).toContain(t);
+    }
+  });
+
+  test('"zaskoczony" świadomie neutralny — w ŻADNYM z dwóch zbiorów nastroju', () => {
+    expect(POSITIVE_TAGS.has('zaskoczony')).toBe(false);
+    expect(NEGATIVE_TAGS.has('zaskoczony')).toBe(false);
+  });
+
+  test('"wyczerpany"/"leniwy" czysto energetyczne jak "zmęczony" — poza obiema osiami nastroju', () => {
+    for (const t of ['wyczerpany', 'leniwy']) {
+      expect(POSITIVE_TAGS.has(t)).toBe(false);
+      expect(NEGATIVE_TAGS.has(t)).toBe(false);
+    }
   });
 });

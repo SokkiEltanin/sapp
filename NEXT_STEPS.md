@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Humor: rozbudowa presetów tagów (26→56) + eksport mood/wydatków do CSV (2026-10-05)
+
+User: "rob to samo z humorem i daj moze możliwość eksportu danych żebym wrzucić ci gdzieś".
+Pełny opis w ARCHITECTURE.md §257. `PRESET_TAGS` w `moodTags.ts` 26→56 (dumny, winny,
+wypalony, pod presją, wyczerpany, naładowany, zaskoczony-neutralny itd.), z poprawnym
+bucketingiem do `POSITIVE/NEGATIVE/HIGH_ENERGY/LOW_ENERGY_TAGS` (rozłączne zbiory, pilnowane
+testem). Nowy `src/utils/moodCsv.ts` (`moodToCsv`, mirror `expensesCsv.ts`) +
+`exportMoodToCsv()` w `backupService.ts` + 4. przycisk "Eksportuj humor (CSV)" w
+`BackupSection.tsx`. Pełny JSON (`exportSnapshotToFile`) już zawierał mood od dawna — CSV to
+dodatkowy, czytelniejszy format. Nowe testy: `moodTags.test.ts` +7, nowy `moodCsv.test.ts`
+(4). `tsc`/`jest` czyste (97/97 suite, wszystkie testy przechodzą).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Humor → dodaj wpis → sprawdź nowe tagi w
+podpowiedziach (np. "dumny", "wypalony", "pod presją"). Ustawienia → Kopia zapasowa →
+"Eksportuj humor (CSV)" → plik otwiera się w Excelu/Sheets, polskie znaki bez krzaków.
+
+**🆕 Odłożone, NIE w zakresie tej rundy** (zidentyfikowane, wymaga odrębnej decyzji usera):
+trzy osobne, niezsynchronizowane "silniki" korelacji dotykające mood (`utils/dashboard/
+correlations.ts`, `utils/correlations.ts`, inline `buildPatterns()` w `mood.tsx`) — każdy z
+własnymi, dryfującymi progami. Nie unifikowane w tej rundzie.
+
 ## 🆕 "Co zjadłem" baza produktów — runda 2: zupy, kurczak, pierogi, bazy (2026-10-05)
 
 User: "dawaj dalej... zupy obiady albo bazy pod nie np ziemniaki gotowane, kurczak smażony
@@ -33,8 +54,8 @@ pomidorowa" powinna być pierwszym wynikiem; spróbuj z literówką ("pasata") �
 znajduje; jeśli masz dużo własnych produktów, sprawdź że wyszukiwanie wśród nich pokazuje
 trafne dopasowania jako pierwsze.
 
-**🆕 Odłożone na później (user: "i pozniej zakładki humoru")**: ta sama runda
-testy/research/ulepszenia dla zakładki "Humor" (mood) — jeszcze nietknięta.
+**✅ Odłożone na później (user: "i pozniej zakładki humoru")**: zrobione, patrz nowy wpis na
+górze tego pliku (runda Humor, 2026-10-05).
 
 ## ✅ "Co zjadłem": auto-kategoria produktu reużywa paragonowy keyword-matcher (2026-10-05)
 
