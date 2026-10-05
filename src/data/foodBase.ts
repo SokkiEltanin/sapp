@@ -60,9 +60,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Pomarańcza',           kcal: 47,  protein: 0.9, unit: 'szt',   unitGrams: { szt: 130 } },
   { name: 'Gruszka',              kcal: 57,  protein: 0.4, unit: 'szt',   unitGrams: { szt: 150 } },
   { name: 'Mandarynka',           kcal: 53,  protein: 0.8, unit: 'szt',   unitGrams: { szt: 70 } },
-  { name: 'Winogrona',            kcal: 67,  protein: 0.6, unit: 'garsc', unitGrams: { garsc: 80 } },
-  { name: 'Truskawki',            kcal: 32,  protein: 0.7, unit: 'garsc', unitGrams: { garsc: 80 } },
-  { name: 'Borówki',              kcal: 57,  protein: 0.7, unit: 'garsc', unitGrams: { garsc: 60 } },
   { name: 'Maliny',               kcal: 52,  protein: 1.2, unit: 'garsc', unitGrams: { garsc: 60 } },
   { name: 'Śliwka',               kcal: 46,  protein: 0.7, unit: 'szt',   unitGrams: { szt: 50 } },
   { name: 'Brzoskwinia',          kcal: 39,  protein: 0.9, unit: 'szt',   unitGrams: { szt: 120 } },
@@ -77,7 +74,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Melon',                kcal: 34,  protein: 0.8, unit: 'porcja', unitGrams: { porcja: 150 } },
   { name: 'Mango',                kcal: 60,  protein: 0.8, unit: 'szt',   unitGrams: { szt: 200 } },
   { name: 'Granat',               kcal: 83,  protein: 1.7, unit: 'szt',   unitGrams: { szt: 200 } },
-  { name: 'Awokado (owoc)',       kcal: 160, protein: 2,   unit: 'szt',   unitGrams: { szt: 150 } },
 
   // ── Podstawy do wypieków / gotowania ──────────────────────────────────────
   // Dodane po to, by PRZEPISY (naleśniki, ciasta) liczyły się od razu: kluczowe są
@@ -86,10 +82,7 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Mąka pszenna',         kcal: 364, protein: 10,  unit: 'szklanka', unitGrams: { szklanka: 130, lyzka: 9 } },
   { name: 'Mąka pełnoziarnista',  kcal: 340, protein: 13,  unit: 'szklanka', unitGrams: { szklanka: 120, lyzka: 8 } },
   { name: 'Mąka ziemniaczana',    kcal: 343, protein: 0.4, unit: 'lyzka',    unitGrams: { szklanka: 160, lyzka: 12 } },
-  { name: 'Mleko 2%',             kcal: 50,  protein: 3.4, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
-  { name: 'Olej rzepakowy',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13, lyzeczka: 5 } },
-  { name: 'Cukier',               kcal: 400, protein: 0,   unit: 'lyzka',    unitGrams: { szklanka: 220, lyzka: 12, lyzeczka: 5 } },
-  { name: 'Masło',                kcal: 735, protein: 0.9, unit: 'lyzka',    unitGrams: { lyzka: 15, lyzeczka: 5, szt: 200 } },
+  { name: 'Cukier',               kcal: 400, protein: 0,   sugar: 100, unit: 'lyzka', unitGrams: { szklanka: 220, lyzka: 12, lyzeczka: 5 } },
   { name: 'Woda',                 kcal: 0,   protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
 
   // ── Pieczywo ───────────────────────────────────────────────────────────────
@@ -117,8 +110,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Serek szczypiorek',    kcal: 230, protein: 8,   unit: 'lyzka',    unitGrams: { lyzka: 20, szt: 100 } },
   { name: 'Jogurt naturalny 2%',  kcal: 60,  protein: 4.3, unit: 'szt',      unitGrams: { szt: 150, lyzka: 25 } },
   { name: 'Jogurt grecki 10%',    kcal: 115, protein: 5,   unit: 'szt',      unitGrams: { szt: 150, lyzka: 25 } },
-  { name: 'Kefir',                kcal: 50,  protein: 3.3, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
-  { name: 'Śmietana 18%',         kcal: 185, protein: 2.5, unit: 'lyzka',    unitGrams: { lyzka: 20 } },
   { name: 'Ser żółty (gouda/edam)', kcal: 330, protein: 25, unit: 'plaster', unitGrams: { plaster: 20 } },
   { name: 'Ser mozzarella',       kcal: 250, protein: 18,  unit: 'plaster',  unitGrams: { plaster: 25 } },
   { name: 'Ser feta',             kcal: 265, protein: 14,  unit: 'porcja',   unitGrams: { porcja: 30 } },
@@ -135,8 +126,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Schab wędzony',        kcal: 150, protein: 22,  unit: 'plaster',  unitGrams: { plaster: 20 } },
   { name: 'Kiełbasa krakowska',   kcal: 260, protein: 20,  unit: 'plaster',  unitGrams: { plaster: 15 } },
   { name: 'Kabanosy',             kcal: 300, protein: 22,  unit: 'szt',      unitGrams: { szt: 30 } },
-  { name: 'Parówki',              kcal: 260, protein: 11,  unit: 'szt',      unitGrams: { szt: 30 } },
-  { name: 'Boczek wędzony',       kcal: 300, protein: 15,  unit: 'plaster',  unitGrams: { plaster: 15 } },
   { name: 'Pasztet',              kcal: 280, protein: 10,  unit: 'lyzka',    unitGrams: { lyzka: 20, plaster: 20 } },
   { name: 'Salami',               kcal: 380, protein: 22,  unit: 'plaster',  unitGrams: { plaster: 8 } },
   { name: 'Pierś z kurczaka (grillowana)', kcal: 165, protein: 31, unit: 'porcja', unitGrams: { porcja: 150 } },
@@ -149,10 +138,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Śledź w oleju',        kcal: 210, protein: 16,  unit: 'porcja',   unitGrams: { porcja: 80 } },
 
   // ── Sosy i tłuszcze ────────────────────────────────────────────────────────
-  { name: 'Ketchup',              kcal: 100, protein: 1.4, unit: 'lyzka',    unitGrams: { lyzka: 15 } },
-  { name: 'Majonez',              kcal: 680, protein: 1,   unit: 'lyzka',    unitGrams: { lyzka: 15 } },
-  { name: 'Musztarda',            kcal: 100, protein: 5,   unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 15 } },
-  { name: 'Oliwa z oliwek',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13, lyzeczka: 5 } },
   { name: 'Masło orzechowe',      kcal: 600, protein: 25,  unit: 'lyzka',    unitGrams: { lyzka: 16 } },
 
   // ── Makarony, kasze, ryż ───────────────────────────────────────────────────
@@ -162,7 +147,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Ryż (ugotowany)',      kcal: 130, protein: 2.7, unit: 'porcja',   unitGrams: { porcja: 150 } },
   { name: 'Kasza gryczana (sucha)', kcal: 340, protein: 12, unit: 'porcja',  unitGrams: { porcja: 70 } },
   { name: 'Kasza jaglana (sucha)', kcal: 350, protein: 11, unit: 'porcja',   unitGrams: { porcja: 70 } },
-  { name: 'Płatki owsiane',       kcal: 370, protein: 13,  unit: 'porcja',   unitGrams: { porcja: 50, lyzka: 10 } },
 
   // ── Słodycze ───────────────────────────────────────────────────────────────
   { name: 'Czekolada mleczna',    kcal: 535, protein: 7.5, sugar: 52, unit: 'porcja',   unitGrams: { porcja: 25 } },
@@ -197,7 +181,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Budyń',                kcal: 100, protein: 3,   sugar: 13, unit: 'porcja',   unitGrams: { porcja: 140 } },
   { name: 'Kisiel',               kcal: 55,  protein: 0.2, sugar: 12, unit: 'porcja',   unitGrams: { porcja: 150 } },
   { name: 'Gofry',                kcal: 290, protein: 6,   sugar: 12, unit: 'szt',      unitGrams: { szt: 80 } },
-  { name: 'Cukier',               kcal: 400, protein: 0,   sugar: 100,unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 12 } },
   // Dobitka słodyczy (2026-09-03, user: "torcikow kupnych z galaretką na oko możesz mi
   // dać, i wgle więcej ich zrobić") — wartości "na oko" jak reszta tej sekcji (packaged
   // goods, ±10-15%), tym samym stylem/formatem co powyżej.
@@ -249,7 +232,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Rosół',                kcal: 35,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
   { name: 'Pierogi ruskie',       kcal: 200, protein: 6,   unit: 'szt',      unitGrams: { szt: 30 } },
   { name: 'Naleśnik',             kcal: 150, protein: 5,   unit: 'szt',      unitGrams: { szt: 60 } },
-  { name: 'Pizza (kawałek)',      kcal: 260, protein: 11,  unit: 'porcja',   unitGrams: { porcja: 120 } },
   { name: 'Kluski śląskie',       kcal: 160, protein: 3,   unit: 'szt',      unitGrams: { szt: 30 } },
   { name: 'Kanapka z serem/wędliną', kcal: 250, protein: 11, unit: 'szt',    unitGrams: { szt: 100 } },
 
@@ -263,7 +245,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Jajko gotowane',       kcal: 155, protein: 13,  unit: 'szt',      unitGrams: { szt: 55 } },
   { name: 'Jajecznica (2 jajka)', kcal: 200, protein: 13,  unit: 'porcja',   unitGrams: { porcja: 120 } },
   { name: 'Tuńczyk w puszce',     kcal: 110, protein: 25,  unit: 'porcja',   unitGrams: { porcja: 80 } },
-  { name: 'Serek wiejski',        kcal: 98,  protein: 12,  unit: 'porcja',   unitGrams: { porcja: 150 } },
   { name: 'Serek homogenizowany', kcal: 140, protein: 7,   sugar: 12, unit: 'porcja', unitGrams: { porcja: 150 } },
   { name: 'Jogurt naturalny',     kcal: 60,  protein: 5,   sugar: 5,  unit: 'porcja', unitGrams: { porcja: 150 } },
   { name: 'Jogurt grecki',        kcal: 110, protein: 9,   sugar: 4,  unit: 'porcja', unitGrams: { porcja: 150 } },
@@ -274,12 +255,12 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Ser żółty Gouda',      kcal: 356, protein: 25,  unit: 'plaster',  unitGrams: { plaster: 20 } },
   { name: 'Mleko 2%',             kcal: 51,  protein: 3.4, sugar: 5,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
   { name: 'Napój owsiany',        kcal: 45,  protein: 1,   sugar: 3,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
-  { name: 'Masło',                kcal: 735, protein: 0.7, unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 14 } },
+  { name: 'Masło',                kcal: 735, protein: 0.7, unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 14, szt: 200 } },
   { name: 'Oliwa z oliwek',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 10, lyzeczka: 5 } },
-  { name: 'Olej rzepakowy',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 10 } },
+  { name: 'Olej rzepakowy',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 10, lyzeczka: 5 } },
   { name: 'Majonez',              kcal: 680, protein: 1,   unit: 'lyzka',    unitGrams: { lyzka: 15 } },
   { name: 'Ketchup',              kcal: 110, protein: 1.2, sugar: 22, unit: 'lyzka',    unitGrams: { lyzka: 15 } },
-  { name: 'Musztarda',            kcal: 100, protein: 5,   unit: 'lyzeczka', unitGrams: { lyzeczka: 6 } },
+  { name: 'Musztarda',            kcal: 100, protein: 5,   unit: 'lyzeczka', unitGrams: { lyzeczka: 6, lyzka: 15 } },
   { name: 'Śmietana 18%',         kcal: 180, protein: 2.5, sugar: 3,  unit: 'lyzka',    unitGrams: { lyzka: 15 } },
   { name: 'Hummus',               kcal: 230, protein: 8,   unit: 'lyzka',    unitGrams: { lyzka: 25 } },
   { name: 'Ryż biały (gotowany)', kcal: 130, protein: 2.7, unit: 'porcja',   unitGrams: { porcja: 150 } },
@@ -291,7 +272,6 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Chleb tostowy',        kcal: 265, protein: 8,   sugar: 4,  unit: 'kromka',   unitGrams: { kromka: 25 } },
   { name: 'Bułka kajzerka',       kcal: 280, protein: 9,   unit: 'szt',      unitGrams: { szt: 50 } },
   { name: 'Tortilla (placek)',    kcal: 300, protein: 8,   unit: 'szt',      unitGrams: { szt: 60 } },
-  { name: 'Awokado',              kcal: 160, protein: 2,   unit: 'szt',      unitGrams: { szt: 150 } },
   { name: 'Winogrona',            kcal: 69,  protein: 0.7, sugar: 16, unit: 'garsc',    unitGrams: { garsc: 80 } },
   { name: 'Truskawki',            kcal: 33,  protein: 0.7, sugar: 5,  unit: 'garsc',    unitGrams: { garsc: 100 } },
   { name: 'Borówki',              kcal: 57,  protein: 0.7, sugar: 10, unit: 'garsc',    unitGrams: { garsc: 80 } },
@@ -387,24 +367,184 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Kurczak w cieście (KFC-style)', kcal: 280, protein: 17, unit: 'szt', unitGrams: { szt: 100 } },
   { name: 'Falafel',              kcal: 330, protein: 13,  unit: 'szt',      unitGrams: { szt: 17 } },
   { name: 'Gyros (danie)',        kcal: 200, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 300 } },
+
+  // ── Rozbudowa 2026-10-05 (user: "pododawaj produktów mnóstwo typu Passata pomidorowa i
+  // wgle bo brakuje") — wypełnia realnie puste kategorie, które `FOOD_SUBCATS`/`getFoodTags`
+  // (receiptParser.ts) od dawna rozpoznają, ale baza nigdy nie dała im żadnej reprezentacji:
+  // sosy (passata — dokładny przykład usera — plus reszta kuchennej klasyki), przyprawy,
+  // konserwy i przetwory, mrożonki, produkty sypkie/oleje, więcej nabiału/napojów/przekąsek,
+  // kuchnia świata. Wartości "na oko" jak reszta bazy (produkty pakowane, ±10-15%).
+
+  // ── Sosy ───────────────────────────────────────────────────────────────────
+  { name: 'Passata pomidorowa',   kcal: 33,  protein: 1.5, sugar: 5,  unit: 'porcja',   unitGrams: { porcja: 100, szklanka: 240 } },
+  { name: 'Pomidory krojone (puszka)', kcal: 25, protein: 1.2, sugar: 4, unit: 'porcja', unitGrams: { porcja: 100 } },
+  { name: 'Koncentrat pomidorowy', kcal: 82,  protein: 4.3, sugar: 12, unit: 'lyzka',   unitGrams: { lyzka: 18 } },
+  { name: 'Sos pomidorowy (do makaronu)', kcal: 60, protein: 1.5, sugar: 7, unit: 'porcja', unitGrams: { porcja: 125 } },
+  { name: 'Sos sojowy',           kcal: 60,  protein: 6,   sugar: 4,  unit: 'lyzka',    unitGrams: { lyzka: 18, lyzeczka: 6 } },
+  { name: 'Sos czosnkowy',        kcal: 320, protein: 1.5, sugar: 5,  unit: 'lyzka',    unitGrams: { lyzka: 18 } },
+  { name: 'Sos BBQ',              kcal: 150, protein: 0.8, sugar: 30, unit: 'lyzka',    unitGrams: { lyzka: 18 } },
+  { name: 'Sos słodko-kwaśny',    kcal: 130, protein: 0.3, sugar: 28, unit: 'lyzka',    unitGrams: { lyzka: 18 } },
+  { name: 'Sos winegret',         kcal: 340, protein: 0.3, unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Sos teriyaki',         kcal: 90,  protein: 2,   sugar: 16, unit: 'lyzka',    unitGrams: { lyzka: 18 } },
+  { name: 'Pesto zielone',        kcal: 440, protein: 4,   unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Pesto czerwone',       kcal: 380, protein: 3,   unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Chrzan tarty',         kcal: 85,  protein: 3,   unit: 'lyzeczka', unitGrams: { lyzeczka: 10, lyzka: 20 } },
+  { name: 'Dressing vinegrette',  kcal: 300, protein: 0.2, unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Sos tatarski',         kcal: 400, protein: 1,   unit: 'lyzka',    unitGrams: { lyzka: 18 } },
+  { name: 'Sriracha',             kcal: 93,  protein: 2,   sugar: 12, unit: 'lyzeczka', unitGrams: { lyzeczka: 6, lyzka: 18 } },
+
+  // ── Przyprawy ──────────────────────────────────────────────────────────────
+  { name: 'Sól',                  kcal: 0,   protein: 0,   unit: 'lyzeczka', unitGrams: { lyzeczka: 6, lyzka: 18 } },
+  { name: 'Pieprz czarny mielony', kcal: 251, protein: 10, unit: 'lyzeczka', unitGrams: { lyzeczka: 3 } },
+  { name: 'Papryka słodka (przyprawa)', kcal: 282, protein: 14, unit: 'lyzeczka', unitGrams: { lyzeczka: 2 } },
+  { name: 'Papryka ostra (przyprawa)', kcal: 282, protein: 14, unit: 'lyzeczka', unitGrams: { lyzeczka: 2 } },
+  { name: 'Czosnek granulowany',  kcal: 331, protein: 17, unit: 'lyzeczka', unitGrams: { lyzeczka: 3 } },
+  { name: 'Cebula suszona',       kcal: 341, protein: 10, unit: 'lyzeczka', unitGrams: { lyzeczka: 3 } },
+  { name: 'Zioła prowansalskie',  kcal: 260, protein: 8,  unit: 'lyzeczka', unitGrams: { lyzeczka: 1.5 } },
+  { name: 'Cynamon',              kcal: 247, protein: 4,  unit: 'lyzeczka', unitGrams: { lyzeczka: 2.5 } },
+  { name: 'Wanilia (cukier wanilinowy)', kcal: 325, protein: 0, sugar: 80, unit: 'lyzeczka', unitGrams: { lyzeczka: 4, szt: 16 } },
+  { name: 'Kurkuma',              kcal: 312, protein: 8,  unit: 'lyzeczka', unitGrams: { lyzeczka: 3 } },
+  { name: 'Oregano suszone',      kcal: 265, protein: 9,  unit: 'lyzeczka', unitGrams: { lyzeczka: 1 } },
+  { name: 'Bazylia suszona',      kcal: 251, protein: 23, unit: 'lyzeczka', unitGrams: { lyzeczka: 1 } },
+  { name: 'Proszek do pieczenia', kcal: 53,  protein: 0,  unit: 'lyzeczka', unitGrams: { lyzeczka: 4 } },
+  { name: 'Kostka rosołowa',      kcal: 240, protein: 7,  unit: 'szt',      unitGrams: { szt: 10 } },
+
+  // ── Konserwy i przetwory ───────────────────────────────────────────────────
+  { name: 'Fasolka po bretońsku (konserwa)', kcal: 100, protein: 5, unit: 'porcja', unitGrams: { porcja: 300 } },
+  { name: 'Groszek z marchewką (konserwa)', kcal: 65, protein: 4, unit: 'porcja',  unitGrams: { porcja: 150 } },
+  { name: 'Kukurydza konserwowa', kcal: 86,  protein: 3,   unit: 'lyzka',    unitGrams: { lyzka: 20, porcja: 150 } },
+  { name: 'Pomidory suszone (w oleju)', kcal: 258, protein: 4, unit: 'porcja', unitGrams: { porcja: 30 } },
+  { name: 'Oliwki czarne',        kcal: 115, protein: 1,   unit: 'porcja',   unitGrams: { porcja: 30 } },
+  { name: 'Oliwki zielone',       kcal: 145, protein: 1,   unit: 'porcja',   unitGrams: { porcja: 30 } },
+  { name: 'Papryka konserwowa',   kcal: 25,  protein: 1,   unit: 'porcja',   unitGrams: { porcja: 50 } },
+  { name: 'Dżem truskawkowy',     kcal: 250, protein: 0.4, sugar: 55, unit: 'lyzka', unitGrams: { lyzka: 20 } },
+  { name: 'Powidła śliwkowe',     kcal: 220, protein: 0.6, sugar: 45, unit: 'lyzka', unitGrams: { lyzka: 20 } },
+
+  // ── Mrożonki ───────────────────────────────────────────────────────────────
+  { name: 'Mieszanka warzywna mrożona', kcal: 45, protein: 2.5, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Groszek mrożony',      kcal: 70,  protein: 5,   unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Szpinak mrożony',      kcal: 25,  protein: 3,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Brokuł mrożony',       kcal: 30,  protein: 3,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Frytki mrożone (surowe)', kcal: 165, protein: 3, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Pierogi mrożone (ruskie)', kcal: 195, protein: 5, unit: 'szt',  unitGrams: { szt: 30 } },
+  { name: 'Pizza mrożona',        kcal: 250, protein: 10,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Lody w wiaderku (waniliowe)', kcal: 207, protein: 3.5, sugar: 21, unit: 'porcja', unitGrams: { porcja: 100 } },
+  { name: 'Owoce mrożone (mix)',  kcal: 50,  protein: 0.8, sugar: 9,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+
+  // ── Produkty sypkie / oleje (dobitka) ──────────────────────────────────────
+  { name: 'Mąka kukurydziana',    kcal: 361, protein: 7,   unit: 'lyzka',    unitGrams: { szklanka: 160, lyzka: 10 } },
+  { name: 'Skrobia ziemniaczana', kcal: 343, protein: 0.4, unit: 'lyzka',    unitGrams: { lyzka: 12 } },
+  { name: 'Drożdże świeże',       kcal: 105, protein: 12,  unit: 'szt',      unitGrams: { szt: 42 } },
+  { name: 'Olej kokosowy',        kcal: 862, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13 } },
+  { name: 'Smalec',               kcal: 897, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13 } },
+  { name: 'Margaryna',            kcal: 530, protein: 0.2, unit: 'lyzka',    unitGrams: { lyzka: 10, lyzeczka: 4 } },
+
+  // ── Nabiał (dobitka) ───────────────────────────────────────────────────────
+  { name: 'Jogurt pitny',         kcal: 65,  protein: 3,   sugar: 10, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Serek kanapkowy',      kcal: 230, protein: 7,   unit: 'lyzka',    unitGrams: { lyzka: 20, szt: 150 } },
+  { name: 'Ser pleśniowy (camembert/brie)', kcal: 300, protein: 20, unit: 'porcja', unitGrams: { porcja: 30 } },
+  { name: 'Mleko sojowe',         kcal: 33,  protein: 3,   sugar: 1,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Mleko migdałowe',      kcal: 24,  protein: 0.5, sugar: 2,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Mleko kokosowe (napój)', kcal: 23, protein: 0.2, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Mleko kokosowe (puszka, do gotowania)', kcal: 230, protein: 2.3, unit: 'porcja', unitGrams: { porcja: 100 } },
+  { name: 'Serek Danio',          kcal: 110, protein: 8,   sugar: 13, unit: 'szt',      unitGrams: { szt: 140 } },
+
+  // ── Napoje (dobitka 2) ─────────────────────────────────────────────────────
+  { name: 'Woda smakowa',         kcal: 20,  protein: 0,   sugar: 4,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Kombucha',             kcal: 30,  protein: 0,   sugar: 6,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Piwo bezalkoholowe',   kcal: 25,  protein: 0.4, sugar: 5,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Wino białe',           kcal: 82,  protein: 0.1, unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Smoothie owocowe',     kcal: 60,  protein: 0.8, sugar: 13, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Sok pomidorowy',       kcal: 21,  protein: 0.9, sugar: 3,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Sok multiwitamina',    kcal: 48,  protein: 0.4, sugar: 10, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Herbata mrożona (ice tea)', kcal: 32, protein: 0, sugar: 8, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+
+  // ── Przekąski (dobitka) ────────────────────────────────────────────────────
+  { name: 'Popcorn (maślany)',    kcal: 480, protein: 7,   unit: 'garsc',    unitGrams: { garsc: 25 } },
+  { name: 'Precelki',             kcal: 380, protein: 10,  unit: 'garsc',    unitGrams: { garsc: 25 } },
+  { name: 'Batonik musli',        kcal: 400, protein: 7,   sugar: 25, unit: 'szt',  unitGrams: { szt: 30 } },
+  { name: 'Batonik proteinowy',   kcal: 370, protein: 30,  sugar: 15, unit: 'szt',  unitGrams: { szt: 50 } },
+  { name: 'Chipsy warzywne',      kcal: 500, protein: 5,   unit: 'garsc',    unitGrams: { garsc: 25 } },
+  { name: 'Hummus z chipsami pita', kcal: 300, protein: 8, unit: 'porcja',   unitGrams: { porcja: 150 } },
+
+  // ── Kuchnia świata ─────────────────────────────────────────────────────────
+  { name: 'Pad Thai',             kcal: 170, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 350 } },
+  { name: 'Ramen',                kcal: 130, protein: 6,   unit: 'porcja',   unitGrams: { porcja: 400 } },
+  { name: 'Pho (zupa wietnamska)', kcal: 90, protein: 7,   unit: 'porcja',   unitGrams: { porcja: 400 } },
+  { name: 'Burrito',              kcal: 210, protein: 9,   unit: 'szt',      unitGrams: { szt: 250 } },
+  { name: 'Tacos',                kcal: 220, protein: 10,  unit: 'szt',      unitGrams: { szt: 100 } },
+  { name: 'Nachos z guacamole',   kcal: 300, protein: 5,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Guacamole',            kcal: 160, protein: 2,   unit: 'lyzka',    unitGrams: { lyzka: 20 } },
+  { name: 'Zestaw sushi (8 kawałków)', kcal: 145, protein: 5, unit: 'porcja', unitGrams: { porcja: 240 } },
+  { name: 'Curry czerwone z ryżem', kcal: 140, protein: 6, unit: 'porcja',   unitGrams: { porcja: 350 } },
+  { name: 'Hummus z pitą',        kcal: 250, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 180 } },
+  { name: 'Shakshuka',            kcal: 100, protein: 6,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Carbonara',            kcal: 190, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Lasagne',              kcal: 150, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Paella',               kcal: 160, protein: 9,   unit: 'porcja',   unitGrams: { porcja: 350 } },
 ];
 
-// Fuzzy-ish search over the base: normalized substring + token match, ranked so a
-// name that STARTS with the query beats one that merely contains it. Returns up to
-// `limit` best matches (all when the query is empty, capped).
+// Levenshtein (edit distance) — ciasna pętla DP, zero zależności, bezpieczne na krótkich
+// nazwach produktów/tokenach (zwykle <15 znaków) które są jedynym wejściem tutaj (2026-10-05,
+// user: "brakuje lepsze wyszukiwanie moze wtedy"). Używane WYŁĄCZNIE jako ostatni,
+// najsłabszy fallback w `foodMatchScore` niżej, żeby literówka ("pomidorwa", "keczup")
+// wciąż coś pokazała zamiast pustej listy wyników.
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp: number[] = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) dp[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prevDiag = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prevDiag : 1 + Math.min(prevDiag, dp[j], dp[j - 1]);
+      prevDiag = tmp;
+    }
+  }
+  return dp[b.length];
+}
+// Token zapytania "fuzzy pasuje" do tokenu nazwy, gdy są na tyle blisko, że to niemal na
+// pewno to samo słowo z literówką — tolerancja rośnie z długością (krótkie słowa, gdzie 1
+// literówka to spory % zmiany, zostają surowe; dłuższe dostają więcej luzu). Token <3 znaki
+// wymaga dokładnego dopasowania — za krótki, żeby fuzzy miało sens (złapałby prawie wszystko).
+function fuzzyTokenHit(nameToks: string[], qt: string): boolean {
+  if (qt.length < 3) return nameToks.includes(qt);
+  const maxDist = qt.length <= 5 ? 1 : 2;
+  return nameToks.some(nt => Math.abs(nt.length - qt.length) <= maxDist && levenshtein(qt, nt) <= maxDist);
+}
+
+// Wspólna skala dopasowania, reużywana TU (baza) i w `app/food/add.tsx` (własne produkty
+// usera) — jeden algorytm "co to znaczy lepsze dopasowanie", nie dwa osobne mogące się
+// rozjechać (2026-10-05, ten sam audyt co literówki wyżej: szukanie we własnych produktach
+// dotąd w ogóle nie sortowało wyników wg trafności, tylko wg kolejności w store). Wejścia
+// już znormalizowane (`normalizeProductName`) — wywołujący odpowiada za normalizację.
+export function foodMatchScore(normalizedName: string, normalizedQuery: string): number {
+  if (!normalizedQuery) return 0;
+  if (normalizedName === normalizedQuery) return 100;
+  if (normalizedName.startsWith(normalizedQuery)) return 70;
+  if (normalizedName.includes(normalizedQuery)) return 45;
+  const toks = normalizedQuery.split(' ').filter(Boolean);
+  if (toks.every(t => normalizedName.includes(t))) return 30;
+  const nameToks = normalizedName.split(' ');
+  if (toks.every(t => fuzzyTokenHit(nameToks, t))) return 15;
+  return 0;
+}
+
+// Wyszukiwanie po bazie: normalizowany substring + dopasowanie tokenów + fallback na
+// literówki (patrz `foodMatchScore`), ranked tak, że nazwa zaczynająca się od zapytania
+// wygrywa z tą, która je tylko zawiera. Zwraca do `limit` najlepszych trafień (wszystko przy
+// pustym zapytaniu, ucięte do limitu).
 export function searchFoodBase(query: string, limit = 30): BaseFood[] {
   const q = normalizeProductName(query);
   if (!q) return FOOD_BASE.slice(0, limit);
-  const toks = q.split(' ').filter(Boolean);
   const scored: { f: BaseFood; score: number }[] = [];
   for (const f of FOOD_BASE) {
     const nk = normalizeProductName(f.name);
-    let score = 0;
-    if (nk === q) score = 100;
-    else if (nk.startsWith(q)) score = 70;
-    else if (nk.includes(q)) score = 45;
-    else if (toks.every(t => nk.includes(t))) score = 30;
-    if (score > 0) { score -= f.name.length * 0.1; scored.push({ f, score }); }
+    const base = foodMatchScore(nk, q);
+    if (base > 0) scored.push({ f, score: base - f.name.length * 0.1 });
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map(s => s.f);
