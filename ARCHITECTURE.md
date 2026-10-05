@@ -14614,6 +14614,74 @@ zdania.
 
 ---
 
+---
+
+## 259. Plan zajęć: ciemniejszy kafelek, podświetlenie "TERAZ", zadania powiązane z zajęciami (2026-10-06)
+
+User: "w planie możesz trochę ciemniejszy na dashboardzie tło, i wtedy dodac ze jak jestem to
+pokazuje podświetla aktualny i ze mogę dodać zadania jakby powiązane z przedmiotem w
+konkretnej dacie np prezentacja za tydzień u kogoś mog zaznaczyć i to sie pokazuje na planie i
+przypomina przed zajęciami". Trzy osobne zmiany w jednej rundzie.
+
+**Ciemniejszy kafelek dashboardu** — `CLASS_GRADIENT` w `ClassScheduleCard.tsx` przyciemniony
+~20% na każdym z 3 stopów (`#3D2A66/#5B3FA0/#140D26` → `#2E2050/#47337F/#0D091C`). Kontrast
+białego tekstu nienaruszony (te same wartości alpha na wszystkich warstwach tekstu).
+
+**Podświetlenie "TERAZ"** — nowa czysta funkcja `isHappeningNow(ev, now)` w `classSchedule.ts`:
+ten sam dzień + `now`'s HH:mm mieści się w `[startTime, endTime)` (granica końca OTWARTA —
+zajęcia które się właśnie skończyły już nie "trwają"). Użyta w DWÓCH miejscach:
+`ClassScheduleCard.tsx` (kafelek dashboardu, sekcja "Dziś") i `app/class-schedule.tsx` (widok
+dnia/tygodnia) — oba tickują `now` co minutę (`setInterval` 60s), wystarczająco często żeby
+podświetlenie zgasło/zapaliło się bez zauważalnego opóźnienia. Wizualnie: fioletowy wash tła
+wiersza + plakietka "TERAZ".
+
+**Zadania powiązane z zajęciami** — nowe pola na `Task` (`src/types/index.ts`): `classEventId`
+(id konkretnego wystąpienia z `gcalEvents`), `classEventLabel` (cache'owana etykieta typu "Pon
+12.10 · 08:00 · Przedmiot" — PRZEŻYWA skasowanie źródłowego eventu z Kalendarza Google, bo plan
+musi dalej pokazywać coś sensownego), `classReminderMinutesBefore` (ile minut przed startem
+zajęć ma odpalić przypomnienie).
+
+- Nowy `src/components/tasks/ClassLinkPicker.tsx` — modal wyboru KONKRETNEGO wystąpienia z
+  planu (najbliższe 60 dni, pogrupowane po dniu, te same `gcalEvents`+`isClassEvent` co pełny
+  plan). Wpięty w `app/tasks/add.tsx` i `app/tasks/[id].tsx`, widoczny TYLKO gdy przypomnienie
+  jest włączone (powiązanie z zajęciami to w praktyce specyficzny sposób WYLICZENIA kiedy
+  przypomnienie ma odpalić, nie osobna funkcja).
+- Nowa `computeClassReminder(ev, minutesBefore)` w `classSchedule.ts` — czysta funkcja licząca
+  `reminderDate`/`reminderTime` WSTECZ od startu wybranego wystąpienia (obsługuje przejście
+  przez północ). **Celowo reużywa ISTNIEJĄCY mechanizm przypomnień zadań**
+  (`reminderDate`/`reminderTime`/`scheduleCustomTaskReminder`) zamiast nowej ścieżki
+  powiadomień — wybranie zajęć + "30 min przed" po prostu WYPEŁNIA te same pola, które user
+  mógłby i tak wpisać ręcznie. Chip-selector 15/30/60 min przelicza datę/godzinę na żywo.
+- `app/class-schedule.tsx`: nowa `tasksByClassEventId` (z `useTasks()`, pomija zadania
+  `done` — zrobione nie zaśmiecają planu) — każdy wiersz zajęć z powiązanym zadaniem pokazuje
+  flagową plakietkę z tytułem zadania pod salą, tap → `/tasks/[id]`.
+- Edycja zadania (`[id].tsx`) odtwarza etykietę z `task.classEventLabel` (cache) i resolve'uje
+  pełny event z `gcalEvents` po `classEventId` TYLKO gdy trzeba przeliczyć nowe "ile min
+  przed" — jeśli źródłowy event już nie istnieje w kalendarzu, cache'owana etykieta i tak się
+  pokazuje, po prostu nie da się już zmienić offsetu bez ponownego powiązania.
+
+**Znana, zaakceptowana granica** (ta sama co przy innych polach `Task` czyszczonych przez
+`undefined`, np. istniejące `counterId: undefined` w `app/counters/[id].tsx`): odpięcie zajęć
+(`unlinkClass`) czyści pole lokalnie i w UI natychmiast, ale `strip()` w `calendarService.ts`
+usuwa klucze o wartości `undefined` PRZED wysyłką do Firestore — więc zdalny dokument
+technicznie wciąż ma stare `classEventId` do czasu kolejnego pełnego nadpisania tego pola.
+Nie nowy problem wprowadzony tą rundą, istniejący wzorzec w całym `tasksService`/`notesService`.
+
+**Testy**: rozszerzony `__tests__/classSchedule.test.ts` (+15 testów —
+`isHappeningNow`/`computeClassReminder`/`fmtClassEventLabel`, w tym granice przedziału
+czasowego i przejście przez północ). `tsc --noEmit` czyste, `jest --silent` 99/99 suite, 1265
+testów (+15 netto licząc wcześniejsze rundy tej sesji).
+
+**Priorytet testu na urządzeniu — wysoki** (dotyka powiadomień, UI na dwóch ekranach, nowe
+pola na Task): Dashboard → sprawdź przyciemniony kafelek Plan zajęć; w trakcie trwających
+zajęć → sprawdź plakietkę "TERAZ" (dashboard + pełny plan, zarówno widok dnia jak i tygodnia).
+Dodaj nowe zadanie → włącz przypomnienie → "Powiąż z zajęciami" → wybierz wystąpienie → sprawdź
+że data/godzina przypomnienia przeliczyła się na "X min przed" → zapisz → sprawdź że w Planie
+zajęć to zadanie pokazuje się pod odpowiednim wierszem → poczekaj na powiadomienie (albo ustaw
+bliski termin testowo) → sprawdź że faktycznie przychodzi o wyliczonej porze.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

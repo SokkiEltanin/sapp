@@ -283,6 +283,9 @@ export interface Task {
   reminderDate?: string;    // YYYY-MM-DD — day the reminder fires; independent of deadline
   reminderMessage?: string; // custom notification text
   counterId?: string;       // linked to a Counter (odliczanie) — see app/counters/[id].tsx
+  classEventId?: string;         // linked Plan zajęć occurrence (gcalEvents id) — see classSchedule.ts
+  classEventLabel?: string;      // cached "Pon 12.10 · 8:00 · Przedmiot" — survives the gcal event being deleted later
+  classReminderMinutesBefore?: number; // minutes before class start the reminder fires (only with classEventId)
   createdAt: string;
   updatedAt: string;
 }

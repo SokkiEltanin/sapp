@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL, ChevronDown, ChevronUp, Trash2, Square, CheckSquare } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, ChevronLeft as ChevronL, ChevronDown, ChevronUp, Trash2, Square, CheckSquare, Flag } from 'lucide-react-native';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, ClassType } from '@/utils/classSchedule';
+import { useTasks } from '@/hooks/useTasks';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, ClassType, isHappeningNow } from '@/utils/classSchedule';
 import { toYMD, addDays, mondayOf, fmtWeekRange, fmtDayLabel, fmtMonthLabel, monthGrid } from '@/utils/weekGrid';
 import { CalendarEvent } from '@/types';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -50,6 +51,28 @@ export default function ClassSchedule() {
   const gcalEvents = useCalendarStore(st => st.gcalEvents);
   const deleteEvents = useCalendarStore(st => st.deleteEvents);
   const classPrefix = useClassScheduleStore(st => st.prefix);
+
+  // "Podświetl aktualny" (2026-10-06) — ten sam wzorzec co w `ClassScheduleCard.tsx`
+  // (dashboard): `now` tickowany co minutę, reużywany przez widok dnia i tygodnia.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Zadania powiązane z konkretnym wystąpieniem zajęć (2026-10-06, user: "mogę dodać
+  // zadania jakby powiązane z przedmiotem w konkretnej dacie... i to się pokazuje na
+  // planie") — zrobione (status 'done') NIE pokazują się już na planie, po co zaśmiecać.
+  const { tasks } = useTasks();
+  const tasksByClassEventId = useMemo(() => {
+    const map = new Map<string, typeof tasks>();
+    for (const t of tasks) {
+      if (!t.classEventId || t.status === 'done') continue;
+      const arr = map.get(t.classEventId);
+      if (arr) arr.push(t); else map.set(t.classEventId, [t]);
+    }
+    return map;
+  }, [tasks]);
 
   // "Usuń wszystkie" (2026-10-01, user: "zmienia mi się plan... żebym mógł usunąć
   // wszystkie eventy z kalendarza jednym przyciskiem złapane i wtedy żebym mógł wgrać
@@ -179,16 +202,32 @@ export default function ClassSchedule() {
   const renderEventRow = (ev: CalendarEvent) => {
     const parsed = parseClassEvent(ev.title, classPrefix);
     const color = parsed?.type ? TYPE_COLOR[parsed.type] : c.text.muted;
+    const live = isHappeningNow(ev, now);
+    const linkedTasks = tasksByClassEventId.get(ev.id) ?? [];
     return (
-      <View key={ev.id} style={[s.evRow, { borderLeftColor: color }]}>
+      <View key={ev.id} style={[s.evRow, { borderLeftColor: color }, live && s.evRowLive]}>
         <View style={s.evTimeCol}>
           <Text style={[s.evTime, { color }]}>{ev.startTime ?? '—'}</Text>
           {ev.endTime ? <Text style={s.evTimeEnd}>{ev.endTime}</Text> : null}
         </View>
         <View style={s.evBody}>
-          {parsed?.type && <Text style={[s.evType, { color }]}>{CLASS_TYPE_LABEL[parsed.type]}</Text>}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+            {parsed?.type && <Text style={[s.evType, { color }]}>{CLASS_TYPE_LABEL[parsed.type]}</Text>}
+            {live && <View style={s.liveBadge}><Text style={s.liveBadgeTxt}>TERAZ</Text></View>}
+          </View>
           <Text style={s.evSubject} numberOfLines={2}>{parsed?.subject ?? ev.title}</Text>
           {parsed?.room && <Text style={s.evRoom}>{parsed.room}</Text>}
+          {linkedTasks.map(t => (
+            <TouchableOpacity
+              key={t.id}
+              onPress={() => { haptic.tap(); router.push(`/tasks/${t.id}` as any); }}
+              style={s.linkedTaskRow}
+              activeOpacity={0.7}
+            >
+              <Flag size={10} color="#A78BFA" />
+              <Text style={s.linkedTaskText} numberOfLines={1}>{t.title}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     );
@@ -428,6 +467,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   // ── Wiersz eventu — reużyty przez widok dnia i tygodnia ──────────────────────
   evRow: { flexDirection: 'row', gap: spacing[3], borderLeftWidth: 3, paddingLeft: spacing[3], paddingVertical: spacing[2] },
+  evRowLive: { backgroundColor: '#A78BFA14', borderRadius: radius.md },
   evTimeCol: { width: 48 },
   evTime: { fontSize: 13, fontWeight: '800' },
   evTimeEnd: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
@@ -435,6 +475,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   evType: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   evSubject: { fontSize: 13, color: c.text.primary, fontWeight: '600', lineHeight: 17 },
   evRoom: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
+  liveBadge: { backgroundColor: '#A78BFA', borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 1 },
+  liveBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#140D26', letterSpacing: 0.4 },
+  linkedTaskRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  linkedTaskText: { fontSize: 11, color: '#A78BFA', fontWeight: '600', flexShrink: 1 },
 
   // ── Widok miesiąca — siatka kalendarza ────────────────────────────────────────
   monthWrap: { paddingHorizontal: spacing[4], paddingBottom: spacing[6] },
