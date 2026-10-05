@@ -3,7 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: pigułki-nudge nawyków pokazywały auto-śledzone "BEZ SŁODYCZY NIE ZAZNACZONY" (2026-10-04)
+## 🆕 Nagroda za głaskanie (skrzynka sardynek) skaluje się z poziomem (2026-10-04)
+
+User: "to za glaskanie pupila tez powinno iść z levelem i dawać więcej... bo teraz dropi 1
+manetka na 26 lvl bez sensu bo to ponad 300 dni zeby upgrada zrobic". Pełny opis w
+ARCHITECTURE.md §253. Nagroda za wypełnienie dziennego paska afekcji (głaskanie) była jedyną
+w CAŁEJ grze bez żadnego skalowania poziomem: stałe +8 XP (`petCat()`) i stałe kwoty coinów
+w obrębie tieru skrzynki (`rollCrate()` w crates.ts, zasilane WYŁĄCZNIE z głaskania — zero
+wpływu na sklepowe skrzynki, osobny system). Oba mnożą teraz przez ten sam `questRewardMult`
+co zwykłe questy (Lv26 ≈2.125×: basic 1-2→2-4 coinów, legendary 100→213, XP 8→~17). Nowe
+testy `petCat.test.ts` (+4) i rozszerzony `crates.test.ts` (+4). `tsc`/`jest` czyste (95/95
+suite, 1212 testów, +8).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: na koncie z wyższym poziomem (20+) głaszcz do
+pełnego paska → sprawdź wyższe XP niż na nowym koncie; otwórz kilka skrzynek sardynek →
+sprawdź że kwoty coinów w tym samym tierze są wyraźnie wyższe niż dawne 1-2/5-10/20-35/100.
+
+## ✅ Fix: pigułki-nudge nawyków pokazywały auto-śledzone "BEZ SŁODYCZY NIE ZAZNACZONY" (2026-10-04)
 
 User zrzutem: "jaka seria ze słodyczami przecież to czy zjem czy nie sam nie zaznaczam jakby
 wtf?". Pełny opis w ARCHITECTURE.md §252. `TopPill.tsx` i kafelek `habits-nudge` w

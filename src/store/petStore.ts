@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
-import { weekKeyOf } from '@/utils/quests';
+import { weekKeyOf, questRewardMult } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
@@ -649,16 +649,22 @@ export const usePetStore = create<PetState>()(
       // Tap-to-pet: fills the daily affection bar; the first time it hits 100 today
       // it grants a sardine crate to open (+ a little XP). Returns the new value +
       // whether the crate just dropped.
+      //
+      // XP skalowane poziomem (2026-10-04, user: "glaskanie pupila tez powinno iść z levelem
+      // i dawać więcej") — dawne stałe +8 XP było JEDYNĄ codzienną nagrodą w całej grze bez
+      // żadnego wzrostu z poziomem. Ten sam `questRewardMult` co zwykłe questy (patrz też
+      // `rollCrate` w crates.ts, która dostała identyczny fix dla coinów skrzynki).
       petCat: (inc) => {
         const t = todayISO();
         const s = get();
         const base = s.affectionDay === t ? s.affection : 0; // reset on a new day
         const value = Math.min(100, base + inc);
         const justFull = value >= 100 && s.affectionRewardDay !== t;
+        const petXp = Math.round(8 * questRewardMult(levelFromXp(s.xp).level));
         set({
           affection: value,
           affectionDay: t,
-          ...(justFull ? { affectionRewardDay: t, xp: s.xp + xpWithPotion(s, 8), pendingCrates: (s.pendingCrates ?? 0) + 1 } : {}),
+          ...(justFull ? { affectionRewardDay: t, xp: s.xp + xpWithPotion(s, petXp), pendingCrates: (s.pendingCrates ?? 0) + 1 } : {}),
         });
         return { value, justFull };
       },
@@ -672,7 +678,8 @@ export const usePetStore = create<PetState>()(
       openCrate: () => {
         const s = get();
         if ((s.pendingCrates ?? 0) <= 0) return null;
-        const roll = rollCrate();
+        const level = levelFromXp(s.xp).level;
+        const roll = rollCrate(level);
         // Szansa na item bojowy TIEROWANA wg tieru skrzynki (2026-08-18, patrz komentarz przy
         // COMBAT_ITEM_DROP_CHANCE_BY_TIER w crates.ts) — niższe/gorsze tiery dają TYLKO nowy
         // nieposiadany item (poziom 1); epic/legendary PREFERUJĄ ulepszenie już posiadanego
@@ -704,7 +711,6 @@ export const usePetStore = create<PetState>()(
         let gearDropped: { itemId: string; name: string; rarity: GearRarity; value: number } | null = null;
         const sardineBox = boxById('sardine');
         if (Math.random() < sardineBox.gearChance) {
-          const level = levelFromXp(s.xp).level;
           const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
           if (unlocked.length > 0) {
             const item = unlocked[Math.floor(Math.random() * unlocked.length)];
