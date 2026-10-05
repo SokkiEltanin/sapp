@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Unifikacja trzech silników korelacji humoru (2026-10-05)
+
+User: "dawaj dalej" — potwierdzenie po pytaniu, czy zunifikować 3 osobne silniki korelacji
+(zidentyfikowane jako "poza zakresem" w poprzedniej rundzie, patrz wpis niżej). Pełny opis w
+ARCHITECTURE.md §258. Dwa Pearson-silniki (`dashboard/correlations.ts` + `correlations.ts`)
+miały osobne, prawie identyczne implementacje matematyki — wydzielona jedna wspólna
+`pearsonCoeff()` w nowym `src/utils/statsPearson.ts`. MIN_N/MIN_R progi świadomie NIE
+zunifikowane (różne okna dni — 30 dni vs cała historia — to legitne, nie bug). Trzeci,
+fundamentalnie inny silnik (`buildPatterns` — różnica średnich, nie Pearson) wydzielony z
+inline w `app/(tabs)/mood.tsx` do nowego, testowalnego `src/utils/moodPatterns.ts` (razem z
+`extractKeywords`) — był kompletnie bez testów. Nowe testy: `statsPearson.test.ts` (4),
+`moodPatterns.test.ts` (9). Czysty refaktor — zero zmiany zachowania user-facing. `tsc`/
+`jest` czyste (99/99 suite, 1254 testów, +13).
+
+**🆕 Priorytet testu na urządzeniu — niski**: Dashboard → karty "Co na Ciebie wpływa" i
+"Zależności" nadal pokazują te same wnioski. Humor → karta "Wnioski" nadal te same zdania.
+
 ## 🆕 Humor: rozbudowa presetów tagów (26→56) + eksport mood/wydatków do CSV (2026-10-05)
 
 User: "rob to samo z humorem i daj moze możliwość eksportu danych żebym wrzucić ci gdzieś".
@@ -19,10 +36,8 @@ dodatkowy, czytelniejszy format. Nowe testy: `moodTags.test.ts` +7, nowy `moodCs
 podpowiedziach (np. "dumny", "wypalony", "pod presją"). Ustawienia → Kopia zapasowa →
 "Eksportuj humor (CSV)" → plik otwiera się w Excelu/Sheets, polskie znaki bez krzaków.
 
-**🆕 Odłożone, NIE w zakresie tej rundy** (zidentyfikowane, wymaga odrębnej decyzji usera):
-trzy osobne, niezsynchronizowane "silniki" korelacji dotykające mood (`utils/dashboard/
-correlations.ts`, `utils/correlations.ts`, inline `buildPatterns()` w `mood.tsx`) — każdy z
-własnymi, dryfującymi progami. Nie unifikowane w tej rundzie.
+**✅ Odłożone, NIE w zakresie tej rundy**: zrobione, patrz nowy wpis na górze tego pliku
+(unifikacja silników korelacji, 2026-10-05).
 
 ## 🆕 "Co zjadłem" baza produktów — runda 2: zupy, kurczak, pierogi, bazy (2026-10-05)
 

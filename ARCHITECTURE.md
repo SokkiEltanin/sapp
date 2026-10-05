@@ -14562,6 +14562,58 @@ otwiera w Excelu/Sheets z polskimi znakami bez krzaków i że kolumny się zgadz
 
 ---
 
+---
+
+## 258. Unifikacja trzech silników korelacji humoru (2026-10-05)
+
+User: "dawaj dalej" (potwierdzenie po pytaniu, czy zunifikować 3 osobne silniki korelacji
+zidentyfikowane w §257 jako "poza zakresem"). Trzy miejsca liczyły "co wpływa na humor",
+każde z WŁASNĄ logiką i progami, które dryfowały niezależnie:
+
+1. `src/utils/dashboard/correlations.ts` (`strongestLinks`) — Pearson, metryki sleep/mood/
+   energy/sweets/work/steps/weather, okno ostatnich 30 dni, MIN_N=5/MIN_R=0.35. Dashboard,
+   karta "Co na Ciebie wpływa".
+2. `src/utils/correlations.ts` (`correlationInsights`) — Pearson, metryki sleepH/steps/mood/
+   spend, CAŁA historia, MIN_N=8/MIN_R=0.35, gotowe polskie szablony tekstowe per para.
+   Dashboard, karta "Zależności".
+3. `buildPatterns()` inline w `app/(tabs)/mood.tsx` (linie ~690-845, ZERO testów) — różnica
+   średnich między dwiema grupami dni (np. praca vs wolne, dobrze vs źle spane noce) —
+   fundamentalnie INNA metoda statystyczna niż Pearson (odpowiada na "czy X różni się
+   istotnie między typem A i B", nie "czy X i Y rosną razem liniowo"). MIN_N=5, D_MOOD=0.45,
+   D_SPEND=60 (progi podniesione po dawnym feedbacku "korelacje w większości błędne").
+   Zakładka Humor, karta "Wnioski".
+
+**Co faktycznie zunifikowane, a co NIE** — #1 i #2 to dosłownie TA SAMA matematyka
+(Pearson) z dwiema osobnymi, prawie identycznymi implementacjami (realne ryzyko driftu:
+poprawka w jednej nie dotrze do drugiej). Wydzielona JEDNA wspólna `pearsonCoeff(xs, ys)`
+w nowym `src/utils/statsPearson.ts`, obie teraz jej używają. MIN_N/MIN_R **NIE
+zunifikowane do jednej wartości** — to NIE był bug: #1 patrzy tylko na 30 dni (potrzebuje
+niższego MIN_N=5, żeby cokolwiek się kiedykolwiek zakwalifikowało), #2 ciągnie z całej
+historii (może sobie pozwolić na MIN_N=8). Wymuszenie jednej wartości byłoby złą "naprawą"
+nieistniejącego buga — udokumentowane komentarzem w obu plikach, żeby nikt tego
+"nie poprawił" w przyszłości.
+
+#3 (`buildPatterns`) to inna metoda — NIE przerobiona na Pearsona (to zmieniłoby semantykę
+istniejących, user-facing wniosków), tylko wydzielona z inline w komponencie ekranu do
+nowego, czystego, testowalnego `src/utils/moodPatterns.ts` (razem z `extractKeywords` —
+którego `buildPatterns` wprost używa do linii "najczęściej stresują Cię"). Był to kod
+zupełnie bez testów mimo bycia realną, user-facing funkcją — teraz ma 9 testów.
+
+**Testy**: nowy `__tests__/statsPearson.test.ts` (4 testy — doskonała korelacja, brak
+wariancji→null nie 0, pusta lista, niezgodne długości). Nowy `__tests__/moodPatterns.test.ts`
+(9 testów — wykrywanie każdej kategorii wzorca, regression-guard na MIN_N/D_MOOD/D_SPEND
+wciąż odsiewający szum, limit 6 wniosków, zero wpisów→zero crashy). Istniejące
+`correlations.test.ts`/`dashboardCorrelations.test.ts` przechodzą bez zmian (zachowanie
+publicznych funkcji identyczne po refaktorze). `tsc --noEmit` czyste, `jest --silent`
+99/99 suite (+2 pliki), 1254 testów (+13).
+
+**Priorytet testu na urządzeniu — niski** (czysty refaktor, zero zmiany zachowania
+user-facing): Dashboard → sprawdź że karty "Co na Ciebie wpływa" i "Zależności" nadal
+pokazują te same wnioski co wcześniej. Humor → karta "Wnioski" nadal pokazuje te same
+zdania.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
