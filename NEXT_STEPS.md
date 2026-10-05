@@ -3,7 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Co zjadłem": auto-kategoria produktu reużywa paragonowy keyword-matcher (2026-10-05)
+## 🆕 "Co zjadłem": duży audyt bazy produktów + lepsze wyszukiwanie (2026-10-05)
+
+User: "musimy sie skupić ogólnie nad ulepszenie tego i to bardzo... pododawaj produktów
+mnóstwo typu Passata pomidorowa... brakuje lepsze wyszukiwanie". Mood świadomie odłożony
+("i pozniej zakładki humoru" — osobna, przyszła runda). Pełny opis w ARCHITECTURE.md §255.
+`foodBase.ts`: 19 grup zduplikowanych nazw wyczyszczone (niektóre z ROZBIEŻNYMI makro między
+kopiami), ~90 nowych wpisów (sosy w tym Passata, przyprawy, konserwy, mrożonki, kuchnia
+świata) — 310→380. Wyszukiwanie: nowa wspólna `foodMatchScore()` reużywana przez bazę ORAZ
+szukanie we WŁASNYCH produktach usera (które dotąd w ogóle nie sortowało wyników wg
+trafności — realny, osobny bug znaleziony przy okazji), plus fallback na literówki
+(Levenshtein). Nowy `__tests__/foodBase.test.ts` (+12 testów). `tsc`/`jest` czyste (96/96
+suite, 1229 testów, +12).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: Co zjadłem → szukaj "passata" → "Passata
+pomidorowa" powinna być pierwszym wynikiem; spróbuj z literówką ("pasata") → wciąż coś
+znajduje; jeśli masz dużo własnych produktów, sprawdź że wyszukiwanie wśród nich pokazuje
+trafne dopasowania jako pierwsze.
+
+**🆕 Odłożone na później (user: "i pozniej zakładki humoru")**: ta sama runda
+testy/research/ulepszenia dla zakładki "Humor" (mood) — jeszcze nietknięta.
+
+## ✅ "Co zjadłem": auto-kategoria produktu reużywa paragonowy keyword-matcher (2026-10-05)
 
 User: "Nadal nie lapie mi Kinder bueno, i wielu słodyczy jako slodycze wgle jak dodaje w co
 zjadlem... moze korzystać z tego co lapie baza produktow?". Pełny opis w ARCHITECTURE.md

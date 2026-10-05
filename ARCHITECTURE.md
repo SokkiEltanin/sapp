@@ -14403,6 +14403,67 @@ produkt" jak i przez szybkie dodawanie z poziomu "Co zjadłem"; sprawdzić że d
 
 ---
 
+## 255. "Co zjadłem": duży audyt bazy produktów + lepsze wyszukiwanie (2026-10-05)
+
+User: "musimy sie skupić ogólnie nad ulepszenie tego i to bardzo, tego co zjadlem... zrob
+testy reaserch i wgle co zjadlem pododawaj produktów mnóstwo typu Passata pomidorowa i wgle
+bo brakuje lepsze wyszukiwanie moze wtedy czy cos". Mood ("zakładki humoru") świadomie
+ODŁOŻONY na później, zgodnie z jawną kolejnością usera ("i pozniej zakładki humoru").
+
+**Audyt `src/data/foodBase.ts`** (310 wpisów przed tą sekcją) ujawnił dwa realne problemy:
+
+1. **19 grup zduplikowanych nazw produktów** (np. 'Parówki', 'Boczek wędzony', 'Mleko 2%',
+   'Majonez', 'Awokado', 'Winogrona'…), każda zaśmiecająca wyniki wyszukiwania DWIEMA
+   prawie-identycznymi kartami tego samego produktu, czasem z ROZBIEŻNYMI makro (np. 'Boczek
+   wędzony' 300 kcal/100g w jednym wpisie vs 500 kcal/100g w drugim — realnie sprzeczne dane,
+   nie tylko kosmetyczny duplikat). Wyczyszczone — przy każdej parze zachowany wpis z
+   bogatszymi/bardziej realistycznymi danymi (merge brakujących pól typu `sugar` tam gdzie
+   się dało), reszta usunięta. Zweryfikowane skryptem (node -e licząc wystąpienia `name:`) —
+   zero duplikatów po czyszczeniu, nie samo wizualne przejrzenie.
+2. **Puste kategorie mimo że `FOOD_TAG_MAP`/`getFoodTags` (receiptParser.ts) od dawna je
+   rozpoznaje**: sosy (ZERO wpisów — brak nawet samej "Passata pomidorowa", dokładny
+   przykład usera), przyprawy, konserwy i przetwory, mrożonki, kuchnia świata. ~90 nowych
+   wpisów wypełniających te dziury (passata, pesto, sos sojowy/BBQ/teriyaki/czosnkowy,
+   przyprawy sypkie, konserwy warzywne, mrożonki, kuchnia świata — pad thai/ramen/pho/
+   burrito/shakshuka/carbonara/lasagne, więcej nabiału roślinnego/napojów/przekąsek).
+   Baza: 310 → 380 wpisów netto (19 usuniętych duplikatów + ~90 nowych − kilka kolizji nazw
+   między nową sekcją a istniejącą, np. 'Wafle ryżowe' już istniało).
+
+**Lepsze wyszukiwanie** (`searchFoodBase`/nowa `foodMatchScore` w `foodBase.ts`):
+- Wydzielona wspólna funkcja `foodMatchScore(normalizedName, normalizedQuery)` — TA SAMA
+  skala trafności (dokładne=100 → zaczyna się od=70 → zawiera=45 → wszystkie tokeny=30 →
+  literówka=15 → brak=0) reużywana TERAZ w DWÓCH miejscach zamiast jednego: `searchFoodBase`
+  (baza) ORAZ nowy sort w `app/food/add.tsx`'s `curatedMatch` (własne produkty usera).
+- **Realny, osobny bug znaleziony przy tej okazji**: szukanie we WŁASNYCH produktach usera
+  (`curatedMatch` w add.tsx) w ogóle nie sortowało wyników wg trafności — zwykły
+  `.filter(x => x._norm.includes(nq))` bez żadnego `.sort()`, więc przy wielu zapisanych
+  produktach wyniki pokazywały się w przypadkowej kolejności store'u, nie "najlepsze
+  dopasowanie pierwsze". Teraz sortowane tym samym `foodMatchScore`, z `_rank` (świeżość/
+  częstość, już istniejące pole) jako tiebreakiem przy remisie.
+- **Fallback na literówki** — nowa `levenshtein()` (prosty DP, zero zależności) +
+  `fuzzyTokenHit()` (tolerancja edycyjna skalowana długością tokenu, krótkie <3 znaki
+  wymagają dokładnego dopasowania — inaczej fuzzy łapałoby prawie wszystko). Działa TYLKO
+  jako ostatni, najsłabszy próg (score 15, niżej niż jakikolwiek realny substring/token
+  hit) — literówka ("pasata pomidorowa" zamiast "passata") wciąż coś pokazuje zamiast pustej
+  listy, ale nie przebija prawdziwych dopasowań ani nie zalewa wyników śmieciem (losowy
+  ciąg znaków dalej zwraca zero wyników, zweryfikowane testem).
+
+**Testy**: nowy `__tests__/foodBase.test.ts` (12 testów) — integralność danych (zero
+duplikatów nazw jako regression-guard, "Passata pomidorowa" obecna, nowe kategorie mają
+realne wpisy, baza >350 pozycji), `foodMatchScore` (hierarchia progów, puste zapytanie=0,
+niepasująca nazwa=0 nawet z fuzzy, krótki token nie fuzzy-matchuje), `searchFoodBase`
+(literówka wciąż trafia, poprawne zapytanie dalej wygrywa jako #1, losowy ciąg nie zwraca
+wszystkiego, puste zapytanie zwraca `limit` pozycji). `tsc --noEmit` czyste, `jest --silent`
+96/96 suite, 1229/1217 testów (+12).
+
+**Priorytet testu na urządzeniu — wysoki**: Co zjadłem → wyszukaj "passata" → sprawdź że
+"Passata pomidorowa" jest pierwszym wynikiem; wyszukaj z celową literówką (np. "pasata") →
+sprawdź że dalej coś znajduje; jeśli masz sporo własnych zapisanych produktów, sprawdź że
+wyszukiwanie wśród nich pokazuje najlepsze dopasowania jako pierwsze, nie przypadkową
+kolejność.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

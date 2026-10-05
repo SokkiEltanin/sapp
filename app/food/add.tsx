@@ -10,7 +10,7 @@ import {
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
   PRESET_CATS, presetCatLabel, isRecipeProduct, presetIngredientNames,
 } from '@/store/foodStore';
-import { searchFoodBase } from '@/data/foodBase';
+import { searchFoodBase, foodMatchScore } from '@/data/foodBase';
 import DatePickerField from '@/components/ui/DatePickerField';
 import DisplayText from '@/components/ui/DisplayText';
 import { useFontsStore } from '@/store/fontsStore';
@@ -377,8 +377,16 @@ export default function FoodAdd() {
         .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
       return [...sorted.slice(0, 60), ...base];
     }
+    // Ranked tym samym `foodMatchScore` co baza (2026-10-05, user: "brakuje lepsze
+    // wyszukiwanie") — dawniej zwykły `.includes()` bez żadnego sortowania, więc wśród
+    // WŁASNYCH produktów wyniki pokazywały się w przypadkowej kolejności (jak w store), nie
+    // wg trafności. `_rank` (świeżość/częstość) zostaje tiebreakiem przy remisie score'u.
     const nq = normalizeProductName(q);
-    const curatedMatch = curated.filter(x => x._norm.includes(nq));
+    const curatedMatch = curated
+      .map(x => ({ x, score: foodMatchScore(x._norm, nq) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => (b.score - a.score) || (b.x._rank - a.x._rank))
+      .map(({ x }) => x);
     const seen = new Set(curatedMatch.map(x => x._norm));
     const base: Candidate[] = searchFoodBase(q, 24)
       .filter(f => !seen.has(normalizeProductName(f.name)))
