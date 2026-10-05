@@ -37,6 +37,19 @@ describe('FOOD_BASE — integralność danych', () => {
     expect(names.some(n => n.includes('ramen'))).toBe(true);
     expect(FOOD_BASE.length).toBeGreaterThan(350);  // było 310 przed rozbudową
   });
+
+  // 2026-10-05 runda 2, user: "dawaj dalej... zupy obiady albo bazy pod nie np ziemniaki
+  // gotowane, kurczak smażony bez oleju, pierogi itp" — dotąd były tylko 2 zupy w CAŁEJ
+  // bazie (pomidorowa/rosół).
+  test('więcej zup, wariantów kurczaka i pierogów, i baz obiadowych (runda 2)', () => {
+    const names = FOOD_BASE.map(f => normalizeProductName(f.name));
+    expect(names.some(n => n.includes('zupa ogorkowa'))).toBe(true);
+    expect(names.some(n => n.includes('krupnik'))).toBe(true);
+    expect(FOOD_BASE.some(f => f.name === 'Kurczak smażony bez oleju')).toBe(true); // dokładny przykład usera
+    expect(names.some(n => n.includes('pierogi z miesem'))).toBe(true);
+    expect(names.some(n => n.includes('kasza perlowa'))).toBe(true);
+    expect(FOOD_BASE.length).toBeGreaterThan(400);  // było 380 przed tą rundą
+  });
 });
 
 describe('foodMatchScore — wspólna skala trafności (baza + własne produkty usera)', () => {

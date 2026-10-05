@@ -482,6 +482,54 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Carbonara',            kcal: 190, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 300 } },
   { name: 'Lasagne',              kcal: 150, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 300 } },
   { name: 'Paella',               kcal: 160, protein: 9,   unit: 'porcja',   unitGrams: { porcja: 350 } },
+
+  // ── Rozbudowa 2026-10-05 runda 2 (user: "dawaj dalej inne produkty albo standardowe
+  // dania... zupy obiady albo bazy pod nie np ziemniaki gotowane, kurczak smażony bez
+  // oleju, pierogi itp") — więcej polskich zup (dotąd były tylko 2: pomidorowa/rosół),
+  // warianty obiadowe kurczaka (w tym dosłowny przykład usera — smażony BEZ oleju, realnie
+  // mniej kaloryczny niż panierowany kotlet), więcej pierogów, i kilka brakujących "baz"
+  // obiadowych (pieczone ziemniaki, kasza perłowa/ryż brązowy gotowane, kopytka).
+
+  // ── Zupy (dobitka) ─────────────────────────────────────────────────────────
+  { name: 'Zupa ogórkowa',        kcal: 40,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa grzybowa',        kcal: 45,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa jarzynowa',       kcal: 35,  protein: 1.5, unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Krupnik (zupa)',       kcal: 55,  protein: 2.5, unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa szczawiowa',      kcal: 45,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa cebulowa',        kcal: 50,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa krem z brokułów', kcal: 55,  protein: 3,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa krem z dyni',     kcal: 60,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa kalafiorowa',     kcal: 50,  protein: 2.5, unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Chłodnik',             kcal: 45,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Flaki',                kcal: 65,  protein: 6,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa pieczarkowa',     kcal: 50,  protein: 2.5, unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zupa koperkowa',       kcal: 40,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+
+  // ── Obiady / dania (dobitka 2) ─────────────────────────────────────────────
+  { name: 'Kurczak smażony bez oleju', kcal: 180, protein: 30, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Kurczak duszony',      kcal: 170, protein: 25,  unit: 'porcja',   unitGrams: { porcja: 200 } },
+  { name: 'Klopsiki w sosie',     kcal: 180, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 250 } },
+  { name: 'Leczo',                kcal: 70,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Warzywa smażone (stir-fry)', kcal: 80, protein: 2.5, unit: 'porcja', unitGrams: { porcja: 250 } },
+  { name: 'Ryż z warzywami',      kcal: 140, protein: 4,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Zapiekanka ziemniaczana', kcal: 160, protein: 5, unit: 'porcja',  unitGrams: { porcja: 300 } },
+  { name: 'Pieczeń wołowa',       kcal: 210, protein: 25,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Indyk pieczony',       kcal: 160, protein: 28,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Schab pieczony',       kcal: 220, protein: 25,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Kaczka pieczona',      kcal: 310, protein: 19,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+
+  // ── Pierogi (dobitka) ──────────────────────────────────────────────────────
+  { name: 'Pierogi z mięsem',     kcal: 220, protein: 8,   unit: 'szt',      unitGrams: { szt: 35 } },
+  { name: 'Pierogi z serem (na słodko)', kcal: 210, protein: 7, unit: 'szt', unitGrams: { szt: 35 } },
+  { name: 'Pierogi leniwe',       kcal: 190, protein: 9,   unit: 'szt',      unitGrams: { szt: 25 } },
+  { name: 'Uszka z grzybami',     kcal: 180, protein: 5,   unit: 'szt',      unitGrams: { szt: 8 } },
+  { name: 'Pierogi z kapustą i grzybami', kcal: 180, protein: 5, unit: 'szt', unitGrams: { szt: 30 } },
+
+  // ── Bazy obiadowe (dobitka) ────────────────────────────────────────────────
+  { name: 'Ziemniaki pieczone',   kcal: 110, protein: 2,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Kasza perłowa (gotowana)', kcal: 110, protein: 3.5, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Ryż brązowy (gotowany)', kcal: 123, protein: 2.7, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Kopytka',              kcal: 150, protein: 3,   unit: 'porcja',   unitGrams: { porcja: 150 } },
 ];
 
 // Levenshtein (edit distance) — ciasna pętla DP, zero zależności, bezpieczne na krótkich

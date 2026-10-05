@@ -3,7 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 "Co zjadłem": duży audyt bazy produktów + lepsze wyszukiwanie (2026-10-05)
+## 🆕 "Co zjadłem" baza produktów — runda 2: zupy, kurczak, pierogi, bazy (2026-10-05)
+
+User: "dawaj dalej... zupy obiady albo bazy pod nie np ziemniaki gotowane, kurczak smażony
+bez oleju, pierogi itp". Pełny opis w ARCHITECTURE.md §256. Kontynuacja §255 — w bazie było
+tylko 2 zupy w ogóle (pomidorowa/rosół), zero "kurczaka bez oleju", jeden wariant pierogów.
++37 wpisów: 13 zup, 11 dań obiadowych (w tym dokładny przykład usera), 5 pierogów, 4 bazy
+(ziemniaki pieczone, kasza perłowa, ryż brązowy, kopytka) — 380→413. +1 test w
+foodBase.test.ts. `tsc`/`jest` czyste (96/96 suite, 1230 testów, +1).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Co zjadłem → wyszukaj "zupa" → dużo więcej
+wyników niż tylko pomidorowa/rosół; wyszukaj "kurczak" → "smażony bez oleju" widoczny.
+
+## ✅ "Co zjadłem": duży audyt bazy produktów + lepsze wyszukiwanie (2026-10-05)
 
 User: "musimy sie skupić ogólnie nad ulepszenie tego i to bardzo... pododawaj produktów
 mnóstwo typu Passata pomidorowa... brakuje lepsze wyszukiwanie". Mood świadomie odłożony
