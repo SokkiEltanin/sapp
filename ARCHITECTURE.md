@@ -14464,6 +14464,42 @@ kolejność.
 
 ---
 
+## 256. "Co zjadłem" baza produktów — runda 2: zupy, warianty kurczaka, pierogi, bazy obiadowe (2026-10-05)
+
+User: "dawaj dalej inne produkty albo standardowe dania dodaj typu zupy obiady albo bazy pod
+nie np ziemniaki gotowane, kurczak smażony bez oleju, pierogi itp". Bezpośrednia kontynuacja
+§255 — ten sam audyt, kolejna fala realnych dziur. Sprawdzone przed dodaniem: "Ziemniaki
+(gotowane)" już ISTNIAŁO w bazie (user podał to jako przykład TYPU wpisu, nie zgłoszenie
+braku) — nie dodane drugi raz. Reszta przykładów usera faktycznie brakowała: w CAŁEJ bazie
+były tylko 2 zupy (Zupa pomidorowa, Rosół — reszta polskich klasyków kompletnie
+nieobecna), żadnego "kurczaka smażonego bez oleju" (tylko grillowany/pieczony/panierowany),
+tylko JEDEN wariant pierogów (ruskie).
+
+~37 nowych wpisów (380 → 413, po doliczeniu nowego testu-regresji §255 na duplikaty — zero
+kolizji nazw, zweryfikowane tym samym skryptem co w §255):
+- **Zupy** (13): ogórkowa, grzybowa, jarzynowa, krupnik, szczawiowa, cebulowa, krem z
+  brokułów, krem z dyni, kalafiorowa, chłodnik, flaki, pieczarkowa, koperkowa.
+- **Obiady/dania** (11): kurczak smażony bez oleju (dokładny przykład usera — realnie mniej
+  kaloryczny niż panierowany kotlet schabowy, ale więcej niż czysto grillowany filet, bo
+  patelnia nieprzywierająca wciąż trochę się różni od grilla), kurczak duszony, klopsiki w
+  sosie, leczo, warzywa stir-fry, ryż z warzywami, zapiekanka ziemniaczana, pieczeń wołowa,
+  indyk/schab/kaczka pieczone.
+- **Pierogi** (5): z mięsem, z serem (na słodko), leniwe, uszka z grzybami, z kapustą i
+  grzybami — obok istniejących "ruskich".
+- **Bazy obiadowe** (4): ziemniaki pieczone, kasza perłowa (gotowana), ryż brązowy
+  (gotowany), kopytka.
+
+**Testy**: rozszerzony `__tests__/foodBase.test.ts` (+1 test, sprawdza obecność zupy
+ogórkowej/krupniku, dokładnie "Kurczak smażony bez oleju", pierogów z mięsem, kaszy
+perłowej, i że baza przekroczyła 400 wpisów). `tsc --noEmit` czyste, `jest --silent` 96/96
+suite, 1230/1229 testów (+1).
+
+**Priorytet testu na urządzeniu — średni**: Co zjadłem → wyszukaj "zupa" → sprawdź że pojawia
+się dużo więcej niż tylko pomidorowa/rosół; wyszukaj "kurczak" → sprawdź że "smażony bez
+oleju" jest widoczny obok grillowanego/pieczonego.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
