@@ -14500,6 +14500,68 @@ oleju" jest widoczny obok grillowanego/pieczonego.
 
 ---
 
+---
+
+## 257. Humor — rozbudowa presetów tagów + eksport danych (mood + wydatki) do CSV (2026-10-05)
+
+User: "Okej czyli zakładka co zjadlem ogarnięta? Jak tak to rob to samo z humorem i daj moze
+możliwość eksportu danych żebym wrzucić ci gdzieś i żebyś rozumiał pazerny wpisywane" —
+bezpośrednia kontynuacja §255/§256 (ta sama runda audytu, teraz Humor zamiast Co zjadłem), plus
+nowa, osobna prośba o eksport.
+
+**Rozbudowa presetów tagów** (`src/utils/moodTags.ts`): `PRESET_TAGS` 26 → 56 (+30). Audyt
+najpierw — każdy kandydat sprawdzony pod kątem realnej redundancji z istniejącymi presetami
+(np. "kreatywny"/"roztargniony"/"wyluzowany"/"pogodny" ODRZUCONE jako prawie-duplikaty
+"twórczy"/"rozproszony"/"zrelaksowany"/"radosny" — nie dodane). Nowe tagi pokrywają realne
+dziury: emocje społeczne/complex (zazdrosny, zawstydzony, winny, dumny), stany motywacyjne
+(ambitny, wypalony, zrezygnowany, zdezorientowany, pod presją), czysto energetyczne
+(wyczerpany, leniwy, naładowany, apatyczny, żywiołowy, bezsilny) i neutralne (zaskoczony,
+ciekawy — świadomie w ŻADNYM z `POSITIVE_TAGS`/`NEGATIVE_TAGS`, bo nie mają jednoznacznego
+znaku). `POSITIVE_TAGS` +11, `NEGATIVE_TAGS` +16, `HIGH_ENERGY_TAGS` +6, `LOW_ENERGY_TAGS` +9
+(w tym "rozbity" — doklejony w self-review, bo konceptualnie czysto-energetyczny tag jak
+"wypalony"/"apatyczny"/"bezsilny" musi być w OBU: negatywny nastrojowo I niskoenergetyczny).
+Te 4 zbiory są rozłączne z założenia (`tagRelevance` dodaje wkład z każdego niezależnie) —
+zweryfikowane skryptem (zero duplikatów w PRESET_TAGS, zero przecięć POSITIVE∩NEGATIVE i
+HIGH∩LOW, każdy tag z 4 zbiorów realnie istnieje w PRESET_TAGS).
+
+**Eksport danych do CSV** — do teraz jedyną opcją eksportu był pełny JSON
+(`exportSnapshotToFile`, Ustawienia → Dane → "Eksportuj dane do pliku (JSON)"), który już
+ZAWIERAŁ `mood` (patrz `CLOUD_COLS` w `backupService.ts`) — ale jest to technicznie gęsty,
+zagnieżdżony JSON obok 9 innych kolekcji, niewygodny do szybkiego podzielenia się/przejrzenia
+samego humoru. Nowy `exportMoodToCsv()` w `backupService.ts` (dokładnie ten sam wzorzec co
+istniejący `exportExpensesToCsv()`): nowy `src/utils/moodCsv.ts` z `moodToCsv(entries)` —
+jeden wpis na wiersz, kolumny `Data, Nastrój, Energia, Tagi, Notatka` (etykiety po polsku z
+`MOOD_LABELS`/`ENERGY_LABELS`, nie gołe liczby 1-5), RFC4180-quoting, BOM prefix, przecinek +
+kropka dziesiętna (zgodność Excel/Sheets) — identyczne konwencje jak `expensesCsv.ts`. Plik
+`sapp-humor-{data}.csv`, udostępniany przez `expo-sharing`. 4. przycisk w `BackupSection.tsx`
+("Eksportuj humor (CSV)", obok istniejącego "Eksportuj wydatki (CSV)"), `busy` state
+rozszerzony o `'moodcsv'`, ten sam handler-wzorzec (`haptic.tap() → busy → try/catch/finally`)
+co pozostałe 3 przyciski.
+
+**Testy**: `__tests__/moodTags.test.ts` +7 testów (integralność rozszerzonej listy — zero
+duplikatów, zero przecięć zbiorów, wszystkie tagi realnie w PRESET_TAGS, konkretne nowe tagi
+obecne, "zaskoczony"/"wyczerpany"/"leniwy" świadomie neutralne). Nowy `__tests__/moodCsv.test.ts`
+(4 testy, mirror `expensesCsv.test.ts`): nagłówek+BOM, sortowanie po dacie + tłumaczenie
+poziomów na etykiety, escaping cudzysłowu/przecinka w notatce, tagi łączone średnikiem.
+`tsc --noEmit` czyste, `jest --silent` 97/97 suite (+1 nowy plik testowy), wszystkie testy
+przechodzą.
+
+**Nie w zakresie tej rundy** (zidentyfikowane, ale NIE zrobione — większa zmiana
+architektoniczna, wymagałaby odrębnej rozmowy z userem): trzy OSOBNE, niezsynchronizowane
+"silniki" korelacji dotykające mood — `src/utils/dashboard/correlations.ts` (generyczny
+pearson), `src/utils/correlations.ts` (hardkodowane polskie szablony), i inline
+`buildPatterns()` w `app/(tabs)/mood.tsx` (linie ~770-918) — każdy z WŁASNYMI, dryfującymi
+niezależnie progami (MIN_N, MIN_R). Nie dotknięte w tej rundzie, bo user poprosił o "to samo
+co jedzenie" (rozbudowa danych + realne bugi wyszukiwania/dopasowania) + eksport — nie o
+unifikację silników korelacji.
+
+**Priorytet testu na urządzeniu — średni**: Humor → dodaj wpis → sprawdź czy nowe tagi (np.
+"dumny", "wypalony", "pod presją") pojawiają się w podpowiedziach i sortują się sensownie wg
+nastroju/energii. Ustawienia → Kopia zapasowa → "Eksportuj humor (CSV)" → sprawdź że plik się
+otwiera w Excelu/Sheets z polskimi znakami bez krzaków i że kolumny się zgadzają.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
