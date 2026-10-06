@@ -15172,6 +15172,46 @@ nic ręcznie triggerować.
 sprawdzić że ikona appki na ekranie głównym i w przełączniku aplikacji pokazuje nowe logo
 (kocia głowa brąz/kremowy), nie starą ikonę.
 
+## 271. Fix: biały flash przy KAŻDYM starcie appki (2026-10-06)
+
+User: "co do białego ekranu to dzieje się przy włączaniu jakby się odświeżał" — biały błysk na
+stałe przy każdym otwarciu appki (nie incydentalnie), osobny od OTA-incydentów z §268/§269.
+
+**Root cause** (zweryfikowane przez czytanie źródła `@expo/prebuild-config`, nie zgadywanie):
+Android 12+ ma własne natywne SplashScreen API (`Theme.SplashScreen`, `postSplashScreenTheme:
+AppTheme`) — Expo SDK 54's `expo-splash-screen` (zainstalowany, auto-aplikowany przez
+`withVersionedExpoSDKPlugins` NIEZALEŻNIE od tego, czy jest wpisany w `app.json`'s `plugins`
+— sprawdzone w `node_modules/@expo/prebuild-config/.../withDefaultPlugins.js`; **odrzucona
+wcześniejsza hipoteza** że brakujący wpis w `plugins` był przyczyną) konfiguruje natywny splash
+z ciemnym tłem z `app.json`'s `splash.backgroundColor`. PROBLEM: ten natywny splash domyślnie
+chowa się sam, jak tylko Activity narysuje swoją PIERWSZĄ klatkę — co u React Native dzieje się
+ZANIM JS zdąży wymalować własny `AnimatedSplash.tsx`. W tej szczelinie (między zniknięciem
+natywnego splasha a pierwszą klatką JS) przebija goły `AppTheme` — bez jawnie ustawionego
+`windowBackground`, czyli domyślnie biały. Nigdzie w kodzie nie było wywołania
+`SplashScreen.preventAutoHideAsync()`/`hideAsync()` (jedyny mechanizm, którym `expo-splash-
+screen` dokumentuje trzymanie natywnego splasha do czasu, aż JS faktycznie jest gotowy) —
+zweryfikowane grepem, zero wystąpień w `src`/`app`/`plugins`.
+
+**Fix** (`app/_layout.tsx`): `SplashScreen.preventAutoHideAsync()` na poziomie MODUŁU (zanim
+cokolwiek się renderuje — ten sam wzorzec co przykład w README paczki) + `SplashScreen.
+hideAsync()` jako PIERWSZY `useEffect` w `RootLayout` (odpala się najwcześniej jak się da po
+pierwszym commicie, czyli dokładnie wtedy gdy `AnimatedSplash` już jest wymalowany). Efekt:
+natywny ciemny splash (z ikoną) zostaje na ekranie bez przerwy aż do czarnego `AnimatedSplash`
+— zero okna na biały `AppTheme`.
+
+**Czysto JS, bez zmian w natywnych zasobach/temacie/`app.json`** — `expo-splash-screen`'s
+natywny moduł jest już wkompilowany (pakiet w `package.json` od dawna, auto-plugin aplikuje
+się przy KAŻDYM prebuildzie niezależnie od `app.json`'s `plugins`, patrz wyżej) — to wyłącznie
+nowe wywołanie już obecnego natywnego API z JS. **Nie wymaga nowego APK — idzie przez OTA**
+(w przeciwieństwie do §270, które zmieniało `app.json`'s `icon`/`adaptiveIcon` i wymagało
+nowego buildu per CLAUDE.md §2).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 100/100 suite (1297 testów) bez zmiany.
+
+**Priorytet testu na urządzeniu — wysoki**: po tym że OTA paczka dojdzie na telefon (albo po
+instalacji kolejnego APK), sprawdzić że biały błysk przy starcie faktycznie zniknął — kilka
+cold-startów appki pod rząd.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

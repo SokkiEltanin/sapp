@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, StyleSheet, AppState, Alert, Pressable, InteractionManager } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
+import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -50,6 +51,17 @@ import { takeDanglingScanSave } from '@/utils/scanBreadcrumb';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useUsageStats } from '@/store/usageStatsStore';
 import { screenInfoFor } from '@/utils/screenStats';
+
+// Biały flash przy KAŻDYM starcie (2026-10-06, user: "jakby się odświeżał"). Root cause:
+// natywny splash Androida 12+ (Theme.SplashScreen, `postSplashScreenTheme: AppTheme`)
+// domyślnie chowa się sam, jak tylko Activity narysuje swoją PIERWSZĄ klatkę — co u RN
+// dzieje się, zanim JS zdąży wymalować własny `AnimatedSplash`. W tej szczelinie przebija
+// goły `AppTheme` (bez ustawionego `windowBackground` = domyślnie biały), nie czarny splash
+// z app.json. `preventAutoHideAsync()` (tu, na poziomie modułu — zanim cokolwiek się
+// renderuje) + `hideAsync()` (w pierwszym efekcie RootLayout, patrz tam) trzyma natywny
+// splash (ciemny, z ikoną) do momentu, aż JS faktycznie namaluje swoją pierwszą klatkę —
+// bez tej szczeliny. Czysto JS, bez zmian w natywnych zasobach/temacie.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Catch JS errors that escape React's render tree (async, event handlers, native
 // bridge) too — those can leave a black screen the ErrorBoundary never sees. We
@@ -186,6 +198,11 @@ function AutoMoodPopup() {
 }
 
 export default function RootLayout() {
+  // Chowa natywny splash (zablokowany przez `preventAutoHideAsync()` na poziomie modułu,
+  // patrz tam) DOKŁADNIE wtedy, gdy JS namalował swoją pierwszą klatkę — nie wcześniej.
+  // Pierwszy efekt deklarowany, więc odpala się najwcześniej jak się da po tym commicie.
+  useEffect(() => { SplashScreen.hideAsync().catch(() => {}); }, []);
+
   // Rejestr obciążenia wątku JS na starcie (2026-09-20, user: "zrób rejestr żebyś miał realne
   // dane" — patrz komentarz przy `startColdStartLagSampling` w perfLog.ts). Pierwszy efekt w
   // komponencie — najwcześniej jak się da bez samo-startowania na poziomie modułu (to
