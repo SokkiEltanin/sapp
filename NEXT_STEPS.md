@@ -3,6 +3,40 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ekwipunek bossa: kategorie pod listą itemów (2026-10-06)
+
+User: "ten ekwipunek bossa mialy byc kategorie ekwipunku na dole a itemy na gorze... zeby sie
+nie chowało i znikało i było lepiej dostępne". Pełny opis w ARCHITECTURE.md §262. Czysty JSX
+reorder w `GearPanel.tsx` — zakładki slotów przeniesione z góry modala na sam dół, pod listę
+itemów. Zero zmiany logiki. `tsc`/`jest` czyste.
+
+**🆕 Priorytet testu na urządzeniu — niski**: Pupil → otwórz slot ekwipunku → zakładki slotów
+na dole, lista itemów na górze.
+
+## 🆕 ODŁOŻONE: limit slotów ekwipunku jak w "SF Game" (2026-10-06)
+
+User: "moze zrobic jak w sfgame te eq ze sa sloty puste na itemy ograniczone i jak za duzo
+trzeba sprzedac czy cos bo inaczej wyda tylko równowartość cenową (ze od razu sprzeda) albo
+zapyta który sprzedac". Duża, nowa funkcja ekonomii (limit kopii na slot + flow
+auto-sprzedaży/wyboru-co-sprzedać przy przekroczeniu) — NIE zaczęta, bo wymaga ustalenia
+konkretów z userem (ile sztuk limitu per slot, auto-sell najsłabszej vs pytanie które
+sprzedać) zanim cokolwiek zbudować — ta sama dyscyplina co inne zmiany ekonomii w tej sesji
+(np. wcześniejsze pytanie o skalowanie nagrody za głaskanie). Do podjęcia w kolejnej rundzie.
+
+## 🆕🔴 OTWARTE: "Bez słodyczy" streak nie łapie Kinder Bueno (2026-10-06)
+
+User: toffifee już łapie (naprawione wcześniej, §250), ale Kinder Bueno NIE — potwierdzone
+drugi raz, z konkretnym terminem: "zanim dodałem to było 9 dni a Kinder jadłem przedwczoraj
+wiec jakby nie złapało". "Kinder"/"bueno" są literalnie w `AVOID_PRESETS['sweets'].keyword`
+(countersStore.ts) i `MealItem.name` zawsze jest zapisywane przy logowaniu posiłku — czytając
+kod (matchesAvoid/matchedEatDays/computeAvoidCounts/autoDaysWithout), substring-match POWINIEN
+zadziałać identycznie jak dla toffi. User nie pamięta jak dokładnie dodał produkt (nowy
+ręcznie wpisany vs wybrany z podpowiedzi) — **czeka na odpowiedź**: dokładna nazwa wpisu
+widoczna w "Co zjadłem" dla tego konkretnego produktu (możliwe że autouzupełnianie podstawiło
+inny, już zapisany produkt pod inną nazwą, i user tego nie zauważył przy zatwierdzaniu — to by
+tłumaczyło czemu matcher, który czytając kod wygląda poprawnie, nie złapał). Do zbadania dalej
+w następnej rundzie, gdy user poda dokładną nazwę wpisu.
+
 ## 🆕 Fix: pigułka planu zajęć ucinała salę (2026-10-06)
 
 User zrzutem pilla: "za dlugi jest ten komunikat na pillu... nazwa skrócona najlepiej plus
@@ -14,17 +48,7 @@ nazwy przedmiotów. +4 testy. `tsc`/`jest` czyste.
 **🆕 Priorytet testu na urządzeniu — średni**: w trakcie zajęć z długą nazwą przedmiotu →
 sprawdź że sala/budynek są widoczne na pigułce, nie ucięte.
 
-## 🆕🔴 OTWARTE: "Bez słodyczy" streak — nie łapie niektórych produktów eaten w "Co zjadłem" (2026-10-06)
-
-User: toffifee już łapie (naprawione wcześniej, §250), ale "kinderbleno" (Kinder Bueno?) NIE
-złapało mimo że "kinder" jest w `AVOID_PRESETS['sweets'].keyword` (countersStore.ts) i
-`MealItem.name` zawsze jest zapisywane przy logowaniu posiłku — czytając kod, substring-match
-POWINIEN zadziałać. Nie ma jeszcze diagnozy — user nie pamięta dokładnie jak dodał produkt
-(nowy ręcznie wpisany vs wybrany z podpowiedzi). **Czeka na odpowiedź usera**: dokładna nazwa
-wpisu widoczna w "Co zjadłem" dla tego konkretnego produktu (możliwe że autouzupełnianie
-podstawiło inny, już zapisany produkt pod inną nazwą, i user tego nie zauważył przy
-zatwierdzaniu — to by tłumaczyło czemu matcher, który jest poprawny, nie złapał). Do zbadania
-dalej w następnej rundzie, gdy user odpowie.
+## 🆕 Fix: dynamic-island pill "hukowy, zlagowany, znikający" (2026-10-06)
 
 User: "ogarnij dynamic pilla naszego zeby nie byl taki hukowy zlagowany znikający". Pełny opis
 w ARCHITECTURE.md §260. Root cause: pomodoro/zarobki z pracy tykają co 1000ms, a `item.key`
