@@ -1,4 +1,11 @@
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel } from '@/utils/classSchedule';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel, isHappeningNow, computeClassReminder, fmtClassEventLabel } from '@/utils/classSchedule';
+import { CalendarEvent } from '@/types';
+
+const ev = (o: Partial<CalendarEvent> = {}): CalendarEvent => ({
+  id: 'e1', title: '[PUR] L - Cięcie wiązką elektronową i laserową - 69 B2',
+  date: '2026-10-12', startTime: '08:00', endTime: '09:30', allDay: false,
+  priority: 'normal', createdAt: '2026-10-01T00:00:00', ...o,
+});
 
 // Fixtures = REALNE tytuły z planu zajęć usera (2 Inżynieria Materiałowa, sem. zimowy
 // 2026/2027, wygenerowane z jego prawdziwego planu + zarządzenia Rektora UR) — nie
@@ -81,5 +88,51 @@ describe('fmtNextClassLabel — etykieta najbliższego dnia z zajęciami (fallba
   });
   test('dzień tygodnia liczony poprawnie z YMD (niedziela)', () => {
     expect(fmtNextClassLabel('2026-10-11', 6)).toBe('Nie 11 paź · za 6 dni');
+  });
+});
+
+// 2026-10-06, user: "jak jestem to pokazuje podświetla aktualny" — podświetlenie trwającego
+// TERAZ zajęcia, zarówno na kafelku dashboardu jak i w pełnym planie.
+describe('isHappeningNow — podświetlenie trwających TERAZ zajęć', () => {
+  test('ten sam dzień, godzina w środku przedziału → true', () => {
+    expect(isHappeningNow(ev(), new Date('2026-10-12T08:45:00'))).toBe(true);
+  });
+  test('dokładnie startTime (granica domknięta) → true', () => {
+    expect(isHappeningNow(ev(), new Date('2026-10-12T08:00:00'))).toBe(true);
+  });
+  test('dokładnie endTime (granica otwarta — zajęcia już się skończyły) → false', () => {
+    expect(isHappeningNow(ev(), new Date('2026-10-12T09:30:00'))).toBe(false);
+  });
+  test('przed startem tego samego dnia → false', () => {
+    expect(isHappeningNow(ev(), new Date('2026-10-12T07:59:00'))).toBe(false);
+  });
+  test('inny dzień, ta sama godzina → false', () => {
+    expect(isHappeningNow(ev(), new Date('2026-10-13T08:45:00'))).toBe(false);
+  });
+  test('event bez godzin (allDay) → nigdy nie "trwa"', () => {
+    expect(isHappeningNow(ev({ startTime: undefined, endTime: undefined }), new Date('2026-10-12T08:45:00'))).toBe(false);
+  });
+});
+
+// 2026-10-06, user: "mogę zaznaczyć i to się pokazuje na planie i przypomina przed zajęciami".
+describe('computeClassReminder — data/godzina przypomnienia liczona wstecz od startu zajęć', () => {
+  test('30 min przed 8:00 → 7:30 tego samego dnia', () => {
+    expect(computeClassReminder(ev(), 30)).toEqual({ date: '2026-10-12', time: '07:30' });
+  });
+  test('przejście przez północ (15 min przed 0:05) → poprzedni dzień', () => {
+    expect(computeClassReminder(ev({ date: '2026-10-13', startTime: '00:05', endTime: '01:35' }), 15))
+      .toEqual({ date: '2026-10-12', time: '23:50' });
+  });
+  test('event bez startTime → null (nie da się policzyć "przed czym")', () => {
+    expect(computeClassReminder(ev({ startTime: undefined }), 30)).toBeNull();
+  });
+});
+
+describe('fmtClassEventLabel — etykieta do wyświetlenia/cache na Task.classEventLabel', () => {
+  test('dzień + godzina + przedmiot', () => {
+    expect(fmtClassEventLabel(ev(), '[PUR]')).toBe('Pon 12.10 · 08:00 · Cięcie wiązką elektronową i laserową');
+  });
+  test('event bez rozpoznanego przedmiotu (zły prefiks) → bez segmentu przedmiotu', () => {
+    expect(fmtClassEventLabel(ev(), '[INNY]')).toBe('Pon 12.10 · 08:00');
   });
 });

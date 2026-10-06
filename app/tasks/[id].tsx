@@ -8,17 +8,20 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft, Trash2, Check, Timer, Edit3, Save,
   Calendar, Flag, AlignLeft, Tag, Clock, RefreshCw, BellOff, Bell,
-  Plus, CheckSquare, Square, X as XIcon, Coins,
+  Plus, CheckSquare, Square, X as XIcon, Coins, GraduationCap,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TimePickerField from '@/components/ui/TimePickerField';
+import ClassLinkPicker from '@/components/tasks/ClassLinkPicker';
 import { useTasks, taskReward } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import { EventPriority, TaskStatus, MoodLevel, TaskRecurring, Subtask } from '@/types';
+import { EventPriority, TaskStatus, MoodLevel, TaskRecurring, Subtask, CalendarEvent } from '@/types';
+import { computeClassReminder, fmtClassEventLabel } from '@/utils/classSchedule';
+import { useClassScheduleStore } from '@/store/classScheduleStore';
 
 const RECURRING_OPTIONS: { value: TaskRecurring; label: string }[] = [
   { value: 'none',    label: 'Brak' },
@@ -143,6 +146,37 @@ export default function TaskDetailScreen() {
   const [reminderClock, setReminderClock] = useState(task?.reminderTime ?? '09:00');
   const [reminderDate, setReminderDate] = useState(task?.reminderDate ?? '');
   const [reminderMsg, setReminderMsg]   = useState(task?.reminderMessage ?? '');
+
+  // Powiąż z zajęciami (2026-10-06) — patrz komentarz w app/tasks/add.tsx. Tu dodatkowo
+  // trzeba ODTWORZYĆ wyświetlaną etykietę z zapisanego `task.classEventLabel` (cache, przeżywa
+  // skasowanie źródłowego eventu z Kalendarza Google) — `classEvent` (pełny obiekt) jest
+  // potrzebny TYLKO do przeliczenia nowego reminderDate/Time gdy user zmieni "ile min przed".
+  const gcalEvents = useCalendarStore(s => s.gcalEvents);
+  const classPrefix = useClassScheduleStore(st => st.prefix);
+  const [showClassPicker, setShowClassPicker] = useState(false);
+  const [classEventId, setClassEventId] = useState(task?.classEventId ?? '');
+  const [classEventLabel, setClassEventLabel] = useState(task?.classEventLabel ?? '');
+  const [classReminderMin, setClassReminderMin] = useState(task?.classReminderMinutesBefore ?? 30);
+  const linkedClassEvent = classEventId ? gcalEvents.find(e => e.id === classEventId) ?? null : null;
+  const applyClassReminder = (ev: CalendarEvent, minutesBefore: number) => {
+    const r = computeClassReminder(ev, minutesBefore);
+    if (!r) return;
+    setReminderOn(true);
+    setReminderDate(r.date);
+    setReminderClock(r.time);
+  };
+  const onPickClass = (ev: CalendarEvent) => {
+    setShowClassPicker(false);
+    setClassEventId(ev.id);
+    setClassEventLabel(fmtClassEventLabel(ev, classPrefix));
+    applyClassReminder(ev, classReminderMin);
+  };
+  const onPickClassMinutes = (min: number) => {
+    haptic.tap();
+    setClassReminderMin(min);
+    if (linkedClassEvent) applyClassReminder(linkedClassEvent, min);
+  };
+  const unlinkClass = () => { haptic.tap(); setClassEventId(''); setClassEventLabel(''); };
   const [moodModal, setMoodModal]       = useState(false);
   const [moodTaskTitle, setMoodTaskTitle] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -182,6 +216,9 @@ export default function TaskDetailScreen() {
         reminderTime,
         reminderDate: reminderDateEff,
         reminderMessage,
+        classEventId: classEventId || undefined,
+        classEventLabel: classEventId ? classEventLabel : undefined,
+        classReminderMinutesBefore: classEventId ? classReminderMin : undefined,
       });
 
       // Reschedule or cancel reminder
@@ -516,6 +553,37 @@ export default function TaskDetailScreen() {
                           style={{ flex: 1 }}
                         />
                       </View>
+                      <TouchableOpacity
+                        style={[styles.reminderBtn, classEventId && styles.reminderBtnOn]}
+                        onPress={() => { haptic.tap(); setShowClassPicker(true); }}
+                        activeOpacity={0.8}
+                      >
+                        <GraduationCap size={13} color={classEventId ? '#A78BFA' : colors.text.muted} />
+                        <Text style={[styles.reminderBtnText, classEventId && { color: '#A78BFA' }]} numberOfLines={1}>
+                          {classEventId ? classEventLabel : 'Powiąż z zajęciami (opcjonalnie)'}
+                        </Text>
+                        {classEventId ? (
+                          <TouchableOpacity onPress={unlinkClass} hitSlop={8}>
+                            <XIcon size={12} color={colors.text.muted} />
+                          </TouchableOpacity>
+                        ) : null}
+                      </TouchableOpacity>
+                      {classEventId && (
+                        <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                          {[15, 30, 60].map(min => {
+                            const active = classReminderMin === min;
+                            return (
+                              <PressableScale
+                                key={min}
+                                onPress={() => onPickClassMinutes(min)}
+                                style={[styles.recurPill, active && styles.recurPillActive]}
+                              >
+                                <Text style={[styles.recurText, active && styles.recurTextActive]}>{min} min przed</Text>
+                              </PressableScale>
+                            );
+                          })}
+                        </View>
+                      )}
                       <TextInput
                         value={reminderMsg}
                         onChangeText={setReminderMsg}
@@ -532,6 +600,7 @@ export default function TaskDetailScreen() {
                   {task.reminderTime
                     ? `${task.reminderDate ?? ''} ${task.reminderTime}${task.reminderMessage ? ` — "${task.reminderMessage}"` : ''}`.trim()
                     : 'Brak'}
+                  {task.classEventLabel ? `\nPowiązane: ${task.classEventLabel}` : ''}
                 </Text>
               )}
             </Row>
@@ -646,6 +715,12 @@ export default function TaskDetailScreen() {
         message="Na pewno usunąć?"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => { setConfirmDelete(false); doDelete(); }}
+      />
+
+      <ClassLinkPicker
+        visible={showClassPicker}
+        onClose={() => setShowClassPicker(false)}
+        onSelect={onPickClass}
       />
     </SafeAreaView>
   );

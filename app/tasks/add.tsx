@@ -9,15 +9,18 @@ import { router } from 'expo-router';
 import {
   X, Check, CalendarDays, Flag, Timer,
   Bell, BellOff, ChevronUp, ChevronDown, Plus,
-  Zap, Target, Hourglass,
+  Zap, Target, Hourglass, GraduationCap,
 } from 'lucide-react-native';
 
-import { EventPriority, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
+import { EventPriority, TaskStatus, TaskRecurring, Subtask, TaskKind, CalendarEvent } from '@/types';
 import { KIND_META, KIND_ORDER, inferKind } from '@/utils/taskKind';
 import { weekChipInfo } from '@/utils/weekChips';
 import { tasksService } from '@/services/calendarService';
 import DatePickerField from '@/components/ui/DatePickerField';
 import TimePickerField from '@/components/ui/TimePickerField';
+import ClassLinkPicker from '@/components/tasks/ClassLinkPicker';
+import { computeClassReminder, fmtClassEventLabel } from '@/utils/classSchedule';
+import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { toast } from '@/store/toastStore';
@@ -110,6 +113,34 @@ export default function AddTaskScreen() {
   const [reminderDate, setReminderDate]   = useState('');        // '' = follow deadline||dziś (see handleSave)
   const [reminderMsg, setReminderMsg]     = useState('');
 
+  // Powiąż z zajęciami (2026-10-06, user: "mogę dodać zadania jakby powiązane z przedmiotem
+  // w konkretnej dacie... i to się pokazuje na planie i przypomina przed zajęciami") —
+  // opcjonalne, tylko gdy `reminderOn`. Wybrany event wylicza reminderDate/reminderTime
+  // WSTECZ od jego startu (computeClassReminder) — reużywa ISTNIEJĄCY mechanizm
+  // przypomnień zadań, zero nowej ścieżki powiadomień.
+  const [showClassPicker, setShowClassPicker] = useState(false);
+  const [classEvent, setClassEvent]       = useState<CalendarEvent | null>(null);
+  const [classReminderMin, setClassReminderMin] = useState(30);
+  const classPrefix = useClassScheduleStore(st => st.prefix);
+  const applyClassReminder = (ev: CalendarEvent, minutesBefore: number) => {
+    const r = computeClassReminder(ev, minutesBefore);
+    if (!r) return;
+    setReminderOn(true);
+    setReminderDate(r.date);
+    setReminderClock(r.time);
+  };
+  const onPickClass = (ev: CalendarEvent) => {
+    setShowClassPicker(false);
+    setClassEvent(ev);
+    applyClassReminder(ev, classReminderMin);
+  };
+  const onPickClassMinutes = (min: number) => {
+    haptic.tap();
+    setClassReminderMin(min);
+    if (classEvent) applyClassReminder(classEvent, min);
+  };
+  const unlinkClass = () => { haptic.tap(); setClassEvent(null); };
+
   // Milestones — break the task into small steps up front (easier to start)
   const [milestones, setMilestones]       = useState<string[]>([]);
   const [msInput, setMsInput]             = useState('');
@@ -182,6 +213,9 @@ export default function AddTaskScreen() {
         reminderTime,
         reminderDate: reminderDateEff,
         reminderMessage,
+        classEventId: classEvent?.id,
+        classEventLabel: classEvent ? fmtClassEventLabel(classEvent, classPrefix) : undefined,
+        classReminderMinutesBefore: classEvent ? classReminderMin : undefined,
         subtasks: milestones.length > 0
           ? milestones.map((t, i): Subtask => ({ id: `${Date.now()}_${i}`, title: t, done: false }))
           : undefined,
@@ -415,6 +449,40 @@ export default function AddTaskScreen() {
                     style={{ flex: 1 }}
                   />
                 </View>
+
+                <TouchableOpacity
+                  style={[s.reminderToggle, classEvent && s.reminderToggleOn]}
+                  onPress={() => { haptic.tap(); setShowClassPicker(true); }}
+                  activeOpacity={0.8}
+                >
+                  <GraduationCap size={14} color={classEvent ? '#A78BFA' : colors.text.muted} />
+                  <Text style={[s.reminderToggleText, classEvent && { color: '#A78BFA' }]} numberOfLines={1}>
+                    {classEvent ? fmtClassEventLabel(classEvent, classPrefix) : 'Powiąż z zajęciami (opcjonalnie)'}
+                  </Text>
+                  {classEvent && (
+                    <TouchableOpacity style={s.reminderClear} onPress={unlinkClass} hitSlop={8}>
+                      <X size={12} color={colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                {classEvent && (
+                  <View style={s.chipRow}>
+                    {[15, 30, 60].map(min => {
+                      const active = classReminderMin === min;
+                      return (
+                        <TouchableOpacity
+                          key={min}
+                          style={[s.deadlineChip, active && s.deadlineChipActive]}
+                          onPress={() => onPickClassMinutes(min)}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>{min} min przed</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
                 <TextInput
                   value={reminderMsg}
                   onChangeText={setReminderMsg}
@@ -595,6 +663,12 @@ export default function AddTaskScreen() {
         </View>
 
       </KeyboardAvoidingView>
+
+      <ClassLinkPicker
+        visible={showClassPicker}
+        onClose={() => setShowClassPicker(false)}
+        onSelect={onPickClass}
+      />
     </SafeAreaView>
   );
 }

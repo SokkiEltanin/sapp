@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Plan zajęć: ciemniejszy kafelek, "TERAZ", zadania powiązane z zajęciami (2026-10-06)
+
+User: "w planie trochę ciemniejszy na dashboardzie tło, i... jak jestem to pokazuje podświetla
+aktualny, i... mogę dodać zadania powiązane z przedmiotem w konkretnej dacie... i to się
+pokazuje na planie i przypomina przed zajęciami". Pełny opis w ARCHITECTURE.md §259.
+`CLASS_GRADIENT` przyciemniony ~20%. Nowa `isHappeningNow()` podświetla trwające TERAZ zajęcia
+na dashboardzie i w pełnym planie (tick co minutę). Nowe pola na `Task`
+(`classEventId`/`classEventLabel`/`classReminderMinutesBefore`) + nowy
+`ClassLinkPicker.tsx` (modal wyboru wystąpienia) wpięty w dodawanie/edycję zadania — reużywa
+ISTNIEJĄCY mechanizm `reminderDate`/`reminderTime`, tylko wylicza je wstecz od startu zajęć.
+Powiązane zadania pokazują się jako plakietka pod odpowiednim wierszem w Planie zajęć. +15
+testów w `classSchedule.test.ts`. `tsc`/`jest` czyste (99/99 suite, 1265 testów).
+
+**🆕 Priorytet testu na urządzeniu — wysoki** (dotyka powiadomień): w trakcie trwających zajęć
+sprawdź plakietkę "TERAZ" (dashboard + plan, dzień i tydzień). Dodaj zadanie z przypomnieniem
+→ "Powiąż z zajęciami" → wybierz wystąpienie → sprawdź przeliczony czas przypomnienia i że
+zadanie pokazuje się w Planie zajęć pod właściwym wierszem → sprawdź że powiadomienie faktycznie
+przychodzi o wyliczonej porze.
+
 ## 🆕 Unifikacja trzech silników korelacji humoru (2026-10-05)
 
 User: "dawaj dalej" — potwierdzenie po pytaniu, czy zunifikować 3 osobne silniki korelacji

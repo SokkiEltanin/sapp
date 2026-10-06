@@ -1,10 +1,10 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { GraduationCap } from 'lucide-react-native';
 import { CalendarEvent } from '@/types';
-import { parseClassEvent, fmtNextClassLabel } from '@/utils/classSchedule';
+import { parseClassEvent, fmtNextClassLabel, isHappeningNow } from '@/utils/classSchedule';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -17,7 +17,9 @@ import RadialGlow from '@/components/ui/RadialGlow';
 // profesjonalny większy trochę... wywal ten fioletowy element po lewej bo nie pasuje").
 // Wystarczająco ciemny żeby biały tekst wszędzie miał kontrast, z `#A78BFA` (marka tej
 // funkcji) zarezerwowanym na ikonę/odznaki/tytuł, nie na całe tło.
-const CLASS_GRADIENT = ['#3D2A66', '#5B3FA0', '#140D26'] as const;
+// Przyciemnione jeszcze bardziej (2026-10-06, user: "trochę ciemniejszy na dashboardzie
+// tło") — każdy stop ~20% ciemniejszy niż poprzednio, kontrast białego tekstu i tak zostaje.
+const CLASS_GRADIENT = ['#2E2050', '#47337F', '#0D091C'] as const;
 
 // "Plan zajęć" dashboard card (2026-09-22) — TEN SAM wzorzec/rozmiar co `GCalCard.tsx`
 // (dziś/jutro, kropka+godzina+tytuł), rozszerzony o odznakę typu (W/C/L/P) i salę, bo to
@@ -49,19 +51,31 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
   const c = useColors();
   const s = makeS(c);
   const showFallback = today.length === 0 && tomorrow.length === 0;
+
+  // "Podświetl aktualny" (2026-10-06, user: "jak jestem to pokazuje podświetla aktualny") —
+  // odświeżane co minutę, wystarczająco często żeby podświetlenie realnie zgasło/zapaliło
+  // się na granicy zajęć bez zauważalnego opóźnienia, za rzadko żeby to był sensowny koszt.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
   if (showFallback && !nextDay) return null;
 
   const renderRow = (e: CalendarEvent) => {
     const parsed = parseClassEvent(e.title, prefix);
     if (!parsed) return null;
+    const live = isHappeningNow(e, now);
     return (
-      <View key={e.id} style={s.row}>
+      <View key={e.id} style={[s.row, live && s.rowLive]}>
         {parsed.type && (
           <View style={s.typeBadge}><Text style={s.typeBadgeTxt}>{parsed.type}</Text></View>
         )}
         {e.startTime ? <Text style={s.time}>{e.startTime}</Text> : null}
         <Text style={s.subject} numberOfLines={1}>{parsed.subject}</Text>
         {parsed.room ? <Text style={s.room} numberOfLines={1}>{parsed.room}</Text> : null}
+        {live && <View style={s.liveBadge}><Text style={s.liveBadgeTxt}>TERAZ</Text></View>}
       </View>
     );
   };
@@ -122,6 +136,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
   dayLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: 0.8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
+  rowLive: {
+    backgroundColor: 'rgba(167,139,250,0.16)', borderRadius: radius.md,
+    paddingHorizontal: spacing[2], marginHorizontal: -spacing[2],
+  },
+  liveBadge: { backgroundColor: '#A78BFA', borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 2 },
+  liveBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#140D26', letterSpacing: 0.4 },
   typeBadge: { width: 18, height: 18, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   typeBadgeTxt: { fontSize: 10, fontWeight: '800', color: '#A78BFA' },
   time: { fontSize: 10, color: 'rgba(255,255,255,0.62)', width: 36, fontWeight: '600' },
