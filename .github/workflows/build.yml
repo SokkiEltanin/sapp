@@ -1,8 +1,22 @@
 name: Build APK
 
+# Auto-odpala się TYLKO gdy zmieniają się pliki natywne/zależności (2026-10-06, patrz
+# ci.yml's nowy krok "Publish OTA update") — zwykła zmiana JS (kolor, layout, animacja, logika)
+# leci teraz szybszą ścieżką (EAS Update, ci.yml), nie potrzebuje już pełnego buildu Gradle
+# (35-60 min) na KAŻDY push. Ten workflow zostaje dla rzeczy, których OTA fizycznie nie może
+# dowieźć — nowa ikona/splash/uprawnienie/plugin/natywna zależność (patrz CLAUDE.md §2) —
+# wykryte po ścieżce zmienionych plików. `workflow_dispatch` zostaje jako ręczny "zrób mi nowy
+# APK teraz" przycisk niezależnie od tego co się zmieniło.
 on:
   push:
     branches: [master, main]
+    paths:
+      - 'app.json'
+      - 'eas.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'android/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 jobs:
