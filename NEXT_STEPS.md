@@ -63,19 +63,17 @@ jednym slocie): wydropić/kupić 11. item jednego slotu → sprawdzić że pojaw
 "Ekwipunek pełny!" → sprzedać wskazaną instancję → nowy item trafia do ekwipunku, modal się
 zamyka → osobno sprawdzić przycisk "Odrzuć nowy przedmiot".
 
-## 🆕🔴 OTWARTE: "Bez słodyczy" streak nie łapie Kinder Bueno (2026-10-06)
+## ✅ ZAMKNIĘTE (nie bug): "Bez słodyczy" streak "nie łapał" Kinder Bueno (2026-10-06)
 
-User: toffifee już łapie (naprawione wcześniej, §250), ale Kinder Bueno NIE — potwierdzone
-drugi raz, z konkretnym terminem: "zanim dodałem to było 9 dni a Kinder jadłem przedwczoraj
-wiec jakby nie złapało". "Kinder"/"bueno" są literalnie w `AVOID_PRESETS['sweets'].keyword`
-(countersStore.ts) i `MealItem.name` zawsze jest zapisywane przy logowaniu posiłku — czytając
-kod (matchesAvoid/matchedEatDays/computeAvoidCounts/autoDaysWithout), substring-match POWINIEN
-zadziałać identycznie jak dla toffi. User nie pamięta jak dokładnie dodał produkt (nowy
-ręcznie wpisany vs wybrany z podpowiedzi) — **czeka na odpowiedź**: dokładna nazwa wpisu
-widoczna w "Co zjadłem" dla tego konkretnego produktu (możliwe że autouzupełnianie podstawiło
-inny, już zapisany produkt pod inną nazwą, i user tego nie zauważył przy zatwierdzaniu — to by
-tłumaczyło czemu matcher, który czytając kod wygląda poprawnie, nie złapał). Do zbadania dalej
-w następnej rundzie, gdy user poda dokładną nazwę wpisu.
+User podejrzewał że matcher nie złapał Kinder Bueno (zjedzone 4.10, 20:55, widoczne w "Co
+zjadłem"). Zrzutem kalendarza `/habit-year` dla "Bez słodyczy": 4.10 pokazany jako
+**zamrożony** (niebieski), nie jako zwykły "zrobiony" dzień. Zweryfikowane w kodzie
+(`habit-year.tsx`'s `stateFor`): dzień dostaje `'frozen'` TYLKO gdy `computeAvoidCounts`
+(habits.ts) najpierw uznał go za `'miss'` (czyli matcher REALNIE złapał Kinder Bueno jako
+słodycz, `dayCounts[habitId] = 0`) — sam fakt że 4.10 jest niebieski, nie czerwony, dowodzi że
+dopasowanie zadziałało poprawnie. Seria pokazuje "1 dzień z rzędu" bo w międzyczasie
+zamrożenie zostało realnie zużyte, nie dlatego że coś nie złapało. User: "zużył się freez
+wtedy nie sprawdziłem" — zgadza się z kodem, zamykam jako niebug, bez zmian w kodzie.
 
 ## 🆕 Fix: pigułka planu zajęć ucinała salę (2026-10-06)
 
