@@ -15045,6 +15045,59 @@ sprawdź diagnostykę jeszcze raz — `ID`/`createdAt` powinny się zmienić.
 
 ---
 
+---
+
+## 268. KRYTYCZNE: OTA `reloadAsync()` na żywo zbrickowało appkę usera — usunięte (2026-10-06)
+
+User, po pierwszym realnym zadziałaniu OTA (§266/§267): "pokazało NOWA WERSJA DOSTĘPNA i
+potem się pokazał biały ekran i potem czarny i tak już zostało" — appka przestała się
+uruchamiać, NIE pomogło kilkukrotne wymuszone zamknięcie+otwarcie (które powinno dać szansę
+wbudowanej ochronie `expo-updates` przed zbrickowaniem — auto-rollback po powtarzających się
+crashach przy starcie — ale najwyraźniej JS crashował zanim ten mechanizm zdążył się
+uruchomić).
+
+**Root cause**: efekt z §266 wołał `Updates.reloadAsync()` 1.2s po pobraniu nowej paczki —
+podmieniając JS bundle NA ŻYWO w pełni uruchomionej, działającej appce (żywy stos nawigacji
+expo-router, nasłuchiwacze Firebase auth, timery, `AppState` listenery z dziesiątek `useEffect`
+w `_layout.tsx`). To ZAUWAŻALNIE mniej przetestowana ścieżka niż prawdziwy zimny start procesu
+(ten sam kod bootstrapu, ale uruchamiany przez natywny system Android od zera, bez żadnego
+współistniejącego stanu JS do posprzątania) — i to właśnie ugryzło przy pierwszym realnym
+użyciu w praktyce.
+
+**Fix**: `reloadAsync()` CAŁKOWICIE usunięty z tego efektu. `fetchUpdateAsync()` samo w sobie
+tylko ŚCIĄGA paczkę na dysk — `expo-updates` natywnie (bez udziału JS) automatycznie użyje jej
+przy NASTĘPNYM zwykłym, zimnym starcie appki (user i tak otwiera appkę wielokrotnie dziennie)
+— dokładnie ta sama, dobrze przetestowana ścieżka co normalne zamknięcie+otwarcie, zero
+ryzykownej podmiany-w-locie. Toast zmieniony z "odświeżam…" (coś się zaraz wydarzy) na
+informacyjne "włączy się przy następnym otwarciu appki" (nic nie jest wymuszane).
+
+**Konsekwencja dla usera w tamtej chwili**: appka pozostała zbrickowana przez PRZED-fixową
+paczkę (już pobraną, zanim ten fix powstał) — sama publikacja NOWEJ, poprawionej paczki NIE
+mogła odblokować urządzenia, które nie wykonuje już żadnego JS (serwer nie może "wypchnąć"
+niczego do appki która nie działa). Jedyna droga odzyskania: deinstalacja + reinstalacja APK
+(czyści lokalny stan `expo-updates`, wraca do wbudowanej, znanej-dobrej paczki z pliku APK) —
+ale DOPIERO PO opublikowaniu tego fixu, inaczej świeża instalacja złapałaby tę samą zepsutą
+paczkę i powtórzyła crash w pętli. Backup w chmurze (`maybeAutoBackup`/"Znaleziono kopię w
+chmurze" w `_layout.tsx`) istnieje właśnie na taką okazję — dane do odzyskania po ponownym
+zalogowaniu.
+
+**Lekcja na przyszłość (zapisane też jako zasada)**: `Updates.reloadAsync()` NIE powinno być
+wołane automatycznie z efektu działającego W TLE na już-uruchomionej appce — tylko ewentualnie
+jako jawna, user-inicjowana akcja (przycisk "odśwież teraz" z pełną świadomością ryzyka), albo
+wcale, jak tutaj. "Zastosuje się przy następnym otwarciu" jest bezpieczniejszym domyślnym
+zachowaniem OTA dla appki tej wielkości/złożoności bootstrapu.
+
+**Testy**: brak nowych (czysta zmiana zachowania efektu, nie nowa logika czysta do
+przetestowania). `tsc --noEmit` czyste, `jest --silent` 100/100 suite.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, natychmiastowy**: po zmergowaniu i realnym
+opublikowaniu tego fixu przez CI, user musi odinstalować i ponownie zainstalować APK #1147,
+potem (po zalogowaniu) potwierdzić że appka wraca do życia i że kolejne OTA (ta sama paczka co
+teraz, zawierająca ten fix) NIE próbuje się już nigdy wymusić samo, tylko czeka cicho do
+następnego otwarcia.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

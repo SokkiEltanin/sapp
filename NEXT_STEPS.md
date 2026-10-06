@@ -3,27 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕🔴 OSTATNI KROK: OTA update (EAS Update) — potwierdź na telefonie (2026-10-06)
+## 🆕🔴🔴 KRYTYCZNE — AWARIA: OTA zbrickowało appkę usera, user ZABLOKOWANY (2026-10-06)
 
-User: "czekam 35min jak nie godzinę... mi się odechciewa" — każda zmiana (nawet jeden kolor)
-odpalała pełny build APK. Pełny opis w ARCHITECTURE.md §266/§267.
+User po pierwszym realnym OTA: "pokazało NOWA WERSJA DOSTĘPNA i potem biały ekran i potem
+czarny i tak już zostało" — appka się nie uruchamia, NIE pomogło kilkukrotne wymuszone
+zamknięcie+otwarcie. Pełny opis w ARCHITECTURE.md §268.
 
-**Status — wszystko po stronie serwera/CI już zweryfikowane:**
-1. ✅ Sekret repo `EXPO_TOKEN` dodany przez usera.
-2. ✅ Ostatni pełny APK (PR #373, auto-triggered przez zmianę `app.json`) — build skończony,
-   sukces (run #1147).
-3. ✅ Realna publikacja OTA z prawdziwym tokenem — potwierdzone wprost w logach CI (PR #374):
-   `✔ Published!`, kanał `production`, osobne update ID na Android/iOS.
-4. 🆕 Nowy wiersz diagnostyczny Ustawienia → Diagnostyka → "Wersja aplikacji (OTA)" (§267) —
-   pokazuje kanał/runtime/`updateId`/kiedy pobrana ostatnia paczka, żeby dało się to sprawdzić
-   na telefonie bez zgadywania.
+**Root cause znaleziony i naprawiony**: `Updates.reloadAsync()` wołane NA ŻYWO w działającej
+appce (podmiana bundla bez zimnego restartu procesu) — usunięte, OTA teraz tylko cicho pobiera
+w tle i czeka do NASTĘPNEGO normalnego otwarcia appki (ten sam fix co §268 opisuje
+szczegółowo).
 
-**🆕 Priorytet testu na urządzeniu — wysoki, ostatni brakujący krok**: zainstaluj build #1147
-(jeśli jeszcze nie), otwórz Ustawienia → Diagnostyka → "Wersja aplikacji (OTA)", zanotuj `ID`.
-Gdy TEN PR (dodający tę diagnostykę) się zmerguje, zamknij i otwórz appkę ponownie — powinien
-pojawić się toast "Nowa wersja gotowa", a `ID`/data w diagnostyce powinny się zmienić, bez
-instalowania nowego APK. To domyka całą funkcję — jeśli zadziała, resztę zmian (kolory,
-animacje, layout) będziesz widział w appce w kilkadziesiąt sekund od zmergowania PR-a.
+**Sekwencja odzyskania usera — KOLEJNOŚĆ KRYTYCZNA (nie zmieniać!):**
+1. Ten fix musi się NAJPIERW zmergować i NAPRAWDĘ opublikować przez CI (sprawdzić w logach
+   kroku "Publish OTA update" — `✔ Published!`, nie tylko zielone CI) — inaczej serwer dalej
+   serwuje zepsutą paczkę.
+2. DOPIERO POTEM powiedzieć userowi: odinstaluj appkę całkowicie, zainstaluj ponownie TEN SAM
+   plik APK #1147 (https://github.com/SokkiEltanin/sapp/releases/download/build-1147/sapp-build1147-v6.0.0-3759fc0.apk)
+   — deinstalacja czyści lokalny stan `expo-updates`, świeża instalacja wraca do wbudowanej
+   (znanej-dobrej) paczki i przy pierwszym uruchomieniu pobierze NOWĄ (już naprawioną) paczkę
+   w tle, bez wymuszania.
+3. Dane: appka robi auto-backup do chmury — po zalogowaniu Google powinna sama zaproponować
+   przywrócenie. Zweryfikować z userem że dane faktycznie wróciły.
+4. Po odzyskaniu: potwierdzić że appka NIE próbuje się już sama resetować przy kolejnych OTA
+   (sprawdzić że toast mówi "włączy się przy następnym otwarciu", nie "odświeżam…").
+
+**🆕 Priorytet testu na urządzeniu — KRYTYCZNY, user obecnie zablokowany z appki.**
 
 ## 🆕 Kafelek "Plan zajęć" — czytelność: zakres godzin, przerwy/okienka, sala, dzień w rogu (2026-10-06)
 
