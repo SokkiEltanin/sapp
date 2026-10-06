@@ -31,6 +31,17 @@ jobs:
       # pliki natywne/zależności — patrz komentarz tam). `continue-on-error` + ręczny guard na
       # brak `EXPO_TOKEN` — publikacja OTA to efekt uboczny, nie bramka jakości, więc jej
       # niepowodzenie (np. sekret jeszcze nie dodany) nie może blokować mergowania PR-ów.
+      #
+      # BUG (2026-10-06, user zrzutem natywnego crasha: "FirebaseError: Firebase: Error
+      # (auth/invalid-api-key)" chwilę po starcie, appka się sama naprawiła dopiero po kolejnym
+      # restarcie) — ten krok NIE miał w ogóle `EXPO_PUBLIC_FIREBASE_*`/`EXPO_PUBLIC_GOOGLE_*`
+      # env (w przeciwieństwie do `build.yml`'s `Expo prebuild`/`Build release APK`, patrz tam),
+      # więc `eas update` budował JS bundle z PUSTYMI kluczami Firebase wpalonymi na stałe —
+      # każda OTA paczka miała złamane logowanie/Firestore. Appka przeżyła bo wbudowana
+      # ochrona `expo-updates` (auto-rollback po nieudanym starcie) tym razem zdążyła się
+      # uruchomić i wróciła do poprzedniej, dobrej paczki — ale KAŻDA kolejna publikacja OTA
+      # powtarzałaby ten sam crash-i-rollback cykl, aż do tego fixu. Te same wartości co
+      # `build.yml` (sekrety repo już istnieją, user nie musi nic dodawać).
       - name: Publish OTA update (EAS Update)
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         continue-on-error: true
@@ -40,6 +51,16 @@ jobs:
           # ryzyko co backtiki w `git commit -m` (patrz CLAUDE.md), tyle że tu interpolacja
           # ${{ }} wklejałaby dowolny tekst commita PROSTO w skrypt powłoki.
           UPDATE_MESSAGE: ${{ github.event.head_commit.message }}
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: sokkisapp.firebaseapp.com
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: sokkisapp
+          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: sokkisapp.firebasestorage.app
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1020705470960"
+          EXPO_PUBLIC_FIREBASE_APP_ID: 1:1020705470960:web:ea4cea0c761d49ce2ec535
+          EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: G-2042K265XB
+          EXPO_PUBLIC_GOOGLE_VISION_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_VISION_API_KEY }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: 1020705470960-h29iavvvn5e1iipg76kdbn8cih7vg5oo.apps.googleusercontent.com
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
             echo "::warning::EXPO_TOKEN sekret nie ustawiony w repo — pomijam publikację OTA. Dodaj token z expo.dev (Account settings → Access tokens) jako sekret repo 'EXPO_TOKEN', żeby zmiany JS trafiały na telefon bez pełnego buildu APK."
