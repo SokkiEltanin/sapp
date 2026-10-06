@@ -69,6 +69,28 @@ export function fmtNextClassLabel(dateYMD: string, daysAway: number): string {
   return `${nice} · za ${daysAway} ${plPlural(daysAway, 'dzień', 'dni', 'dni')}`;
 }
 
+// Przerwa między KOLEJNYMI zajęciami tego samego dnia, w minutach (2026-10-06, user: "musi
+// być... blokowo od której do której, potem żeby było widać czy mam 15 min przerwy pomiędzy
+// czy ze np mam okienko"). Proste odejmowanie HH:mm→minuty — oba czasy już są w tej samej
+// strefie/dobie (plan zajęć, nie eventy przechodzące przez północ), więc bez dat/Date().
+function hmToMin(hm: string): number {
+  const [h, m] = hm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+export function classGapMinutes(endTime: string, nextStartTime: string): number {
+  return hmToMin(nextStartTime) - hmToMin(endTime);
+}
+
+// Etykieta przerwy — "15min przerwy" pod godzinę, "1h 30min okienko" od godziny wzwyż (user
+// rozróżnił wprost "15 min przerwy" vs "okienko" jako dwie różne rzeczy). Ten sam format
+// "Xh Ymin"/"Ymin" co fmtPotionCountdown (potions.ts)/fmtMissionCountdown (missions.ts).
+export function classGapLabel(gapMin: number): string {
+  const h = Math.floor(gapMin / 60);
+  const m = gapMin % 60;
+  const dur = h > 0 ? `${h}h ${m}min` : `${m}min`;
+  return gapMin >= 60 ? `${dur} okienko` : `${dur} przerwy`;
+}
+
 // "Podświetl aktualny" (2026-10-06, user: "jak jestem to pokazuje podświetla aktualny") —
 // czy DOKŁADNIE TERAZ trwa to zajęcie: ten sam dzień + `now`'s HH:mm mieści się w
 // [startTime, endTime). Eventy bez godzin (allDay czy brak start/end) nigdy nie "trwają".

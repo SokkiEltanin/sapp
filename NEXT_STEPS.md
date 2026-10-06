@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kafelek "Plan zajęć" — czytelność: zakres godzin, przerwy/okienka, sala, dzień w rogu (2026-10-06)
+
+User zrzutem kafelka: "średnio czytelny... musi być czasowo blokowo od której do której...
+żeby było widać czy mam 15 min przerwy pomiędzy czy ze np mam okienko, i żeby było lepiej
+widać sale, a tekst dzień tygodnia i za ile dni możesz dać w prawym górnym żeby nie
+rozciągała nam tak kafelka". Pełny opis w ARCHITECTURE.md §265. Cztery zmiany w
+`ClassScheduleCard.tsx`: (1) wiersz pokazuje pełny zakres `start–end`, nie sam start; (2)
+nowe `classGapMinutes`/`classGapLabel` (classSchedule.ts) + dzielnik między wierszami gdy
+jest przerwa (<60min "Xmin przerwy", ≥60min "Xh Ymin okienko"); (3) sala jako jasny chip
+zamiast przygaszonego tekstu; (4) etykieta "dzień + za N dni" (tylko wariant fallback, gdy
+dziś/jutro puste) przeniesiona z pełnoszerokościowej linii do chipa w rogu nagłówka, obok
+tytułu. `tsc`/`jest` czyste (100/100 suite, 1297 testów, +17).
+
+**🆕 Priorytet testu na urządzeniu — średni** (czytelność): Dashboard → kafelek Plan zajęć →
+sprawdzić zakres godzin "od–do", dzielnik przerwy/okienka między zajęciami, wyraźny chip
+sali, i że w wariancie "najbliższy dzień" etykieta siedzi w rogu obok tytułu, nie w osobnej
+szerokiej linii.
+
 ## 🆕 Fix: "Wklej paragon" (Kaufland) dawał "Brak produktów" na drukowanym paragonie (2026-10-06)
 
 User zrzutem: wkleił tekst drukowanego paragonu Kaufland w poprawnym formacie i dostał "Brak

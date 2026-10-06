@@ -14897,6 +14897,60 @@ sprawdzić że nowy item trafia do ekwipunku i modal się zamyka; osobno sprawdz
 
 ---
 
+---
+
+## 265. Kafelek "Plan zajęć" — zakres godzin, przerwy/okienka, sala jako chip, dzień w rogu (2026-10-06)
+
+User zrzutem fioletowego kafelka: "średnio czytelny... musi być czasowo jak wypada
+najlepiej blokowo... od której do której... żeby było widać czy mam 15 min przerwy
+pomiędzy czy ze np mam okienko, i żeby było lepiej widać sale, a tekst dzień tygodnia i za
+ile dni możesz dać w prawym górnym żeby nie rozciągała nam tak kafelka".
+
+**Cztery zmiany w `ClassScheduleCard.tsx` (dashboard), zero zmian w pełnym planie
+(`app/class-schedule.tsx`, nietknięty):**
+
+1. **Zakres godzin** — wiersz pokazywał sam `startTime` ("08:00"); teraz
+   `startTime–endTime` ("08:00–09:45"), `time` style poszerzony 36→68px. Długość zajęć
+   widoczna bez otwierania pełnego planu.
+2. **Dzielniki przerw/okienek między zajęciami** — nowe czyste funkcje w `classSchedule.ts`:
+   `classGapMinutes(endTime, nextStartTime)` (proste odejmowanie HH:mm→minuty, oba czasy w
+   tej samej dobie, bez Date()) i `classGapLabel(gapMin)` (< 60min → "Xmin przerwy", ≥60min →
+   "Xh Ymin okienko" — user explicite rozróżnił te dwa słowa; ten sam format "Xh Ymin"/"Ymin"
+   co `fmtPotionCountdown`/`fmtMissionCountdown`). W komponencie nowy `renderDay(events)`
+   (zastępuje gołe `.map(renderRow)`) interleave'uje cienką linię+etykietę między kolejnymi
+   wierszami gdy `gap > 0` — liczone z SUROWYCH `startTime`/`endTime` niezależnie od tego czy
+   `parseClassEvent` rozpoznał tytuł. `classToday`/`classTomorrow`/`classNextDay.events`
+   (index.tsx) już są posortowane wg `startTime` (niezmienione), więc sekwencyjne liczenie
+   przerw jest bezpieczne.
+3. **Sala jako jasny chip** — dawny goły `room` tekst (`rgba(255,255,255,0.62)`, przygaszony,
+   ginął na gradiencie) zastąpiony `roomChip`em (jasne tło `rgba(255,255,255,0.14)`, biały
+   bold tekst 11.5px) — ten sam "jasne tło na ciemnym gradiencie" przepis co istniejący
+   `typeBadge`.
+4. **Chip "dzień + za N dni" w prawym górnym rogu** — dotyczy TYLKO wariantu fallback
+   (`showFallback && nextDay`, gdy dziś/jutro puste i kafelek pokazuje najbliższy przyszły
+   dzień, `fmtNextClassLabel` np. "Pon 12 paź · za 6 dni") — dawniej pełnoszerokościowa linia
+   nad listą zajęć, rozciągająca kafelek. Przeniesiony do `cardHeader` jako kompaktowy
+   `dayChip` obok tytułu — `cardTitle` dostało `flex: 1`, żeby wypchnąć chip do prawej
+   krawędzi (DOKŁADNIE ten sam wzorzec co `catChip`/`title: {flex:1}` w `TriviaCard.tsx`,
+   widoczny na tym samym zrzucie ekranu usera jako "Świat" w rogu "Ciekawostki dnia").
+   "Dziś"/"Jutro" (gdy OBA warianty są widoczne naraz) zostają jako krótkie nagłówki sekcji
+   nad listą — same w sobie nie rozciągały kafelka, user narzekał konkretnie na dłuższy
+   format dzień-tygodnia+data+"za N dni".
+
+**Testy**: nowe `describe` w `classSchedule.test.ts` dla `classGapMinutes` (prosta różnica,
+przejście przez godzinę, zero dla zajęć bez przerwy, ujemne dla nakładających się,
+wielogodzinne okienko) i `classGapLabel` (granica 59→60min "przerwy"→"okienko", kilka
+wartości). `tsc --noEmit` czyste, `jest --silent` 100/100 suite, 1297 testów (+17).
+
+**Priorytet testu na urządzeniu — średni** (czytelność, nie funkcjonalność blokująca):
+Dashboard → kafelek Plan zajęć → sprawdzić że każdy wiersz pokazuje zakres "od–do", że
+między zajęciami z przerwą widać cienką linię z etykietą (15 min vs godzinne okienko), że
+sala jest wyraźnym jasnym chipem, i że w wariancie "najbliższy dzień" (weekend/przerwa
+międzysemestralna) dzień+data+"za N dni" siedzi w rogu obok "Plan zajęć", nie w osobnej,
+szerokiej linii.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -1,4 +1,4 @@
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel, isHappeningNow, computeClassReminder, fmtClassEventLabel, abbreviateSubject } from '@/utils/classSchedule';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel, isHappeningNow, computeClassReminder, fmtClassEventLabel, abbreviateSubject, classGapMinutes, classGapLabel } from '@/utils/classSchedule';
 import { CalendarEvent } from '@/types';
 
 const ev = (o: Partial<CalendarEvent> = {}): CalendarEvent => ({
@@ -156,5 +156,37 @@ describe('abbreviateSubject — deterministyczne cięcie długich nazw przedmiot
     // limit pada DOKŁADNIE na spacji — bez trimEnd wyszłoby "Struktura …" z nadmiarową spacją
     const r = abbreviateSubject('Struktura cos', 10);
     expect(r).toBe('Struktura…');
+  });
+});
+
+// 2026-10-06, user o kafelku dashboardu: "musi być czasowo... blokowo od której do której,
+// potem żeby było widać czy mam 15 min przerwy pomiędzy czy ze np mam okienko".
+describe('classGapMinutes — przerwa między kolejnymi zajęciami, w minutach', () => {
+  test('prosta różnica w tej samej godzinie', () => {
+    expect(classGapMinutes('08:00', '08:15')).toBe(15);
+  });
+  test('przechodzi przez pełną godzinę', () => {
+    expect(classGapMinutes('09:45', '10:00')).toBe(15);
+  });
+  test('zajęcia bezpośrednio po sobie → 0', () => {
+    expect(classGapMinutes('09:30', '09:30')).toBe(0);
+  });
+  test('nakładające się (koniec po starcie następnych) → ujemne', () => {
+    expect(classGapMinutes('10:15', '10:00')).toBe(-15);
+  });
+  test('wielogodzinne okienko', () => {
+    expect(classGapMinutes('09:45', '13:15')).toBe(3 * 60 + 30);
+  });
+});
+
+describe('classGapLabel — etykieta "15min przerwy" vs "1h 30min okienko"', () => {
+  test('poniżej godziny → "przerwy"', () => {
+    expect(classGapLabel(15)).toBe('15min przerwy');
+    expect(classGapLabel(59)).toBe('59min przerwy');
+  });
+  test('od godziny wzwyż → "okienko"', () => {
+    expect(classGapLabel(60)).toBe('1h 0min okienko');
+    expect(classGapLabel(90)).toBe('1h 30min okienko');
+    expect(classGapLabel(210)).toBe('3h 30min okienko');
   });
 });

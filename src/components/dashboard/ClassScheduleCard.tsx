@@ -1,10 +1,10 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { GraduationCap } from 'lucide-react-native';
 import { CalendarEvent } from '@/types';
-import { parseClassEvent, fmtNextClassLabel, isHappeningNow } from '@/utils/classSchedule';
+import { parseClassEvent, fmtNextClassLabel, isHappeningNow, classGapMinutes, classGapLabel } from '@/utils/classSchedule';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -72,12 +72,48 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
         {parsed.type && (
           <View style={s.typeBadge}><Text style={s.typeBadgeTxt}>{parsed.type}</Text></View>
         )}
-        {e.startTime ? <Text style={s.time}>{e.startTime}</Text> : null}
+        {/* Blok "od-do" (2026-10-06, user: "musi być czasowo... blokowo od której do której,
+            potem żeby było widać czy mam 15 min przerwy pomiędzy czy ze np mam okienko") —
+            dawniej sam `startTime`, teraz pełny zakres, żeby długość zajęć była widoczna bez
+            otwierania pełnego planu. */}
+        {e.startTime ? (
+          <Text style={s.time}>{e.startTime}{e.endTime ? `–${e.endTime}` : ''}</Text>
+        ) : null}
         <Text style={s.subject} numberOfLines={1}>{parsed.subject}</Text>
-        {parsed.room ? <Text style={s.room} numberOfLines={1}>{parsed.room}</Text> : null}
+        {/* Sala jako wyraźny chip zamiast przygaszonego tekstu (2026-10-06, user: "żeby było
+            lepiej widać sale") — ten sam przepis co `typeBadge` (jasne tło na ciemnym
+            gradiencie), nie goła szarość. */}
+        {parsed.room ? (
+          <View style={s.roomChip}><Text style={s.roomChipTxt} numberOfLines={1}>{parsed.room}</Text></View>
+        ) : null}
         {live && <View style={s.liveBadge}><Text style={s.liveBadgeTxt}>TERAZ</Text></View>}
       </View>
     );
+  };
+
+  // Renderuje jeden dzień (lista eventów, już posortowana wg startTime — patrz classToday/
+  // classTomorrow/classNextDay w index.tsx) WRAZ z dzielnikami przerw między kolejnymi
+  // zajęciami — liczonymi z surowych `startTime`/`endTime`, niezależnie od tego czy
+  // `parseClassEvent` rozpoznał tytuł (gap dotyczy SAMEGO czasu, nie treści).
+  const renderDay = (events: CalendarEvent[]) => {
+    const nodes: ReactNode[] = [];
+    events.forEach((e, i) => {
+      nodes.push(renderRow(e));
+      const next = events[i + 1];
+      if (next?.startTime && e.endTime) {
+        const gap = classGapMinutes(e.endTime, next.startTime);
+        if (gap > 0) {
+          nodes.push(
+            <View key={`gap-${e.id}`} style={s.gapRow}>
+              <View style={s.gapLine} />
+              <Text style={s.gapTxt}>{classGapLabel(gap)}</Text>
+              <View style={s.gapLine} />
+            </View>,
+          );
+        }
+      }
+    });
+    return nodes;
   };
 
   return (
@@ -98,25 +134,30 @@ function ClassScheduleCard({ today, tomorrow, nextDay, prefix }: ClassScheduleCa
         <View style={s.cardHeader}>
           <GraduationCap size={13} color="#A78BFA" />
           <Text style={s.cardTitle}>Plan zajęć</Text>
+          {/* Dzień tygodnia + "za N dni" przeniesione w prawy górny róg (2026-10-06, user:
+              "tekst dzień tygodnia i za ile dni możesz dać w prawym górnym żeby nie
+              rozciągała nam tak kafelka") — dawniej pełnoszerokościowy `dayLabel` nad
+              listą zajęć, teraz kompaktowy chip obok tytułu (ten sam wzorzec co `catChip`
+              w TriviaCard.tsx: `cardTitle` dostało `flex:1`, żeby wypchnąć chip do
+              krawędzi). Tylko w wariancie fallback — "Dziś"/"Jutro" zostają jako krótkie
+              nagłówki sekcji, same w sobie nie rozciągały kafelka. */}
+          {showFallback && nextDay && (
+            <View style={s.dayChip}><Text style={s.dayChipTxt}>{fmtNextClassLabel(nextDay.date, nextDay.daysAway).toUpperCase()}</Text></View>
+          )}
         </View>
         {today.length > 0 && (
           <>
             <Text style={s.dayLabel}>Dziś</Text>
-            {today.map(renderRow)}
+            {renderDay(today)}
           </>
         )}
         {tomorrow.length > 0 && (
           <>
             <Text style={[s.dayLabel, { marginTop: today.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
-            {tomorrow.map(renderRow)}
+            {renderDay(tomorrow)}
           </>
         )}
-        {showFallback && nextDay && (
-          <>
-            <Text style={s.dayLabel}>{fmtNextClassLabel(nextDay.date, nextDay.daysAway)}</Text>
-            {nextDay.events.map(renderRow)}
-          </>
-        )}
+        {showFallback && nextDay && renderDay(nextDay.events)}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -133,7 +174,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   glowWrap: { position: 'absolute', left: -40, top: '50%', marginTop: -100 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  cardTitle: { fontFamily: fonts.label, fontSize: 11, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
+  cardTitle: { flex: 1, fontFamily: fonts.label, fontSize: 11, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1, fontWeight: '700' },
+  // Chip "dzień tygodnia + za N dni" w prawym górnym rogu (2026-10-06) — zastępuje dawny
+  // pełnoszerokościowy `dayLabel` tylko w wariancie fallback, patrz komentarz przy JSX wyżej.
+  dayChip: { backgroundColor: 'rgba(167,139,250,0.18)', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+  dayChipTxt: { fontSize: 8.5, fontWeight: '800', color: '#D8CCFC', letterSpacing: 0.5 },
   dayLabel: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: 0.8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
   rowLive: {
@@ -144,9 +189,22 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   liveBadgeTxt: { fontSize: 8, fontWeight: '800', color: '#140D26', letterSpacing: 0.4 },
   typeBadge: { width: 18, height: 18, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   typeBadgeTxt: { fontSize: 10, fontWeight: '800', color: '#A78BFA' },
-  time: { fontSize: 10, color: 'rgba(255,255,255,0.62)', width: 36, fontWeight: '600' },
+  // Blok "od-do" (2026-10-06) — szerszy niż dawny sam `startTime` (36px), żeby zmieścić pełny
+  // zakres "08:00–09:30" bez zawijania.
+  time: { fontSize: 10, color: 'rgba(255,255,255,0.72)', width: 68, fontWeight: '600' },
   subject: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.88)' },
-  room: { fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: '700' },
+  // Sala jako jasny chip (2026-10-06, user: "żeby było lepiej widać sale") — zastępuje dawny
+  // goły, przygaszony tekst (`rgba(255,255,255,0.62)`) — ten sam jasny-tło-na-gradiencie
+  // przepis co `typeBadge`/`dayChip` wyżej, żeby sala realnie rzucała się w oczy, nie ginęła.
+  roomChip: { backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: radius.sm, paddingHorizontal: 7, paddingVertical: 3 },
+  roomChipTxt: { fontSize: 11.5, color: '#fff', fontWeight: '800' },
+  // Dzielnik przerwy między kolejnymi zajęciami (2026-10-06, user: "zeby bylo qidac czy mam
+  // 15 min przerwy pomiędzy czy ze np mam okienko") — cienka linia po obu stronach etykiety,
+  // ten sam motyw co separator w statystykach, ale minimalny (nie pełny `row`, nie ma własnej
+  // interakcji/podświetlenia).
+  gapRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 2 },
+  gapLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' },
+  gapTxt: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3 },
 }));
 
 export default memo(ClassScheduleCard);
