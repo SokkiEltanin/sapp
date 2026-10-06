@@ -15099,6 +15099,44 @@ automatycznego backupu w chmurze po ponownym zalogowaniu Google.
 
 ---
 
+---
+
+## 269. KRYTYCZNE: OTA paczki miały puste klucze Firebase — ci.yml nie przekazywał env (2026-10-06)
+
+User zrzutem natywnego crasha: `FirebaseError: Firebase: Error (auth/invalid-api-key)`, krótko
+po starcie appki, appka "sama się naprawiła" po kolejnym otwarciu.
+
+**Root cause**: `ci.yml`'s krok "Publish OTA update" (`eas update`, §266) NIE dostawał
+`EXPO_PUBLIC_FIREBASE_*`/`EXPO_PUBLIC_GOOGLE_*` jako env — w przeciwieństwie do `build.yml`'s
+`Expo prebuild`/`Build release APK`, które mają je od zawsze. Expo wpala `EXPO_PUBLIC_*` do
+bundla JS W MOMENCIE BUDOWANIA (nie w runtime) — `eas update` budował więc KAŻDĄ paczkę OTA z
+PUSTYMI kluczami Firebase na stałe wpalonymi w kod, łamiąc `initializeAuth`/`getAuth` (i każdą
+inną usługę Firebase) w każdej opublikowanej dotąd paczce OTA.
+
+**Dlaczego appka "sama się naprawiła"**: wbudowana ochrona `expo-updates` (auto-rollback po
+nieudanym starcie, ta sama co nie zdążyła zadziałać w §268 — tu najwyraźniej zdążyła) wykryła
+crash przy uruchomieniu zepsutej paczki i wróciła do poprzedniej, działającej. To był SZCZĘŚLIWY
+przypadek, nie gwarancja — kolejna publikacja OTA powtórzyłaby crash-i-rollback cykl w
+nieskończoność, z realnym ryzykiem powtórki pełnego zablokowania jak w §268.
+
+**Fix**: `ci.yml`'s krok dostał DOKŁADNIE te same `EXPO_PUBLIC_*` env co `build.yml` (te same
+sekrety repo, user nic nie musi dodawać — już istnieją od configu pełnych buildów).
+
+**Konsekwencja**: KAŻDA paczka OTA opublikowana między #373 (wdrożenie OTA) a tym fixem miała
+złamane Firebase — wliczając tę obecnie opublikowaną na kanale `production`. Ten fix, jak
+tylko się opublikuje, NADPISZE ją poprawną wersją — appka użytkownika (build #1148, już
+działająca) w tle i tak regularnie sprawdza/pobiera najnowszą, więc złapie poprawkę przy
+najbliższej okazji.
+
+**Testy**: brak nowych — czysta zmiana configu CI. `ci.yml` zwalidowany parserem YAML przed
+commitem.
+
+**Priorytet testu na urządzeniu — wysoki**: po opublikowaniu tego fixu (sprawdzić w logach
+`✔ Published!`), obserwować czy kolejne otwarcia appki NIE pokazują już natywnego crasha
+Firebase.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
