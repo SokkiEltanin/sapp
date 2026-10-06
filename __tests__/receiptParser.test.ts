@@ -280,6 +280,62 @@ describe('parseReceiptText — Kaufland app "Receipt copy" (2026-08-27)', () => 
   });
 });
 
+// 2026-10-06 — user wkleił DRUKOWANY papierowy paragon Kaufland (nie app "Receipt copy"
+// powyżej) i dostał "Brak produktów" mimo poprawnego formatu linii ("4 * 1,49 ... 5,96 C").
+// Root cause: drukowany paragon TEŻ ma nagłówek "Cena PLN" (więc trafia do tego samego
+// `parseKauflandReceiptCopy`), ale kończy się zwykłą "Suma", nie "Suma cząstkowa" — regex
+// szukający WYŁĄCZNIE "Suma cząstkowa" nigdy nie znajdował końca sekcji pozycji, więc
+// `itemLines` było puste. Tekst dokładnie jak wklejony przez usera (skrócony do nagłówka).
+const KAUFLAND_PRINTED_RECEIPT = `
+Kaufland Polska Markety Sp.z o.o.Sp.j.
+Al.Armii Krajowej 47, 50-541 Wrocław
+Nr BDO 000013346
+ul. Rejtana 40
+35-959  Rzeszów 5464
+Cena PLN
+Piekarnia
+Bułka orkiszowa 90g
+ 4 * 1,49                         5,96 C
+Bułka pszenno-żytnia 80g
+ 4 * 0,99                         3,96 C
+Podstawowe artykuły spożywcze
+KotlinKetchupZPiekła450G
+ 2 * 4,99                         9,98 B
+Słodycze
+MilkaCiastkaSens156g
+ 2 * 6,49                        12,98 C
+Suma                             32,88
+Płatność kartą                   32,88
+Reszta                            0,00
+`;
+
+describe('parseReceiptText — Kaufland DRUKOWANY paragon, "Suma" zamiast "Suma cząstkowa" (2026-10-06)', () => {
+  test('łapie wszystkie 4 pozycje zamiast "Brak produktów"', () => {
+    const r = parseReceiptText(KAUFLAND_PRINTED_RECEIPT);
+    expect(r.products).toHaveLength(4);
+  });
+
+  test('ilość/cena jednostkowa/cena finalna poprawnie odczytane z linii kontynuacji', () => {
+    const r = parseReceiptText(KAUFLAND_PRINTED_RECEIPT);
+    const p = r.products.find(x => /bułka orkiszowa/i.test(x.name));
+    expect(p).toBeDefined();
+    expect(p!.quantity).toBe(4);
+    expect(p!.unitPrice).toBe(1.49);
+    expect(p!.finalPrice).toBe(5.96);
+  });
+
+  test('nagłówki kategorii ("Piekarnia"/"Słodycze"/...) nie trafiają jako produkty', () => {
+    const r = parseReceiptText(KAUFLAND_PRINTED_RECEIPT);
+    expect(r.products.some(p => /^piekarnia$/i.test(p.name) || /^słodycze$/i.test(p.name))).toBe(false);
+  });
+
+  test('total = kwota z "Płatność kartą" (32,88)', () => {
+    const r = parseReceiptText(KAUFLAND_PRINTED_RECEIPT);
+    expect(r.total).toBe(32.88);
+    expect(r.subtotal).toBeCloseTo(32.88, 2);
+  });
+});
+
 describe('parseReceiptText — Lidl paragon ze zwrotem kaucji (2026-08-20)', () => {
   test('"Razem" to finalna, po-kaucyjna kwota (23,66), nie "SUMA PLN" sprzed zwrotu (29,66)', () => {
     const r = parseReceiptText(LIDL_RECEIPT_WITH_DEPOSIT);

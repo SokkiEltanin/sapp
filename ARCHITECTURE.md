@@ -14787,6 +14787,44 @@ sprawdź że lista itemów jest na górze, zakładki slotów (ikony hełm/zbroja
 
 ---
 
+---
+
+## 263. Fix: "Wklej paragon" (Kaufland) — drukowany paragon dawał "Brak produktów" (2026-10-06)
+
+User zrzutem: wkleił tekst drukowanego papierowego paragonu Kaufland (format dokładnie
+zgodny z podpowiedzią w komunikacie błędu, "1 * 7,99 7,99 C") i dostał "Brak produktów — Nie
+udało się rozpoznać produktów".
+
+**Root cause**: `isKauflandReceiptCopy()` wykrywa format po nagłówku "Cena PLN" — ale TEN
+nagłówek jest WSPÓLNY dla dwóch różnych layoutów: cyfrowego eksportu z appki Kaufland
+("Receipt copy", §255-era fixture) ORAZ zwykłego drukowanego paragonu papierowego. Oba trafiały
+więc do `parseKauflandReceiptCopy`. Różnica: cyfrowy eksport kończy sekcję pozycji linią
+"Suma cząstkowa NN,NN" (przed osobną sekcją promocji kasowych), a drukowany paragon ma tam
+po prostu zwykłą "Suma NN,NN" — `KFL_COPY_SUBTOTAL_RE` szukał WYŁĄCZNIE "Suma cząstkowa", więc
+na drukowanym paragonie `endIdx` zawsze wychodził -1, `itemLines` (slice między nagłówkiem a
+tym nieznalezionym końcem) było puste, i parser zwracał zero produktów — mimo że linie
+kontynuacji ("4 * 1,49 ... 5,96 C") mają DOKŁADNIE ten format, który `KFL_COPY_CONT_QTY_RE`
+już poprawnie rozpoznaje.
+
+**Fix**: `KFL_COPY_SUBTOTAL_RE` rozszerzony na `/^Suma(?:\s*cz[ąa]stkowa)?\s+(\d+[.,]\d{2})$/i`
+— "cząstkowa" teraz opcjonalne, więc oba warianty trafiają na tę samą granicę końca pozycji.
+Bezpieczne: przechwycona grupa i tak nigdzie nie jest używana (`subtotal` liczony z sumy
+`products[].finalPrice`, `total` z `detectTotal()` szukającego "Płatność"/"Suma"/"Razem" w
+całym tekście) — regex służy WYŁĄCZNIE do znalezienia granicy `endIdx`.
+
+**Testy**: nowy opis w `receiptParser.test.ts` z dokładnym tekstem paragonu usera (4 pozycje:
+2× bułka, ketchup, ciastka Milka) — sprawdza liczbę pozycji, ilość/cenę jednostkową/finalną z
+linii kontynuacji, że nagłówki kategorii ("Piekarnia"/"Słodycze") nie trafiają jako produkty, i
+poprawny `total`/`subtotal`. Istniejący fixture cyfrowego "Receipt copy" (10 pozycji, rabaty
+kasowe) wciąż przechodzi bez zmian — rozszerzenie regexu nie psuje tamtej ścieżki. `tsc
+--noEmit` czyste, `jest --silent` 100/100 suite, 1279 testów (+4).
+
+**Priorytet testu na urządzeniu — wysoki** (realny, zgłoszony bug blokujący dodawanie
+wydatków): Wydatki → Skanuj/Wklej paragon → wklej tekst drukowanego paragonu Kaufland →
+sprawdź że produkty się pojawiają zamiast "Brak produktów".
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

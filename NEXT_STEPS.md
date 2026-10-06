@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: "Wklej paragon" (Kaufland) dawał "Brak produktów" na drukowanym paragonie (2026-10-06)
+
+User zrzutem: wkleił tekst drukowanego paragonu Kaufland w poprawnym formacie i dostał "Brak
+produktów". Pełny opis w ARCHITECTURE.md §263. Root cause: drukowany paragon dzieli nagłówek
+"Cena PLN" z cyfrowym eksportem z appki Kaufland, więc trafiał do TEGO SAMEGO parsera — ale
+kończy się zwykłą "Suma", nie "Suma cząstkowa", więc granica końca pozycji nigdy się nie
+znajdowała i lista pozycji wychodziła pusta. `KFL_COPY_SUBTOTAL_RE` rozszerzony — "cząstkowa"
+teraz opcjonalne. +4 testy z dokładnym tekstem paragonu usera. `tsc`/`jest` czyste (100/100
+suite, 1279 testów).
+
+**🆕 Priorytet testu na urządzeniu — wysoki** (realny bug blokujący dodawanie wydatków):
+Wydatki → Wklej paragon → wklej tekst drukowanego paragonu Kaufland → produkty powinny się
+pojawić.
+
 ## 🆕 Ekwipunek bossa: kategorie pod listą itemów (2026-10-06)
 
 User: "ten ekwipunek bossa mialy byc kategorie ekwipunku na dole a itemy na gorze... zeby sie
