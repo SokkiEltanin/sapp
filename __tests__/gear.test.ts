@@ -1,7 +1,8 @@
 import {
-  GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
+  GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT, GEAR_SLOT_CAP,
   gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots, gearSellValue,
   gearCombatBonuses, gearFlatHp, gearCoinsMult, gearAtkFlat, fmtGearStat,
+  countInSlot, isSlotFull,
 } from '@/utils/gear';
 import { atkPower } from '@/utils/bosses';
 
@@ -272,5 +273,40 @@ describe('gear — fmtGearStat (2026-09-26 fix: atkFlat nie ma już +0 dla mały
   });
   test('staty procentowe bez zmian — jedno miejsce po przecinku, %', () => {
     expect(fmtGearStat('critPct', 0.12)).toBe('+12.0%');
+  });
+});
+
+// 2026-10-06, user: "zrobić jak w sfgame te eq ze sa sloty puste na itemy ograniczone" —
+// limit PER SLOT KATEGORII, nie na cały ekwipunek naraz (patrz GEAR_SLOT_CAP w gear.ts).
+describe('gear — countInSlot/isSlotFull (limit slotu ekwipunku, 2026-10-06)', () => {
+  test('countInSlot liczy tylko instancje DANEGO slotu, ignoruje inne', () => {
+    const owned = {
+      'helm_slomiany:001': { itemId: 'helm_slomiany' },
+      'helm_skorzany:001': { itemId: 'helm_skorzany' },
+      'zbroja_szmaciana:001': { itemId: 'zbroja_szmaciana' },
+    };
+    expect(countInSlot(owned, 'helm')).toBe(2);
+    expect(countInSlot(owned, 'zbroja')).toBe(1);
+    expect(countInSlot(owned, 'buty')).toBe(0);
+  });
+
+  test('countInSlot ignoruje undefined/dziurawe wpisy (Partial<Record>)', () => {
+    const owned: Partial<Record<string, { itemId: string }>> = { 'a': undefined, 'helm_slomiany:001': { itemId: 'helm_slomiany' } };
+    expect(countInSlot(owned, 'helm')).toBe(1);
+  });
+
+  test('isSlotFull false pod limitem, true dokładnie na limicie i nad nim', () => {
+    const makeOwned = (n: number) => {
+      const o: Record<string, { itemId: string }> = {};
+      for (let i = 0; i < n; i++) o[`helm_slomiany:${i}`] = { itemId: 'helm_slomiany' };
+      return o;
+    };
+    expect(isSlotFull(makeOwned(GEAR_SLOT_CAP - 1), 'helm')).toBe(false);
+    expect(isSlotFull(makeOwned(GEAR_SLOT_CAP), 'helm')).toBe(true);
+    expect(isSlotFull(makeOwned(GEAR_SLOT_CAP + 1), 'helm')).toBe(true);
+  });
+
+  test('pusty ekwipunek nigdy nie jest pełny', () => {
+    expect(isSlotFull({}, 'helm')).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import LevelUpCelebration from '@/components/pet/LevelUpCelebration';
+import GearOverflowModal from '@/components/pet/GearOverflowModal';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useFontsStore } from '@/store/fontsStore';
 import { usePetLevelUp } from '@/store/petLevelUpStore';
@@ -614,6 +615,7 @@ export default function RootLayout() {
         <Toast />
         <BadgeCelebration />
         <LevelUpCelebration />
+        <GearOverflowModal />
         <AutoMoodPopup />
         {!splashGone && (
           <AnimatedSplash visible={splashVisible} onHidden={() => setSplashGone(true)} />

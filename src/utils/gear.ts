@@ -240,6 +240,35 @@ export function rollGearValue(item: GearItemDef, rarity: GearRarity, rand: () =>
 // przed 2026-08-31).
 export interface OwnedGear { rarity: GearRarity; value: number }
 
+// ── Limit slotów ekwipunku (2026-10-06) ─────────────────────────────────────────────────
+// User: "ten ekwipunek bossa... moze zrobic jak w sfgame te eq ze sa sloty puste na itemy
+// ograniczone i jak za duzo trzeba sprzedac czy cos... albo zapyta który sprzedac" —
+// potwierdził wprost przy doprecyzowaniu: "Limit ekwipunku: pytaj który sprzedać gdy pełne"
+// (NIE auto-sprzedaż najsłabszego). Limit jest PER KATEGORIA slotu (helm/zbroja/buty/obroza/
+// talizman/kolczyki), nie na cały ekwipunek naraz — dalszy drop/zakup w pełnym slocie nie
+// ginie i nie sprzedaje się automatycznie, trafia do kolejki `pendingGearOverflow`
+// (petStore.ts) aż user wybierze w nowym modalu, którą z posiadanych instancji TEGO SLOTU
+// sprzedać, żeby zrobić miejsce. TODO-balance: brak danych z playtestów — 10 to strzał
+// startowy (5 rarity × ~2 kopie nim trzeba decydować), do wyregulowania jak reszta liczb w
+// tym pliku.
+export const GEAR_SLOT_CAP = 10;
+
+export function countInSlot(ownedGear: Partial<Record<string, { itemId: string }>>, slot: GearSlot): number {
+  let n = 0;
+  for (const inst of Object.values(ownedGear)) {
+    if (inst && gearById(inst.itemId)?.slot === slot) n++;
+  }
+  return n;
+}
+
+export function isSlotFull(ownedGear: Partial<Record<string, { itemId: string }>>, slot: GearSlot): boolean {
+  return countInSlot(ownedGear, slot) >= GEAR_SLOT_CAP;
+}
+
+// Item "wygrany" (ze skrzynki/Sklepu dnia) ale jeszcze nie przyznany do `ownedGear`, bo jego
+// slot był pełny w chwili przyznania — czeka w kolejce na wybór usera (który sprzedać).
+export interface GearOverflowEntry { itemId: string; rarity: GearRarity; value: number }
+
 // Każdy DROP = własna, trwała instancja (2026-09-18, user: "musimy operować inaczej z
 // itemami bo w eq sie nie mieszczą... moze każdy item bedzie miał id swoje np id itemi to
 // 1222 a po dwukropku numer od resetu który raz drapałem czyli np 1222:001") — zastępuje

@@ -14825,6 +14825,78 @@ sprawdź że produkty się pojawiają zamiast "Brak produktów".
 
 ---
 
+---
+
+## 264. Limit slotów ekwipunku + modal "sprzedaj by zrobić miejsce" (2026-10-06)
+
+User: "ten ekwipunek bossa... moze zrobic jak w sfgame te eq ze sa sloty puste na itemy
+ograniczone i jak za duzo trzeba sprzedac czy cos bo inaczej wyda tylko równowartość
+cenową... albo zapyta który sprzedac" — i doprecyzował wprost: **"Limit ekwipunku: pytaj
+który sprzedać gdy pełne"** (NIE auto-sprzedaż najsłabszego).
+
+Dotąd każdy slot (helm/zbroja/buty/obroza/talizman/kolczyki) mógł rosnąć w nieskończoność —
+`grantGear`/`buyDailyGear`/`openCrate` (sardinka) ZAWSZE przyznawały nową, trwałą instancję
+(§model instancji, 2026-09-18), bez limitu.
+
+**Design**: limit jest PER SLOT KATEGORII (nie na cały ekwipunek naraz) — `GEAR_SLOT_CAP = 10`
+(gear.ts, TODO-balance jak reszta liczb w tym pliku — brak danych z playtestów) +
+`countInSlot(ownedGear, slot)`/`isSlotFull(ownedGear, slot)`, czyste i testowane. Gdy drop/
+zakup trafia w pełny slot, item NIE ginie i NIE sprzedaje się automatycznie — ląduje w nowej
+kolejce `pendingGearOverflow: GearOverflowEntry[]` (petStore.ts, ten sam wzorzec `queue[0]`
+co `usePetLevelUp`), a globalny `GearOverflowModal.tsx` (zamontowany w app/_layout.tsx, jak
+BadgeCelebration/LevelUpCelebration/MoodCheckInModal — widoczny niezależnie z którego ekranu
+przyszedł drop: pet.tsx/pet-shop.tsx/CrateModal) prosi usera o wybór KONKRETNEJ posiadanej
+instancji TEGO SAMEGO slotu do sprzedania, żeby zrobić miejsce.
+
+**Trzy punkty przyznania zmienione identycznym wzorcem** (sprawdzają `isSlotFull` PRZED
+zapisem do `ownedGear`):
+- `grantGear(itemId, rarity, value)` — slot pełny → zwraca `''` (zamiast id instancji),
+  item do kolejki. Zwracana wartość nigdzie nie jest czytana przez wołających (pet.tsx/
+  pet-shop.tsx), więc zero zmian po ich stronie.
+- `buyDailyGear(...)` — slot pełny → zakup MIMO TO się liczy jako "udany" (`true`, monety
+  schodzą, dzienny slot zajęty) — to GWARANTOWANY zakup, user płaci za pewną rzecz, nie za
+  wolne miejsce w magazynie; sam item do kolejki.
+- `openCrate()` (skrzynka sardynek z pieszczenia) — inline logika (nie woła `grantGear`),
+  własna kopia tego samego sprawdzenia; `gearDropped` w zwracanym `roll` zostaje niezmienione
+  (CrateModal dalej pokazuje "wygrane" niezależnie od tego czy trafiło do `ownedGear` czy do
+  kolejki — overflow modal dopyta PO zamknięciu odsłony).
+
+**Rozwiązanie kolejki** — dwie nowe akcje w petStore.ts:
+- `resolveGearOverflow(sellInstanceId)` — JEDEN `set()` na sprzedaż+przyznanie (nie dwa
+  kolejne wołania `sellGear`+`grantGear`, żeby nic nie mogło wbić się między nie). Odmawia
+  (`false`) gdy `sellInstanceId` nie istnieje albo jest z INNEGO slotu niż czekający item —
+  sprzedanie np. hełma nie robi miejsca w zbroi.
+- `discardGearOverflow()` — "ucieczka": odrzuca czoło kolejki bez sprzedawania niczego, dla
+  usera który nie chce sprzedać żadnej z posiadanych instancji (bez tego kolejka byłaby
+  dead-endem, patrz CLAUDE.md §7).
+
+`pendingGearOverflow` persystowane (AsyncStorage, jak `ownedGear`) + migracja w
+`onRehydrateStorage` (stary zapis sprzed tej daty dostaje `[]`) — jeśli user zamknie apkę w
+trakcie decyzji, kolejka wraca przy następnym otwarciu, item nie przepada.
+
+**GearOverflowModal.tsx** (nowy) — karta "Zdobyto: {item}" (ikona + rzadkość + stat) + lista
+posiadanych instancji tego slotu (najsłabsza pierwsza, ten sam `itemRow`/`sellBtn` wizualny
+język co `GearPanel.tsx`'s `GearSlotModal`) z przyciskiem sprzedaży per instancja
+(`ConfirmDialog`, mirror `sellTarget` z GearPanel) + przycisk "Odrzuć nowy przedmiot" na
+dole (też za `ConfirmDialog`, bo nieodwracalne).
+
+**Testy**: nowy `describe` w `gear.test.ts` (`countInSlot`/`isSlotFull` — zlicza tylko dany
+slot, ignoruje dziurawe/undefined wpisy, granica `GEAR_SLOT_CAP-1`/`=cap`/`>cap`, pusty
+ekwipunek nigdy pełny), nowy `describe` w `grantGear.test.ts` (slot pełny → `''`+kolejka,
+`resolveGearOverflow` sprzedaje+przyznaje w jednym, odmawia przy złym slocie/nieistniejącej
+instancji, `discardGearOverflow` czyści kolejkę bez zmian w `ownedGear`, inny slot z miejscem
+nie jest blokowany), nowy `describe` w `buyDailyGear.test.ts` (slot pełny → zakup "udany"
+mimo to, item w kolejce nie w `ownedGear`). `tsc --noEmit` czyste, `jest --silent` 100/100
+suite.
+
+**Priorytet testu na urządzeniu — średni** (nowa ścieżka ekonomii, ale rzadko trafiana —
+wymaga 10 instancji w jednym slocie): Pupil/Sklep → wydropić/kupić 10+ itemów jednego slotu
+→ sprawdzić że 11. drop pokazuje modal "Ekwipunek pełny!" → sprzedać jedną instancję →
+sprawdzić że nowy item trafia do ekwipunku i modal się zamyka; osobno sprawdzić przycisk
+"Odrzuć nowy przedmiot".
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

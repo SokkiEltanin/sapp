@@ -8,7 +8,7 @@ import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE, menaceHpFor } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST, raidHpFor } from '@/utils/raid';
-import { GearSlot, GearRarity, OwnedGear, GearInstance, gearInstanceId, parseGearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
+import { GearSlot, GearRarity, OwnedGear, GearInstance, GearOverflowEntry, gearInstanceId, parseGearInstanceId, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, rollGearValue, GEAR_SLOTS, unlockedGearFor, isSlotFull } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 import { PotionKind, ActivePotion, POTIONS, potionFlatHp, potionXpMult } from '@/utils/potions';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
@@ -264,6 +264,11 @@ interface PetState {
   // niżej — każda istniejąca kopia dostaje `seq: 1`.
   ownedGear: Partial<Record<string, GearInstance>>;
   equippedGear: Partial<Record<GearSlot, string>>;   // slot → id ZAŁOŻONEJ INSTANCJI (nie itemu)
+  // Kolejka itemów "wygranych" ale jeszcze nie przyznanych, bo ich slot był pełny
+  // (`GEAR_SLOT_CAP`, gear.ts, 2026-10-06) — patrz `resolveGearOverflow`/`discardGearOverflow`
+  // niżej i `GearOverflowModal.tsx`. Pokazujemy/rozwiązujemy po jednym (kolejka[0]), ten sam
+  // wzorzec co `usePetLevelUp`'s `queue`.
+  pendingGearOverflow: GearOverflowEntry[];
   // Jednorazowy onboarding (imię + wygląd) przy pierwszym uruchomieniu — patrz setOnboarded.
   onboarded: boolean;
   // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila... jakby
@@ -412,6 +417,13 @@ interface PetState {
   // per (dzień, slot itemu) — ten sam mechanizm co dayClaims dla questów, żeby nie dało się
   // kupić tego samego slotu dwa razy tego samego dnia.
   buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number, value: number) => boolean;
+  // Rozwiązanie kolejki `pendingGearOverflow` (slot pełny, patrz `GEAR_SLOT_CAP` w gear.ts) —
+  // `sellInstanceId` musi być posiadaną instancją z TEGO SAMEGO slotu co czekający item
+  // (false = zły slot/nieposiadana); sprzedaje ją i OD RAZU przyznaje czekający item.
+  resolveGearOverflow: (sellInstanceId: string) => boolean;
+  // Odrzuca czoło kolejki bez sprzedawania niczego — "ucieczka" gdy user nie chce sprzedać
+  // żadnej z posiadanych instancji, żeby zrobić miejsce dla nowej.
+  discardGearOverflow: () => void;
   setOnboarded: () => void;
   ackPetLevel: (level: number) => void;   // po pokazaniu celebracji level-upu
   // Potki czasowe — patrz `activePotion` w stanie wyżej i `src/utils/potions.ts`.
@@ -487,6 +499,7 @@ export const usePetStore = create<PetState>()(
       equippedCombatItems: [],
       ownedGear: {},
       equippedGear: {},
+      pendingGearOverflow: [],
       onboarded: false,
       lastSeenLevel: 1,
       _hydrated: false,
@@ -729,14 +742,22 @@ export const usePetStore = create<PetState>()(
         // kopię logiki (nie woła współdzielonego `grantGear`) — nikt jej wtedy nie poprawił.
         // Teraz KAŻDY drop dostaje własną, trwałą instancję (`GearInstance`/`gearInstanceId`
         // w gear.ts) — nic już nie ginie, karta odsłony (CrateModal.tsx) zawsze mówi prawdę.
-        const gearSeq = gearDropped ? nextGearSeq(s.ownedGear, gearDropped.itemId) : 0;
+        // Slot pełny (GEAR_SLOT_CAP, gear.ts) → ten drop też czeka w `pendingGearOverflow`
+        // zamiast ginąć (ten sam fix co `grantGear`/`buyDailyGear` — patrz komentarze tam).
+        // CrateModal dalej pokazuje `gearDropped` jako "wygrane" (item realnie przyznany,
+        // tylko do kolejki, nie od razu do ownedGear) — GearOverflowModal.tsx dopyta po
+        // zamknięciu odsłony.
+        const gearSlotFull = gearDropped ? isSlotFull(s.ownedGear, gearById(gearDropped.itemId)!.slot) : false;
+        const gearSeq = (gearDropped && !gearSlotFull) ? nextGearSeq(s.ownedGear, gearDropped.itemId) : 0;
         set({
           pendingCrates: s.pendingCrates - 1,
           coins: s.coins + roll.coins,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
           ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
-          ...(gearDropped
+          ...(gearDropped && !gearSlotFull
             ? { ownedGear: { ...s.ownedGear, [gearInstanceId(gearDropped.itemId, gearSeq)]: { itemId: gearDropped.itemId, seq: gearSeq, rarity: gearDropped.rarity, value: gearDropped.value } } } : {}),
+          ...(gearDropped && gearSlotFull
+            ? { pendingGearOverflow: [...s.pendingGearOverflow, { itemId: gearDropped.itemId, rarity: gearDropped.rarity, value: gearDropped.value }] } : {}),
         });
         return { ...roll, itemDropped, itemLeveledUp, gearDropped };
       },
@@ -971,6 +992,13 @@ export const usePetStore = create<PetState>()(
       // niżej, teraz per-instancja, i grupowy "sprzedaj N" w GearPanel.tsx).
       grantGear: (itemId, rarity, value) => {
         const s = get();
+        const item = gearById(itemId);
+        // Slot pełny (GEAR_SLOT_CAP, gear.ts, 2026-10-06) → item NIE ginie, czeka w kolejce
+        // aż user sprzeda coś z tego slotu (patrz `resolveGearOverflow`/GearOverflowModal.tsx).
+        if (item && isSlotFull(s.ownedGear, item.slot)) {
+          set({ pendingGearOverflow: [...s.pendingGearOverflow, { itemId, rarity, value }] });
+          return '';
+        }
         const seq = nextGearSeq(s.ownedGear, itemId);
         const id = gearInstanceId(itemId, seq);
         set({ ownedGear: { ...s.ownedGear, [id]: { itemId, seq, rarity, value } } });
@@ -1019,6 +1047,18 @@ export const usePetStore = create<PetState>()(
         const s = get();
         if (s.dayClaims[dayKey]) return false;
         if (s.coins < cost) return false;
+        const item = gearById(itemId);
+        // Slot pełny → zakup się LICZY (monety schodzą, dzienny slot zajęty — płacisz za
+        // GWARANTOWANY zakup, nie za miejsce w ekwipunku), item czeka w kolejce jak w
+        // `grantGear` wyżej.
+        if (item && isSlotFull(s.ownedGear, item.slot)) {
+          set({
+            coins: s.coins - cost,
+            dayClaims: { ...s.dayClaims, [dayKey]: true },
+            pendingGearOverflow: [...s.pendingGearOverflow, { itemId, rarity, value }],
+          });
+          return true;
+        }
         const seq = nextGearSeq(s.ownedGear, itemId);
         set({
           coins: s.coins - cost,
@@ -1027,6 +1067,32 @@ export const usePetStore = create<PetState>()(
         });
         return true;
       },
+      // Patrz komentarz przy `resolveGearOverflow` w interfejsie wyżej — JEDEN `set()` na
+      // sprzedaż+przyznanie (nie dwa kolejne wołania sellGear/grantGear), żeby nie dało się
+      // wcisnąć innej zmiany `ownedGear` między nimi.
+      resolveGearOverflow: (sellInstanceId) => {
+        const s = get();
+        const pending = s.pendingGearOverflow[0];
+        if (!pending) return false;
+        const owned = s.ownedGear[sellInstanceId];
+        const sellItem = owned ? gearById(owned.itemId) : undefined;
+        const pendingItem = gearById(pending.itemId);
+        if (!owned || !sellItem || !pendingItem || sellItem.slot !== pendingItem.slot) return false;
+        const coinsEarned = gearSellValue(sellItem, owned.rarity);
+        const nextOwned = { ...s.ownedGear };
+        delete nextOwned[sellInstanceId];
+        const nextEquipped = { ...s.equippedGear };
+        if (nextEquipped[sellItem.slot] === sellInstanceId) delete nextEquipped[sellItem.slot];
+        const seq = nextGearSeq(nextOwned, pending.itemId);
+        nextOwned[gearInstanceId(pending.itemId, seq)] = { itemId: pending.itemId, seq, rarity: pending.rarity, value: pending.value };
+        set({
+          ownedGear: nextOwned, equippedGear: nextEquipped,
+          coins: s.coins + coinsEarned,
+          pendingGearOverflow: s.pendingGearOverflow.slice(1),
+        });
+        return true;
+      },
+      discardGearOverflow: () => set((s) => ({ pendingGearOverflow: s.pendingGearOverflow.slice(1) })),
       setOnboarded: () => set({ onboarded: true }),
       ackPetLevel: (level) => set((s) => level > s.lastSeenLevel ? { lastSeenLevel: level } : s),
       // Potki czasowe — patrz `activePotion` w stanie i `src/utils/potions.ts`. Kupienie nowej
@@ -1045,7 +1111,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidMaxHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, activePotion: null, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidMaxHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, activePotion: null, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, pendingGearOverflow: [], onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -1073,7 +1139,7 @@ export const usePetStore = create<PetState>()(
         activePotion: s.activePotion,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
-        ownedGear: s.ownedGear, equippedGear: s.equippedGear, onboarded: s.onboarded,
+        ownedGear: s.ownedGear, equippedGear: s.equippedGear, pendingGearOverflow: s.pendingGearOverflow, onboarded: s.onboarded,
         lastSeenLevel: s.lastSeenLevel,
       }),
       onRehydrateStorage: () => (state) => {
@@ -1142,6 +1208,7 @@ export const usePetStore = create<PetState>()(
         // istniejącego, już nazwanego pupila, onboarding ma się pokazać TYLKO nowym pupilom
         // (initial state w create() ustawia false, to migracyjny fallback dla starych zapisów).
         state.ownedGear = state.ownedGear ?? {};
+        state.pendingGearOverflow = state.pendingGearOverflow ?? [];   // stary zapis sprzed limitu slotów (2026-10-06) go nie ma
         // Migracja rozstrzału wartości (2026-08-31) — stary zapis trzymał `ownedGear[id]`
         // jako SAM string rzadkości (np. `"common"`), nowy kształt to `{rarity, value}`
         // (patrz `OwnedGear` w gear.ts). Backfill: dla każdego wpisu, który jest jeszcze
