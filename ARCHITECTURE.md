@@ -14731,6 +14731,39 @@ zarobki).
 
 ---
 
+---
+
+## 261. Fix: pigułka planu zajęć ucinała salę — sala/budynek przeniesione na początek (2026-10-06)
+
+User zrzutem pilla w trakcie zajęć ("TERAZ | LABORATORIUM: STRUKTURA POWIERZCHNI I JEJ MOD…"):
+"za dlugi jest ten komunikat na pillu, ciężko cokolwiek widac nazwa skrócona najlepiej plus
+sala i budynek w pillu".
+
+**Root cause**: priorytet "3b — Plan zajęć" w `TopPill.tsx` budował tekst jako `TYP: NAZWA ·
+SALA` — pełne słowo typu wypisane ("LABORATORIUM:" zamiast litery), pełna nazwa przedmiotu, a
+**sala na samym końcu**. `Text` renderuje się z `numberOfLines={1}` (ellipsis na końcu) — więc
+przy dłuższej nazwie przedmiotu sala (druga najważniejsza informacja po samej godzinie, która
+i tak już jest w osobnym `badge`) ginęła jako PIERWSZA, zanim user w ogóle zdążył ją zobaczyć.
+
+**Fix**:
+- Kolejność odwrócona: `TYP SALA · NAZWA` — sala/budynek na początku, gwarantowane widoczne.
+- Typ skrócony do jednej litery (W/C/L/P) zamiast pełnego słowa (`CLASS_TYPE_LABEL[...]`) —
+  odzyskuje miejsce.
+- Nowa `abbreviateSubject(subject, maxLen=28)` w `classSchedule.ts` — deterministyczne cięcie
+  nazwy przedmiotu po ZNAKACH (nie tylko zdane na natywny ellipsis RN, który jest zależny od
+  szerokości ekranu/fontu, więc nieprzewidywalny i nietestowalny). `trimEnd()` przed doklejeniem
+  „…" — nie urywa w połowie spacji.
+
+**Testy**: +4 testy `abbreviateSubject` w `classSchedule.test.ts` (bez zmian poniżej limitu,
+dokładnie na granicy, cięcie z wielokropkiem, bez urwanej spacji na granicy). `tsc --noEmit`
+czyste, `jest --silent` zielone.
+
+**Priorytet testu na urządzeniu — średni** (czysto wizualne): w trakcie trwających zajęć z
+długą nazwą przedmiotu sprawdź, że pigułka pokazuje literę typu + salę/budynek na początku,
+nazwa przedmiotu przycięta z „…" jeśli za długa.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
