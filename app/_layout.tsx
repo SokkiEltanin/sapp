@@ -364,12 +364,27 @@ export default function RootLayout() {
   // nigdy nie wołało `checkForUpdateAsync`/`fetchUpdateAsync`, więc KAŻDA zmiana, nawet czysto
   // JS (kolor, layout, animacja), szła tą samą ciężką ścieżką co zmiana wymagająca nowego
   // natywnego APK — pełny build Gradle na CI (35-60 min) + ręczna instalacja. Teraz: cichy
-  // check przy starcie + każdym powrocie z tła, auto-pobranie i restart jeśli CI opublikowało
+  // check przy starcie + każdym powrocie z tła, auto-pobranie w tle jeśli CI opublikowało
   // nowszą paczkę (patrz ci.yml's `eas update` krok) — z JS-owej strony to tyle, reszta (branch/
   // kanał `production`, `requestHeaders` w app.json) jest po stronie configu/CI.
   // `Updates.isEnabled` chroni przed wywołaniem w Expo Go/dev-kliencie (tam `checkForUpdateAsync`
   // rzuca, nie no-op'uje) — standalone APK bez zainstalowanego jeszcze kanału (sprzed tej
   // zmiany) też po prostu nigdy nie znajdzie nic nowego, cicho (catch), bez efektu ubocznego.
+  //
+  // BUG (2026-10-06, user: pierwsze realne zadziałanie — "pokazało NOWA WERSJA DOSTĘPNA i
+  // potem się pokazał biały ekran i potem czarny i tak już zostało") — ten efekt dawniej wołał
+  // `Updates.reloadAsync()` 1.2s po pobraniu, podmieniając JS bundle NA ŻYWO w PEŁNI
+  // uruchomionej appce (z żywym stosem nawigacji, nasłuchiwaczami Firebase, timerami itd.).
+  // `reloadAsync()` w locie jest zauważalnie mniej przetestowaną ścieżką niż prawdziwy zimny
+  // start procesu (który appka i tak dostaje za każdym normalnym otwarciem) — i tu właśnie
+  // ugryzło: appka zbrickowała się tak twardo, że nawet wymuszone zamknięcie+otwarcie kilka
+  // razy z rzędu nie pozwoliło wbudowanej ochronie `expo-updates` (auto-rollback po
+  // powtarzających się crashach przy starcie) się uruchomić — JS crashował najwyraźniej zanim
+  // ten kod w ogóle dostał szansę się wykonać. Fix: PRZESTAJEMY wołać `reloadAsync()` wcale.
+  // `fetchUpdateAsync()` samo w sobie tylko ŚCIĄGA paczkę na dysk — `expo-updates` (natywnie,
+  // bez udziału tego kodu) automatycznie użyje jej przy NASTĘPNYM normalnym, zimnym starcie
+  // appki, czyli dokładnie tej samej, dobrze przetestowanej ścieżce co zwykłe
+  // zamknięcie+otwarcie. Toast informuje, nic nie wymusza.
   useEffect(() => {
     if (!Updates.isEnabled) return;
     let cancelled = false;
@@ -379,8 +394,7 @@ export default function RootLayout() {
         if (!res.isAvailable || cancelled) return;
         await Updates.fetchUpdateAsync();
         if (cancelled) return;
-        toast.info('Nowa wersja gotowa — odświeżam…');
-        setTimeout(() => { Updates.reloadAsync().catch(() => {}); }, 1200);
+        toast.info('Nowa wersja pobrana — włączy się przy następnym otwarciu appki');
       } catch {}
     };
     const t = setTimeout(checkAndApply, 3000);
