@@ -27,15 +27,23 @@ itemów. Zero zmiany logiki. `tsc`/`jest` czyste.
 **🆕 Priorytet testu na urządzeniu — niski**: Pupil → otwórz slot ekwipunku → zakładki slotów
 na dole, lista itemów na górze.
 
-## 🆕 ODŁOŻONE: limit slotów ekwipunku jak w "SF Game" (2026-10-06)
+## 🆕 Limit slotów ekwipunku jak w "SF Game" (2026-10-06)
 
 User: "moze zrobic jak w sfgame te eq ze sa sloty puste na itemy ograniczone i jak za duzo
 trzeba sprzedac czy cos bo inaczej wyda tylko równowartość cenową (ze od razu sprzeda) albo
-zapyta który sprzedac". Duża, nowa funkcja ekonomii (limit kopii na slot + flow
-auto-sprzedaży/wyboru-co-sprzedać przy przekroczeniu) — NIE zaczęta, bo wymaga ustalenia
-konkretów z userem (ile sztuk limitu per slot, auto-sell najsłabszej vs pytanie które
-sprzedać) zanim cokolwiek zbudować — ta sama dyscyplina co inne zmiany ekonomii w tej sesji
-(np. wcześniejsze pytanie o skalowanie nagrody za głaskanie). Do podjęcia w kolejnej rundzie.
+zapyta który sprzedac" — doprecyzował: **"Limit ekwipunku: pytaj który sprzedać gdy pełne"**.
+Pełny opis w ARCHITECTURE.md §264. `GEAR_SLOT_CAP = 10` per slot kategorii (TODO-balance,
+strzał startowy, brak danych z playtestów — do wyregulowania jeśli user zgłosi że za
+ciasno/za luźno). Grant w pełnym slocie (`grantGear`/`buyDailyGear`/`openCrate`) nie ginie,
+ląduje w kolejce `pendingGearOverflow` — nowy globalny `GearOverflowModal.tsx` prosi usera o
+wybór KONKRETNEJ instancji do sprzedania (albo odrzucenia nowego itemu). +testy w
+`gear.test.ts`/`grantGear.test.ts`/`buyDailyGear.test.ts`. `tsc`/`jest` czyste (100/100
+suite).
+
+**🆕 Priorytet testu na urządzeniu — średni** (rzadko trafiana ścieżka, wymaga 10+ itemów w
+jednym slocie): wydropić/kupić 11. item jednego slotu → sprawdzić że pojawia się modal
+"Ekwipunek pełny!" → sprzedać wskazaną instancję → nowy item trafia do ekwipunku, modal się
+zamyka → osobno sprawdzić przycisk "Odrzuć nowy przedmiot".
 
 ## 🆕🔴 OTWARTE: "Bez słodyczy" streak nie łapie Kinder Bueno (2026-10-06)
 
