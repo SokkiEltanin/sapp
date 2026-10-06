@@ -15090,11 +15090,12 @@ zachowaniem OTA dla appki tej wielkości/złożoności bootstrapu.
 **Testy**: brak nowych (czysta zmiana zachowania efektu, nie nowa logika czysta do
 przetestowania). `tsc --noEmit` czyste, `jest --silent` 100/100 suite.
 
-**Priorytet testu na urządzeniu — KRYTYCZNY, natychmiastowy**: po zmergowaniu i realnym
-opublikowaniu tego fixu przez CI, user musi odinstalować i ponownie zainstalować APK #1147,
-potem (po zalogowaniu) potwierdzić że appka wraca do życia i że kolejne OTA (ta sama paczka co
-teraz, zawierająca ten fix) NIE próbuje się już nigdy wymusić samo, tylko czeka cicho do
-następnego otwarcia.
+**✅ Rozwiązane (2026-10-06)**: sama publikacja fixu przez OTA NIE wystarczyła — reinstalacja
+APK #1147 miała dalej wbudowany na stałe stary, zepsuty kod (`reloadAsync`), więc crash się
+powtarzał przy każdej reinstalacji zanim appka zdążyła dotrzeć do poprawionej paczki z OTA.
+Zbudowany nowy natywny APK (#1148, `workflow_dispatch` na `build.yml`, fix wbudowany
+bezpośrednio w plik) przerwał pętlę. User potwierdził: appka działa, dane w 100% odzyskane z
+automatycznego backupu w chmurze po ponownym zalogowaniu Google.
 
 ---
 

@@ -3,30 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕🔴🔴 KRYTYCZNE — AWARIA: OTA zbrickowało appkę usera, user ZABLOKOWANY (2026-10-06)
+## ✅ ZAMKNIĘTE — AWARIA: OTA zbrickowało appkę usera, odzyskana (2026-10-06)
 
 User po pierwszym realnym OTA: "pokazało NOWA WERSJA DOSTĘPNA i potem biały ekran i potem
-czarny i tak już zostało" — appka się nie uruchamia, NIE pomogło kilkukrotne wymuszone
-zamknięcie+otwarcie. Pełny opis w ARCHITECTURE.md §268.
+czarny i tak już zostało" — appka przestała się uruchamiać. Pełny opis w ARCHITECTURE.md §268.
 
-**Root cause znaleziony i naprawiony**: `Updates.reloadAsync()` wołane NA ŻYWO w działającej
-appce (podmiana bundla bez zimnego restartu procesu) — usunięte, OTA teraz tylko cicho pobiera
-w tle i czeka do NASTĘPNEGO normalnego otwarcia appki (ten sam fix co §268 opisuje
-szczegółowo).
+**Root cause**: `Updates.reloadAsync()` wołane NA ŻYWO w działającej appce (podmiana bundla
+bez zimnego restartu procesu) — usunięte, OTA teraz tylko cicho pobiera w tle i czeka do
+NASTĘPNEGO normalnego otwarcia appki.
 
-**Sekwencja odzyskania usera — KOLEJNOŚĆ KRYTYCZNA (nie zmieniać!):**
-1. Ten fix musi się NAJPIERW zmergować i NAPRAWDĘ opublikować przez CI (sprawdzić w logach
-   kroku "Publish OTA update" — `✔ Published!`, nie tylko zielone CI) — inaczej serwer dalej
-   serwuje zepsutą paczkę.
-2. DOPIERO POTEM powiedzieć userowi: odinstaluj appkę całkowicie, zainstaluj ponownie TEN SAM
-   plik APK #1147 (https://github.com/SokkiEltanin/sapp/releases/download/build-1147/sapp-build1147-v6.0.0-3759fc0.apk)
-   — deinstalacja czyści lokalny stan `expo-updates`, świeża instalacja wraca do wbudowanej
-   (znanej-dobrej) paczki i przy pierwszym uruchomieniu pobierze NOWĄ (już naprawioną) paczkę
-   w tle, bez wymuszania.
-3. Dane: appka robi auto-backup do chmury — po zalogowaniu Google powinna sama zaproponować
-   przywrócenie. Zweryfikować z userem że dane faktycznie wróciły.
-4. Po odzyskaniu: potwierdzić że appka NIE próbuje się już sama resetować przy kolejnych OTA
-   (sprawdzić że toast mówi "włączy się przy następnym otwarciu", nie "odświeżam…").
+**Komplikacja po drodze**: sam fix opublikowany przez OTA nie wystarczył — reinstalacja
+TEGO SAMEGO APK #1147 wciąż miała WBUDOWANY na stałe stary, zepsuty kod (ten co wymuszał
+reload), więc crash powtarzał się przy każdej reinstalacji zanim zdążył dotrzeć do fixu z OTA.
+Dopiero nowy natywny build (#1148, `workflow_dispatch` na `build.yml`, fix wbudowany
+BEZPOŚREDNIO w plik, nie przez OTA) przerwał pętlę.
+
+**Wynik**: user zainstalował build #1148, appka działa, dane w 100% odzyskane z automatycznego
+backupu w chmurze po zalogowaniu Google ("tak wszystko jest, wszystko wróciło").
+
+**Lekcja zapisana w ARCHITECTURE.md §268**: `Updates.reloadAsync()` nigdy nie wołać automatycznie
+w tle na żywej appce — tylko user-inicjowana akcja albo (jak teraz) wcale, zastosowanie
+dopiero przy naturalnym następnym zimnym starcie.
 
 **🆕 Priorytet testu na urządzeniu — KRYTYCZNY, user obecnie zablokowany z appki.**
 
