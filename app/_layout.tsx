@@ -17,7 +17,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { whenAuthReady } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
-import { toast } from '@/store/toastStore';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import LevelUpCelebration from '@/components/pet/LevelUpCelebration';
@@ -376,48 +375,14 @@ export default function RootLayout() {
     return () => { clearTimeout(t); sub.remove(); };
   }, [authReady]);
 
-  // OTA update check (2026-10-06, user: "czekam 35min jak nie godzinę żeby sprawdzić... mi
-  // się odechciewa") — `expo-updates` było skonfigurowane (`app.json`'s `updates.url`) ale nic
-  // nigdy nie wołało `checkForUpdateAsync`/`fetchUpdateAsync`, więc KAŻDA zmiana, nawet czysto
-  // JS (kolor, layout, animacja), szła tą samą ciężką ścieżką co zmiana wymagająca nowego
-  // natywnego APK — pełny build Gradle na CI (35-60 min) + ręczna instalacja. Teraz: cichy
-  // check przy starcie + każdym powrocie z tła, auto-pobranie w tle jeśli CI opublikowało
-  // nowszą paczkę (patrz ci.yml's `eas update` krok) — z JS-owej strony to tyle, reszta (branch/
-  // kanał `production`, `requestHeaders` w app.json) jest po stronie configu/CI.
-  // `Updates.isEnabled` chroni przed wywołaniem w Expo Go/dev-kliencie (tam `checkForUpdateAsync`
-  // rzuca, nie no-op'uje) — standalone APK bez zainstalowanego jeszcze kanału (sprzed tej
-  // zmiany) też po prostu nigdy nie znajdzie nic nowego, cicho (catch), bez efektu ubocznego.
-  //
-  // BUG (2026-10-06, user: pierwsze realne zadziałanie — "pokazało NOWA WERSJA DOSTĘPNA i
-  // potem się pokazał biały ekran i potem czarny i tak już zostało") — ten efekt dawniej wołał
-  // `Updates.reloadAsync()` 1.2s po pobraniu, podmieniając JS bundle NA ŻYWO w PEŁNI
-  // uruchomionej appce (z żywym stosem nawigacji, nasłuchiwaczami Firebase, timerami itd.).
-  // `reloadAsync()` w locie jest zauważalnie mniej przetestowaną ścieżką niż prawdziwy zimny
-  // start procesu (który appka i tak dostaje za każdym normalnym otwarciem) — i tu właśnie
-  // ugryzło: appka zbrickowała się tak twardo, że nawet wymuszone zamknięcie+otwarcie kilka
-  // razy z rzędu nie pozwoliło wbudowanej ochronie `expo-updates` (auto-rollback po
-  // powtarzających się crashach przy starcie) się uruchomić — JS crashował najwyraźniej zanim
-  // ten kod w ogóle dostał szansę się wykonać. Fix: PRZESTAJEMY wołać `reloadAsync()` wcale.
-  // `fetchUpdateAsync()` samo w sobie tylko ŚCIĄGA paczkę na dysk — `expo-updates` (natywnie,
-  // bez udziału tego kodu) automatycznie użyje jej przy NASTĘPNYM normalnym, zimnym starcie
-  // appki, czyli dokładnie tej samej, dobrze przetestowanej ścieżce co zwykłe
-  // zamknięcie+otwarcie. Toast informuje, nic nie wymusza.
-  useEffect(() => {
-    if (!Updates.isEnabled) return;
-    let cancelled = false;
-    const checkAndApply = async () => {
-      try {
-        const res = await Updates.checkForUpdateAsync();
-        if (!res.isAvailable || cancelled) return;
-        await Updates.fetchUpdateAsync();
-        if (cancelled) return;
-        toast.info('Nowa wersja pobrana — włączy się przy następnym otwarciu appki');
-      } catch {}
-    };
-    const t = setTimeout(checkAndApply, 3000);
-    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') checkAndApply(); });
-    return () => { cancelled = true; clearTimeout(t); sub.remove(); };
-  }, []);
+  // OTA update check — PRZENIESIONE na manualny przycisk w Ustawieniach (2026-10-06, user:
+  // "mogę zrobić wtedy w ustawieniach aktualizację zamiast przy starcie? żeby nie ładowało tak
+  // w kółko" — nie chciał automatycznego sprawdzania przy każdym starcie/powrocie z tła).
+  // Dawny automatyczny `useEffect` (check przy starcie + AppState 'active') usunięty w całości —
+  // patrz `app/settings.tsx`'s wiersz `diag-ota` dla aktualnego, manualnego flow
+  // (`checkForUpdateAsync`/`fetchUpdateAsync`/`reloadAsync` tylko po jawnym tapie usera, zgodnie
+  // z lekcją z §268: `reloadAsync()` na żywo jest bezpieczny TYLKO jako wyraźna akcja usera, nie
+  // automatyczny efekt w tle).
 
   // Background-ish health sync: pull the watch's recent history into the per-day
   // cache on cold start + every time the app returns to the foreground, so the
