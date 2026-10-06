@@ -11,19 +11,17 @@ Update), `app/_layout.tsx` (auto-check+apply przy starcie/powrocie z tła), `ci.
 OTA po każdym pushu do mastera), `build.yml` (pełny APK tylko gdy zmienia się coś natywnego —
 `app.json`/`eas.json`/`package.json`/`android/**`).
 
-**Żeby to ruszyło, user musi zrobić DWIE rzeczy JEDNORAZOWO:**
-1. Dodać sekret repo `EXPO_TOKEN` (expo.dev → Account settings → Access tokens → stwórz token
-   → GitHub repo → Settings → Secrets and variables → Actions → New repository secret). Bez
-   tego CI cicho pomija publikację OTA (warning w logu, reszta CI zielona) — JS-owe zmiany
-   dalej będą czekać na kolejny pełny build, aż token się pojawi.
-2. Zainstalować JESZCZE JEDEN pełny APK (następny, który powstanie z mastera) — dopiero on ma
-   wpalony nagłówek kanału w manifeście. Każdy wcześniej zainstalowany APK nigdy nie znajdzie
-   żadnego OTA update'u. Od TEJ instalacji dalej: kolejne zmiany czysto JS/UI/animacje powinny
-   pojawiać się same w ~30-60s od otwarcia appki (toast "Nowa wersja gotowa"), bez nowego APK.
+**Dwie jednorazowe rzeczy — status:**
+1. ✅ Sekret repo `EXPO_TOKEN` dodany przez usera (2026-10-06).
+2. ⏳ Ostatni pełny APK — PR #373 sam zmienił `app.json` (nowy nagłówek kanału), więc
+   `build.yml`'s ścieżkowy filtr złapał TĘ ZMIANĘ i automatycznie odpalił build od razu po
+   zmergowaniu (user nie musiał nic osobno robić) — to WŁAŚNIE jest ten "ostatni pełny APK".
+   User: zainstaluj build z tego runa, jak tylko się skończy. Każdy APK sprzed niego nigdy nie
+   znajdzie OTA update'u.
 
-**🆕 Priorytet testu na urządzeniu — wysoki, jednorazowy**: po dodaniu `EXPO_TOKEN` i
-zainstalowaniu najnowszego APK, poproś o drobną zmianę JS (np. kolor) i sprawdź czy po
-zmergowaniu PR-a telefon sam pokazuje toast odświeżenia bez nowego pobierania APK.
+**🆕 Priorytet testu na urządzeniu — wysoki, jednorazowy**: po instalacji tego APK, poproś o
+drobną zmianę JS (np. kolor) i sprawdź czy po zmergowaniu PR-a telefon sam pokazuje toast
+odświeżenia bez nowego pobierania APK.
 
 ## 🆕 Kafelek "Plan zajęć" — czytelność: zakres godzin, przerwy/okienka, sala, dzień w rogu (2026-10-06)
 
