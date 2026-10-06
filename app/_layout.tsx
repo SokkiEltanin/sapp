@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { whenAuthReady } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
+import { toast } from '@/store/toastStore';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import LevelUpCelebration from '@/components/pet/LevelUpCelebration';
@@ -357,6 +358,35 @@ export default function RootLayout() {
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, [authReady]);
+
+  // OTA update check (2026-10-06, user: "czekam 35min jak nie godzinę żeby sprawdzić... mi
+  // się odechciewa") — `expo-updates` było skonfigurowane (`app.json`'s `updates.url`) ale nic
+  // nigdy nie wołało `checkForUpdateAsync`/`fetchUpdateAsync`, więc KAŻDA zmiana, nawet czysto
+  // JS (kolor, layout, animacja), szła tą samą ciężką ścieżką co zmiana wymagająca nowego
+  // natywnego APK — pełny build Gradle na CI (35-60 min) + ręczna instalacja. Teraz: cichy
+  // check przy starcie + każdym powrocie z tła, auto-pobranie i restart jeśli CI opublikowało
+  // nowszą paczkę (patrz ci.yml's `eas update` krok) — z JS-owej strony to tyle, reszta (branch/
+  // kanał `production`, `requestHeaders` w app.json) jest po stronie configu/CI.
+  // `Updates.isEnabled` chroni przed wywołaniem w Expo Go/dev-kliencie (tam `checkForUpdateAsync`
+  // rzuca, nie no-op'uje) — standalone APK bez zainstalowanego jeszcze kanału (sprzed tej
+  // zmiany) też po prostu nigdy nie znajdzie nic nowego, cicho (catch), bez efektu ubocznego.
+  useEffect(() => {
+    if (!Updates.isEnabled) return;
+    let cancelled = false;
+    const checkAndApply = async () => {
+      try {
+        const res = await Updates.checkForUpdateAsync();
+        if (!res.isAvailable || cancelled) return;
+        await Updates.fetchUpdateAsync();
+        if (cancelled) return;
+        toast.info('Nowa wersja gotowa — odświeżam…');
+        setTimeout(() => { Updates.reloadAsync().catch(() => {}); }, 1200);
+      } catch {}
+    };
+    const t = setTimeout(checkAndApply, 3000);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') checkAndApply(); });
+    return () => { cancelled = true; clearTimeout(t); sub.remove(); };
+  }, []);
 
   // Background-ish health sync: pull the watch's recent history into the per-day
   // cache on cold start + every time the app returns to the foreground, so the

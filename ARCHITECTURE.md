@@ -14951,6 +14951,73 @@ szerokiej linii.
 
 ---
 
+---
+
+## 266. OTA update (EAS Update) — JS-owe zmiany bez pełnego APK (2026-10-06)
+
+User: "czekam 35min jak nie godzinę żeby sprawdzić, potem edytujesz, ja znowu czekam i mi się
+odechciewa" — chciał szybszej pętli "zmiana → widzę efekt na telefonie" dla iteracji nad
+UI/animacjami.
+
+**Root cause (nie szybkość pracy, infrastruktura)**: `build.yml` odpalał PEŁNY natywny build
+Androida (`expo prebuild` + `gradlew assembleRelease`, zimny Gradle/NDK bez cache'u, 35-60 min)
+na **każdym** pushu do mastera — nawet przy zmianie jednego koloru. `expo-updates` było już
+zainstalowane i skonfigurowane (`app.json`'s `updates.url`, projekt EAS podpięty), ale NIC
+nigdy nie wołało `checkForUpdateAsync`/`fetchUpdateAsync` po stronie appki, ani nic w CI nie
+publikowało update'u — kanał (`requestHeaders['expo-channel-name']`) też nie był ustawiony,
+więc nawet gdyby appka pytała, nie miałaby czego szukać.
+
+**Trzy części fixu:**
+1. **`app.json`** — dodane `updates.requestHeaders: {"expo-channel-name": "production"}`.
+   Bez tego natywny manifest (AndroidManifest meta-data, wstrzykiwane przez
+   `@expo/config-plugins`'s `AndroidConfig.Updates.withUpdates` przy `expo prebuild`) nie niesie
+   informacji JAKI kanał EAS Update sprawdzać — zweryfikowane czytając
+   `node_modules/@expo/config-plugins/build/{android,utils}/Updates.js` wprost (nie zgadywane),
+   bo ten mechanizm (request header, nie osobne pole `channel`) jest nieoczywisty i
+   nieudokumentowany wprost w SDK 54.
+2. **`app/_layout.tsx`** — nowy `useEffect` (wzorzec 1:1 z istniejącym `maybeAutoBackup`'s
+   `setTimeout` + `AppState.addEventListener('change', ...)`): cichy check przy starcie (3s
+   delay) i przy każdym powrocie z tła; gdy `checkForUpdateAsync()` znajdzie coś nowego —
+   `fetchUpdateAsync()` → toast "Nowa wersja gotowa — odświeżam…" → `reloadAsync()` po 1.2s.
+   `Updates.isEnabled` guard — w Expo Go/dev-kliencie te wywołania RZUCAJĄ (nie no-op'ują), więc
+   bez guarda appka by się wywalała w trybie deweloperskim lokalnie.
+3. **CI** — `ci.yml` dostał nowy krok "Publish OTA update" PO testach, tylko na
+   `push` do mastera (nie na PR-ach — to by publikowało niezmergowany kod), publikujący przez
+   `npx eas-cli@latest update --channel production --non-interactive`. `EXPO_TOKEN` przez env
+   (sekret repo), commit message TEŻ przez env zmienną (`UPDATE_MESSAGE`), nie bezpośrednią
+   interpolację `${{ }}` w skrypcie powłoki — to samo ryzyko injection co backtiki w
+   `git commit -m` (patrz CLAUDE.md §8), tylko że tu atakerem/źródłem tekstu byłaby treść
+   commita wklejona prosto w bash. `continue-on-error: true` + ręczny guard na pusty
+   `EXPO_TOKEN` (`::warning::` + `exit 0`) — publikacja OTA to efekt uboczny, nie bramka
+   jakości, jej brak/niepowodzenie NIE może blokować mergowania PR-ów przez tsc/jest.
+
+**`build.yml` przebudowany** — `on.push` dostał `paths:` filtr (`app.json`, `eas.json`,
+`package.json`, `package-lock.json`, `android/**`, sam plik workflow) zamiast odpalać się na
+KAŻDYM pushu — pełny build teraz tylko gdy realnie zmienia się coś natywnego (ikona/
+uprawnienie/plugin/zależność, patrz CLAUDE.md §2), zgodnie z zasadą która już i tak była
+zapisana w CLAUDE.md, tylko nigdy nie wymuszona w CI. `workflow_dispatch` zostaje jako ręczny
+"zrób mi APK teraz" niezależnie od ścieżek.
+
+**Wymaga od usera (jednorazowo)**: (1) dodać sekret repo `EXPO_TOKEN` (expo.dev → Account
+settings → Access tokens) — bez tego CI cicho pomija publikację (warning w logu, CI dalej
+zielone). (2) zainstalować JESZCZE JEDEN pełny APK (ten z tym PR-em) — dopiero on ma
+`expo-channel-name` wpalone w manifest; wszystkie APK-i sprzed tej zmiany nigdy nie znajdą
+żadnego update'u (brak nagłówka kanału), więc OTA zacznie realnie działać dopiero PO tej jednej
+ostatniej pełnej instalacji.
+
+**Testy**: brak nowych — czysta infrastruktura CI/config, nic czysto-logicznego do
+jednostkowego przetestowania (ten sam brak pokrycia co reszta `app/_layout.tsx`, który nie ma
+żadnych testów). `tsc --noEmit` czyste, `jest --silent` 100/100 suite (bez zmiany liczby
+testów), `app.json`/oba workflow YAML zwalidowane parserem przed commitem.
+
+**Priorytet testu na urządzeniu — wysoki, ale jednorazowy i opóźniony**: po zmergowaniu tego
+PR-a poczekaj na pełny build APK (ostatni, który realnie potrzebny), zainstaluj go ręcznie jak
+dotychczas. Od TEJ chwili: kolejna zmiana czysto JS (np. następny kafelek dashboardu) powinna
+po zmergowaniu PR-a pojawić się na telefonie samoistnie w ciągu ~30-60s od otwarcia/wznowienia
+appki (toast "Nowa wersja gotowa"), bez pobierania nowego APK.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -23,3 +23,26 @@ jobs:
         run: npx tsc --noEmit
       - name: Tests
         run: npm test -- --ci
+      # OTA (EAS Update) — 2026-10-06, user: "czekam 35min jak nie godzinę... mi się
+      # odechciewa". Publikuje JS bundle na kanał "production" (app.json's
+      # `updates.requestHeaders`) po KAŻDYM pushu na mastera — telefon z zainstalowanym APK
+      # (patrz app/_layout.tsx's nowy update-check efekt) złapie to w kilkadziesiąt sekund,
+      # bez czekania na pełny natywny build (build.yml, teraz odpalany TYLKO gdy zmieniają się
+      # pliki natywne/zależności — patrz komentarz tam). `continue-on-error` + ręczny guard na
+      # brak `EXPO_TOKEN` — publikacja OTA to efekt uboczny, nie bramka jakości, więc jej
+      # niepowodzenie (np. sekret jeszcze nie dodany) nie może blokować mergowania PR-ów.
+      - name: Publish OTA update (EAS Update)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        continue-on-error: true
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # Commit message przez env (nie bezpośrednia interpolacja ${{ }} w `run:`) — to samo
+          # ryzyko co backtiki w `git commit -m` (patrz CLAUDE.md), tyle że tu interpolacja
+          # ${{ }} wklejałaby dowolny tekst commita PROSTO w skrypt powłoki.
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::EXPO_TOKEN sekret nie ustawiony w repo — pomijam publikację OTA. Dodaj token z expo.dev (Account settings → Access tokens) jako sekret repo 'EXPO_TOKEN', żeby zmiany JS trafiały na telefon bez pełnego buildu APK."
+            exit 0
+          fi
+          npx eas-cli@latest update --channel production --message "$UPDATE_MESSAGE" --non-interactive

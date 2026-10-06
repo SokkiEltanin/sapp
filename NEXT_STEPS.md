@@ -3,6 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🔴 WYMAGA AKCJI USERA: OTA update (EAS Update) — jednorazowy setup (2026-10-06)
+
+User: "czekam 35min jak nie godzinę... mi się odechciewa" — każda zmiana (nawet jeden kolor)
+odpalała pełny build APK. Pełny opis w ARCHITECTURE.md §266. Zrobione: `app.json` (kanał EAS
+Update), `app/_layout.tsx` (auto-check+apply przy starcie/powrocie z tła), `ci.yml` (publikuje
+OTA po każdym pushu do mastera), `build.yml` (pełny APK tylko gdy zmienia się coś natywnego —
+`app.json`/`eas.json`/`package.json`/`android/**`).
+
+**Żeby to ruszyło, user musi zrobić DWIE rzeczy JEDNORAZOWO:**
+1. Dodać sekret repo `EXPO_TOKEN` (expo.dev → Account settings → Access tokens → stwórz token
+   → GitHub repo → Settings → Secrets and variables → Actions → New repository secret). Bez
+   tego CI cicho pomija publikację OTA (warning w logu, reszta CI zielona) — JS-owe zmiany
+   dalej będą czekać na kolejny pełny build, aż token się pojawi.
+2. Zainstalować JESZCZE JEDEN pełny APK (następny, który powstanie z mastera) — dopiero on ma
+   wpalony nagłówek kanału w manifeście. Każdy wcześniej zainstalowany APK nigdy nie znajdzie
+   żadnego OTA update'u. Od TEJ instalacji dalej: kolejne zmiany czysto JS/UI/animacje powinny
+   pojawiać się same w ~30-60s od otwarcia appki (toast "Nowa wersja gotowa"), bez nowego APK.
+
+**🆕 Priorytet testu na urządzeniu — wysoki, jednorazowy**: po dodaniu `EXPO_TOKEN` i
+zainstalowaniu najnowszego APK, poproś o drobną zmianę JS (np. kolor) i sprawdź czy po
+zmergowaniu PR-a telefon sam pokazuje toast odświeżenia bez nowego pobierania APK.
+
 ## 🆕 Kafelek "Plan zajęć" — czytelność: zakres godzin, przerwy/okienka, sala, dzień w rogu (2026-10-06)
 
 User zrzutem kafelka: "średnio czytelny... musi być czasowo blokowo od której do której...
