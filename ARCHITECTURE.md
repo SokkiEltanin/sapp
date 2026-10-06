@@ -14764,6 +14764,29 @@ nazwa przedmiotu przycięta z „…" jeśli za długa.
 
 ---
 
+---
+
+## 262. Ekwipunek bossa: kategorie przeniesione pod listę itemów (2026-10-06)
+
+User: "ten ekwipunek bossa mialy byc kategorie ekwipunku na dole a itemy na gorze jakby zeby
+sie nie chowało i znikało i było lepiej dostępne".
+
+W `GearPanel.tsx`'s `GearSlotModal` — zakładki slotów (`tabRow`: helm/zbroja/buty/obroza/
+talizman/kolczyki) renderowały się PRZED listą itemów, więc przy dłuższej liście (albo
+mniejszym ekranie) lista zaczynała się niżej i łatwiej ginęła pod fałdą modala. Kolejność
+odwrócona: nagłówek slotu → lista itemów (ScrollView, bez zmian w logice/stylach samej listy)
+→ zakładki slotów na samym dole. `tabRow`'s `marginBottom` zamieniony na `marginTop`
+(odpowiednia przerwa od treści nad nim, nie pod). Bez zmian w logice sprzedaży/zakładania —
+czysty reorder JSX.
+
+**Testy**: brak nowych (czysty UI reorder, zero zmiany logiki) — `tsc --noEmit` czyste, `jest
+--silent` 100/100 suite, 1275 testów (bez zmiany liczby, nic nowego do testowania).
+
+**Priorytet testu na urządzeniu — niski** (czysto wizualne): Pupil → dotknij slot ekwipunku →
+sprawdź że lista itemów jest na górze, zakładki slotów (ikony hełm/zbroja/itd.) na dole modala.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

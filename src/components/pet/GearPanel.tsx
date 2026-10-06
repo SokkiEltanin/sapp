@@ -153,22 +153,6 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
             <TouchableOpacity onPress={onClose} hitSlop={16} style={s.closeBtn}><X size={22} color={c.text.primary} /></TouchableOpacity>
           </View>
 
-          <View style={s.tabRow}>
-            {GEAR_SLOTS.map(sl => {
-              const TabIcon = SLOT_ICON[sl];
-              const active = sl === slot;
-              const slEquippedId = equippedGear[sl];
-              const hasDot = Object.entries(ownedGear).some(
-                ([id, inst]) => inst && id !== slEquippedId && gearById(inst.itemId)?.slot === sl,
-              );
-              return (
-                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
-                  <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />
-                  {hasDot && <View style={s.tabDot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
           {/* Bez emoji (2026-09-18, user: "eq możemy w górę i usun z niego emotki") — dawne
               `SLOT_META[slot].icon` zostaje jako format dla pet-shop.tsx/BoxRevealModal.tsx
               (celowe, nie dead code), tu tylko sama etykieta słowna. */}
@@ -316,6 +300,29 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
             </ScrollView>
             </>
           )}
+
+          {/* Kategorie NA DOLE, itemy NA GÓRZE (2026-10-06, user: "kategorie ekwipunku na dole
+              a itemy na gorze jakby zeby sie nie chowało i znikało i było lepiej dostępne") —
+              dawniej `tabRow` był pierwszy w sheecie, więc przy dłuższej liście itemów (albo
+              mniejszym ekranie) lista itemów zaczynała się niżej i łatwiej ginęła pod fałdą;
+              zakładki na samym dole są też bliżej kciuka (ten sam motyw co dolny `TabBar`
+              appki), więc przełączanie slotów zostaje równie wygodne. */}
+          <View style={s.tabRow}>
+            {GEAR_SLOTS.map(sl => {
+              const TabIcon = SLOT_ICON[sl];
+              const active = sl === slot;
+              const slEquippedId = equippedGear[sl];
+              const hasDot = Object.entries(ownedGear).some(
+                ([id, inst]) => inst && id !== slEquippedId && gearById(inst.itemId)?.slot === sl,
+              );
+              return (
+                <TouchableOpacity key={sl} onPress={() => { haptic.tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
+                  <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />
+                  {hasDot && <View style={s.tabDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -424,7 +431,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   closeBtn: { padding: spacing[1] },
-  tabRow: { flexDirection: 'row', gap: spacing[1], marginBottom: spacing[2] },
+  tabRow: { flexDirection: 'row', gap: spacing[1], marginTop: spacing[2] },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: radius.md, backgroundColor: c.fill.subtle, position: 'relative' },
   tabActive: { backgroundColor: c.accent.blue + '22' },
   tabDot: { position: 'absolute', top: 5, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: '#FBBF24' },
