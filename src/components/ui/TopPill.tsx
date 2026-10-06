@@ -13,7 +13,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { usePetStore } from '@/store/petStore';
 import { useClassScheduleStore } from '@/store/classScheduleStore';
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL } from '@/utils/classSchedule';
+import { isClassEvent, parseClassEvent, abbreviateSubject } from '@/utils/classSchedule';
 import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { isSelfTransfer } from '@/utils/statWidgets';
@@ -283,12 +283,22 @@ export default function TopPill() {
         const diffM = h * 60 + m - nowMinsClass;
         timeLabel = diffM <= 0 ? 'TERAZ' : diffM < 60 ? `ZA ${diffM} MIN` : ev.startTime;
       }
-      const typePrefix = parsed?.type ? `${CLASS_TYPE_LABEL[parsed.type].toUpperCase()}: ` : '';
-      const roomSuffix = parsed?.room ? ` · ${parsed.room}` : '';
+      // Kolejność STAŁA (2026-10-06, user zrzutem: "za dlugi jest ten komunikat na
+      // pillu... ciężko cokolwiek widac, nazwa skrócona najlepiej plus sala i budynek") —
+      // sala/budynek TERAZ NA POCZĄTKU, nie na końcu. Tekst renderuje się z
+      // `numberOfLines={1}` (ellipsis na KOŃCU) — sala doklejona na końcu zawsze ginęła
+      // pierwsza przy dłuższej nazwie przedmiotu, mimo że to druga najważniejsza
+      // informacja po samej godzinie (już w `badge`). Typ skrócony do jednej litery
+      // (W/C/L/P) zamiast całego słowa — też odzyskuje miejsce. Nazwa przedmiotu dodatkowo
+      // przycięta deterministycznie (`abbreviateSubject`), żeby długość była przewidywalna
+      // niezależnie od szerokości ekranu/fontu, nie tylko zdana na natywny ellipsis.
+      const typePrefix = parsed?.type ? `${parsed.type} ` : '';
+      const roomPrefix = parsed?.room ? `${parsed.room} · ` : '';
+      const subjectPart = abbreviateSubject(parsed?.subject ?? ev.title, 26);
       return {
         badge: timeLabel,
         color:  '#A78BFA',             // fioletowy — spójny z sekcją "Plan zajęć" (Ustawienia/dashboard)
-        text:   `${typePrefix}${up(parsed?.subject ?? ev.title)}${roomSuffix}`,
+        text:   up(`${typePrefix}${roomPrefix}${subjectPart}`),
         route:  '/(tabs)',
         key:    `class-${ev.id}`,
       };

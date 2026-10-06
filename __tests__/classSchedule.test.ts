@@ -1,4 +1,4 @@
-import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel, isHappeningNow, computeClassReminder, fmtClassEventLabel } from '@/utils/classSchedule';
+import { isClassEvent, parseClassEvent, CLASS_TYPE_LABEL, fmtNextClassLabel, isHappeningNow, computeClassReminder, fmtClassEventLabel, abbreviateSubject } from '@/utils/classSchedule';
 import { CalendarEvent } from '@/types';
 
 const ev = (o: Partial<CalendarEvent> = {}): CalendarEvent => ({
@@ -134,5 +134,27 @@ describe('fmtClassEventLabel — etykieta do wyświetlenia/cache na Task.classEv
   });
   test('event bez rozpoznanego przedmiotu (zły prefiks) → bez segmentu przedmiotu', () => {
     expect(fmtClassEventLabel(ev(), '[INNY]')).toBe('Pon 12.10 · 08:00');
+  });
+});
+
+// 2026-10-06, user zrzutem pilla: "za dlugi jest ten komunikat na pillu, ciężko cokolwiek
+// widac nazwa skrócona najlepiej plus sala i budynek".
+describe('abbreviateSubject — deterministyczne cięcie długich nazw przedmiotów', () => {
+  test('krótsza niż limit → bez zmian', () => {
+    expect(abbreviateSubject('Obróbka cieplno-chemiczna', 28)).toBe('Obróbka cieplno-chemiczna');
+  });
+  test('dokładnie na limicie → bez zmian (brak zbędnego cięcia na granicy)', () => {
+    expect(abbreviateSubject('1234567890', 10)).toBe('1234567890');
+  });
+  test('dłuższa niż limit → ucięta z wielokropkiem, długość = maxLen', () => {
+    const r = abbreviateSubject('Struktura powierzchni i jej modyfikacje', 20);
+    expect(r.length).toBe(20);
+    expect(r.endsWith('…')).toBe(true);
+    expect(r).toBe('Struktura powierzch…');
+  });
+  test('nie ucina w połowie białego znaku na granicy (trimEnd przed wielokropkiem)', () => {
+    // limit pada DOKŁADNIE na spacji — bez trimEnd wyszłoby "Struktura …" z nadmiarową spacją
+    const r = abbreviateSubject('Struktura cos', 10);
+    expect(r).toBe('Struktura…');
   });
 });

@@ -3,7 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: dynamic-island pill "hukowy, zlagowany, znikający" (2026-10-06)
+## 🆕 Fix: pigułka planu zajęć ucinała salę (2026-10-06)
+
+User zrzutem pilla: "za dlugi jest ten komunikat na pillu... nazwa skrócona najlepiej plus
+sala i budynek". Pełny opis w ARCHITECTURE.md §261. Sala/budynek były na KOŃCU tekstu →
+ginęły pierwsze przy `numberOfLines={1}` ellipsis. Przestawione na początek (`TYP SALA ·
+NAZWA`), typ skrócony do litery, nowa `abbreviateSubject()` deterministycznie tnie długie
+nazwy przedmiotów. +4 testy. `tsc`/`jest` czyste.
+
+**🆕 Priorytet testu na urządzeniu — średni**: w trakcie zajęć z długą nazwą przedmiotu →
+sprawdź że sala/budynek są widoczne na pigułce, nie ucięte.
+
+## 🆕🔴 OTWARTE: "Bez słodyczy" streak — nie łapie niektórych produktów eaten w "Co zjadłem" (2026-10-06)
+
+User: toffifee już łapie (naprawione wcześniej, §250), ale "kinderbleno" (Kinder Bueno?) NIE
+złapało mimo że "kinder" jest w `AVOID_PRESETS['sweets'].keyword` (countersStore.ts) i
+`MealItem.name` zawsze jest zapisywane przy logowaniu posiłku — czytając kod, substring-match
+POWINIEN zadziałać. Nie ma jeszcze diagnozy — user nie pamięta dokładnie jak dodał produkt
+(nowy ręcznie wpisany vs wybrany z podpowiedzi). **Czeka na odpowiedź usera**: dokładna nazwa
+wpisu widoczna w "Co zjadłem" dla tego konkretnego produktu (możliwe że autouzupełnianie
+podstawiło inny, już zapisany produkt pod inną nazwą, i user tego nie zauważył przy
+zatwierdzaniu — to by tłumaczyło czemu matcher, który jest poprawny, nie złapał). Do zbadania
+dalej w następnej rundzie, gdy user odpowie.
 
 User: "ogarnij dynamic pilla naszego zeby nie byl taki hukowy zlagowany znikający". Pełny opis
 w ARCHITECTURE.md §260. Root cause: pomodoro/zarobki z pracy tykają co 1000ms, a `item.key`

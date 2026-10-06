@@ -92,6 +92,18 @@ export function computeClassReminder(ev: CalendarEvent, minutesBefore: number): 
   return { date: ymd(dt), time: `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}` };
 }
 
+// Skraca nazwę przedmiotu do stałej, przewidywalnej długości (2026-10-06, user: zrzutem
+// pilla — "za dlugi jest ten komunikat na pillu, ciężko cokolwiek widac... plus sala i
+// budynek"). Deterministyczne cięcie po znakach zamiast polegać WYŁĄCZNIE na natywnym
+// `numberOfLines`/ellipsis React Native — to i tak ucina na końcu, więc bez tego sala (room),
+// doklejana na samym końcu stringa w TopPill.tsx, znikała PIERWSZA (była niewidoczna
+// praktycznie zawsze przy dłuższych nazwach przedmiotów).
+export function abbreviateSubject(subject: string, maxLen = 28): string {
+  const s = subject.trim();
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen - 1).trimEnd() + '…';
+}
+
 // Etykieta do wyświetlenia/cache'owania przy linkowaniu zadania do zajęć (np. "Pon 12.10 ·
 // 8:00 · Cięcie wiązką elektronową i laserową") — zapisywana na Task jako `classEventLabel`,
 // żeby plan wciąż był czytelny nawet gdy źródłowy event zniknie z Kalendarza Google.
