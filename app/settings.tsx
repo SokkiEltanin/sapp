@@ -2274,6 +2274,27 @@ export default function SettingsScreen() {
           ) },
         },
         {
+          // 2026-10-06, weryfikacja OTA (expo-updates, ARCHITECTURE.md §266) — user: "sprawdźmy
+          // czy działa teraz te aktualizacje w sekundy". Prosty diagnostyczny wiersz zamiast
+          // jednorazowego testowego tekstu gdzieś na dashboardzie — zostaje na stałe jako
+          // sposób na sprawdzenie "czy to jest najnowsza paczka JS" bez liczenia na pamięć.
+          id: 'diag-ota', title: 'Wersja aplikacji (OTA)', subtitle: 'Kanał, kiedy pobrana ostatnia aktualizacja JS, czy to wbudowana wersja',
+          icon: LucideIcons.RefreshCw, accentColor: '#2AC68F',
+          keywords: ['ota', 'aktualizacja', 'update', 'eas', 'wersja', 'build', 'kanał'],
+          control: { kind: 'link', onPress: () => {
+            haptic.tap();
+            const lines = [
+              `Kanał: ${Updates.channel ?? '—'}`,
+              `Runtime: ${Updates.runtimeVersion ?? '—'}`,
+              Updates.isEmbeddedLaunch
+                ? 'Wbudowana wersja — jeszcze żadna aktualizacja OTA się nie pobrała.'
+                : `OTA pobrana: ${Updates.createdAt ? Updates.createdAt.toLocaleString('pl-PL') : '—'}`,
+              `ID: ${Updates.updateId ?? '—'}`,
+            ];
+            Alert.alert('Wersja aplikacji (OTA)', lines.join('\n'));
+          } },
+        },
+        {
           id: 'diag-health-test', title: 'Test połączeń zdrowia', subtitle: 'Sprawdza kroki (wg źródła), sen, wagę, kalorie, wodę — raport do wysłania',
           icon: LucideIcons.Activity, accentColor: '#46B0DE',
           keywords: ['zdrowie', 'kroki', 'sen', 'waga', 'kalorie', 'woda', 'health connect', 'test'],

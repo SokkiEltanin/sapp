@@ -15018,6 +15018,33 @@ appki (toast "Nowa wersja gotowa"), bez pobierania nowego APK.
 
 ---
 
+---
+
+## 267. Diagnostyka: "Wersja aplikacji (OTA)" (2026-10-06)
+
+User: "sprawdźmy czy działa teraz te aktualizacje w sekundy" — po dodaniu `EXPO_TOKEN` (§266)
+potrzebny był sposób żeby na telefonie SPRAWDZIĆ, czy OTA faktycznie coś pobrało, zamiast
+zgadywać po samym wyglądzie ekranu.
+
+Nowy wiersz w Ustawienia → Diagnostyka ("Wersja aplikacji (OTA)") — `Alert` pokazujący
+`Updates.channel`/`runtimeVersion`/`isEmbeddedLaunch`/`createdAt`/`updateId` (expo-updates,
+już zaimportowane w `settings.tsx`). `isEmbeddedLaunch` rozróżnia "jeszcze żadna OTA się nie
+pobrała" od realnej daty pobrania — bez tego sam brak `createdAt` byłby niejednoznaczny.
+Zostaje na stałe (nie jednorazowy test) — ten sam diagnostyczny wzorzec co
+`diag-water`/`diag-last-crash` obok (prosty `Alert.alert` z tekstem, nie osobny ekran).
+
+**Testy**: brak nowych — czysty diagnostyczny `Alert`, nic logicznego do testowania (ten sam
+brak pokrycia co reszta diagnostyki w `settings.tsx`). `tsc --noEmit` czyste, `jest --silent`
+100/100 suite (bez zmiany liczby testów).
+
+**Priorytet testu na urządzeniu — wysoki, jednorazowy** (to JEST test OTA): po zainstalowaniu
+ostatniego pełnego APK (§266), otwórz Ustawienia → Diagnostyka → "Wersja aplikacji (OTA)" —
+zanotuj `ID`. Poczekaj aż ten PR (dodający właśnie ten wiersz) się zmerguje i OTA się
+opublikuje, zamknij i otwórz appkę ponownie (powinien pokazać się toast "Nowa wersja gotowa"),
+sprawdź diagnostykę jeszcze raz — `ID`/`createdAt` powinny się zmienić.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

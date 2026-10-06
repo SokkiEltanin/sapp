@@ -3,25 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕🔴 WYMAGA AKCJI USERA: OTA update (EAS Update) — jednorazowy setup (2026-10-06)
+## 🆕🔴 OSTATNI KROK: OTA update (EAS Update) — potwierdź na telefonie (2026-10-06)
 
 User: "czekam 35min jak nie godzinę... mi się odechciewa" — każda zmiana (nawet jeden kolor)
-odpalała pełny build APK. Pełny opis w ARCHITECTURE.md §266. Zrobione: `app.json` (kanał EAS
-Update), `app/_layout.tsx` (auto-check+apply przy starcie/powrocie z tła), `ci.yml` (publikuje
-OTA po każdym pushu do mastera), `build.yml` (pełny APK tylko gdy zmienia się coś natywnego —
-`app.json`/`eas.json`/`package.json`/`android/**`).
+odpalała pełny build APK. Pełny opis w ARCHITECTURE.md §266/§267.
 
-**Dwie jednorazowe rzeczy — status:**
-1. ✅ Sekret repo `EXPO_TOKEN` dodany przez usera (2026-10-06).
-2. ⏳ Ostatni pełny APK — PR #373 sam zmienił `app.json` (nowy nagłówek kanału), więc
-   `build.yml`'s ścieżkowy filtr złapał TĘ ZMIANĘ i automatycznie odpalił build od razu po
-   zmergowaniu (user nie musiał nic osobno robić) — to WŁAŚNIE jest ten "ostatni pełny APK".
-   User: zainstaluj build z tego runa, jak tylko się skończy. Każdy APK sprzed niego nigdy nie
-   znajdzie OTA update'u.
+**Status — wszystko po stronie serwera/CI już zweryfikowane:**
+1. ✅ Sekret repo `EXPO_TOKEN` dodany przez usera.
+2. ✅ Ostatni pełny APK (PR #373, auto-triggered przez zmianę `app.json`) — build skończony,
+   sukces (run #1147).
+3. ✅ Realna publikacja OTA z prawdziwym tokenem — potwierdzone wprost w logach CI (PR #374):
+   `✔ Published!`, kanał `production`, osobne update ID na Android/iOS.
+4. 🆕 Nowy wiersz diagnostyczny Ustawienia → Diagnostyka → "Wersja aplikacji (OTA)" (§267) —
+   pokazuje kanał/runtime/`updateId`/kiedy pobrana ostatnia paczka, żeby dało się to sprawdzić
+   na telefonie bez zgadywania.
 
-**🆕 Priorytet testu na urządzeniu — wysoki, jednorazowy**: po instalacji tego APK, poproś o
-drobną zmianę JS (np. kolor) i sprawdź czy po zmergowaniu PR-a telefon sam pokazuje toast
-odświeżenia bez nowego pobierania APK.
+**🆕 Priorytet testu na urządzeniu — wysoki, ostatni brakujący krok**: zainstaluj build #1147
+(jeśli jeszcze nie), otwórz Ustawienia → Diagnostyka → "Wersja aplikacji (OTA)", zanotuj `ID`.
+Gdy TEN PR (dodający tę diagnostykę) się zmerguje, zamknij i otwórz appkę ponownie — powinien
+pojawić się toast "Nowa wersja gotowa", a `ID`/data w diagnostyce powinny się zmienić, bez
+instalowania nowego APK. To domyka całą funkcję — jeśli zadziała, resztę zmian (kolory,
+animacje, layout) będziesz widział w appce w kilkadziesiąt sekund od zmergowania PR-a.
 
 ## 🆕 Kafelek "Plan zajęć" — czytelność: zakres godzin, przerwy/okienka, sala, dzień w rogu (2026-10-06)
 
