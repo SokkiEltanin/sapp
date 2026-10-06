@@ -788,7 +788,16 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
 // this file, so `subtotal` (sum of finalPrice) matches `total` directly.
 
 const KFL_COPY_HEADER_RE = /^Cena\s+PLN$/i;
-const KFL_COPY_SUBTOTAL_RE = /^Suma\s*cz[ąa]stkowa\s+(\d+[.,]\d{2})$/i;
+// "Suma cząstkowa" (app "Receipt copy", PRZED tabelą promocji) ALBO zwykła "Suma" (drukowany
+// papierowy paragon, który też ma nagłówek "Cena PLN" ale NIE ma osobnej sekcji promocji/
+// "Suma cząstkowa" — produkty idą prosto do finalnej "Suma") — 2026-10-06, user wkleił
+// dokładnie taki drukowany paragon ("Brak produktów" mimo poprawnego formatu linii). Oba
+// warianty dzielą TEN SAM format linii kontynuacji ("ilość * cena ... suma LITERA"), więc
+// jedyne co było złe to szukanie WYŁĄCZNIE "Suma cząstkowa" jako granicy końca pozycji —
+// na drukowanym paragonie ten string nigdy się nie pojawia, więc `endIdx` zawsze wychodził
+// -1 i `itemLines` było puste. Grupa przechwytująca i tak nieużywana (patrz niżej, `subtotal`
+// liczony z `products[].finalPrice`, nie z tego capture) — bezpieczne rozszerzenie.
+const KFL_COPY_SUBTOTAL_RE = /^Suma(?:\s*cz[ąa]stkowa)?\s+(\d+[.,]\d{2})$/i;
 const KFL_COPY_VAT_TABLE_RE = /^Vat\s*%/i;
 const KFL_COPY_ITEM_QTY_RE = /^(.+?)\s+(\d+)\s*\*\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s*[A-E]$/;
 const KFL_COPY_CONT_QTY_RE = /^(\d+)\s*\*\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s*[A-E]$/;
