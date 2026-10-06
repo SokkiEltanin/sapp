@@ -15137,6 +15137,43 @@ Firebase.
 
 ---
 
+---
+
+## 270. Nowe logo (kocia głowa brąz/kremowy) + porządki w assets/ (2026-10-06)
+
+User: dodał `assets/LV610_Brown&Creme.png` bezpośrednio przez GitHub (poza tą sesją) i poprosił
+"dodaj to logo jako główne i zrób tam porządek ze starymi wersjami".
+
+**Reorganizacja `assets/`** — dwa nowe foldery:
+- `assets/LOGO/` — tylko aktualnie używany plik, `LV610_Brown&Creme.png` (1024×1024, RGB bez
+  alfa — kocia głowa w kremowym na brązowym tle, ten sam motyw co `CatArt`/pupil appki).
+- `assets/LOGO_OLD/` — wszystkie poprzednie próby logo, dotąd luzem w korzeniu `assets/`, żadna
+  już nigdzie nie referencjonowana w kodzie (zweryfikowane grepem PRZED przeniesieniem):
+  `LOGONOWEpupildoapki.png`, `L_WhiteBcg_Color.png` (poprzednia aktywna ikona),
+  `NowelogoSapp.png`, `V4logoSapp.png`, `logoSapp.png`, `icon.png`, `adaptive-icon.png`,
+  `splash-icon.png`, `pupildoapki.png`. Wszystkie `git mv` (historia pliku zachowana, nie
+  usunięte).
+
+**`app.json`** — `expo.icon` i `expo.android.adaptiveIcon.foregroundImage` przestawione z
+`./assets/L_WhiteBcg_Color.png` na `./assets/LOGO/LV610_Brown&Creme.png`. `splash.image`
+(`./assets/splash-blank.png`) ŚWIADOMIE nietknięty — to nie "wersja logo", tylko celowo pusty
+natywny splash (prawdziwy animowany splash robi `AnimatedSplash.tsx` w JS, patrz komentarz w
+`app/_layout.tsx`'s pierwszy import).
+
+**To zmiana ikony — wymaga nowego natywnego APK** (CLAUDE.md §2, "Ikona/splash/uprawnienia/
+pluginy wchodzą TYLKO przez nowy build APK, nie OTA") — `build.yml`'s ścieżkowy filtr (§266)
+złapie zmianę `app.json` automatycznie i sam odpali pełny build po zmergowaniu, user nie musi
+nic ręcznie triggerować.
+
+**Testy**: brak nowych (czysta zmiana assetów/configu). `tsc --noEmit` czyste, `jest --silent`
+100/100 suite.
+
+**Priorytet testu na urządzeniu — średni**: po automatycznym buildzie, zainstalować nowy APK i
+sprawdzić że ikona appki na ekranie głównym i w przełączniku aplikacji pokazuje nowe logo
+(kocia głowa brąz/kremowy), nie starą ikonę.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

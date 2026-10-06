@@ -3,18 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕🔴 KRYTYCZNE: OTA paczki miały puste klucze Firebase (2026-10-06)
+## 🆕 Nowe logo + porządki w assets/ (2026-10-06)
+
+User dodał `assets/LV610_Brown&Creme.png` (kocia głowa brąz/kremowy) bezpośrednio przez
+GitHub, poprosił o ustawienie jako głównej ikony i posprzątanie starych wersji. Pełny opis w
+ARCHITECTURE.md §270. `assets/LOGO/` (nowe, jedyny aktywny plik) + `assets/LOGO_OLD/` (9 starych,
+nieużywanych już plików, `git mv` — historia zachowana). `app.json`'s `icon`/
+`adaptiveIcon.foregroundImage` przestawione. To zmiana ikony → wymaga nowego APK, `build.yml`
+złapie ją automatycznie (ścieżkowy filtr na `app.json`).
+
+**🆕 Priorytet testu na urządzeniu — średni**: po automatycznym buildzie, zainstalować i
+sprawdzić że ikona appki (ekran główny + przełącznik aplikacji) pokazuje nowe logo.
+
+## ✅ ZAMKNIĘTE — KRYTYCZNE: OTA paczki miały puste klucze Firebase (2026-10-06)
 
 User zrzutem natywnego crasha: "FirebaseError... auth/invalid-api-key", appka się "sama
 naprawiła" po kolejnym otwarciu (zadziałał auto-rollback `expo-updates`). Pełny opis w
 ARCHITECTURE.md §269. Root cause: `ci.yml`'s krok publikujący OTA nie miał
 `EXPO_PUBLIC_FIREBASE_*`/`EXPO_PUBLIC_GOOGLE_*` env (w przeciwieństwie do `build.yml`) — każda
 dotychczas opublikowana paczka OTA miała złamane Firebase. Fix dodaje te same env co
-`build.yml` (sekrety już istnieją, nic do dodania przez usera).
-
-**🆕 Priorytet testu na urządzeniu — wysoki**: po opublikowaniu fixu (sprawdzić `✔ Published!`
-w logach), obserwować kolejne otwarcia appki — natywny crash Firebase nie powinien się już
-pojawiać.
+`build.yml` (sekrety już istnieją) — zweryfikowane w logach CI: `✔ Published!` z poprawnymi
+kluczami.
 
 ## ✅ ZAMKNIĘTE — AWARIA: OTA zbrickowało appkę usera, odzyskana (2026-10-06)
 

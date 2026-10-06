@@ -4,7 +4,7 @@
     "slug": "sapp",
     "version": "6.0.0",
     "orientation": "portrait",
-    "icon": "./assets/L_WhiteBcg_Color.png",
+    "icon": "./assets/LOGO/LV610_Brown&Creme.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "scheme": "sapp",
@@ -20,7 +20,7 @@
       "backgroundColor": "#12100F",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/L_WhiteBcg_Color.png",
+        "foregroundImage": "./assets/LOGO/LV610_Brown&Creme.png",
         "backgroundColor": "#14171A"
       },
       "predictiveBackGestureEnabled": false,
