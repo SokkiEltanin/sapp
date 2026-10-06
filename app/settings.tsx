@@ -2274,24 +2274,51 @@ export default function SettingsScreen() {
           ) },
         },
         {
-          // 2026-10-06, weryfikacja OTA (expo-updates, ARCHITECTURE.md §266) — user: "sprawdźmy
-          // czy działa teraz te aktualizacje w sekundy". Prosty diagnostyczny wiersz zamiast
-          // jednorazowego testowego tekstu gdzieś na dashboardzie — zostaje na stałe jako
-          // sposób na sprawdzenie "czy to jest najnowsza paczka JS" bez liczenia na pamięć.
-          id: 'diag-ota', title: 'Wersja aplikacji (OTA)', subtitle: 'Kanał, kiedy pobrana ostatnia aktualizacja JS, czy to wbudowana wersja',
+          // 2026-10-06, weryfikacja OTA (expo-updates, ARCHITECTURE.md §266/§271) — user
+          // najpierw: "sprawdźmy czy działa teraz te aktualizacje w sekundy" (diag info), potem:
+          // "mogę zrobić wtedy w ustawieniach aktualizację zamiast przy starcie? żeby nie
+          // ładowało tak w kółko" — automatyczny check przy starcie/powrocie z tła USUNIĘTY
+          // (patrz `app/_layout.tsx`), ten wiersz jest teraz JEDYNYM miejscem, gdzie
+          // `checkForUpdateAsync`/`fetchUpdateAsync` się odpala. `reloadAsync()` na restart jest
+          // tu bezpieczny (w przeciwieństwie do §268) bo to wyraźny, jawny tap usera na przycisk
+          // w alercie — nie automatyczny efekt w tle na żywo działającej appce.
+          id: 'diag-ota', title: 'Sprawdź aktualizację (OTA)', subtitle: 'Manualne sprawdzenie/pobranie nowszej paczki JS — appka nie robi tego sama przy starcie',
           icon: LucideIcons.RefreshCw, accentColor: '#2AC68F',
           keywords: ['ota', 'aktualizacja', 'update', 'eas', 'wersja', 'build', 'kanał'],
-          control: { kind: 'link', onPress: () => {
+          control: { kind: 'link', onPress: async () => {
             haptic.tap();
-            const lines = [
-              `Kanał: ${Updates.channel ?? '—'}`,
-              `Runtime: ${Updates.runtimeVersion ?? '—'}`,
-              Updates.isEmbeddedLaunch
-                ? 'Wbudowana wersja — jeszcze żadna aktualizacja OTA się nie pobrała.'
-                : `OTA pobrana: ${Updates.createdAt ? Updates.createdAt.toLocaleString('pl-PL') : '—'}`,
-              `ID: ${Updates.updateId ?? '—'}`,
-            ];
-            Alert.alert('Wersja aplikacji (OTA)', lines.join('\n'));
+            if (!Updates.isEnabled) {
+              Alert.alert('Sprawdź aktualizację (OTA)', 'OTA wyłączone w tym buildzie (dev/Expo Go) — dotyczy tylko prawdziwego APK.');
+              return;
+            }
+            toast.info('Sprawdzanie aktualizacji…');
+            try {
+              const res = await Updates.checkForUpdateAsync();
+              if (!res.isAvailable) {
+                Alert.alert('Sprawdź aktualizację (OTA)', [
+                  'Masz najnowszą wersję.',
+                  '',
+                  `Kanał: ${Updates.channel ?? '—'}`,
+                  `Runtime: ${Updates.runtimeVersion ?? '—'}`,
+                  Updates.isEmbeddedLaunch
+                    ? 'Wbudowana wersja — jeszcze żadna aktualizacja OTA się nie pobrała.'
+                    : `OTA pobrana: ${Updates.createdAt ? Updates.createdAt.toLocaleString('pl-PL') : '—'}`,
+                  `ID: ${Updates.updateId ?? '—'}`,
+                ].join('\n'));
+                return;
+              }
+              await Updates.fetchUpdateAsync();
+              Alert.alert(
+                'Nowa wersja pobrana',
+                'Zrestartować appkę teraz, żeby ją włączyć?',
+                [
+                  { text: 'Później', style: 'cancel' },
+                  { text: 'Restart teraz', onPress: () => { Updates.reloadAsync().catch(() => {}); } },
+                ],
+              );
+            } catch (e: any) {
+              Alert.alert('Błąd sprawdzania aktualizacji', e?.message ?? 'Nieznany błąd — sprawdź internet.');
+            }
           } },
         },
         {

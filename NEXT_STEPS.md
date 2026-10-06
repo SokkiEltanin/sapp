@@ -3,17 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: biały flash przy KAŻDYM starcie appki (2026-10-06)
+## 🆕 OTA-check przeniesiony na manualny przycisk w Ustawieniach (2026-10-06)
+
+User: "mogę zrobić wtedy w ustawieniach aktualizację zamiast przy starcie? żeby nie ładowało
+tak w kółko" — nie chciał automatycznego sprawdzania OTA przy każdym starcie/powrocie z tła.
+Pełny opis w ARCHITECTURE.md §272. Automatyczny `useEffect` w `app/_layout.tsx` USUNIĘTY —
+appka już nigdy sama nie odpytuje kanału. `app/settings.tsx`'s wiersz "Sprawdź aktualizację
+(OTA)" (w Diagnostyce) jest teraz jedynym miejscem — tap sam sprawdza/pobiera/oferuje restart.
+`tsc`/`jest` zielone (1297/1297, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Ustawienia → Diagnostyka → "Sprawdź aktualizację
+(OTA)" — sprawdzić że działa (znajduje nowszą paczkę gdy jest, "Restart teraz" włącza ją bez
+crasha) i że appka NIE sprawdza już sama nic przy starcie.
+
+## ✅ ZAMKNIĘTE — Fix: biały flash przy KAŻDYM starcie appki (2026-10-06)
 
 User: "co do białego ekranu to dzieje się przy włączaniu jakby się odświeżał" — osobny, stały
 (nie incydentalny) temat, niezwiązany z OTA-awariami poniżej. Root cause + fix pełny opis w
 ARCHITECTURE.md §271: natywny splash Androida 12+ chował się sam, jak tylko Activity narysuje
 swoją pierwszą klatkę — co u RN jest ZANIM JS wymalował `AnimatedSplash`, więc w tej szczelinie
 przebijał biały `AppTheme`. Fix: `SplashScreen.preventAutoHideAsync()`/`hideAsync()` w
-`app/_layout.tsx` — trzyma natywny (ciemny) splash do pierwszej klatki JS. Czysto JS, idzie
-przez OTA (nie wymaga nowego APK). `tsc`/`jest` zielone (1297/1297, bez zmiany).
+`app/_layout.tsx` — trzyma natywny (ciemny) splash do pierwszej klatki JS. Czysto JS, poszło
+przez OTA (PR #380 zmergowany, opublikowane). `tsc`/`jest` zielone (1297/1297, bez zmiany).
 
-**🆕 Priorytet testu na urządzeniu — wysoki**: po dojściu OTA paczki (albo następnym APK),
+**Priorytet testu na urządzeniu — wysoki**: po dojściu OTA paczki (albo następnym APK),
 zrobić kilka cold-startów appki pod rząd i sprawdzić że biały błysk faktycznie zniknął.
 
 ## 🆕 Nowe logo + porządki w assets/ (2026-10-06)

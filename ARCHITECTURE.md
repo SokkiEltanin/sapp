@@ -15212,6 +15212,33 @@ nowego buildu per CLAUDE.md §2).
 instalacji kolejnego APK), sprawdzić że biały błysk przy starcie faktycznie zniknął — kilka
 cold-startów appki pod rząd.
 
+## 272. OTA-check przeniesiony z automatycznego efektu na manualny przycisk w Ustawieniach (2026-10-06)
+
+User: "mogę zrobić wtedy w ustawieniach aktualizację zamiast przy starcie? żeby nie ładowało
+tak w kółko" — nie chciał, żeby appka sama ciągnęła sieć przy KAŻDYM starcie i powrocie z tła
+(§266's `useEffect` z `checkForUpdateAsync`/`fetchUpdateAsync` co każde wejście na pierwszy
+plan).
+
+**Zmiana**:
+- `app/_layout.tsx` — cały automatyczny `useEffect` (check przy starcie po 3s + na każdy
+  `AppState` → `active`) USUNIĘTY. Appka już nigdy sama nie odpytuje kanału OTA.
+- `app/settings.tsx`'s wiersz `diag-ota` (dawniej czysto informacyjny, tylko `Alert` z
+  `Updates.channel`/`runtimeVersion`/`updateId`) — rozbudowany w pełny manualny flow: tap →
+  toast "Sprawdzanie…" → `checkForUpdateAsync()` → jeśli brak nowszej, ten sam diag-info alert
+  co dawniej; jeśli jest → `fetchUpdateAsync()` → alert z przyciskiem "Restart teraz"
+  (`Updates.reloadAsync()`) albo "Później" (paczka i tak włączy się przy następnym zwykłym
+  zimnym starcie, jak dawniej).
+- `reloadAsync()` tutaj jest BEZPIECZNY (w przeciwieństwie do §268's incydentu) — to wyraźny,
+  jawny tap usera na przycisk w alercie, nie automatyczny efekt w tle na żywo działającej
+  appce z pełnym stosem nawigacji/listenerów. Zasada z §268 ("reload tylko jako explicit user
+  action") zachowana, nie złamana.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 100/100 suite (1297 testów) bez zmiany.
+
+**Priorytet testu na urządzeniu — średni**: w Ustawieniach → Diagnostyka → "Sprawdź
+aktualizację (OTA)" — sprawdzić że tap faktycznie odpytuje kanał (nie tylko pokazuje starą
+info), i że "Restart teraz" po znalezieniu nowej paczki poprawnie ją włącza bez crasha.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
