@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: dynamic-island pill "hukowy, zlagowany, znikający" (2026-10-06)
+
+User: "ogarnij dynamic pilla naszego zeby nie byl taki hukowy zlagowany znikający". Pełny opis
+w ARCHITECTURE.md §260. Root cause: pomodoro/zarobki z pracy tykają co 1000ms, a `item.key`
+wplatał tykającą wartość WPROST (`pom-${sekundy}`, `earn-${kwota}`) — efekty animacji
+(crossfade + pulsująca kropka) w `TopPill.tsx` były keyowane o ten surowy klucz, więc CAŁA
+animacja restartowała się co sekundę przez cały czas trwania pomodoro/pracy. Nowa
+`animKeyFor()` (w `src/utils/pillAnim.ts`) ścina tykający sufiks do stabilnej kategorii —
+badge nadal aktualizuje się co sekundę (zwykły re-render), ale animacja odpala się TYLKO przy
+realnej zmianie kategorii. +9 testów w `pillAnim.test.ts`. `tsc`/`jest` czyste (100/100 suite,
+1271 testów).
+
+**🆕 Priorytet testu na urządzeniu — wysoki** (czysto wizualne, trzeba zobaczyć): uruchom
+pomodoro → obserwuj pigułkę min. 10-15s — powinna płynnie liczyć w dół bez mrugania/thumpnięcia
+co sekundę, pulsująca kropka jak ciągłe "oddychanie" nie poszarpane restarty. To samo przy
+aktywnej zmianie pracy.
+
 ## 🆕 Plan zajęć: ciemniejszy kafelek, "TERAZ", zadania powiązane z zajęciami (2026-10-06)
 
 User: "w planie trochę ciemniejszy na dashboardzie tło, i... jak jestem to pokazuje podświetla

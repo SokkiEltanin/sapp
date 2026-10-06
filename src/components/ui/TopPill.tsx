@@ -18,6 +18,7 @@ import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
+import { isLive, animKeyFor } from '@/utils/pillAnim';
 import { colors } from '@/theme';
 import DisplayText from '@/components/ui/DisplayText';
 import { useColors } from '@/theme/useColors';
@@ -83,8 +84,8 @@ function pillIcon(key: string): any {
   if (key === 'all-clear') return Check;
   return Sparkles;
 }
-// Stany „na żywo" (tykają co sekundę) → pulsująca kropka.
-const isLive = (key: string) => key.startsWith('pom-') || key.startsWith('earn-');
+// `isLive`/`animKeyFor` wydzielone do `src/utils/pillAnim.ts` (2026-10-06, user: "ogarnij
+// dynamic pilla... zeby nie byl taki hukowy zlagowany znikający") — patrz komentarz tam.
 
 // ─── Pill data type ───────────────────────────────────────────────────────────
 
@@ -535,15 +536,20 @@ export default function TopPill() {
   ]);
 
   // ── Animation on content change — Dynamic-Island style pop ────────────────
-  const opacity  = useRef(new Animated.Value(item ? 1 : 0)).current;
-  const scale    = useRef(new Animated.Value(item ? 1 : 0.9)).current;
-  const slideX   = useRef(new Animated.Value(0)).current;
-  const prevKey  = useRef<string | null>(item?.key ?? null);
-  const pulse    = useRef(new Animated.Value(0)).current;
+  const opacity    = useRef(new Animated.Value(item ? 1 : 0)).current;
+  const scale      = useRef(new Animated.Value(item ? 1 : 0.9)).current;
+  const slideX     = useRef(new Animated.Value(0)).current;
+  const prevAnimKey = useRef<string | null>(item ? animKeyFor(item.key) : null);
+  const pulse      = useRef(new Animated.Value(0)).current;
+  const animKey    = item ? animKeyFor(item.key) : null;
+  const live       = item ? isLive(item.key) : false;
 
-  // Pulsująca kropka dla stanów „na żywo" (pomodoro / praca).
+  // Pulsująca kropka dla stanów „na żywo" (pomodoro / praca) — `live` jest stabilny MIĘDZY
+  // kolejnymi sekundami tykania (zawsze `true` przez cały czas trwania pomodoro/pracy), więc
+  // pętla NIE restartuje się co sekundę jak dawniej (patrz komentarz przy `animKeyFor`
+  // wyżej) — kręci się płynnie od startu do końca stanu „na żywo".
   useEffect(() => {
-    if (item && isLive(item.key)) {
+    if (live) {
       const loop = Animated.loop(Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
@@ -552,7 +558,7 @@ export default function TopPill() {
       return () => loop.stop();
     }
     pulse.setValue(0);
-  }, [item?.key]);
+  }, [live]);
 
   // Bez `Animated.spring` NIGDZIE tutaj (2026-09-13, user: "zeby ta animacja przejścia
   // pomiędzy wiadomościami byla płynnym rozszerzeniem... bo tak to wygląda jak bouncy
@@ -569,9 +575,13 @@ export default function TopPill() {
         Animated.timing(opacity, { toValue: 0, duration: 180, easing: EASE_OUT, useNativeDriver: true }),
         Animated.timing(scale, { toValue: 0.94, duration: 180, easing: EASE_OUT, useNativeDriver: true }),
       ]).start();
+      // Reset, żeby gdy pigułka wróci (nawet z TĄ SAMĄ kategorią jak przed zniknięciem) ZAWSZE
+      // odpaliła pop-in zamiast zostać niewidzialna — `prevAnimKey` inaczej by uznał kolejny
+      // `animKey` za "bez zmian" i pominął animację powrotu.
+      prevAnimKey.current = null;
       return;
     }
-    if (prevKey.current !== item.key) {
+    if (prevAnimKey.current !== animKey) {
       // Crossfade zamiast miga-do-zera (2026-09-29, user: "zeby bylo tak ze ten pill nie
       // znika non stop zrobmy animacje pomiędzy wiadomościami inaczej") — dawna wersja
       // spadała do opacity 0 (pigułka na chwilę realnie znikała) przy KAŻDEJ zmianie
@@ -579,6 +589,12 @@ export default function TopPill() {
       // opacity ma PODŁOGĘ 0.4 (nigdy nie znika całkiem) + lekkie zsunięcie w bok
       // (`slideX`), więc czyta się jako przesunięcie do nowej wiadomości, nie zgaśnięcie
       // i zapalenie na nowo. Nadal bez `Animated.spring` (patrz komentarz wyżej).
+      //
+      // Wyzwalacz to `animKey`, NIE `item.key` (2026-10-06, patrz komentarz przy
+      // `animKeyFor`) — dla stanów „na żywo" `item.key` tyka co sekundę, więc crossfade na
+      // SUROWYM kluczu odpalał się co sekundę (thump co tykanie zegara = „hukowy,
+      // zlagowany"). Teraz ticking badge'a (sekundy/zarobek) po prostu podmienia się w
+      // tekście bez żadnej animacji — crossfade zostaje TYLKO dla realnej zmiany kategorii.
       slideX.setValue(5);
       Animated.sequence([
         Animated.parallel([
@@ -591,19 +607,13 @@ export default function TopPill() {
           Animated.timing(slideX, { toValue: 0, duration: 220, easing: EASE_OUT, useNativeDriver: true }),
         ]),
       ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 200, easing: EASE_OUT, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 200, easing: EASE_OUT, useNativeDriver: true }),
-      ]).start();
+      prevAnimKey.current = animKey;
     }
-    prevKey.current = item.key;
-  }, [item?.key]);
+  }, [animKey]);
 
   if (!item) return null;
 
   const Icon = pillIcon(item.key);
-  const live = isLive(item.key);
   const on   = textOn(item.color);
 
   return (

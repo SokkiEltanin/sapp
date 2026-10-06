@@ -14682,6 +14682,55 @@ bliski termin testowo) → sprawdź że faktycznie przychodzi o wyliczonej porze
 
 ---
 
+---
+
+## 260. Fix: dynamic-island pill "hukowy, zlagowany, znikający" podczas stanów "na żywo" (2026-10-06)
+
+User: "ogarnij dynamic pilla naszego zeby nie byl taki hukowy zlagowany znikający i wgle xdd".
+
+**Root cause**: `TopPill.tsx` animuje crossfade + pulsującą kropkę przez efekty Reacta keyowane
+o `item.key`. Dla stanów "na żywo" (pomodoro, zarobki z aktywnej pracy) `item.key` wplata
+tykającą wartość WPROST — `pom-${sekundy pozostałe}`, `earn-${Math.floor(zarobek)}` — a
+`pomodoroStore.ts`/`useWorkEarnings.ts` tykają co **1000ms**. Efekt crossfade'u i pętla
+pulsującej kropki miały `[item?.key]` jako deps → CAŁA animacja (dip opacity do 0.4 + scale
+0.97, potem powrót; restart pętli pulsu od zera) **restartowała się co sekundę**, przez cały
+czas trwania pomodoro/pracy. Stąd dokładnie to, co user opisał: thump (hukowy), stutter
+(zlagowany), wrażenie migania (znikający) — pigułka dosłownie "mrugała" opacity 1→0.4→1 raz na
+sekundę non-stop.
+
+**Fix**: nowa `animKeyFor(key)` (w nowym `src/utils/pillAnim.ts`, razem z `isLive`) ścina
+tykający sufiks do stabilnej kategorii (`pom-125` → `pom`, `earn-42` → `earn`; wszystko inne
+bez zmian). Oba efekty animacji w `TopPill.tsx` teraz zależą od `animKey`/`live` (pochodnych
+`animKeyFor`/`isLive`) zamiast surowego `item.key`:
+- Crossfade: `prevAnimKey.current !== animKey` — dla pomodoro/pracy `animKey` zostaje tym samym
+  `'pom'`/`'earn'` przez całą sesję, więc efekt NIE re-triggeruje się co sekundę. Badge (sekundy/
+  kwota) nadal aktualizuje się co sekundę — zwykłym re-renderem Reacta, bez animacji na każdym
+  tyknięciu. Crossfade zostaje TYLKO dla realnej zmiany kategorii (np. pomodoro się kończy →
+  pigułka pokazuje coś innego).
+- Pulsująca kropka: zależy od `live` (boolean, stabilny między tyknięciami) — pętla kręci się
+  płynnie od startu do końca stanu "na żywo", nie restartuje się co sekundę.
+- `prevAnimKey` jest resetowany do `null` w gałęzi `!item` — gdyby pigułka kiedyś zniknęła i
+  wróciła z TĄ SAMĄ kategorią co przed zniknięciem, pop-in i tak się odpali (inaczej zostałaby
+  niewidzialna, bo `animKey` wyglądałby jak "bez zmian").
+
+Wydzielone do `src/utils/pillAnim.ts` (nie zostawione inline w komponencie) — ten sam wzorzec
+co `moodPatterns.ts`/`statsPearson.ts` wcześniej w tej sesji: żeby dało się przetestować bez
+ciągnięcia całego `TopPill.tsx` (RN/expo-router/lucide/zustand stores) do Jest — w tym repo
+ŻADEN test nie importuje z `@/components`, świadomie zachowana granica.
+
+**Testy**: nowy `__tests__/pillAnim.test.ts` (9 testów) — `isLive` dla pom/earn vs reszty,
+`animKeyFor` ścina różne tykające wartości do tej samej kategorii (regression-guard dokładnie
+na ten bug), realna zmiana kategorii dalej daje różne `animKey` (pop-in nadal działa). `tsc
+--noEmit` czyste, `jest --silent` 100/100 suite, 1271 testów.
+
+**Priorytet testu na urządzeniu — wysoki** (czysto wizualna zmiana, trzeba zobaczyć na żywo):
+uruchom pomodoro → obserwuj pigułkę przez min. 10-15 sekund — powinna płynnie liczyć w dół bez
+żadnego mrugania/thumpnięcia co sekundę, pulsująca kropka powinna wyglądać jak jedno ciągłe,
+płynne "oddychanie", nie poszarpane restarty. To samo w trakcie aktywnej zmiany pracy (żywe
+zarobki).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
