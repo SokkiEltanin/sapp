@@ -1276,7 +1276,7 @@ niewpięty. `tsc`/`jest` czyste (1121 testów, bez zmiany).
 termin w UI to 1 miesiąc) — jeśli masz stary list bliski odblokowaniu, dobra okazja do
 sprawdzenia że powiadomienie faktycznie przychodzi.
 
-## 🆕 Udostępnij tekst prosto do parsera paragonów, WYMAGA NOWEGO APK (2026-09-27)
+## ✅ POTWIERDZONE na urządzeniu (2026-10-07) — Udostępnij tekst do parsera paragonów (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §193. Piąty z listy zaakceptowanych pomysłów tej sesji. Nowy
 plugin `withReceiptShareIntent.js` — mała natywna `ShareReceiverActivity` (Android Share
@@ -1328,7 +1328,7 @@ pierwszy+ostatni odczyt, sumuje wydatki pojazdu w tym oknie dat). UI: sekcja "Pr
 **🆕 Priorytet testu na urządzeniu — niski**: Pojazdy → rozwiń pojazd → "Przebieg" → dodaj dwa
 odczyty licznika z wydatkami między nimi → sprawdź że "≈X zł/km" wygląda sensownie.
 
-## 🆕 Interaktywny widget "Zadania" — przycisk "zrobione" bez otwierania appki, WYMAGA NOWEGO APK (2026-09-27)
+## ✅ POTWIERDZONE na urządzeniu (2026-10-07) — Interaktywny widget "Zadania" (2026-09-27)
 
 Pełny opis w ARCHITECTURE.md §189. Pierwszy z listy zaakceptowanych pomysłów tej sesji —
 user: "Interaktywny widget - spoko to możemy ogarnąć" → "Dawaj po kolie". Każdy wiersz
@@ -1448,7 +1448,7 @@ kolorystycznie, ale bez ŻADNEGO ruchu (brak oddechu/mrugania/swata na trafienie
 **czy walki subiektywnie mniej lagują teraz?** Jeśli nie — lag ma inne źródło, nie kotka,
 trzeba profilować głębiej (re-rendery store'a, efekty pocisków/cząsteczek, coś innego).
 
-## 🆕 Widget "Zadania": przezroczystość-stopniowana + kolor + wielkość tekstu, WYMAGA NOWEGO APK (2026-09-25)
+## ✅ POTWIERDZONE na urządzeniu (2026-10-07) — Widget "Zadania": przezroczystość/kolor/wielkość (2026-09-25)
 
 Pełny opis w ARCHITECTURE.md §183. User: "Slider przezroczystości może, koloru w razie czego.
 Dodajmy możliwość zmiany wielkości tekstu". Binarny przełącznik przezroczystości zastąpiony
