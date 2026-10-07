@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ustawienia: nowe sekcje "Pupil" i "Zdrowie" (2026-10-07)
+
+User: "w ustawieniach znów jest chaos, eksport danych wrzucasz w kilka miejsc... powinna być
+zakładka pupil i tam wszystkie skrzynki dane pupila eksport reset itp, tak samo ze zdrowiem".
+Pełny opis w ARCHITECTURE.md §273. Dwie nowe sekcje najwyższego poziomu: "Pupil" (link do /pet,
+eksport raportu, reset, statystyki skrzynek, edytor układu walki — wszystko, co było
+porozrzucane w "Skróty"/"Diagnostyka"/"Dane") i "Zdrowie" (test połączeń, diagnostyka wody,
+backfill Samsung Health — byłe w "Diagnostyka"). Czysty UI-reorg, zero zmiany logiki. `tsc`/
+`jest` zielone (1297/1297, bez zmiany).
+
+**🆕 Priorytet testu na urządzeniu — średni**: Ustawienia → sprawdź nowe sekcje "Pupil" i
+"Zdrowie" (kompletna zawartość, nic nie zniknęło) + że "Skróty"/"Diagnostyka" wciąż działają
+bez przeniesionych wierszy.
+
 ## 🆕 OTA-check przeniesiony na manualny przycisk w Ustawieniach (2026-10-06)
 
 User: "mogę zrobić wtedy w ustawieniach aktualizację zamiast przy starcie? żeby nie ładowało

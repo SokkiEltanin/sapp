@@ -15239,6 +15239,53 @@ plan).
 aktualizację (OTA)" — sprawdzić że tap faktycznie odpytuje kanał (nie tylko pokazuje starą
 info), i że "Restart teraz" po znalezieniu nowej paczki poprawnie ją włącza bez crasha.
 
+## 273. Ustawienia: nowe sekcje "Pupil" i "Zdrowie" — koniec rozsypanego eksportu/resetu (2026-10-07)
+
+User: "w ustawieniach znów jest chaos, eksport danych wrzucasz w kilka miejsc i nawet nie jest
+posegregowane... powinna być zakładka pupil i tam wszystkie skrzynki dane pupila eksport reset
+itp, tak samo ze zdrowiem dane zdrowia itp powinny być w jednym miejscu". Realny bug UX, nie
+tylko gust — zweryfikowane przed zmianą (grep po `sections:` w `app/settings.tsx`):
+
+- Link do `/pet` mieszkał w sekcji "Skróty" (`more-pet`), razem z osiągnięciami/licznikami —
+  zero związku.
+- Eksport raportu bossów + reset postępu pupila (`diag-pet-export`/`diag-pet-reset`) mieszkały
+  w "Diagnostyka", obok self-testu appki, OTA, audytu finansów, last-crash itp — tematycznie
+  nic wspólnego.
+- `BoxStatsSection` (statystyki skrzynek) i `BattleLayoutLabSection` (edytor układu walki) były
+  WKLEJONE NA SIŁĘ pod podstronę "Dane" (`activeSection.id === 'dane'` custom-render blok),
+  mimo że "Dane" to ogólny eksport/statystyki appki (`BackupSection`/`UsageStatsSection`) — oba
+  komponenty są czysto pupilowe, nie miały tam żadnego związku tematycznego z resztą strony.
+- Diagnostyka zdrowia (`diag-health-test`, `diag-water`, `diag-backfill` — Samsung Health) była
+  również w "Diagnostyka", osobno od wszystkiego, co faktycznie dotyczy zdrowia (zakładka
+  Zdrowie w appce, nie w Ustawieniach).
+
+**Fix**: dwie nowe sekcje najwyższego poziomu w `sections: SettingsSectionDef[]`:
+- **"Pupil"** (`id: 'pupil'`, `PawPrint`) — `pet-open` (link do `/pet`, był `more-pet`),
+  `pet-export` (był `diag-pet-export`), `pet-reset` (był `diag-pet-reset`), plus
+  `BoxStatsSection`/`BattleLayoutLabSection` przeniesione z custom-render bloku "Dane" do
+  nowego custom-render bloku `activeSection.id === 'pupil'`.
+- **"Zdrowie"** (`id: 'zdrowie'`, `HeartPulse`) — `health-test`/`health-water`/
+  `health-backfill` (byłe `diag-health-test`/`diag-water`/`diag-backfill`), identyczna logika,
+  tylko przeniesione.
+- "Skróty" i "Diagnostyka" zostają — po usunięciu przeniesionych wierszy mają teraz tylko
+  rzeczy faktycznie ze sobą związane (Skróty: osiągnięcia+liczniki; Diagnostyka: self-test/OTA/
+  audyt finansów/last-crash/perf-log/storage-stats — same ogólno-appkowe narzędzia dev).
+- "Dane" zostaje z `BackupSection`+`UsageStatsSection` (ogólny eksport/statystyki — JSON, CSV
+  wydatków, CSV humoru, nic pupilowego) — TEN eksport (dane usera) jest i zostaje osobny od
+  `pet-export` (raport diagnostyczny do analizy balansu, nie eksport danych).
+
+Same ID-ki wierszy zmienione (`more-pet`→`pet-open` itd.) — zweryfikowane grepem, że nic innego
+w repo nie referencjonowało starych id (tylko React key + search index, bezpieczne).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 100/100 suite (1297 testów, bez zmiany —
+czysty reorganizacyjny refaktor UI, zero zmiany logiki eksportu/resetu/statystyk).
+
+**Priorytet testu na urządzeniu — średni**: Ustawienia → sprawdź że są teraz dwie nowe
+pozycje "Pupil" i "Zdrowie" na głównej liście, każda z kompletną zawartością (Pupil: otwórz
+pupila + eksport raportu + reset + statystyki skrzynek + edytor układu walki; Zdrowie: test
+połączeń + diagnostyka wody + backfill Samsung Health). "Skróty" i "Diagnostyka" nadal działają,
+tylko bez przeniesionych wierszy.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -1978,10 +1978,12 @@ export default function SettingsScreen() {
     },
     {
       // Nazwa "Skróty" (2026-09-15, było "Więcej") — user: "bo to realnie skróty do
-      // liczników pupila itp" — sekcja to zawsze była tylko 3 linki-skróty (osiągnięcia/
-      // liczniki/pupil), "Więcej" nic nie mówiło o tym co w środku.
+      // liczników pupila itp". "Pupil" (2026-10-07, §273) PRZENIESIONY stąd do własnej
+      // sekcji "Pupil" niżej — razem z eksportem/resetem/statystykami skrzynek, które
+      // dotąd mieszkały porozrzucane w "Diagnostyka"/"Dane" (user: "chaos w ustawieniach,
+      // eksport danych wrzucasz w kilka miejsc").
       id: 'wiecej', title: 'Skróty', icon: LucideIcons.MoreHorizontal, color: '#8A93A8', defaultOpen: false,
-      keywords: ['osiągnięcia', 'liczniki', 'pupil', 'więcej', 'skróty'],
+      keywords: ['osiągnięcia', 'liczniki', 'więcej', 'skróty'],
       items: [
         {
           id: 'more-achievements', title: 'Gablota osiągnięć', subtitle: 'Odznaki, serie, legendy i grzeszki',
@@ -1994,12 +1996,6 @@ export default function SettingsScreen() {
           icon: LucideIcons.Hourglass, accentColor: '#46B0DE',
           keywords: ['liczniki', 'odliczanie', 'countdown', 'dni temu'],
           control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/counters' as any); } },
-        },
-        {
-          id: 'more-pet', title: 'Pupil', subtitle: 'Twój blob — nastrój zależny od tego, jak dbasz o siebie',
-          icon: LucideIcons.Sparkles, accentColor: '#2AC68F',
-          keywords: ['pupil', 'kot', 'blob', 'zwierzak', 'pet'],
-          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/pet' as any); } },
         },
       ],
     },
@@ -2322,46 +2318,6 @@ export default function SettingsScreen() {
           } },
         },
         {
-          id: 'diag-health-test', title: 'Test połączeń zdrowia', subtitle: 'Sprawdza kroki (wg źródła), sen, wagę, kalorie, wodę — raport do wysłania',
-          icon: LucideIcons.Activity, accentColor: '#46B0DE',
-          keywords: ['zdrowie', 'kroki', 'sen', 'waga', 'kalorie', 'woda', 'health connect', 'test'],
-          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/health-test' as any); } },
-        },
-        {
-          // 2026-09-23, user #14: "możliwe że źle łapie wodę z zegarka... gdzie w
-          // ustawieniach dosłownie co łapie kiedy i ile ml, żebym potwierdził" — TA SAMA
-          // diagnostyka istniała już od dawna, ale TYLKO wewnątrz sheeta edycji kubka na
-          // zakładce Zdrowie, nie w Ustawieniach, gdzie user jej szukał. Zdublowany punkt
-          // wejścia (formatWaterDiagnostic() dzieli formatowanie z health.tsx, nie
-          // duplikuje logiki) — teraz per-rekordowa lista kiedy/ile ml/źródło, nie tylko
-          // suma za okno.
-          id: 'diag-water', title: 'Diagnostyka wody z zegarka', subtitle: 'Co Health Connect faktycznie widzi: kiedy i ile ml, z jakiego źródła — ostatnie 7 dni',
-          icon: LucideIcons.Droplets, accentColor: '#60A5FA',
-          keywords: ['woda', 'nawodnienie', 'zegarek', 'health connect', 'szklanki', 'ml', 'hydration'],
-          control: { kind: 'link', onPress: async () => {
-            haptic.tap();
-            const p = await probeHydration(7);
-            Alert.alert('Diagnostyka wody', formatWaterDiagnostic(p));
-          } },
-        },
-        {
-          id: 'diag-backfill', title: `Wgraj zaległe dane z Samsung Health${backfillDone ? ' ✓' : ''}`,
-          subtitle: `Historyczne kroki/sen/waga/kalorie (${backfillRange().days} ${plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki`,
-          keywords: ['samsung health', 'zaległe dane', 'backfill', 'historia', 'uzupełnij'],
-          control: { kind: 'custom', render: () => (
-            <PressableScale onPress={doBackfill} disabled={backfillBusy} style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
-              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
-                {backfillBusy ? <ActivityIndicator size="small" color="#2AC68F" /> : <LucideIcons.DownloadCloud size={16} color="#2AC68F" />}
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Wgraj zaległe dane z Samsung Health{backfillDone ? ' ✓' : ''}</Text>
-                <Text style={styles.rowSub}>Historyczne kroki/sen/waga/kalorie ({backfillRange().days} {plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki</Text>
-              </View>
-              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
-            </PressableScale>
-          ) },
-        },
-        {
           id: 'diag-audit', title: 'Audyt finansów', subtitle: 'Zobacz dokładnie co składa się na sumę miesiąca',
           icon: LucideIcons.Receipt, accentColor: '#E43434',
           keywords: ['audyt', 'finanse', 'suma miesiąca', 'weryfikacja'],
@@ -2442,15 +2398,29 @@ export default function SettingsScreen() {
             );
           } },
         },
+      ],
+    },
+    {
+      // §273 (2026-10-07) — user: "chaos w ustawieniach, powinna być zakładka pupil i tam
+      // wszystkie skrzynki dane pupila eksport reset itp". Zbiera to, co dotąd leżało
+      // porozrzucane: link do /pet (był w "Skróty"), eksport/reset (były w "Diagnostyka"),
+      // statystyki skrzynek + edytor układu walki (były wklejone na siłę pod "Dane", patrz
+      // `activeSection.id === 'pupil'` niżej).
+      id: 'pupil', title: 'Pupil', icon: LucideIcons.PawPrint, color: '#2AC68F', defaultOpen: false,
+      keywords: ['pupil', 'kot', 'blob', 'zwierzak', 'pet', 'bossy', 'walka', 'skrzynki', 'ekwipunek'],
+      items: [
         {
-          // 2026-09-09, user: "eksport danych mamy w kilku miejscach" — ta pozycja nazywała się
-          // "Eksportuj postęp pupila", TA SAMA nazwa co prawdziwy eksport danych (sekcja "Dane"
-          // → BackupSection niżej), mimo że to zupełnie inna rzecz: raport balansu bossów do
-          // wysłania mi na czacie, nie eksport DANYCH usera. Zmiana nazwy (nie przeniesienie —
-          // to diagnostyczne narzędzie, dobrze umiejscowione TU) usuwa kolizję nazewniczą.
-          id: 'diag-pet-export', title: 'Udostępnij raport postępu pupila', subtitle: 'Poziom, staty, pokonani bossowie, log walk — do analizy balansu bossów',
+          id: 'pet-open', title: 'Otwórz Pupila', subtitle: 'Twój blob — nastrój zależny od tego, jak dbasz o siebie',
+          icon: LucideIcons.Sparkles, accentColor: '#2AC68F',
+          keywords: ['pupil', 'kot', 'blob', 'zwierzak', 'pet'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/pet' as any); } },
+        },
+        {
+          // Nazwa (2026-09-09) odróżnia to od prawdziwego eksportu DANYCH usera
+          // (BackupSection w sekcji "Dane") — to raport balansu bossów do wysłania mi na czacie.
+          id: 'pet-export', title: 'Udostępnij raport postępu pupila', subtitle: 'Poziom, staty, pokonani bossowie, log walk — do analizy balansu bossów',
           icon: LucideIcons.Swords, accentColor: '#F59E0B',
-          keywords: ['pupil', 'bossy', 'walka', 'balans', 'raport', 'poziom', 'log', 'kotek'],
+          keywords: ['pupil', 'bossy', 'walka', 'balans', 'raport', 'poziom', 'log', 'kotek', 'eksport'],
           control: { kind: 'link', onPress: async () => {
             haptic.tap();
             const report = buildBossProgressReport(usePetStore.getState());
@@ -2462,7 +2432,7 @@ export default function SettingsScreen() {
           } },
         },
         {
-          id: 'diag-pet-reset', title: 'Zresetuj postęp pupila', subtitle: 'Kasuje poziom, monety, itemy, pokonanych bossów, kolory — zostaje tylko imię',
+          id: 'pet-reset', title: 'Zresetuj postęp pupila', subtitle: 'Kasuje poziom, monety, itemy, pokonanych bossów, kolory — zostaje tylko imię',
           icon: LucideIcons.RotateCcw, accentColor: '#EF4444',
           keywords: ['pupil', 'reset', 'restart', 'bossy', 'walka', 'wyzeruj', 'kotek'],
           control: { kind: 'link', onPress: () => {
@@ -2485,6 +2455,55 @@ export default function SettingsScreen() {
               ],
             );
           } },
+        },
+      ],
+    },
+    {
+      // §273 (2026-10-07) — health-specific diagnostyka zbierana w jedno miejsce (była
+      // porozrzucana po "Diagnostyka"), user: "tak samo ze zdrowiem dane zdrowia itp powinny
+      // być w jednym miejscu".
+      id: 'zdrowie', title: 'Zdrowie', icon: LucideIcons.HeartPulse, color: '#46B0DE', defaultOpen: false,
+      keywords: ['zdrowie', 'kroki', 'sen', 'waga', 'kalorie', 'woda', 'health connect', 'samsung health'],
+      items: [
+        {
+          id: 'health-test', title: 'Test połączeń zdrowia', subtitle: 'Sprawdza kroki (wg źródła), sen, wagę, kalorie, wodę — raport do wysłania',
+          icon: LucideIcons.Activity, accentColor: '#46B0DE',
+          keywords: ['zdrowie', 'kroki', 'sen', 'waga', 'kalorie', 'woda', 'health connect', 'test'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/health-test' as any); } },
+        },
+        {
+          // 2026-09-23, user #14: "możliwe że źle łapie wodę z zegarka... gdzie w
+          // ustawieniach dosłownie co łapie kiedy i ile ml, żebym potwierdził" — TA SAMA
+          // diagnostyka istniała już od dawna, ale TYLKO wewnątrz sheeta edycji kubka na
+          // zakładce Zdrowie, nie w Ustawieniach, gdzie user jej szukał. Zdublowany punkt
+          // wejścia (formatWaterDiagnostic() dzieli formatowanie z health.tsx, nie
+          // duplikuje logiki) — teraz per-rekordowa lista kiedy/ile ml/źródło, nie tylko
+          // suma za okno.
+          id: 'health-water', title: 'Diagnostyka wody z zegarka', subtitle: 'Co Health Connect faktycznie widzi: kiedy i ile ml, z jakiego źródła — ostatnie 7 dni',
+          icon: LucideIcons.Droplets, accentColor: '#60A5FA',
+          keywords: ['woda', 'nawodnienie', 'zegarek', 'health connect', 'szklanki', 'ml', 'hydration'],
+          control: { kind: 'link', onPress: async () => {
+            haptic.tap();
+            const p = await probeHydration(7);
+            Alert.alert('Diagnostyka wody', formatWaterDiagnostic(p));
+          } },
+        },
+        {
+          id: 'health-backfill', title: `Wgraj zaległe dane z Samsung Health${backfillDone ? ' ✓' : ''}`,
+          subtitle: `Historyczne kroki/sen/waga/kalorie (${backfillRange().days} ${plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki`,
+          keywords: ['samsung health', 'zaległe dane', 'backfill', 'historia', 'uzupełnij'],
+          control: { kind: 'custom', render: () => (
+            <PressableScale onPress={doBackfill} disabled={backfillBusy} style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                {backfillBusy ? <ActivityIndicator size="small" color="#2AC68F" /> : <LucideIcons.DownloadCloud size={16} color="#2AC68F" />}
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Wgraj zaległe dane z Samsung Health{backfillDone ? ' ✓' : ''}</Text>
+                <Text style={styles.rowSub}>Historyczne kroki/sen/waga/kalorie ({backfillRange().days} {plPlural(backfillRange().days, 'dzień', 'dni', 'dni')}) do wykresów — jednorazowo, wypełnia luki</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+          ) },
         },
       ],
     },
@@ -2561,6 +2580,13 @@ export default function SettingsScreen() {
               <View>
                 <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
                 <UsageStatsSection />
+              </View>
+            )}
+            {/* §273 (2026-10-07) — statystyki skrzynek + edytor układu walki PRZENIESIONE tu z
+                "Dane" (gdzie siedziały na siłę, bez związku z resztą sekcji) — oba są czysto
+                pupilowe, więc mieszkają teraz razem z eksportem/resetem postępu pupila. */}
+            {activeSection.id === 'pupil' && (
+              <View>
                 <BoxStatsSection />
                 <BattleLayoutLabSection />
               </View>
