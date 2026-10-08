@@ -579,6 +579,13 @@ export interface FightRound {
   bossHpAfter: number;
   healed: number;       // REGENERACJA bossa tej rundy (0 = brak)
   counterDmg: number;
+  // Czemu `counterDmg` jest 0, gdy boss W OGÓLE miał okazję kontratakować (2026-10-08, user:
+  // "zrob zeby uniki albo pominięcia bossow byly widoczne z animacjami" — dotąd `counterDmg===0`
+  // renderowało się jako KOMPLETNA cisza, nie dało się odróżnić uniku od pominięcia rundy od
+  // zwykłego "boss już padł, nie zdążył kontratakować"). `undefined` = normalny cios (counterDmg>0)
+  // LUB boss nie dożył swojej kolejki (zabity tym samym ciosem/execute) — to NIE jest unik, UI go
+  // nie pokazuje. Patrz `app/boss-fight.tsx`'s `counterBeat()`.
+  counterOutcome?: 'dodged' | 'reflected' | 'skipped';
   catHealed: number;    // item „heal" zadziałał tej rundy (0 = brak)
   catHpAfter: number;
   thornDmg: number;     // item „cierń" zadziałał tej rundy (0 = brak) — było liczone w bossHpAfter
@@ -629,6 +636,7 @@ export function simulateFight(
     let counterDmg = 0;
     let healed = 0;
     let thornDmg = 0;
+    let counterOutcome: FightRound['counterOutcome'];
     if (bossHp > 0) {
       // 'execute' — HP bossa poniżej progu → instakill (sprawdzone PRZED regeneracją,
       // żeby regen nie mógł "uratować" bossa z progu egzekucji tej samej rundy)
@@ -641,14 +649,17 @@ export function simulateFight(
         }
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
-        if (!controlled) {
+        if (controlled) {
+          counterOutcome = 'skipped';
+        } else {
           counterDmg = counterDamage(boss.counterHp ?? boss.hp, bonuses.dodge, guarded, boss.counterMult ?? 1);
           // 'dodge' — całkowity unik kontrataku
-          if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
+          if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) { counterDmg = 0; counterOutcome = 'dodged'; }
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka
           if (counterDmg > 0 && has('reflect') && Math.random() < reflectPctAt(levelOf('reflect'))) {
             bossHp = Math.max(0, bossHp - counterDmg);
             counterDmg = 0;
+            counterOutcome = 'reflected';
           }
           // 'shield' — stała redukcja tego co faktycznie dolatuje do kotka
           if (counterDmg > 0 && has('shield')) counterDmg = Math.round(counterDmg * (1 - SHIELD_REDUCTION_PCT));
@@ -672,7 +683,7 @@ export function simulateFight(
       healUsed = true;
     }
 
-    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHealed, catHpAfter: catHp, thornDmg });
+    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, counterOutcome, catHealed, catHpAfter: catHp, thornDmg });
   }
   return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, guarded, bossHpLeft: bossHp, catHpLeft: catHp };
 }

@@ -15286,6 +15286,53 @@ pupila + eksport raportu + reset + statystyki skrzynek + edytor układu walki; Z
 połączeń + diagnostyka wody + backfill Samsung Health). "Skróty" i "Diagnostyka" nadal działają,
 tylko bez przeniesionych wierszy.
 
+## 274. Walki: widoczne uniki/pominięcia bossa + większe, czystsze pociski (2026-10-08)
+
+User: "napraw walki zrob żeby uniki albo pominięcia bosów były widoczne z animacjami, powieksz
+trochę projectile jak lecą te ataki i usun z nich poświaty za nimi czerwone itp".
+
+**Uniki/pominięcia bossa — root cause**: `counterDmg===0` (kontratak bossa wyzerowany) ma TRZY
+różne przyczyny — item `dodge` (całkowity unik), `reflect` (odbite na bossa), `mindcontrol`
+(boss w ogóle nie zaatakował tej rundy) — plus CZWARTĄ, niezwiązaną: boss padł w tej samej
+rundzie i nie zdążył kontratakować. UI (`app/boss-fight.tsx`) nie rozróżniał ŻADNEJ z nich —
+`catHit && !!catHit.dmg` gatuje render liczby obrażeń, więc `dmg:0` renderował się jako
+KOMPLETNA cisza we wszystkich czterech przypadkach, nieodróżnialne jedne od drugich (albo od
+zwykłego "nic się nie stało").
+
+**Fix**: `FightRound` (bosses.ts) dostało nowe pole `counterOutcome?: 'dodged' | 'reflected' |
+'skipped'` — ustawiane w `simulateFight()` dokładnie w trzech gałęziach (dodge/reflect/
+mindcontrol), `undefined` dla normalnego trafienia LUB dla "boss padł, nie zdążył" (CELOWO
+nieoznaczone — to nie unik, nie ma co pokazywać). `app/boss-fight.tsx`'s `counterBeat()`:
+- `dodged`/`reflected` — pocisk LECI jak przy normalnym trafieniu (boss faktycznie rzucił
+  ciosem), ale na lądowaniu zamiast `-{dmg}` pokazuje się "UNIK!" (niebieski) albo "ODBITE!"
+  (zielony — ten sam odcień co "Cierń"), bez shake'u portretu kotka (`playCatMissFx()`, nowy
+  wariant `playCatHitFx()` bez sekwencji trzęsienia — shake sygnalizuje TRAFIENIE, unik nim nie
+  jest).
+- `skipped` (mindcontrol) — pocisk W OGÓLE nie leci (boss nic nie rzucił), ale ten sam rytm
+  (THROW_MS opóźnienia) co pozostałe, żeby runda nie rozstrzygała się wyczuwalnie szybciej —
+  pokazuje "POMINIĘCIE!".
+- Normalne "boss padł, nie zdążył" — zachowanie BEZ zmian (cisza, poza ewentualnym healem).
+
+**Pociski — powiększone i bez poświaty**: `PROJECTILE_SIZE` (nowa stała, 28→36, zastępuje
+magiczne liczby w `s.projectile` + `translateX` centrujący) + same ikony (`PawPrint` 30→34,
+`Image` kontrataku 28→32). `RadialGlow` (czerwono-szara poświata za KAŻDYM lecącym pociskiem,
+`size={46} color="#F87171"`) USUNIĘTA z obu — user: "usun z nich poświaty za nimi czerwone
+itp". Statyczne halo za portretami kotka/bossa i burst pazurów na portrecie kotka (`clawFx`) —
+ŚWIADOMIE nietknięte, to inny, osobno wyproszony element ("high-end fight scene", 2026-09-06) i
+nie "leci" jak pocisk, user mówił konkretnie o "projectile jak lecą te ataki".
+
+**Testy**: `__tests__/bosses.test.ts` — rozszerzone istniejące testy dodge/mindcontrol/reflect o
+asercje `counterOutcome` ('dodged'/'skipped'/'reflected') + nowa asercja że "boss padł, nie
+zdążył kontratakować" zostaje `undefined`. `tsc --noEmit` czyste, `jest --silent` 100/100 suite
+(1297 testów, bez nowych plików — rozszerzenie istniejących testów, nie nowe scenariusze).
+
+**Priorytet testu na urządzeniu — średni**: walka z ekwipunkiem `dodge`/`reflect`/
+`mindcontrol` (każdy ma niski bazowy proc — do szybkiego wymuszenia skorzystaj z Edytora/wielu
+prób) — sprawdź że "UNIK!"/"ODBITE!"/"POMINIĘCIE!" faktycznie się pokazują, że pocisk leci przy
+pierwszych dwóch i NIE leci przy pominięciu, i że zwykłe trafienia wciąż wyglądają jak dawniej
+(shake + czerwona liczba). Przy okazji — pociski (łapka/broń bossa) powinny wyglądać zauważalnie
+większe i bez czerwonawej poświaty za sobą.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

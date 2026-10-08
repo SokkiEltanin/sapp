@@ -98,6 +98,12 @@ const BOSS_SHADOW_SCALE_X = 0.62, BOSS_SHADOW_SCALE_Y = 0.18;
 // zostaje poprawna też gdyby user kiedyś wyeksportował różne wartości dla obu.
 const SPRITE_OFFSET_Y_AVG = (CAT_OFFSET_Y + BOSS_OFFSET_Y) / 2;
 
+// Rozmiar lecącego pocisku (łapka kotka / broń bossa) — 28→36 (2026-10-08, user: "powiększ
+// trochę projectile jak lecą te ataki"). Jedna stała (jak reszta geometrii wyżej) zamiast
+// magicznej liczby w `s.projectile` ORAZ w ikonach wewnątrz, żeby box i jego zawartość nie
+// rozjechały się przy kolejnej zmianie.
+const PROJECTILE_SIZE = 36;
+
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
 
@@ -436,7 +442,11 @@ export default function BossFight() {
   // ── cat-side hit fx (kontratak bossa) — TYLKO kampania, raid/wydarzenie nie mają kontrataku ──
   const kShake = useRef(new Animated.Value(0)).current;
   const kDmgY = useRef(new Animated.Value(0)).current;
-  const [catHit, setCatHit] = useState<{ dmg: number; healed: number } | null>(null);
+  // `label` (2026-10-08, user: "zrob zeby uniki albo pominięcia bossow byly widoczne z
+  // animacjami") — dotąd `counterDmg===0` (unik/reflect/mindcontrol, patrz `counterOutcome`
+  // w bosses.ts) renderował się jako KOMPLETNA cisza, nieodróżnialne od "boss jeszcze nie
+  // zdążył kontratakować". `label` zastępuje wtedy `-{dmg}` tekstem opisującym co się stało.
+  const [catHit, setCatHit] = useState<{ dmg: number; healed: number; label?: string }| null>(null);
   const playCatHitFx = () => {
     kShake.setValue(0); kDmgY.setValue(0);
     Animated.parallel([
@@ -448,6 +458,13 @@ export default function BossFight() {
       ]),
       Animated.timing(kDmgY, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),   // skrócone, patrz komentarz przy bDmgY
     ]).start();
+  };
+  // Wariant BEZ shake'u (2026-10-08) — unik/odbicie/pominięcie to właśnie to, że kotek NIE
+  // oberwał, więc trzęsienie portretem (sygnał trafienia) byłoby mylące. Sam float+fade
+  // (ta sama `kDmgY`) wystarcza jako "coś się stało" bez udawania ciosu, który nie doszedł.
+  const playCatMissFx = () => {
+    kDmgY.setValue(0);
+    Animated.timing(kDmgY, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   };
 
   // Pociski lecące między kafelkami. 0→1 = leci; JSX niżej interpoluje na `left` (% szerokości
@@ -637,21 +654,44 @@ export default function BossFight() {
         i++;
         roundTimer.current = setTimeout(i < result.rounds.length ? playerBeat : finish, i < result.rounds.length ? 420 : 550);
       };
-      if (round.counterDmg > 0) {
+      // Unik/odbicie (2026-10-08, §274) — boss WYRZUCIŁ cios (pocisk leci jak przy normalnym
+      // trafieniu), tylko nie dociera do kotka. Pominięcie (mindcontrol) — boss w ogóle nie
+      // zaatakował, więc pocisk w ogóle nie leci (patrz brak `setBoltFlying` niżej).
+      const missed = round.counterOutcome === 'dodged' || round.counterOutcome === 'reflected';
+      if (round.counterDmg > 0 || missed) {
         setBoltFlying(true);
         boltTravel.setValue(0);
         Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
         roundTimer.current = setTimeout(() => {
           if (!alive.current) return;
           setBoltFlying(false);
-          haptic.medium();
-          setCatHit({ dmg: round.counterDmg, healed: round.catHealed });
-          playCatHitFx();
-          damageCat(round.counterDmg);
+          if (round.counterDmg > 0) {
+            haptic.medium();
+            setCatHit({ dmg: round.counterDmg, healed: round.catHealed });
+            playCatHitFx();
+            damageCat(round.counterDmg);
+          } else {
+            haptic.tap();
+            setCatHit({ dmg: 0, healed: round.catHealed, label: round.counterOutcome === 'reflected' ? 'ODBITE!' : 'UNIK!' });
+            playCatMissFx();
+          }
+          if (round.catHealed > 0) healCat(round.catHealed);
+          advance();
+        }, THROW_MS);
+      } else if (round.counterOutcome === 'skipped') {
+        // Ten sam rytm co trafienie/unik (THROW_MS opóźnienia) mimo braku pocisku — żeby
+        // runda nie rozstrzygała się wyczuwalnie szybciej niż pozostałe.
+        roundTimer.current = setTimeout(() => {
+          if (!alive.current) return;
+          haptic.tap();
+          setCatHit({ dmg: 0, healed: round.catHealed, label: 'POMINIĘCIE!' });
+          playCatMissFx();
           if (round.catHealed > 0) healCat(round.catHealed);
           advance();
         }, THROW_MS);
       } else {
+        // Boss padł w tej samej rundzie (execute/Twój cios) zanim doszedł do kontrataku —
+        // to NIE jest unik, nic do pokazania poza ewentualnym healem itemu.
         if (round.catHealed > 0) { setCatHit({ dmg: 0, healed: round.catHealed }); healCat(round.catHealed); }
         advance();
       }
@@ -855,6 +895,12 @@ export default function BossFight() {
                     {catHit && !!catHit.dmg && (
                       <Animated.Text style={[s.dmgFloat, { opacity: kFloatOp, transform: [{ translateY: kFloatY }], color: '#F87171' }]}>-{catHit.dmg}</Animated.Text>
                     )}
+                    {/* Unik/odbicie/pominięcie (2026-10-08, §274) — ten sam float co liczba
+                        obrażeń wyżej, inny tekst/kolor: niebieski = kotek nic nie oberwał,
+                        zielony = cios wrócił do bossa (ten sam odcień co "Cierń" niżej). */}
+                    {catHit?.label && (
+                      <Animated.Text style={[s.dmgFloat, { opacity: kFloatOp, transform: [{ translateY: kFloatY }], color: catHit.label === 'ODBITE!' ? '#4ADE80' : '#7DD3FC' }]}>{catHit.label}</Animated.Text>
+                    )}
                   </View>
                 </View>
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
@@ -908,18 +954,18 @@ export default function BossFight() {
             {/* pociski między kafelkami — łapka kota (Twój cios, wszystkie tryby) i "broń" bossa
                 (kontratak, TYLKO kampania — boltFlying nigdy nie ustawia się w attackSimple) */}
             {pawFlying && (
-              <Animated.View pointerEvents="none" style={[s.projectile, { left: pawX, opacity: pawOp, transform: [{ scale: pawScale }, { translateX: -14 }] }]}>
+              <Animated.View pointerEvents="none" style={[s.projectile, { left: pawX, opacity: pawOp, transform: [{ scale: pawScale }, { translateX: -PROJECTILE_SIZE / 2 }] }]}>
                 {/* Był stroke-only bursztynowy #FBBF24 — nierozpoznawalne jako "łapka" w ruchu,
                     user: "nie używa swojej łapki tylko czegoś żółtego nie wiem co to" (2026-08-12).
-                    Solidne wypełnienie (fill), żeby czytało się jednoznacznie jako łapka nawet przy
-                    28px i szybkim locie. Kolor = `palette.coat` (2026-08-16, user: "kotek w walkach
-                    niech rzuca swoją łapką zależną od koloru") — ta sama paleta co portret kota na
-                    tym samym ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego.
-                    `RadialGlow` statyczny za ikoną (2026-08-30, patrz komentarz przy usunięciu
-                    `tileFlash`) — dziedziczy opacity/scale animowanego wrappera, zero nowego
-                    Animated.Value. */}
-                <RadialGlow size={46} color="#F87171" opacity={0.5} />
-                <PawPrint size={30} color={palette.coat} fill={palette.coat} />
+                    Solidne wypełnienie (fill), żeby czytało się jednoznacznie jako łapka nawet w
+                    locie. Kolor = `palette.coat` (2026-08-16, user: "kotek w walkach niech rzuca
+                    swoją łapką zależną od koloru") — ta sama paleta co portret kota na tym samym
+                    ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego.
+                    `RadialGlow` (szara/czerwona poświata) USUNIĘTA (2026-10-08, user: "usun z
+                    nich poświaty za nimi czerwone itp") — sama ikona teraz nieco większa
+                    (30→34, patrz `PROJECTILE_SIZE`) zamiast polegać na poświacie, żeby nie
+                    stracić czytelności w locie. */}
+                <PawPrint size={34} color={palette.coat} fill={palette.coat} />
               </Animated.View>
             )}
             {/* Kontratak bossa — user (2026-08-12): poprzednio leciał tu ten sam per-bossowy
@@ -934,9 +980,10 @@ export default function BossFight() {
                 na portrecie kotka wyżej, ten sam trigger (`boltFlying`/`boltOp`/`boltScale`),
                 inne miejsce renderu. */}
             {boltFlying && target?.attackKind !== 'claw' && (
-              <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
-                <RadialGlow size={46} color="#F87171" opacity={0.5} />
-                <Image source={counterPng} style={{ width: 28, height: 28 }} contentFit="contain" />
+              <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -PROJECTILE_SIZE / 2 }] }]}>
+                {/* `RadialGlow` poświata USUNIĘTA (2026-10-08, jak przy łapce wyżej) — ikona
+                    powiększona (28→32) zamiast niej. */}
+                <Image source={counterPng} style={{ width: 32, height: 32 }} contentFit="contain" />
               </Animated.View>
             )}
             </View>
@@ -1287,5 +1334,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // pominięty przy zmianie PORTRAIT_SIZE w TEJ SAMEJ zmianie (patrz `TILE_PORTRAIT_HEIGHT` u
   // góry pliku), więc teraz obie zależności czytają jedną definicję zamiast dwóch kopii do
   // ręcznej synchronizacji.
-  projectile: { position: 'absolute', top: spacing[2] + TILE_PORTRAIT_HEIGHT / 2 - 14 + SPRITE_OFFSET_Y_AVG, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  projectile: { position: 'absolute', top: spacing[2] + TILE_PORTRAIT_HEIGHT / 2 - PROJECTILE_SIZE / 2 + SPRITE_OFFSET_Y_AVG, width: PROJECTILE_SIZE, height: PROJECTILE_SIZE, alignItems: 'center', justifyContent: 'center' },
 }));
