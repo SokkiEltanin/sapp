@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: "Co zjadłem" — stare produkty bez kategorii nigdy się nie doganiały (2026-10-08)
+
+User zrzutem: "Ciastka milka XXL" wciąż nie łapie jako słodycze, mimo że matcher 'milka'/
+'ciastk' ma od dawna. Root cause + fix pełny opis w ARCHITECTURE.md §275: kategoria liczyła
+się TYLKO przy tworzeniu NOWEGO produktu — ponowne wybranie już istniejącego (nieskategory-
+zowanego) z wyszukiwarki nigdy nie próbowało dopasować. Fix: (1) ta gałąź w `app/food/add.tsx`
+dostała tę samą logikę co nowy produkt, (2) nowy `reclassifyUncategorized()` odpalany na
+KAŻDYM starcie appki (bezpieczne — dotyka tylko produktów bez `cat`) doganiający stare wpisy.
+`tsc`/`jest` zielone (1302/1302, +5 nowych testów).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: po OTA, otwórz appkę i sprawdź w Co zjadłem czy
+"Ciastka milka XXL" i inne stare nieskategoryzowane wpisy dostały kategorię "Słodycze", i że
+streak "Bez słodyczy" to teraz widzi.
+
 ## 🆕 Walki: widoczne uniki/pominięcia bossa + większe pociski bez poświaty (2026-10-08)
 
 User: "napraw walki zrob żeby uniki albo pominięcia bosów były widoczne z animacjami, powieksz

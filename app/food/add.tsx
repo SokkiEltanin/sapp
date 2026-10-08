@@ -528,6 +528,16 @@ export default function FoodAdd() {
       if (sel.carbs100 != null && sel.carbs100 !== existing?.carbs100) patch.carbs100 = sel.carbs100;
       if (sel.fat100 != null && sel.fat100 !== existing?.fat100) patch.fat100 = sel.fat100;
       if (sel.sugar100 != null && sel.sugar100 !== existing?.sugar100) patch.sugar100 = sel.sugar100;
+      // Produkt bez kategorii, wybrany PONOWNIE z wyszukiwarki (2026-10-08, user: "Ciastka
+      // milka XXL" wciąż nie łapało jako słodycze) — dotąd ta gałąź (produkt JUŻ istnieje,
+      // ma `productId`) nigdy nie dotykała `cat`, więc raz nieskategoryzowany produkt
+      // zostawał tak NA ZAWSZE, nawet po rozbudowie matchera. Ta sama bezpieczna zasada co
+      // przy nowym produkcie wyżej — TYLKO gdy jeszcze nie ma kategorii, nigdy nie nadpisuje
+      // świadomego wyboru usera.
+      if (!existing?.cat) {
+        const catSeed = purchasedCatForName(sel.name, purchasedCatIndex) ?? suggestCatFromName(sel.name);
+        if (catSeed) patch.cat = catSeed;
+      }
       if (Object.keys(patch).length) updateProduct(productId, patch);
     }
     const ov = parseFloat(gramsOverride.replace(',', '.'));

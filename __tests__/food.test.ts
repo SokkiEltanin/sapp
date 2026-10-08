@@ -1,5 +1,6 @@
-import { purchasedCatForName, buildPurchasedCatIndex, suggestCatFromName } from '@/utils/food';
+import { purchasedCatForName, buildPurchasedCatIndex, suggestCatFromName, reclassifyUncategorized } from '@/utils/food';
 import { Expense, ReceiptItem } from '@/types';
+import type { FoodProduct } from '@/store/foodStore';
 
 const item = (o: Partial<ReceiptItem>): ReceiptItem => ({
   name: 'x', price: 5, category: 'groceries', quantity: 1, unitPrice: 5, tags: [], ...o,
@@ -94,5 +95,46 @@ describe('suggestCatFromName', () => {
 
   test('pusta nazwa → undefined', () => {
     expect(suggestCatFromName('')).toBeUndefined();
+  });
+});
+
+const product = (o: Partial<FoodProduct>): FoodProduct => ({
+  id: 'p1', name: 'x', uses: 1, createdAt: 0, ...o,
+});
+
+// 2026-10-08, user: "Ciastka milka XXL wciąż nie łapie jako słodycze" — root cause:
+// `suggestCatFromName`/`purchasedCatForName` liczą się TYLKO przy tworzeniu NOWEGO produktu;
+// ponowne wybranie JUŻ istniejącego (nieskategoryzowanego) produktu z wyszukiwarki nigdy nie
+// dotykało `cat`, więc zostawał tak na zawsze, nawet po rozbudowie matchera. Patrz pełny
+// komentarz przy `reclassifyUncategorized` w utils/food.ts.
+describe('reclassifyUncategorized', () => {
+  test('produkt bez kategorii, którego nazwę teraz łapie matcher → dostaje patcha', () => {
+    const patches = reclassifyUncategorized([product({ id: 'a', name: 'Ciastka milka XXL' })], new Map());
+    expect(patches).toEqual([{ id: 'a', cat: 'słodycze' }]);
+  });
+
+  test('produkt z JUŻ ustawioną kategorią — nigdy nie nadpisany, nawet jeśli nazwa sugeruje co innego', () => {
+    const patches = reclassifyUncategorized([product({ id: 'a', name: 'Czekolada Milka', cat: 'inne' })], new Map());
+    expect(patches).toEqual([]);
+  });
+
+  test('historia zakupów (purchasedIndex) wygrywa z gołym dopasowaniem nazwy', () => {
+    const idx = new Map([['ciastka milka xxl', 'przekąski']]); // user ręcznie przetagował na paragonie
+    const patches = reclassifyUncategorized([product({ id: 'a', name: 'Ciastka milka XXL' })], idx);
+    expect(patches).toEqual([{ id: 'a', cat: 'przekąski' }]);
+  });
+
+  test('nazwa bez żadnego dopasowania → pomijana, nie wymusza "inne"', () => {
+    const patches = reclassifyUncategorized([product({ id: 'a', name: 'Coś zupełnie nieznanego xyz123' })], new Map());
+    expect(patches).toEqual([]);
+  });
+
+  test('kilka produktów naraz — patchuje tylko te bez kategorii i z dopasowaniem', () => {
+    const patches = reclassifyUncategorized([
+      product({ id: 'a', name: 'Kinder Bueno' }),           // bez cat, łapie się → patch
+      product({ id: 'b', name: 'Pierś z kurczaka', cat: 'mięso' }), // ma już cat → pomijany
+      product({ id: 'c', name: 'xyz123 nieznane' }),         // bez cat, nic nie łapie → pomijany
+    ], new Map());
+    expect(patches).toEqual([{ id: 'a', cat: 'słodycze' }]);
   });
 });
