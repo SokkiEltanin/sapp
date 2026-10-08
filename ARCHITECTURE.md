@@ -15335,6 +15335,48 @@ większe i bez czerwonawej poświaty za sobą.
 
 ---
 
+## 275. Fix: produkty "Co zjadłem" bez kategorii nigdy nie dostawały drugiej szansy (2026-10-08)
+
+User zrzutem ekranu: "Ciastka milka XXL" zalogowane w Obiedzie, "i jeszcze to nie łapie jako
+słodycze" — mimo że 'milka'/'ciastk' są w `FOOD_TAG_MAP` (receiptParser.ts) od dawna i
+`suggestCatFromName('Czekolada Milka mleczna')` ma już test potwierdzający trafienie.
+
+**Root cause** (nie bug w samym matcherze — matcher łapał poprawnie): `suggestCatFromName`/
+`purchasedCatForName` (§254, "Kinder Bueno nie łapało") liczą się WYŁĄCZNIE przy tworzeniu
+NOWEGO produktu (`app/food/add.tsx`'s `confirmManual`/gałąź `confirmPicker` bez `productId`).
+Ponowne wybranie JUŻ istniejącego produktu z wyszukiwarki (MA `productId` — dokładnie to, co
+dzieje się przy logowaniu posiłku z czegoś już wcześniej jedzonego) w ogóle nie dotykało
+`cat` — produkt zalogowany raz PRZED jakimkolwiek dopasowaniem (albo z innego poślizgu),
+zostawał nieskategoryzowany NA ZAWSZE. Każda kolejna rozbudowa matchera (§254, §255, §256)
+naprawiała tylko NOWE produkty — classic dead-end z CLAUDE.md #7, ten sam wzorzec co "Kinder
+Bueno" wcześniej, tylko jedną warstwę głębiej.
+
+**Fix, dwie części**:
+1. `app/food/add.tsx`'s `confirmPicker()` — gałąź "produkt już istnieje" dostała TĘ SAMĄ
+   logikę cat-seedingu co gałąź "nowy produkt" (`!existing?.cat` → spróbuj
+   `purchasedCatForName`/`suggestCatFromName`), zamykając dziurę na przyszłość.
+2. Nowa `reclassifyUncategorized(products, purchasedIndex)` w `utils/food.ts` — czysta
+   funkcja, zwraca listę `{id, cat}` do patchnięcia dla WSZYSTKICH już istniejących produktów
+   bez `cat`, którym teraz (po całej historii rozbudów matchera) da się coś dopasować.
+   Podłączona w `app/_layout.tsx` jako kolejny `afterInteractions` efekt obok
+   `migrateBalanceModel`/`migratePaydayDefaultOff` — ale ŚWIADOMIE NIE jednorazowa migracja
+   (brak AsyncStorage-flagi): dotyka wyłącznie produktów bez `cat` (nigdy nie nadpisuje
+   świadomego wyboru usera), więc bezpieczne na KAŻDYM starcie — każda PRZYSZŁA rozbudowa
+   `FOOD_TAG_MAP` automatycznie "dogania" starsze produkty przy następnym uruchomieniu, bez
+   pamiętania o nowej fladze migracji za każdym razem.
+
+**Testy**: nowy `describe('reclassifyUncategorized', …)` w `__tests__/food.test.ts` (5
+testów — łapie "Ciastka milka XXL", nie nadpisuje już ustawionej kategorii nawet gdy nazwa
+sugeruje co innego, `purchasedIndex` wygrywa z gołym dopasowaniem nazwy, brak dopasowania nie
+wymusza "inne", wsadowe patchowanie kilku produktów naraz). `tsc --noEmit` czyste, `jest
+--silent` 100/100 suite, 1302 testy (+5).
+
+**Priorytet testu na urządzeniu — wysoki**: po dojściu OTA, otwórz appkę (efekt leci cicho w
+tle) i sprawdź w Co zjadłem czy "Ciastka milka XXL" (i inne stare, nieskategoryzowane wpisy)
+dostały kategorię "Słodycze" — oraz że streak "Bez słodyczy" to teraz poprawnie widzi.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

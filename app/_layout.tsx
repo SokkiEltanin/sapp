@@ -39,7 +39,8 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import { migratePaydayDefaultOff } from '@/utils/payday';
-import { loadNonFood } from '@/utils/food';
+import { loadNonFood, reclassifyUncategorized, buildPurchasedCatIndex } from '@/utils/food';
+import { useFoodStore } from '@/store/foodStore';
 import { loadOwnName } from '@/utils/ownName';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
@@ -263,6 +264,16 @@ export default function RootLayout() {
   useEffect(() => afterInteractions(() => { migratePaydayDefaultOff().catch(() => {}); }), []);
   useEffect(() => afterInteractions(() => { loadNonFood().catch(() => {}); }), []);   // "to nie jedzenie" exclusions → module set
   useEffect(() => afterInteractions(() => { loadOwnName().catch(() => {}); }), []);   // własne imię → wykrywanie przelewów do siebie (bankNotification.ts)
+  // Dogania produkty "Co zjadłem" bez kategorii (2026-10-08, §275 — user: "Ciastka milka XXL
+  // wciąż nie łapie jako słodycze") — `reclassifyUncategorized()` w utils/food.ts, patrz
+  // komentarz tam. NIE jednorazowa migracja (brak AsyncStorage-flagi) — bezpieczne na każdym
+  // starcie, bo dotyka wyłącznie produktów bez `cat`, więc każda przyszła rozbudowa
+  // `FOOD_TAG_MAP` automatycznie "dogania" starsze produkty następnym razem.
+  useEffect(() => afterInteractions(() => {
+    const { products, updateProduct } = useFoodStore.getState();
+    const patches = reclassifyUncategorized(products, buildPurchasedCatIndex(useExpensesStore.getState().expenses));
+    for (const { id, cat } of patches) updateProduct(id, { cat });
+  }), []);
 
   // Lokalny licznik użycia ekranów (2026-09-12, user: "coś ala meta pixel... obieg
   // zamknięty" — patrz `usageStatsStore.ts`/`screenStats.ts` dla pełnego opisu). JEDNO

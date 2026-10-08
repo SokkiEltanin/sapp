@@ -3,6 +3,7 @@ import { Expense, ReceiptItem } from '@/types';
 import { looksLikeFood } from '@/utils/calories';
 import { normalizeProductName } from '@/utils/productMemory';
 import { getFoodTags } from '@/utils/receiptParser';
+import type { FoodProduct } from '@/store/foodStore';
 
 // Food spend = FOOD items only, not the whole grocery receipt. Papier toaletowy /
 // chemia / higiena bought at Lidl must NOT count as jedzenie. Food sub-tags drive the
@@ -172,6 +173,30 @@ export function suggestCatFromName(name: string): string | undefined {
   const tags = getFoodTags(name);
   for (const s of FOOD_SUBCATS) if (tags.includes(s.tag)) return s.tag;
   return undefined;
+}
+
+// Produkty bez kategorii nigdy nie dostawały drugiej szansy (2026-10-08, user: "Ciastka
+// milka XXL" wciąż nie łapało jako słodycze, mimo że 'milka'/'ciastk' są w `FOOD_TAG_MAP`
+// od dawna — realny root cause: `suggestCatFromName`/`purchasedCatForName` (patrz wyżej)
+// liczą się TYLKO przy tworzeniu NOWEGO produktu (`app/food/add.tsx`'s `confirmManual`/
+// `confirmPicker`, gałąź bez `productId`). Ponowne wybranie JUŻ istniejącego produktu z
+// wyszukiwarki (MA `productId`) w ogóle nie dotyka `cat` — produkt zalogowany raz, zanim
+// matcher go łapał (albo przy jakimkolwiek innym poślizgu), zostawał nieskategoryzowany NA
+// ZAWSZE, żadna późniejsza rozbudowa `FOOD_TAG_MAP` (tak jak przy Kinder Bueno, §254) go
+// już nie naprawiała — klasyczny "dead end" z CLAUDE.md #7.
+//
+// Czysta funkcja — bezpieczna do wołania na KAŻDYM starcie appki, nie jednorazowa migracja:
+// dotyka WYŁĄCZNIE produktów bez jeszcze ustawionej kategorii (`!p.cat`, nigdy nie nadpisuje
+// świadomego wyboru usera), więc każda przyszła rozbudowa matchera automatycznie "dogania"
+// starsze produkty przy następnym uruchomieniu, bez nowej flagi migracji do pamiętania.
+export function reclassifyUncategorized(products: FoodProduct[], purchasedIndex: Map<string, string>): { id: string; cat: string }[] {
+  const patches: { id: string; cat: string }[] = [];
+  for (const p of products) {
+    if (p.cat) continue;
+    const cat = purchasedCatForName(p.name, purchasedIndex) ?? suggestCatFromName(p.name);
+    if (cat) patches.push({ id: p.id, cat });
+  }
+  return patches;
 }
 
 // How much of an expense is FOOD: with items → sum food lines; without items but the
