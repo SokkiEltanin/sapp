@@ -15377,6 +15377,45 @@ dostały kategorię "Słodycze" — oraz że streak "Bez słodyczy" to teraz pop
 
 ---
 
+## 276. Fix: powiadomienie "Pupil wrócił z misji" zostawało w szufladzie po walce bez klikania (2026-10-08)
+
+User: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę bez klikania w
+niego żeby po walce zniknęło samo".
+
+**Root cause**: `notificationsService.cancelMissionReady()` (wołane przez `claimMission()` w
+petStore.ts przy zwycięskiej walce) wołało WYŁĄCZNIE `Notifications.
+cancelScheduledNotificationAsync('mission-ready')` — to anuluje tylko JESZCZE NIE wystrzelone,
+zaplanowane powiadomienie. Jeśli misja już się skończyła (dokładnie ten scenariusz — user WIE,
+że ma iść walczyć, BO powiadomienie już przyszło), ten call no-opuje: nic już nie jest
+"zaplanowane", bo powiadomienie DAWNO wystrzeliło i siedzi doręczone w systemowej szufladzie.
+`claimMission()` je realnie obsługuje (zeruje slot misji, daje nagrodę), ale nic nie mówiło
+systemowi Androida "to powiadomienie jest już nieaktualne, usuń je" — zostawało tam, aż user
+sam je swipe'nął.
+
+**Fix**: `cancelMissionReady()` dodatkowo woła `Notifications.dismissNotificationAsync
+('mission-ready')` — usuwa już DORĘCZONE powiadomienie z szuflady, jeśli tam akurat siedzi
+(no-op przez `catch`, jeśli go tam nie ma — np. misja anulowana zanim w ogóle wystrzeliło).
+`cancelScheduledNotificationAsync` zostaje obok (dalej potrzebne dla ścieżki "misja anulowana
+PRZED końcem", gdzie powiadomienie jeszcze nie wystrzeliło).
+
+**Nie w zakresie tej zmiany** — zidentyfikowany, ale NIE naprawiony: ten sam wzorzec (`cancel*`
+woła tylko `cancelScheduledNotificationAsync`, nigdy `dismissNotificationAsync`) występuje w
+~30 innych miejscach w `notificationsService.ts` (habit/budget/task/debt/capsule/note itp.) —
+część z nich to faktycznie ten sam "dead end" (np. zrobione zadanie z aktywnym przypomnieniem,
+które już wystrzeliło), część to RECURRING reminder'y gdzie semantyka jest inna. User poprosił
+konkretnie o powiadomienie pupila — reszta czeka na osobną decyzję, żeby nie poszerzać tej
+zmiany bez pytania.
+
+**Testy**: brak nowych (czysto wywołanie natywnego API, nie ma co unit-testować bez mocka
+`expo-notifications`, które i tak jest już mockowane globalnie w testach jako no-op). `tsc
+--noEmit` czyste, `jest --silent` 100/100 suite (1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: poczekaj aż misja się skończy (albo skróć sobie
+czas lokalnie do testu), NIE klikaj w powiadomienie, wejdź do appki przez ikonę, zawalcz z
+bossem misji — powiadomienie w szufladzie systemowej Androida powinno zniknąć samo po walce.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

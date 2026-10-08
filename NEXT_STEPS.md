@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: powiadomienie "Pupil wrócił z misji" zostawało w szufladzie (2026-10-08)
+
+User: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę bez klikania w
+niego żeby po walce zniknęło samo". Pełny opis w ARCHITECTURE.md §276. `cancelMissionReady()`
+anulowało tylko ZAPLANOWANE powiadomienie (`cancelScheduledNotificationAsync`) — bezużyteczne
+gdy misja już się skończyła i powiadomienie DAWNO wystrzeliło. Dodane `dismissNotificationAsync`
+— usuwa już doręczone powiadomienie z szuflady Androida. `tsc`/`jest` zielone (1302/1302, bez
+zmiany — czyste wywołanie natywnego API).
+
+**Zidentyfikowane, NIE naprawione**: ten sam wzorzec (brak `dismissNotificationAsync` obok
+`cancelScheduledNotificationAsync`) w ~30 innych miejscach `notificationsService.ts` — user
+poprosił konkretnie o powiadomienie pupila, reszta czeka na osobną decyzję.
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: poczekaj na koniec misji, NIE klikaj
+powiadomienia, wejdź do appki normalnie i zawalcz — powiadomienie w szufladzie powinno zniknąć
+samo.
+
 ## 🆕 Fix: "Co zjadłem" — stare produkty bez kategorii nigdy się nie doganiały (2026-10-08)
 
 User zrzutem: "Ciastka milka XXL" wciąż nie łapie jako słodycze, mimo że matcher 'milka'/
