@@ -296,6 +296,9 @@ describe('bosses — simulateFight (silnik rund)', () => {
     const r = simulateFight(0, 1, noCrit, b, 100);
     expect(r.rounds).toHaveLength(1);
     expect(r.rounds[0].counterDmg).toBe(0); // boss umarł, nie zdążył kontratakować
+    // §274 (2026-10-08) — to NIE jest unik ani pominięcie, boss po prostu nie dożył swojej
+    // kolejki — UI (boss-fight.tsx) nie powinien tu pokazać "UNIK!"/"POMINIĘCIE!".
+    expect(r.rounds[0].counterOutcome).toBeUndefined();
     expect(r.catHpLeft).toBe(100); // kotek nietknięty
   });
 
@@ -384,6 +387,9 @@ describe('bosses — simulateFight z itemami bojowymi (v4.1, jeszcze bez UI do z
     randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
     const r = simulateFight(0, 1, noCrit, b, 1000, 1, item('dodge'));
     expect(r.rounds[0].counterDmg).toBe(0);
+    // §274 (2026-10-08) — UI (boss-fight.tsx) czyta ten tag, żeby pokazać "UNIK!" zamiast
+    // ciszy przy counterDmg===0 (user: "zrob zeby uniki... byly widoczne z animacjami").
+    expect(r.rounds[0].counterOutcome).toBe('dodged');
     expect(r.catHpLeft).toBe(1000);
   });
 
@@ -392,6 +398,9 @@ describe('bosses — simulateFight z itemami bojowymi (v4.1, jeszcze bez UI do z
     randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
     const r = simulateFight(0, 1, noCrit, b, 1000, 1, item('mindcontrol'));
     expect(r.rounds[0].counterDmg).toBe(0);
+    // §274 — UI pokazuje "POMINIĘCIE!" i (w odróżnieniu od dodge/reflect) NIE puszcza pocisku,
+    // bo boss faktycznie nic nie rzucił.
+    expect(r.rounds[0].counterOutcome).toBe('skipped');
   });
 
   test('shield: redukuje obrażenia kontrataku o stały procent', () => {
@@ -415,6 +424,9 @@ describe('bosses — simulateFight z itemami bojowymi (v4.1, jeszcze bez UI do z
     randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
     const r = simulateFight(0, 1, noCrit, b, 1000, 1, item('reflect'));
     expect(r.rounds[0].counterDmg).toBe(0);
+    // §274 — UI pokazuje "ODBITE!" (zielony, w odróżnieniu od "UNIK!") i NADAL puszcza pocisk
+    // (boss faktycznie rzucił ciosem, tylko wrócił do niego).
+    expect(r.rounds[0].counterOutcome).toBe('reflected');
     expect(r.catHpLeft).toBe(1000);
     expect(r.bossHpLeft).toBeLessThan(b.hp); // boss dostał odbite obrażenia
   });

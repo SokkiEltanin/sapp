@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Walki: widoczne uniki/pominięcia bossa + większe pociski bez poświaty (2026-10-08)
+
+User: "napraw walki zrob żeby uniki albo pominięcia bosów były widoczne z animacjami, powieksz
+trochę projectile jak lecą te ataki i usun z nich poświaty za nimi czerwone itp". Pełny opis w
+ARCHITECTURE.md §274. `counterDmg===0` miało 3 różne przyczyny (dodge/reflect/mindcontrol) i
+renderowało się jako kompletna cisza — teraz nowe pole `FightRound.counterOutcome` + UI pokazuje
+"UNIK!"/"ODBITE!"/"POMINIĘCIE!" (bez shake'u, bo to nie trafienie). Pociski powiększone (28→36)
+i bez czerwonawej poświaty (`RadialGlow` usunięta z obu lecących pocisków). `tsc`/`jest` zielone
+(1297/1297, rozszerzone istniejące testy dodge/mindcontrol/reflect o `counterOutcome`).
+
+**🆕 Priorytet testu na urządzeniu — średni**: walka z itemami dodge/reflect/mindcontrol —
+sprawdź że napisy się pokazują poprawnie (pocisk leci przy uniku/odbiciu, NIE leci przy
+pominięciu), i że pociski ogólnie wyglądają większe/bez poświaty.
+
 ## 🆕 Ustawienia: nowe sekcje "Pupil" i "Zdrowie" (2026-10-07)
 
 User: "w ustawieniach znów jest chaos, eksport danych wrzucasz w kilka miejsc... powinna być
