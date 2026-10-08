@@ -855,8 +855,17 @@ export const notificationsService = {
     }).catch(() => {});
   },
 
+  // 2026-10-08, user: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę
+  // bez klikania w nie żeby po walce zniknęło samo" — `cancelScheduledNotificationAsync`
+  // (sam, jak dotąd) anuluje tylko ZAPLANOWANE, jeszcze nie wystrzelone powiadomienie. Jeśli
+  // misja już się skończyła, powiadomienie DAWNO wystrzeliło (stąd user w ogóle wie, że ma
+  // iść walczyć) — ten call wtedy no-opuje, a doręczone powiadomienie zostaje w szufladzie
+  // systemowej do ręcznego swipe'a, mimo że `claimMission()` (zwycięska walka) już je
+  // obsłużyła. `dismissNotificationAsync` usuwa je z szuflady, jeśli tam akurat siedzi — no-op
+  // (catch) jeśli go tam nie ma (misja odebrana/anulowana ZANIM w ogóle wystrzeliło).
   async cancelMissionReady(): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync('mission-ready').catch(() => {});
+    await Notifications.dismissNotificationAsync('mission-ready').catch(() => {});
   },
 
   // Nie DAILY (2026-09-20, "inteligentne powiadomienia" cd. — ta sama dziura co
