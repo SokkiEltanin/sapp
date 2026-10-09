@@ -1,7 +1,7 @@
 // Import FIRST — its module-eval time is the `JS_START` reference for the cold-start perf
 // log (perfLog.ts) that Diagnostyka reads back. Must stay the very first import so it evals
 // as close to real app launch as this JS bundle can observe.
-import { startColdStartLagSampling } from '@/utils/perfLog';
+import { startColdStartLagSampling, pauseLagSampling, resumeLagSampling } from '@/utils/perfLog';
 import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -208,6 +208,16 @@ export default function RootLayout() {
   // komponencie — najwcześniej jak się da bez samo-startowania na poziomie modułu (to
   // zapętliłoby prawdziwe timery w testach Jest, patrz komentarz tam).
   useEffect(() => { startColdStartLagSampling(); }, []);
+  // 2026-10-09 — próbkowanie teraz leci przez CAŁĄ sesję, nie tylko pierwsze 8s (patrz
+  // komentarz w perfLog.ts) — ale appka w TLE nie ma po co próbkować (OS i tak zamraża JS,
+  // wznowiony timer zmierzyłby czas zamrożenia jako fałszywy "lag"). Pauza/wznowienie na
+  // AppState, ten sam wzorzec co pozostałe AppState-effecty w tym pliku.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resumeLagSampling(); else pauseLagSampling();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Fix na podstawie WYNIKU tego rejestru (2026-09-24, user przysłał realny export z
   // urządzenia): "0 próbek" przy WSZYSTKICH 20 startach, mimo że "gotowy" trwało 600ms-1,9s —

@@ -15573,6 +15573,50 @@ aktualizację (OTA)" tam jest i działa jak dotąd; Diagnostyka nie ma go już.
 
 ---
 
+## 281. Rejestr lagu wątku JS rozszerzony na CAŁĄ sesję, nie tylko start (2026-10-09)
+
+User: "nadal mam wrażenie że appka laguje, porób testy albo dodaj testową więcej żeby lepiej
+zrozumieć i jakoś to naprawić". Odrębny temat od §244/perfLog startowego — ten feedback
+("ogólnie czuję że laguje") dotyczy czasu PODCZAS używania appki, nie tylko pierwszych sekund
+po otwarciu.
+
+**Gap w dotychczasowym narzędziu**: `startColdStartLagSampling()` (perfLog.ts, §od 2026-09-20)
+próbkowało wątek JS co 50ms, ale TYLKO przez pierwsze `LAG_WINDOW_MS`=8000ms od startu —
+sampler sam się zatrzymywał na stałe po tym oknie. `recordDashboardReady()` zapisywało jeden
+snapshot tych liczników przy starcie dashboardu. Efekt: appka miała ZERO widoczności we
+własny lag poza pierwszymi ~8 sekundami — dokładnie ten rodzaj "ogólnego wrażenia że laguje"
+zgłoszony teraz, przez minuty/godziny realnego użycia, był kompletnie niemierzony.
+
+**Fix — dwie fazy próbkowania zamiast jednej z twardym stopem**:
+- Pierwsze `LAG_WINDOW_MS` (8s) — bez zmian, gęsto co `LAG_SAMPLE_MS`=50ms (cel: dokładnie
+  złapać start, jak dotąd).
+- PO tym oknie — próbkowanie LECI DALEJ przez resztę sesji, tylko rzadziej
+  (`LAG_SAMPLE_MS_IDLE`=500ms) — wystarczy złapać zauważalne (>0.5s) zacięcia bez obciążania
+  appki kolejnym 50ms-timerem bez końca.
+- `pauseLagSampling()`/`resumeLagSampling()` — nowe, wołane z AppState listenerem w
+  `_layout.tsx` (ten sam wzorzec co pozostałe AppState-effecty tam). Appka w TLE nie próbkuje
+  wcale — OS i tak zamraża JS, wznowiony timer zmierzyłby czas zamrożenia jako fałszywy,
+  ogromny "lag", psując dane.
+- `getLiveLagStats()` — nowa funkcja, czyta ŻYWE liczniki (`maxLagMs`/`totalLagMs`/
+  `lagSamples`/`sinceMs`) W DOWOLNYM momencie sesji, nie tylko ten jeden snapshot zapisany przy
+  starcie. Diagnostyka → "Wydajność appki" (przemianowane z "Wydajność startu apki") pokazuje
+  teraz na samej górze alertu sekcję "Ta sesja (na żywo)" z tymi liczbami — user może to
+  sprawdzić ZARAZ PO tym jak poczuje zacięcie, zamiast czekać na kolejny cold start i
+  pamiętać, że coś było nie tak.
+
+**Testy**: nowy `describe('perfLog — live lag stats …')` w `__tests__/perfLog.test.ts` (2
+testy — `getLiveLagStats()` zwraca sensowny kształt bez odpalania prawdziwego samplera,
+pause/resume nie rzucają nawet gdy sampler nigdy nie wystartował). `tsc --noEmit` czyste,
+`jest --silent` 100/100 suite, 1304 testy (+2).
+
+**Priorytet testu na urządzeniu — wysoki**: poużywaj appki chwilę (kilka minut, różne
+ekrany/scrolle), potem Ustawienia → Diagnostyka → "Wydajność appki" — sekcja "Ta sesja (na
+żywo)" powinna pokazać realne liczby z tego okresu, nie same zera.
+Jeśli lag max/suma faktycznie rosną przy konkretnych akcjach (np. scroll długiej listy
+wydatków) — to już konkretny trop do dalszego audytu, zamiast zgadywania.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

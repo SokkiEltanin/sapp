@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rejestr lagu wątku JS rozszerzony na CAŁĄ sesję (2026-10-09)
+
+User: "nadal mam wrażenie że appka laguje, porób testy albo dodaj testową więcej żeby lepiej
+zrozumieć i jakoś to naprawić". Pełny opis w ARCHITECTURE.md §281. Dotychczasowy sampler
+(perfLog.ts) mierzył lag TYLKO przez pierwsze 8s od startu, potem się zatrzymywał na stałe —
+zero widoczności w ogólne, ciągłe odczucie laga podczas realnego używania. Teraz próbkuje przez
+CAŁĄ sesję (rzadziej po starcie — 500ms zamiast 50ms, żeby nie obciążać), pauzuje się w tle
+(AppState), i nowe `getLiveLagStats()` pozwala sprawdzić aktualne liczby W DOWOLNYM momencie —
+Diagnostyka → "Wydajność appki" (przemianowane z "Wydajność startu apki") ma teraz na górze
+sekcję "Ta sesja (na żywo)". `tsc`/`jest` zielone (1304/1304, +2 nowe testy).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: poużywaj appki kilka minut (różne ekrany,
+scrolle), potem Ustawienia → Diagnostyka → "Wydajność appki" — "Ta sesja (na żywo)" powinna
+pokazać realne liczby. Jeśli lag faktycznie rośnie przy konkretnych akcjach — to konkretny
+trop do dalszego audytu, wyślij mi co tam widzisz.
+
 ## 🆕 Ustawienia: "Sprawdź aktualizację (OTA)" przeniesione do Aplikacji (2026-10-09)
 
 User: "przenieśmy w ustawieniach aktualizacje do zakładki aplikacja". Pełny opis w

@@ -47,7 +47,7 @@ import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { useWidgetSettingsStore, WidgetTextScale } from '@/store/widgetSettingsStore';
 import { setWidgetAppearance } from '@/services/widgetSync';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
-import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
+import { getPerfLog, clearPerfLog, getLiveLagStats } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
 import { probeHydration, formatWaterDiagnostic } from '@/services/healthConnectService';
 import { haptic } from '@/utils/haptics';
@@ -2291,7 +2291,15 @@ export default function SettingsScreen() {
           } },
         },
         {
-          id: 'diag-perf-log', title: 'Wydajność startu apki', subtitle: 'Czas do pierwszej klatki, dashboardu i lag wątku JS (czy da się kliknąć) — ostatnie starty',
+          // 2026-10-09, user: "nadal mam wrażenie że appka laguje, dodaj testową [diagnostykę]
+          // żeby lepiej zrozumieć" — dotąd próbkowanie lagu wątku JS (perfLog.ts) zatrzymywało
+          // się na stałe po pierwszych 8s od startu, więc ten Alert pokazywał TYLKO lag przy
+          // starcie — zero widoczności w ciągłe, ogólne odczucie laga podczas zwykłego
+          // używania. Próbkowanie teraz leci przez całą sesję (rzadziej po starcie, patrz
+          // komentarz w perfLog.ts) — nowa pierwsza sekcja "Ta sesja (na żywo)" czyta
+          // `getLiveLagStats()` w MOMENCIE otwarcia tego alertu, więc user może to sprawdzić
+          // ZARAZ PO tym jak poczuje zacięcie, zamiast czekać na kolejny cold start.
+          id: 'diag-perf-log', title: 'Wydajność appki', subtitle: 'Lag wątku JS na żywo (cała sesja) + czas startu — ostatnie uruchomienia',
           icon: LucideIcons.Gauge, accentColor: '#46B0DE',
           keywords: ['wydajność', 'lag', 'laguje', 'szybkość', 'start', 'optymalizacja', 'dashboard'],
           control: { kind: 'link', onPress: async () => {
@@ -2299,9 +2307,12 @@ export default function SettingsScreen() {
             // Poor-man's cold-start profiler (perfLog.ts) — nie ma tu zdalnego Flipper/
             // profilera na urządzeniu, więc zamiast zgadywać dalsze optymalizacje "na oko",
             // to są REALNE liczby z tego telefonu, do porównania build-do-buildu.
+            const live = getLiveLagStats();
+            const liveLine = `Ta sesja (na żywo, od ${Math.round(live.sinceMs / 1000)}s): lag max ${live.maxLagMs}ms, suma ${live.totalLagMs}ms (${live.lagSamples} próbek).`;
             const log = await getPerfLog();
             if (log.length === 0) {
-              Alert.alert('Wydajność startu apki', 'Brak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).');
+              Alert.alert('Wydajność appki', `${liveLine}\n\nBrak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).`,
+                [{ text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}` }).catch(() => {}); } }, { text: 'OK' }]);
               return;
             }
             const last = log[log.length - 1];
@@ -2316,9 +2327,9 @@ export default function SettingsScreen() {
             const lines = log.slice().reverse().map(fmtEntry);
             Alert.alert(
               `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms, lag max ${last.maxLagMs ?? 0}ms`,
-              `1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria (najnowsze u góry):\n${lines.join('\n')}`,
+              `${liveLine}\n\nPrzy starcie — 1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria startów (najnowsze u góry):\n${lines.join('\n')}`,
               [
-                { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność startu apki (Sapp)\n\n${lines.join('\n')}` }).catch(() => {}); } },
+                { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}\n\n${lines.join('\n')}` }).catch(() => {}); } },
                 { text: 'Wyczyść historię', onPress: () => clearPerfLog() },
                 { text: 'OK' },
               ],
