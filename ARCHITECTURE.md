@@ -15416,6 +15416,48 @@ bossem misji — powiadomienie w szufladzie systemowej Androida powinno znikną�
 
 ---
 
+## 277. Ten sam "zostaje w szufladzie" fix dla WSZYSTKICH powiadomień (2026-10-08)
+
+User po §276 (fix mission-ready): "dawaj resztę" — zidentyfikowany tam wzorzec
+(`cancelScheduledNotificationAsync` anuluje TYLKO jeszcze niewystrzelone powiadomienie, zero
+wpływu na coś już doręczonego do szuflady systemowej) powtarzał się w ~30 innych miejscach
+`notificationsService.ts` (humor poranny/wieczorny, nawyki, serwis pojazdu, wypłata, budżet,
+podsumowanie tygodnia, karta miesiąca, pupil, boss, event, lista zadań, deadline'y, długi,
+przypomnienia o subskrypcji, notatki, kapsuła czasu, odliczenia pracy).
+
+**Fix**: jeden wspólny `cancelAndDismiss(identifier)` (nowy moduł-level helper na górze
+pliku) zamiast powtarzania pary wywołań wszędzie — woła `cancelScheduledNotificationAsync`
+(anuluje przyszłe) + `dismissNotificationAsync` (usuwa już doręczone z szuflady, jeśli tam
+akurat siedzi, no-op przez `catch` jeśli nie). WSZYSTKIE ~34 dotychczasowe wywołania
+`Notifications.cancelScheduledNotificationAsync(X).catch(() => {})` w pliku zamienione na
+`cancelAndDismiss(X)` — mechaniczna, jednoznaczna zamiana (zweryfikowana skryptem, każdy stary
+string zamieniony dokładnie tyle razy ile występował). `cancelMissionReady()` (§276) uproszczone
+do jednej linii korzystającej z tego samego helpera zamiast własnej pary wywołań.
+
+**`cancelAll()`** dostało analogiczny dopisek — `Notifications.dismissAllNotificationsAsync()`
+obok `cancelAllScheduledNotificationsAsync()`. Oba wywołujące miejsca (`app/settings.tsx`:
+wyłączenie głównego przełącznika powiadomień, przycisk "Anuluj wszystkie powiadomienia" z
+alertem "Gotowe, wszystkie powiadomienia anulowane") obiecywały userowi coś, czego dotąd
+realnie nie robiły dla już doręczonych powiadomień.
+
+**Ryzyko — niskie**: `dismissNotificationAsync`/`dismissAllNotificationsAsync` są no-opami
+(przez `catch`) jeśli nic z danym identyfikatorem akurat nie wisi w szufladzie — bezpieczne
+do wołania przy KAŻDYM `cancel`/`refresh`/`schedule` (re-arm na żywy stan), nie tylko przy
+faktycznym rozwiązaniu sprawy. Żadna zmiana logiki PLANOWANIA powiadomień — wyłącznie dodatkowe
+sprzątanie już-doręczonych.
+
+**Testy**: brak nowych — czyste wywołania natywnego API (ten sam brak testów co §276,
+`expo-notifications` i tak zmockowane globalnie jako no-op w testach). `tsc --noEmit` czyste,
+`jest --silent` 100/100 suite (1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: dowolne powiadomienie z tej listy (np. "Nie
+zapisałeś dziś humoru" wieczorem) — NIE klikaj go, zrób tę rzecz bezpośrednio w appce (zapisz
+humor) — powiadomienie w szufladzie powinno zniknąć samo. Osobno: Ustawienia → wyłącz główny
+przełącznik powiadomień (albo "Anuluj wszystkie powiadomienia") przy jakimkolwiek
+powiadomieniu wiszącym w szufladzie — powinno zniknąć razem z resztą.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

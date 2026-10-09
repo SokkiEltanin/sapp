@@ -3,22 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: powiadomienie "Pupil wrócił z misji" zostawało w szufladzie (2026-10-08)
+## 🆕 Fix: WSZYSTKIE powiadomienia zostawały w szufladzie po rozwiązaniu sprawy inną drogą (2026-10-08)
 
 User: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę bez klikania w
-niego żeby po walce zniknęło samo". Pełny opis w ARCHITECTURE.md §276. `cancelMissionReady()`
-anulowało tylko ZAPLANOWANE powiadomienie (`cancelScheduledNotificationAsync`) — bezużyteczne
-gdy misja już się skończyła i powiadomienie DAWNO wystrzeliło. Dodane `dismissNotificationAsync`
-— usuwa już doręczone powiadomienie z szuflady Androida. `tsc`/`jest` zielone (1302/1302, bez
-zmiany — czyste wywołanie natywnego API).
+niego żeby po walce zniknęło samo" → potem "dawaj resztę". Pełny opis w ARCHITECTURE.md
+§276/§277. `cancelScheduledNotificationAsync` anuluje TYLKO jeszcze niewystrzelone
+powiadomienie — bezużyteczne, gdy user WŁAŚNIE dostał powiadomienie i dlatego wie, że ma coś
+zrobić (albo zrobił to bez klikania w nie). Nowy wspólny `cancelAndDismiss()` helper (dodaje
+`dismissNotificationAsync`) zastąpił WSZYSTKIE ~34 dotychczasowe wywołania w
+`notificationsService.ts` — humor, nawyki, serwis pojazdu, wypłata, budżet, podsumowanie
+tygodnia, karta miesiąca, pupil (misja + daily), boss, event, zadania, długi, subskrypcje,
+notatki, kapsuła czasu, zmiany pracy. `cancelAll()` też dostało `dismissAllNotificationsAsync`.
+`tsc`/`jest` zielone (1302/1302, bez zmiany — czyste wywołania natywnego API).
 
-**Zidentyfikowane, NIE naprawione**: ten sam wzorzec (brak `dismissNotificationAsync` obok
-`cancelScheduledNotificationAsync`) w ~30 innych miejscach `notificationsService.ts` — user
-poprosił konkretnie o powiadomienie pupila, reszta czeka na osobną decyzję.
-
-**🆕 Priorytet testu na urządzeniu — wysoki**: poczekaj na koniec misji, NIE klikaj
-powiadomienia, wejdź do appki normalnie i zawalcz — powiadomienie w szufladzie powinno zniknąć
-samo.
+**🆕 Priorytet testu na urządzeniu — średni**: dowolne wiszące powiadomienie z appki — NIE
+klikaj go, zrób tę rzecz bezpośrednio w appce — powinno zniknąć samo z szuflady. Osobno:
+Ustawienia → wyłącz powiadomienia (albo "Anuluj wszystkie") przy czymś wiszącym w szufladzie.
 
 ## 🆕 Fix: "Co zjadłem" — stare produkty bez kategorii nigdy się nie doganiały (2026-10-08)
 
