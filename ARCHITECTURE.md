@@ -15497,6 +15497,82 @@ z pracy") faktycznie wchodzi bez pytania.
 
 ---
 
+## 279. KRYTYCZNE: brak blokady podwójnego kliknięcia "Zatwierdź" — jeden przelew zaksięgowany 6× (2026-10-09)
+
+User zrzutem: ten sam przelew ("[JD] MARKETING INVESTMENT GROUP SA", +3245.65 zł) sześć razy
+w historii tego samego dnia, miesięczny przychód sztucznie napompowany o ~16 200 zł. Bezpośrednia
+konsekwencja §278 (ten sam przelew, user wcześniej: "nie mogę zatwierdzić") — zanim tamten fix
+poszedł, przycisk realnie wyglądał jak martwy, więc user naciskał go wielokrotnie czekając na
+reakcję.
+
+**Root cause**: "Zatwierdź" nie miało ŻADNEJ blokady przed wielokrotnym naciśnięciem.
+`commitBankTx` kończy się na AWAITED Firestore `addDoc` (do 10s, `withTimeout` w firebase.ts).
+Dedup "czy ten przychód już istnieje" w `bankCommit.ts` (`alreadyIncome`/`findMatchingIncome`,
+po kwocie+dniu) czyta `st.expenses` W MOMENCIE wywołania — ale każde kolejne naciśnięcie
+Zatwierdź podczas gdy POPRZEDNIE wywołanie wciąż czekało na Firestore odpalało WŁASNE,
+RÓWNOLEGŁE wywołanie `commitBankTx`, które czytało `st.expenses` ZANIM którekolwiek z
+poprzednich zdążyło dopisać swój wpis (`st.addExpense` następuje DOPIERO po rozwiązaniu
+await'u). Z punktu widzenia KAŻDEGO z sześciu wywołań, żaden pasujący wpis jeszcze nie istniał
+— dedup nie miał szans zadziałać, bo nie chronił przed współbieżnością, tylko przed ponownym
+wysłaniem tej samej, już zakończonej płatności.
+
+**Zweryfikowane, wykluczone jako przyczyna**: (1) `processAutoBankQueue` (bankAutoProcess.ts)
+— ma własny `_running` lock + przetwarza kolejkę SEKWENCYJNIE (`for...of` z `await`, nie
+`Promise.all`), a ta transakcja i tak nie była `auto` (flagowana jako niepewna — duża kwota od
+nieznanego wtedy nadawcy); (2) sześć OSOBNYCH wpisów w kolejce (np. z redelivery powiadomienia)
+samo w sobie NIE wyjaśnia 6 duplikatów — zaakceptowane PO KOLEI, piąty i kolejne trafiłyby w
+dedup po pierwszym. Tylko RÓWNOLEGŁE wywołania (wielokrotne naciśnięcia TEJ SAMEJ karty, zanim
+pierwsze się skończyło) tłumaczą wynik.
+
+**Fix** (`app/bank-review.tsx`): nowy `submittingIds: Set<string>` — `accept(p)` na wejściu
+sprawdza `if (submittingIds.has(p.id)) return;` (drugie/kolejne naciśnięcie ignorowane w
+całości, zero nowego wywołania `commitBankTx`), ustawia się PRZED `try`, czyści w `finally`
+(sukces LUB błąd — karta nigdy nie zostaje trwale zablokowana). Przycisk "Zatwierdź" dostał
+`disabled={submittingIds.has(p.id)}` + spinner (`ActivityIndicator`) i tekst "Dodaję…" zamiast
+ikony/"Zatwierdź" podczas zapisu — realny wizualny feedback "coś się dzieje", nie tylko cicha
+blokada (dokładnie to, czego brakowało w §278 i co napędzało wielokrotne klikanie). "Odrzuć"
+też zablokowane podczas trwającego zapisu tej samej karty (unika wyścigu odrzuć-vs-dodaj).
+
+**Nie w zakresie tej zmiany**: dedup w `commitBankTx` (po kwocie+dniu) wciąż NIE jest odporny
+na współbieżne wywołania z RÓŻNYCH miejsc kodu (np. dwie osobno zakolejkowane, redeliverowane
+kopie tej samej notyfikacji, zaakceptowane w idealnie tym samym momencie z dwóch różnych kart).
+Ten konkretny, zgłoszony scenariusz (wielokrotne naciśnięcia JEDNEJ karty) jest w pełni
+naprawiony — ogólniejsza odporność na współbieżność między-kartową to osobna, większa zmiana
+(np. krótkotrwały zamek na sygnaturze kwota+dzień+kierunek w `commitBankTx` samym), nieporuszana
+tu bez realnego dowodu, że faktycznie się zdarza.
+
+**Sprzątanie danych usera**: appka NIE MA (jeszcze) narzędzia do hurtowego usuwania
+duplikatów — user poinstruowany ręcznie usunąć 5 z 6 kopii (Wydatki → stuknij każdy duplikat →
+"Usuń transakcję"), zostawiając jeden.
+
+**Testy**: brak nowych — czysta zmiana UI-stanu (lock + spinner), ten sam brak testów co reszta
+`bank-review.tsx` (komponent ekranu, nie czysta logika). `tsc --noEmit` czyste, `jest --silent`
+100/100 suite (1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: zatwierdź dowolną płatność z banku, naciśnij
+"Zatwierdź" kilka razy szybko pod rząd — drugie i kolejne naciśnięcia mają być całkowicie
+ignorowane (przycisk disabled + spinner), w historii ma wylądować TYLKO JEDEN wpis.
+
+---
+
+## 280. Ustawienia: "Sprawdź aktualizację (OTA)" przeniesione z Diagnostyki do Aplikacji (2026-10-09)
+
+User: "przenieśmy w ustawieniach aktualizacje do zakładki aplikacja". Drobna organizacyjna
+poprawka w tym samym duchu co §273 (Pupil/Zdrowie) — wiersz `diag-ota` (§266/§271/§278)
+mieszkał w "Diagnostyka" obok dev-narzędzi (self-test/last-crash/perf-log), mimo że tematycznie
+pasuje bardziej do "Aplikacja" (obok wersji/builda w "O aplikacji"). Czyste przeniesienie —
+ten sam `id`, ta sama logika/`onPress`, zero zmiany zachowania, tylko inna sekcja w drzewie
+`sections`. "Aplikacja"'s `keywords` rozszerzone o 'aktualizacja'/'update'/'ota', żeby
+wyszukiwarka Ustawień nadal łapała ten wiersz z dowolnej z tych fraz.
+
+**Testy**: brak nowych — czysty przenosiny, zero zmiany logiki. `tsc --noEmit` czyste, `jest
+--silent` 100/100 suite (1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Ustawienia → Aplikacja → sprawdź że "Sprawdź
+aktualizację (OTA)" tam jest i działa jak dotąd; Diagnostyka nie ma go już.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ustawienia: "Sprawdź aktualizację (OTA)" przeniesione do Aplikacji (2026-10-09)
+
+User: "przenieśmy w ustawieniach aktualizacje do zakładki aplikacja". Pełny opis w
+ARCHITECTURE.md §280. Czyste przeniesienie z "Diagnostyka" do "Aplikacja" (obok wersji/
+builda), zero zmiany logiki. `tsc`/`jest` zielone (1302/1302, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Ustawienia → Aplikacja → sprawdź że wiersz tam
+jest i działa.
+
+## 🆕🔴 KRYTYCZNE: jeden przelew zaksięgowany 6× — brak blokady podwójnego kliknięcia (2026-10-09)
+
+User zrzutem: ten sam przelew +3245.65 zł sześć razy w historii, miesięczny przychód
+napompowany o ~16 200 zł. Bezpośrednia konsekwencja poprzedniego fixu (§278) — zanim poszedł,
+"Zatwierdź" realnie wyglądał jak martwy, user naciskał wielokrotnie, a przycisk nie miał
+ŻADNEJ blokady przed współbieżnymi naciśnięciami. Pełny opis w ARCHITECTURE.md §279. Fix:
+`submittingIds` lock w `app/bank-review.tsx` — drugie/kolejne naciśnięcie tej samej karty w
+pełni ignorowane, przycisk disabled + spinner "Dodaję…" podczas zapisu. `tsc`/`jest` zielone
+(1302/1302, bez zmiany).
+
+**🆕 Wymaga Twojej akcji — ręczne sprzątanie danych**: appka nie ma (jeszcze) narzędzia do
+hurtowego usuwania duplikatów. Wejdź w Wydatki → znajdź 6 wpisów "[JD] MARKETING INVESTMENT
+GROUP SA" +3245.65 zł z tego samego dnia → stuknij w KAŻDY z 5 nadmiarowych → "Usuń
+transakcję" → zostaw TYLKO JEDEN.
+
+**🆕 Priorytet testu na urządzeniu — KRYTYCZNY**: zatwierdź dowolną płatność z banku,
+naciśnij "Zatwierdź" kilka razy szybko pod rząd — drugie/kolejne naciśnięcia mają być
+całkowicie zignorowane, w historii ma wylądować TYLKO JEDEN wpis.
+
 ## 🆕 Fix: "Zatwierdź" na przeglądzie banku wyglądał jak martwy przycisk (2026-10-09)
 
 User zrzutem (duży przelew przychodzący): "Nie mogę zatwierdzić a wolę żeby samo dodawało".

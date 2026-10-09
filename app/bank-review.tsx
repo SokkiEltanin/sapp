@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -32,6 +32,18 @@ export default function BankReview() {
   const { pending, update, remove } = useBankQueue();
   const [mem, setMem] = useState<MerchantMemory>({});
   const [plnDrafts, setPlnDrafts] = useState<Record<string, string>>({});   // pending.id -> typed PLN string
+  // 2026-10-09, user zrzutem: JEDEN przelew zaksięgowany SZEŚĆ razy (+3245.65 zł × 6 w
+  // historii). Root cause: "Zatwierdź" nie miało ŻADNEJ blokady przed wielokrotnym
+  // naciśnięciem — `commitBankTx` kończy się na awaited Firestore `addDoc` (do 10s, patrz
+  // komentarz przy `accept()` niżej), a user (sfrustrowany, bo wtedy przycisk jeszcze
+  // naprawdę wyglądał jak martwy — patrz §278) nacisnął go wielokrotnie w trakcie tego okna.
+  // Każde kolejne naciśnięcie odpalało WŁASNE, równoległe wywołanie `commitBankTx`, które
+  // czytało `st.expenses` ZANIM poprzednie zdążyło dopisać swój wpis — dedup "czy to już
+  // jest" (amount+dzień, w bankCommit.ts) nie miał szans zadziałać, bo z jego punktu
+  // widzenia każde wywołanie było "pierwsze". `submittingIds` blokuje DRUGIE i kolejne
+  // naciśnięcie TEJ SAMEJ karty, dopóki pierwsze się nie skończy (sukcesem lub błędem) —
+  // patrz `accept()`/JSX przycisku niżej.
+  const [submittingIds, setSubmittingIds] = useState<Set<string>>(new Set());
   const reloadMem = useCallback(() => { loadMerchantMemory().then(setMem).catch(() => {}); }, []);
   useFocusEffect(reloadMem);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
@@ -42,6 +54,7 @@ export default function BankReview() {
   }, [reloadMem]);
 
   const accept = async (p: PendingBankTx) => {
+    if (submittingIds.has(p.id)) return; // already in flight — drugie/kolejne naciśnięcie ignorowane
     const foreign = !!p.currency && p.currency !== 'PLN';
     const plnOverride = foreign ? parseFloat((plnDrafts[p.id] ?? '').replace(',', '.')) : undefined;
     if (foreign && !(plnOverride! > 0)) {
@@ -50,6 +63,7 @@ export default function BankReview() {
       return;
     }
     haptic.success();
+    setSubmittingIds(prev => new Set(prev).add(p.id));
     const corrected = p.category !== p.suggestedCategory; // reader guessed wrong → don't reward trust
     if (corrected) {
       // "Prostuję Zeznania" achievement — counts how many times the parser guessed wrong.
@@ -89,6 +103,8 @@ export default function BankReview() {
       remove(p.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Nie udało się dodać — spróbuj ponownie');
+    } finally {
+      setSubmittingIds(prev => { if (!prev.has(p.id)) return prev; const next = new Set(prev); next.delete(p.id); return next; });
     }
   };
 
@@ -201,14 +217,23 @@ export default function BankReview() {
                 </>
               )}
               <View style={s.actions}>
-                <TouchableOpacity style={[s.actBtn, s.rejectBtn]} onPress={() => reject(p)} activeOpacity={0.85}>
+                <TouchableOpacity style={[s.actBtn, s.rejectBtn]} onPress={() => reject(p)} activeOpacity={0.85} disabled={submittingIds.has(p.id)}>
                   <X size={16} color={c.accent.red} /><Text style={[s.actText, { color: c.accent.red }]}>Odrzuć</Text>
                 </TouchableOpacity>
+                {/* `disabled` podczas zapisu (2026-10-09, §279) — dotąd przycisk dawało się
+                    naciskać dowolną liczbę razy w trakcie trwającego (do 10s) zapisu do
+                    Firestore, każde naciśnięcie odpalało WŁASNY, równoległy zapis, bo
+                    lokalny dedup w `commitBankTx` nie miał szans zobaczyć poprzedniego —
+                    stąd user z JEDNYM przelewem zaksięgowanym 6×. Spinner zamiast ikony
+                    daje też realny feedback "coś się dzieje", nie tylko blokadę. */}
                 <TouchableOpacity
-                  style={[s.actBtn, s.acceptBtn, foreign && !(parseFloat((plnDrafts[p.id] ?? '').replace(',', '.')) > 0) && s.acceptBtnDisabled]}
-                  onPress={() => accept(p)} activeOpacity={0.85}
+                  style={[s.actBtn, s.acceptBtn, (foreign && !(parseFloat((plnDrafts[p.id] ?? '').replace(',', '.')) > 0) || submittingIds.has(p.id)) && s.acceptBtnDisabled]}
+                  onPress={() => accept(p)} activeOpacity={0.85} disabled={submittingIds.has(p.id)}
                 >
-                  <Check size={16} color="#fff" /><Text style={[s.actText, { color: '#fff' }]}>Zatwierdź</Text>
+                  {submittingIds.has(p.id)
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Check size={16} color="#fff" />}
+                  <Text style={[s.actText, { color: '#fff' }]}>{submittingIds.has(p.id) ? 'Dodaję…' : 'Zatwierdź'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
