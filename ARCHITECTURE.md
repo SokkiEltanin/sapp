@@ -15615,6 +15615,40 @@ ekrany/scrolle), potem Ustawienia → Diagnostyka → "Wydajność appki" — se
 Jeśli lag max/suma faktycznie rosną przy konkretnych akcjach (np. scroll długiej listy
 wydatków) — to już konkretny trop do dalszego audytu, zamiast zgadywania.
 
+## 282. Fix: paragon Lidl nie łapał opłaty kaucyjnej "Opakowania zwrotne wydania" (2026-10-09)
+
+User: "Nie złapało mi kaucji na takim paragonie :" + wklejony paragon Lidl z sekcją
+"Opakowania zwrotne wydania" (4× "Kaucja PET  1 * 0.5 0.5", "Opakowania zwrotne suma 2,00") —
+ekran "Wklej paragon" pokazywał fałszywy alarm "Suma produktów (34,93 zł) < kwota na
+paragonie — mogły zostać pominięte pozycje", mimo że użytkownik zaznaczył WSZYSTKIE realne
+produkty.
+
+**Root cause**: `receiptParser.ts` miał logikę TYLKO dla ZWROTU kaucji (`DEPOSIT_RETURN_RE`
+= "opakowania zwrotne" / "zwrot kaucji" / "opak bez kau", ujemna kwota, §2026-08-20) —
+odwrotna sekcja, OPŁATA za kaucję ("wydania" = wydane/naliczone, nie zwrócone), nie miała
+ŻADNEJ obsługi. Nagłówek "Opakowania zwrotne wydania" i stopka "Opakowania zwrotne suma 2,00"
+łapały się na `DEPOSIT_RETURN_RE` (zawierają "opakowania zwrotne") ORAZ na
+`DEPOSIT_SECTION_TOTAL_RE` (via "wydan"/"suma") — poprawnie pomijane jako header/footer. Ale
+same linie pozycji ("Kaucja PET  1 * 0.5 0.5") nie zawierają "zwrotn"/"zwrot kaucj", więc nie
+łapały się na `DEPOSIT_RETURN_RE` wcale — i DODATKOWO ten paragon zapisuje ceny pozycji z
+JEDNĄ cyfrą po przecinku ("0.5", nie "0,50"), co nie przechodzi też przez generyczne
+`FULL_RE`/`SIMPLE_RE` (obie wymagają DWÓCH cyfr) — więc linia ginie całkowicie, bez trafienia
+do `products` w ŻADNEJ formie (nie jako produkt, nie jako kaucja).
+
+**Fix** (`parseGeneric` w `receiptParser.ts`): nowy blok PO istniejącym bloku zwrotu kaucji,
+PRZED `FULL_RE`/`SIMPLE_RE` — `DEPOSIT_CHARGE_RE = /\bkaucj/i` łapie każdą linię ze słowem
+"kaucj" (gdy to NIE jest już linia zwrotu, obsłużona wyżej i `continue`owana), wyciąga końcową
+cenę przez `TRAIL_POS_RE` (`\d{1,2}` po przecinku — działa niezależnie od liczby cyfr) i
+dodaje pozycję `{ name: 'Kaucja (butelka)', kind: 'deposit', finalPrice: amt }` — tak samo jak
+istniejący wzorzec dla zwrotu/Kauflandu (kind: 'deposit' już jest wszędzie poprawnie
+wykluszany: `SUSPECT_NAME_RE` w `parseReceiptText`, achievements, kategoryzacja jedzenia,
+rekordy osobiste).
+
+**Testy** (`__tests__/receiptParser.test.ts`, nowy `describe` z realnym pełnym paragonem
+usera): (1) 4× "Kaucja PET" → 4 pozycje `kind: 'deposit'` po 0,50 zł, (2) `subtotal` zgadza
+się z `total` (36,93), nie 34,93. `tsc --noEmit` czyste, `jest --silent` 100/100 suite, 1306
+testów (+2).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

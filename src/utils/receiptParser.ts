@@ -554,6 +554,20 @@ const DEPOSIT_RETURN_RE = /opakowan(?:ia|ie)?\s*zwrotn|zwrot\s*kaucj|\bopak\.?\s
 const DEPOSIT_SECTION_TOTAL_RE = /przyj[ęe]|wydan|\bsuma\b|\brazem\b/i;
 const TRAIL_NEG_RE = /[-–]\s*(\d+[.,]\d{1,2})\s*$/;
 
+// Returnable-packaging / deposit CHARGE section ("Opakowania zwrotne wydania"), opposite
+// of the refund above — 2026-10-09, user: "Nie złapało mi kaucji na takim paragonie" na
+// paragonie Lidl z sekcją "Opakowania zwrotne wydania" + 4× "Kaucja PET  1 * 0.5 0.5".
+// Header/footer tej sekcji ŁAPIE się na DEPOSIT_RETURN_RE (zawiera "opakowania zwrotne") i
+// DEPOSIT_SECTION_TOTAL_RE ("wydan"/"suma"), więc są poprawnie pomijane jako nagłówek/stopka.
+// Ale same linie pozycji ("Kaucja PET  1 * 0.5 0.5") NIE zawierają "zwrotn"/"zwrot kaucj",
+// więc nie łapały się na DEPOSIT_RETURN_RE — a dodatkowo ten konkretny paragon zapisuje ceny
+// z JEDNĄ cyfrą po przecinku ("0.5", nie "0,50"), co nie przechodzi też przez FULL_RE/
+// SIMPLE_RE (obie wymagają DWÓCH cyfr) — więc linia ginie bez śladu, zamiast trafić do
+// produktów. Rozpoznawane tu po samym słowie "kaucj" (gdy to NIE jest już linia zwrotu) +
+// końcowej dodatniej cenie, niezależnie od liczby cyfr po przecinku.
+const DEPOSIT_CHARGE_RE = /\bkaucj/i;
+const TRAIL_POS_RE = /(\d+[.,]\d{1,2})\s*$/;
+
 const SKIP_RE = /^(SUMA|RAZEM|DO ZAP[ŁL]ATY|[ŁL][AĄ]CZNIE|PTU|KWOTA|VAT\s+[A-E]|PARAGON|DZIE[NK]UJEMY|DZIE[NK]\.?|THANK|KOD\s|NIP|DATA\s|KASJER|ZAPRASZAMY|ZMIANA|GOT[ÓO]WKA|KARTA|P[ŁL]ATNO|FISKALNY|WYDRUK|POKWITOWANIE|ORYGINA[ŁL]|KOPIA|NUMER|TERMINAL|TRANSAKCJA|APPROVED|AUTORYZ|POWROT|POWRÓT|CASHBACK|SPRZEDAŻ|SPRZEDAZ|SALDO|ODBIÓR|ODBIORY|SERIA|KASY|KAS\s|CZĄSTK|CZASTK|SUMA\s+CZĄSTK|NADRUK|PARAGON FISKALN|KOPIĘ|NIEFISKALN)/i;
 
 // ─── Abbreviation expansion ───────────────────────────────────────────────────
@@ -1146,6 +1160,24 @@ function parseGeneric(text: string): ParsedReceipt {
         products.push({ name: depName, quantity: 1, unitPrice: amt, finalPrice: amt, category: 'groceries', kind: 'deposit' });
         lastProduct = null;
         subtotal += amt;
+      }
+      pendingName = null;
+      continue;
+    }
+
+    // Deposit CHARGE line ("Kaucja PET  1 * 0.5 0.5") — patrz komentarz przy
+    // DEPOSIT_CHARGE_RE wyżej. Musi iść PO bloku zwrotu (ten już by złapał i
+    // 'continue'ował linie zwrotu/nagłówek/stopkę sekcji) i PRZED FULL_RE/SIMPLE_RE,
+    // bo te dwie nie łapią cen z jedną cyfrą po przecinku.
+    if (DEPOSIT_CHARGE_RE.test(line)) {
+      const pos = line.match(TRAIL_POS_RE);
+      if (pos) {
+        const amt = parseFloat(pos[1].replace(',', '.'));
+        if (amt > 0 && amt < 5000) {
+          products.push({ name: 'Kaucja (butelka)', quantity: 1, unitPrice: amt, finalPrice: amt, category: 'groceries', kind: 'deposit' });
+          lastProduct = null;
+          subtotal += amt;
+        }
       }
       pendingName = null;
       continue;
