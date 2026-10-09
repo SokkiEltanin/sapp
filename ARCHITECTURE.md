@@ -15555,6 +15555,24 @@ ignorowane (przycisk disabled + spinner), w historii ma wylądować TYLKO JEDEN 
 
 ---
 
+## 280. Ustawienia: "Sprawdź aktualizację (OTA)" przeniesione z Diagnostyki do Aplikacji (2026-10-09)
+
+User: "przenieśmy w ustawieniach aktualizacje do zakładki aplikacja". Drobna organizacyjna
+poprawka w tym samym duchu co §273 (Pupil/Zdrowie) — wiersz `diag-ota` (§266/§271/§278)
+mieszkał w "Diagnostyka" obok dev-narzędzi (self-test/last-crash/perf-log), mimo że tematycznie
+pasuje bardziej do "Aplikacja" (obok wersji/builda w "O aplikacji"). Czyste przeniesienie —
+ten sam `id`, ta sama logika/`onPress`, zero zmiany zachowania, tylko inna sekcja w drzewie
+`sections`. "Aplikacja"'s `keywords` rozszerzone o 'aktualizacja'/'update'/'ota', żeby
+wyszukiwarka Ustawień nadal łapała ten wiersz z dowolnej z tych fraz.
+
+**Testy**: brak nowych — czysty przenosiny, zero zmiany logiki. `tsc --noEmit` czyste, `jest
+--silent` 100/100 suite (1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Ustawienia → Aplikacja → sprawdź że "Sprawdź
+aktualizację (OTA)" tam jest i działa jak dotąd; Diagnostyka nie ma go już.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

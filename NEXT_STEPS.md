@@ -3,6 +3,15 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ustawienia: "Sprawdź aktualizację (OTA)" przeniesione do Aplikacji (2026-10-09)
+
+User: "przenieśmy w ustawieniach aktualizacje do zakładki aplikacja". Pełny opis w
+ARCHITECTURE.md §280. Czyste przeniesienie z "Diagnostyka" do "Aplikacja" (obok wersji/
+builda), zero zmiany logiki. `tsc`/`jest` zielone (1302/1302, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Ustawienia → Aplikacja → sprawdź że wiersz tam
+jest i działa.
+
 ## 🆕🔴 KRYTYCZNE: jeden przelew zaksięgowany 6× — brak blokady podwójnego kliknięcia (2026-10-09)
 
 User zrzutem: ten sam przelew +3245.65 zł sześć razy w historii, miesięczny przychód
