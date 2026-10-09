@@ -16,6 +16,22 @@ function nextFireDate(hour: number, minute: number, skipToday: boolean): Date {
   return d;
 }
 
+// 2026-10-08, §276/§277 (user: "jak wchodzę na pupila a dostałem że zakończył walkę to jak
+// zawalczę bez klikania w nie żeby po walce zniknęło samo", potem: "dawaj resztę") —
+// `cancelScheduledNotificationAsync` anuluje WYŁĄCZNIE jeszcze niewystrzelone, zaplanowane
+// powiadomienie. Każdy `schedule*`/`refresh*`/`cancel*` niżej cancel'uje przed/zamiast
+// odpalenia innej akcji w appce (zrobiłeś nawyk, zapłaciłeś dług, odebrałeś misję…) — jeśli
+// powiadomienie DAWNO wystrzeliło (user je właśnie zobaczył i stąd wie, że ma coś zrobić, albo
+// zignorował i zrobił to inną drogą), sam `cancelScheduled...` jest wtedy no-opem, a doręczone
+// powiadomienie zostaje w systemowej szufladzie do ręcznego swipe'a, mimo że appka właśnie je
+// realnie obsłużyła. Jeden wspólny helper zamiast powtarzania pary wywołań w ~30 miejscach —
+// `dismissNotificationAsync` usuwa doręczone powiadomienie z szuflady, jeśli tam akurat siedzi
+// (no-op przez `catch`, jeśli go tam nie ma).
+async function cancelAndDismiss(identifier: string): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
+  await Notifications.dismissNotificationAsync(identifier).catch(() => {});
+}
+
 // ─── Keyword detection ────────────────────────────────────────────────────────
 
 const KW_UNI = [
@@ -133,7 +149,7 @@ export const notificationsService = {
   // nagging that you "didn't log" when you did. Re-armed on app foreground +
   // after logging via refreshMoodReminder().
   async scheduleDailyMoodReminder(hour = 20, minute = 0, skipToday = false): Promise<string> {
-    await Notifications.cancelScheduledNotificationAsync('daily-mood').catch(() => {});
+    await cancelAndDismiss('daily-mood');
     await AsyncStorage.multiSet([
       ['notif_mood_enabled', 'true'],
       ['notif_mood_hour', String(hour)],
@@ -163,11 +179,11 @@ export const notificationsService = {
   },
 
   async cancelDailyMoodReminder(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('daily-mood').catch(() => {});
+    await cancelAndDismiss('daily-mood');
   },
 
   async scheduleMorningMoodReminder(hour = 8, minute = 0): Promise<string> {
-    await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
+    await cancelAndDismiss('morning-mood');
     return Notifications.scheduleNotificationAsync({
       identifier: 'morning-mood',
       content: {
@@ -183,7 +199,7 @@ export const notificationsService = {
   },
 
   async cancelMorningReminder(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
+    await cancelAndDismiss('morning-mood');
   },
 
   // Vehicle service / maintenance-item due reminder. Re-armed on app foreground
@@ -191,7 +207,7 @@ export const notificationsService = {
   // even when the app is closed; cancelled when nothing's due.
   async refreshMaintenanceReminder(dueLabels: string[]): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('maintenance-due').catch(() => {});
+      await cancelAndDismiss('maintenance-due');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
       if (await AsyncStorage.getItem('notif_maintenance_enabled') === 'false') return;
       if (dueLabels.length === 0) return;
@@ -209,7 +225,7 @@ export const notificationsService = {
   // is confirmed (handledMonth === this month).
   async refreshPaydayReminder(enabled: boolean, day: number, handledMonth: string | null): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('payday').catch(() => {});
+      await cancelAndDismiss('payday');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       if (!enabled) return;
       const now = new Date();
@@ -243,7 +259,7 @@ export const notificationsService = {
     near: { label: string; pct: number; spend: number; limit: number; period: 'week' | 'month' }[],
   ): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('budget-limit').catch(() => {});
+      await cancelAndDismiss('budget-limit');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
       if (await AsyncStorage.getItem('notif_budget_enabled') === 'false') return;
       const thrRaw = parseInt((await AsyncStorage.getItem('budget_alert_threshold')) ?? '80', 10);
@@ -270,7 +286,7 @@ export const notificationsService = {
   // open so the content reflects the latest week. Gated by its own flag.
   async refreshWeeklySummary(parts: string[]): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('weekly-summary').catch(() => {});
+      await cancelAndDismiss('weekly-summary');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       if (await AsyncStorage.getItem('notif_weekly_enabled') === 'false') return;
       if (parts.length === 0) return;
@@ -303,7 +319,7 @@ export const notificationsService = {
   // niemal ostatecznych — ten sam kompromis co reszta `refresh*` w tym pliku.
   async refreshMonthCardReminder(comparison?: { pct: number; spend: number } | null): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('month-card').catch(() => {});
+      await cancelAndDismiss('month-card');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + 1, 1, 10, 0, 0, 0); // 1st of next month, 10:00
@@ -328,7 +344,7 @@ export const notificationsService = {
   // there's nothing worth nudging, it just cancels. Deep-links to the pet page.
   async refreshPetReminder(opts: { dailyBoxReady: boolean; claimable: number; affectionLow: boolean }): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('pet-daily').catch(() => {});
+      await cancelAndDismiss('pet-daily');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       let content: { title: string; body: string } | null = null;
       if (opts.dailyBoxReady)      content = { title: 'Skrzynka dnia czeka 🎁', body: 'Odbierz darmowe monety u pupila — zajmie chwilę.' };
@@ -349,7 +365,7 @@ export const notificationsService = {
   // ma HP) i masz zbankowaną energię — inaczej cisza (nie spamuje). Aktywuje Etap 4.
   async refreshBossReminder(opts: { fightable: boolean; energy: number }): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('boss-ready').catch(() => {});
+      await cancelAndDismiss('boss-ready');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       if (!opts.fightable || opts.energy < 80) return;
       const hour = parseInt((await AsyncStorage.getItem('notif_boss_hour')) ?? '18') || 18;
@@ -370,7 +386,7 @@ export const notificationsService = {
     opts: { active: false } | { active: true; name: string; won: boolean; daysLeft: number },
   ): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync('event-ending').catch(() => {});
+      await cancelAndDismiss('event-ending');
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
       if (!opts.active || opts.won || opts.daysLeft <= 0 || opts.daysLeft > 2) return;
       await Notifications.scheduleNotificationAsync({
@@ -391,7 +407,7 @@ export const notificationsService = {
   // odhaczył, bo DAILY nie wie nic o realnym stanie) przeskakuje na jutro miast nagabywać
   // dzisiaj; `remaining` (liczba nieodhaczonych) trafia do treści.
   async scheduleDailyHabitReminder(hour = 21, minute = 0, allDoneToday = false, remaining = 0): Promise<string> {
-    await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
+    await cancelAndDismiss('daily-habits');
     await AsyncStorage.multiSet([
       ['notif_habits_enabled', 'true'],
       ['notif_habits_hour', String(hour)],
@@ -412,7 +428,7 @@ export const notificationsService = {
   },
 
   async cancelDailyHabitReminder(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
+    await cancelAndDismiss('daily-habits');
   },
 
   // Re-arm na żywy stan (app foreground, po odhaczeniu, po zmianie listy nawyków) — jak
@@ -433,7 +449,7 @@ export const notificationsService = {
   // Reschedule on every app open so content stays fresh.
 
   async scheduleDailyTodoList(hour: number, minute: number, tasks: Task[]): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('daily-todo-list').catch(() => {});
+    await cancelAndDismiss('daily-todo-list');
 
     function pad(n: number) { return String(n).padStart(2, '0'); }
     const now = new Date();
@@ -475,7 +491,7 @@ export const notificationsService = {
   },
 
   async cancelDailyTodoList(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('daily-todo-list').catch(() => {});
+    await cancelAndDismiss('daily-todo-list');
   },
 
   // ─── Smart deadline digests (legacy — kept for recurring tasks) ───────────────
@@ -503,7 +519,7 @@ export const notificationsService = {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
     for (const notif of scheduled) {
       if (notif.identifier?.startsWith('digest-')) {
-        await Notifications.cancelScheduledNotificationAsync(notif.identifier).catch(() => {});
+        await cancelAndDismiss(notif.identifier);
       }
     }
 
@@ -577,9 +593,9 @@ export const notificationsService = {
   },
 
   async cancelTaskReminder(taskId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`task-${taskId}`).catch(() => {});
-    await Notifications.cancelScheduledNotificationAsync(`task-reminder-${taskId}`).catch(() => {});
-    await Notifications.cancelScheduledNotificationAsync(`task-humor-${taskId}`).catch(() => {});
+    await cancelAndDismiss(`task-${taskId}`);
+    await cancelAndDismiss(`task-reminder-${taskId}`);
+    await cancelAndDismiss(`task-humor-${taskId}`);
   },
 
   // ─── Subscription reminders ────────────────────────────────────────────────
@@ -604,7 +620,7 @@ export const notificationsService = {
   },
 
   async cancelSubscriptionReminder(subId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`sub-${subId}`).catch(() => {});
+    await cancelAndDismiss(`sub-${subId}`);
   },
 
   // Passive "renewing soon" heads-up — always on for active subscriptions (not tied to
@@ -636,8 +652,8 @@ export const notificationsService = {
   },
 
   async cancelRenewalHeadsUp(subId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`sub-renew7-${subId}`).catch(() => {});
-    await Notifications.cancelScheduledNotificationAsync(`sub-renew1-${subId}`).catch(() => {});
+    await cancelAndDismiss(`sub-renew7-${subId}`);
+    await cancelAndDismiss(`sub-renew1-${subId}`);
   },
 
   async scheduleEventReminder(eventId: string, title: string, dateIso: string, startTime?: string): Promise<void> {
@@ -659,7 +675,7 @@ export const notificationsService = {
   },
 
   async cancelEventReminder(eventId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`event-${eventId}`).catch(() => {});
+    await cancelAndDismiss(`event-${eventId}`);
   },
 
   // ─── Work shift notifications ─────────────────────────────────────────────
@@ -674,7 +690,7 @@ export const notificationsService = {
     const all = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
     for (const n of all) {
       if (n.identifier?.startsWith('work-start-') || n.identifier?.startsWith('work-end-')) {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+        await cancelAndDismiss(n.identifier);
       }
     }
 
@@ -739,7 +755,7 @@ export const notificationsService = {
   },
 
   async cancelSnoozeReminder(taskId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`snooze-${taskId}`).catch(() => {});
+    await cancelAndDismiss(`snooze-${taskId}`);
   },
 
   // Kapsuła czasu — "list do przyszłego siebie" (2026-09-27, user zaakceptował pomysł:
@@ -752,7 +768,7 @@ export const notificationsService = {
   // identyfikatorem.
   async scheduleCapsuleUnlockReminder(id: string, unlockAtMs: number): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync(`capsule-${id}`).catch(() => {});
+      await cancelAndDismiss(`capsule-${id}`);
       const fire = new Date(unlockAtMs);
       if (fire <= new Date()) return;
       await Notifications.scheduleNotificationAsync({
@@ -768,7 +784,7 @@ export const notificationsService = {
   },
 
   async cancelCapsuleUnlockReminder(id: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`capsule-${id}`).catch(() => {});
+    await cancelAndDismiss(`capsule-${id}`);
   },
 
   // Dług (2026-09-28, user zaakceptował pomysł: powiadomienie push o terminie długu) —
@@ -780,7 +796,7 @@ export const notificationsService = {
   // przy rozliczeniu/usunięciu, żeby nie przypominać o czymś co już nieaktualne.
   async scheduleDebtReminder(id: string, person: string, amount: number, iOwe: boolean, askDateIso: string): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync(`debt-${id}`).catch(() => {});
+      await cancelAndDismiss(`debt-${id}`);
       const [year, month, day] = askDateIso.split('-').map(Number);
       const fire = new Date(year, month - 1, day, 10, 0, 0);
       if (fire <= new Date()) return;
@@ -799,7 +815,7 @@ export const notificationsService = {
   },
 
   async cancelDebtReminder(id: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`debt-${id}`).catch(() => {});
+    await cancelAndDismiss(`debt-${id}`);
   },
 
   // Notatka (2026-09-28, user zaakceptował pomysł: przypomnienie do notatki, jak w Google
@@ -811,7 +827,7 @@ export const notificationsService = {
   // zmiana daty/wyczyszczenie nie zostawiły starego powiadomienia.
   async scheduleNoteReminder(id: string, title: string, reminderAtIso: string): Promise<void> {
     try {
-      await Notifications.cancelScheduledNotificationAsync(`note-${id}`).catch(() => {});
+      await cancelAndDismiss(`note-${id}`);
       const [datePart, timePart] = reminderAtIso.split('T');
       const [year, month, day] = datePart.split('-').map(Number);
       const [hour, minute] = (timePart ?? '09:00').split(':').map(Number);
@@ -830,7 +846,7 @@ export const notificationsService = {
   },
 
   async cancelNoteReminder(id: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`note-${id}`).catch(() => {});
+    await cancelAndDismiss(`note-${id}`);
   },
 
   // Pupil mission (petStore.startMission, 2026-08-15) — direct consequence of a user action
@@ -856,16 +872,10 @@ export const notificationsService = {
   },
 
   // 2026-10-08, user: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę
-  // bez klikania w nie żeby po walce zniknęło samo" — `cancelScheduledNotificationAsync`
-  // (sam, jak dotąd) anuluje tylko ZAPLANOWANE, jeszcze nie wystrzelone powiadomienie. Jeśli
-  // misja już się skończyła, powiadomienie DAWNO wystrzeliło (stąd user w ogóle wie, że ma
-  // iść walczyć) — ten call wtedy no-opuje, a doręczone powiadomienie zostaje w szufladzie
-  // systemowej do ręcznego swipe'a, mimo że `claimMission()` (zwycięska walka) już je
-  // obsłużyła. `dismissNotificationAsync` usuwa je z szuflady, jeśli tam akurat siedzi — no-op
-  // (catch) jeśli go tam nie ma (misja odebrana/anulowana ZANIM w ogóle wystrzeliło).
+  // bez klikania w nie żeby po walce zniknęło samo" — pierwowzór `cancelAndDismiss` (patrz
+  // pełne uzasadnienie przy jej definicji na górze pliku).
   async cancelMissionReady(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('mission-ready').catch(() => {});
-    await Notifications.dismissNotificationAsync('mission-ready').catch(() => {});
+    await cancelAndDismiss('mission-ready');
   },
 
   // Nie DAILY (2026-09-20, "inteligentne powiadomienia" cd. — ta sama dziura co
@@ -874,7 +884,7 @@ export const notificationsService = {
   // przeskakuje na jutro, jak wszędzie indziej w tym pliku. Re-armowane z useHabits() na
   // każdą zmianę habits/todayDone, dla każdego nawyku z ustawionym `reminderTime`.
   async scheduleHabitReminder(habitId: string, title: string, hour: number, minute: number, doneToday = false): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`habit-${habitId}`).catch(() => {});
+    await cancelAndDismiss(`habit-${habitId}`);
     await Notifications.scheduleNotificationAsync({
       identifier: `habit-${habitId}`,
       content: {
@@ -887,7 +897,7 @@ export const notificationsService = {
   },
 
   async cancelHabitReminder(habitId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(`habit-${habitId}`).catch(() => {});
+    await cancelAndDismiss(`habit-${habitId}`);
   },
 
   async notifyCategoryLimit(categoryLabel: string, spent: number, limit: number): Promise<void> {
@@ -919,10 +929,16 @@ export const notificationsService = {
   // ewentualną już zaplanowaną instancję u userów, którzy mieli ją zarmowaną PRZED tym
   // usunięciem; bez tego sprzątania stary, osierocony harmonogram OS-owy wciąż by odpalił.
   async cancelTodayDigestReminder(): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync('today-digest').catch(() => {});
+    await cancelAndDismiss('today-digest');
   },
 
+  // `dismissAllNotificationsAsync` (2026-10-08, §277) — dotąd czyściło TYLKO zaplanowane,
+  // nie wystrzelone powiadomienia. Oba wywołujące miejsca (`app/settings.tsx`: wyłączenie
+  // głównego przełącznika, i przycisk "Anuluj wszystkie powiadomienia" z alertem "Gotowe,
+  // wszystkie powiadomienia anulowane") obiecują userowi, że WSZYSTKIE znikną — ta obietnica
+  // była fałszywa dla czegokolwiek już doręczonego do szuflady systemowej.
   async cancelAll(): Promise<void> {
     await Notifications.cancelAllScheduledNotificationsAsync();
+    await Notifications.dismissAllNotificationsAsync().catch(() => {});
   },
 };
