@@ -355,6 +355,78 @@ describe('parseReceiptText — Lidl paragon ze zwrotem kaucji (2026-08-20)', () 
   });
 });
 
+// 2026-10-09 — user: "Nie złapało mi kaucji na takim paragonie :" + realny paragon Lidl
+// z sekcją "Opakowania zwrotne wydania" (OPŁATA za kaucję, odwrotność sekcji wyżej) — 4×
+// "Kaucja PET  1 * 0.5 0.5" ginęło bez śladu (FULL_RE/SIMPLE_RE wymagają DWÓCH cyfr po
+// przecinku, ten paragon pisze ceny pozycji jedną: "0.5"), więc suma produktów (34,93)
+// nie zgadzała się z kwotą na paragonie (36,93) i strzelał fałszywy alarm "mogły zostać
+// pominięte pozycje".
+const LIDL_RECEIPT_WITH_DEPOSIT_CHARGE = `
+Adres siedziby: Poznańska 48, Jankowice
+             62-080 Tarnowo
+Podgórne nr rej: BDO 000002265 Lidl sp.
+             z o.o. sp.k.
+   ul. Podwisłocze 13, 35-309 Rzeszów
+2026-10-09
+
+Papryka czerwona luz
+                0,466kg x 14.99 6.99 C
+   KDR                         -0,70
+Bułka z kiełkami
+                        4 * 1.45 5.8 C
+   Taniej za 2                 -0,60
+   KDR                         -0,52
+Mus ow.20g białkaWPC
+                       1 * 4.99 4.99 C
+   KDR                         -0,50
+Bułka ziemn.z ziarn.
+                       4 * 1.14 4.56 C
+   Taniej za 4                 -0,32
+   KDR                         -0,44
+Smoothie owsiane.
+                       1 * 3.69 3.69 C
+   Taniej za 2                 -0,37
+Smoothie owsiane.
+                       1 * 3.69 3.69 C
+   Taniej za 2                 -0,37
+Smoothie owsiane.
+                       1 * 3.69 3.69 C
+   Taniej za 2                 -0,37
+Smoothie owsiane.
+                       1 * 3.69 3.69 C
+   Taniej za 2                 -0,37
+Wł. Serek Wiejski
+                       1 * 2.39 2.39 C
+PTU C                            34,93
+Kwota C 5,00%                     1,66
+Suma                              1,66
+Suma PLN            34,93
+85 1688      nr:   132127        18:23
+Opakowania zwrotne wydania
+   Kaucja PET              1 * 0.5 0.5
+   Kaucja PET              1 * 0.5 0.5
+   Kaucja PET              1 * 0.5 0.5
+   Kaucja PET              1 * 0.5 0.5
+Opakowania zwrotne suma           2,00
+Suma                    36,93
+Płatność         Karta płatnicza 36,93
+`;
+
+describe('parseReceiptText — Lidl paragon z opłatą kaucji "wydania" (2026-10-09)', () => {
+  test('4× "Kaucja PET" trafia do produktów jako 4 pozycje "deposit" po 0,50 zł', () => {
+    const r = parseReceiptText(LIDL_RECEIPT_WITH_DEPOSIT_CHARGE);
+    const deposits = r.products.filter(p => p.kind === 'deposit');
+    expect(deposits.length).toBe(4);
+    expect(deposits.every(d => d.finalPrice === 0.5)).toBe(true);
+  });
+
+  test('suma pozycji (subtotal) zgadza się z kwotą na paragonie (36,93), nie 34,93', () => {
+    const r = parseReceiptText(LIDL_RECEIPT_WITH_DEPOSIT_CHARGE);
+    expect(r.total).toBe(36.93);
+    expect(r.subtotal).toBeCloseTo(36.93, 2);
+  });
+});
+
 // 2026-09-16 — user: "jak mamy wydatki per kategoria z jedzeniem proponuję lekko
 // rozbudowac o inne kategorie bo ciężko dopasować i sporo jest w inne". 8 nowych kategorii
 // (jajka/makarony/ryż i kasze/mąka i produkty sypkie/oleje i tłuszcze/przyprawy/konserwy

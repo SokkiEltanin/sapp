@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: paragon Lidl nie łapał opłaty kaucyjnej "Opakowania zwrotne wydania" (2026-10-09)
+
+User: "Nie złapało mi kaucji na takim paragonie :" + wklejony paragon Lidl z 4× "Kaucja PET
+1 * 0.5 0.5" (łącznie 2,00 zł) — pełny opis w ARCHITECTURE.md §282. Parser miał logikę
+TYLKO dla zwrotu kaucji, nic dla OPŁATY (ta sama "Opakowania zwrotne", ale "wydania" nie
+"przyjęcia") — a te konkretne linie dodatkowo zapisują cenę z jedną cyfrą po przecinku
+("0.5"), więc ginęły nawet przez generyczny parser produktów. Fix: nowy
+`DEPOSIT_CHARGE_RE`/`TRAIL_POS_RE` w `receiptParser.ts` łapie każdą linię ze słowem "kaucj"
+(poza już obsłużonym zwrotem) i dodaje ją jako `kind: 'deposit'`. `tsc`/`jest` zielone
+(1306/1306, +2 nowe testy z realnym paragonem usera).
+
+**Priorytet testu na urządzeniu — średni**: wklej ten sam (lub podobny) paragon Lidl z
+kaucją za butelki PET jeszcze raz na ekranie "Wklej paragon" — ostrzeżenie "mogły zostać
+pominięte pozycje" nie powinno się już pojawić, a na liście pozycji powinny być widoczne
+4 wpisy kaucji po 0,50 zł (albo jedna zbiorcza, zależnie od formatu konkretnego paragonu).
+
 ## 🆕 Rejestr lagu wątku JS rozszerzony na CAŁĄ sesję (2026-10-09)
 
 User: "nadal mam wrażenie że appka laguje, porób testy albo dodaj testową więcej żeby lepiej
