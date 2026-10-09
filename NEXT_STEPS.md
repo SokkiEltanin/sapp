@@ -3,7 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: WSZYSTKIE powiadomienia zostawały w szufladzie po rozwiązaniu sprawy inną drogą (2026-10-08)
+## 🆕 Fix: "Zatwierdź" na przeglądzie banku wyglądał jak martwy przycisk (2026-10-09)
+
+User zrzutem (duży przelew przychodzący): "Nie mogę zatwierdzić a wolę żeby samo dodawało".
+Pełny opis w ARCHITECTURE.md §278. Root cause: Firestore-zapis w `commitBankTx` na słabym
+sygnale rzucał czytelny komunikat, ale `catch {}` go gubił, a `bank-review.tsx`'s `accept()`
+w ogóle nie miało `try/catch` — zero feedbacku w razie błędu, przycisk wyglądał jak martwy.
+`CommitResult.error` + pełny `try/catch` w `accept()` naprawiają feedback. "Wolę żeby samo
+dodawało" — mechanizm (`rememberPaycheckSender` przy udanym Zatwierdź z włączonym "Wypłata z
+pracy") już istniał, był tylko zablokowany tym samym bugiem. `tsc`/`jest` zielone (1302/1302).
+
+**🆕 Priorytet testu na urządzeniu — wysoki**: zatwierdź płatność z banku — powinno teraz
+zadziałać (albo pokazać konkretny komunikat błędu zamiast ciszy). Kolejny przelew od tego
+samego nadawcy (z "Wypłata z pracy" włączonym przy akceptacji) powinien wejść bez pytania.
 
 User: "jak wchodzę na pupila a dostałem że zakończył walkę to jak zawalczę bez klikania w
 niego żeby po walce zniknęło samo" → potem "dawaj resztę". Pełny opis w ARCHITECTURE.md
