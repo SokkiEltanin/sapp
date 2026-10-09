@@ -57,27 +57,39 @@ export default function BankReview() {
         AsyncStorage.setItem('ach_bank_corrections', String((parseInt(v ?? '0', 10) || 0) + 1)).catch(() => {});
       }).catch(() => {});
     }
-    const res = await commitBankTx(p, { corrected, plnOverride });
-    if (!res.ok) { toast.error('Nie udało się dodać'); return; }
-    const saved = foreign ? plnOverride! : p.amount;   // what actually landed in the summary
-    if (p.direction === 'in') {
-      toast.success(res.matched
-        ? `Dopasowano do istniejącego przychodu: +${saved.toFixed(2)} zł`
-        : `Dodano przychód: +${saved.toFixed(2)} zł${p.jd ? ' (wypłata)' : ''}`);
-      reloadMem(); remove(p.id); return;
+    // 2026-10-09, user: "nie mogę zatwierdzić" (duży przelew przychodzący — Zatwierdź nic nie
+    // dawało, bez żadnego komunikatu). Root cause: `commitBankTx` kończy się na AWAITED
+    // Firestore `addDoc` (10s timeout, patrz `withTimeout` w firebase.ts) — na słabym/braku
+    // sygnału rzuca. Ten `try` dotąd nie istniał wcale — niezłapany wyjątek w `await
+    // commitBankTx(...)` cichcem przerywał `accept()` bez JAKIEGOKOLWIEK toastu, więc
+    // "Zatwierdź" wyglądało jak kompletnie martwy przycisk. `res.error` (nowe pole, patrz
+    // bankCommit.ts) pokazuje teraz PRAWDZIWY powód ("Zapis trwa zbyt długo — sprawdź
+    // połączenie...") zamiast gołego "Nie udało się dodać".
+    try {
+      const res = await commitBankTx(p, { corrected, plnOverride });
+      if (!res.ok) { toast.error(res.error ?? 'Nie udało się dodać — spróbuj ponownie'); return; }
+      const saved = foreign ? plnOverride! : p.amount;   // what actually landed in the summary
+      if (p.direction === 'in') {
+        toast.success(res.matched
+          ? `Dopasowano do istniejącego przychodu: +${saved.toFixed(2)} zł`
+          : `Dodano przychód: +${saved.toFixed(2)} zł${p.jd ? ' (wypłata)' : ''}`);
+        reloadMem(); remove(p.id); return;
+      }
+      if (res.matched) {
+        toast.success(`Dopasowano do paragonu: ${p.store || 'płatność'}`);
+      } else if (res.merchant?.auto && (res.merchant.cleanAccepts ?? 0) === AUTO_THRESHOLD) {
+        toast.success(`${p.store || 'Sklep'} przechodzi na automat — kolejne płatności dodam sam`);
+      } else if (!corrected && res.merchant) {
+        const left = Math.max(0, AUTO_THRESHOLD - (res.merchant.cleanAccepts ?? 0));
+        toast.success(left > 0 ? `Dodano · jeszcze ${left} do automatu` : `Dodano: ${saved.toFixed(2)} zł`);
+      } else {
+        toast.success(`Dodano: ${saved.toFixed(2)} zł · ${p.store || 'płatność'}`);
+      }
+      reloadMem();
+      remove(p.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Nie udało się dodać — spróbuj ponownie');
     }
-    if (res.matched) {
-      toast.success(`Dopasowano do paragonu: ${p.store || 'płatność'}`);
-    } else if (res.merchant?.auto && (res.merchant.cleanAccepts ?? 0) === AUTO_THRESHOLD) {
-      toast.success(`${p.store || 'Sklep'} przechodzi na automat — kolejne płatności dodam sam`);
-    } else if (!corrected && res.merchant) {
-      const left = Math.max(0, AUTO_THRESHOLD - (res.merchant.cleanAccepts ?? 0));
-      toast.success(left > 0 ? `Dodano · jeszcze ${left} do automatu` : `Dodano: ${saved.toFixed(2)} zł`);
-    } else {
-      toast.success(`Dodano: ${saved.toFixed(2)} zł · ${p.store || 'płatność'}`);
-    }
-    reloadMem();
-    remove(p.id);
   };
 
   const reject = (p: PendingBankTx) => { haptic.tap(); remove(p.id); };

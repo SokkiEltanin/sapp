@@ -15458,6 +15458,45 @@ powiadomieniu wiszącym w szufladzie — powinno zniknąć razem z resztą.
 
 ---
 
+## 278. Fix: "Zatwierdź" na przeglądzie banku wyglądał jak martwy przycisk (2026-10-09)
+
+User zrzutem (duży przelew przychodzący, +3245.65 zł): "Nie mogę zatwierdzić a wolę żeby samo
+dodawało".
+
+**Root cause**: `commitBankTx()` (bankCommit.ts) kończy dodawanie wpisu AWAITED Firestore
+`addDoc` (`expensesService.add`, `withTimeout` 10s w firebase.ts) — na słabym/braku sygnału
+rzuca z CZYTELNYM komunikatem ("Zapis trwa zbyt długo — sprawdź połączenie z internetem").
+Dwa problemy złożyły się w "martwy przycisk":
+1. Oba `catch {}` w `commitBankTx` wyrzucały ten komunikat, zwracając goły `{ok:false}` —
+   `bank-review.tsx` pokazywał generyczne "Nie udało się dodać", nie mówiąc userowi CZEMU.
+2. `bank-review.tsx`'s `accept()` w ogóle nie miało `try/catch` wokół `await commitBankTx(...)`
+   — gdyby coś rzuciło WCZEŚNIEJ niż wewnętrzny try `commitBankTx` (np. w przyszłości), cała
+   funkcja ucinałaby się BEZ ŻADNEGO toastu — przycisk reagowałby jak całkowicie martwy, zero
+   feedbacku w jakimkolwiek kierunku.
+
+**Fix**: `CommitResult` dostało `error?: string` — oba `catch` w `bankCommit.ts` przekazują
+`e.message` zamiast go gubić. `accept()` w `bank-review.tsx` owinięte w pełny `try/catch` +
+pokazuje `res.error` zamiast generycznego tekstu, gdy jest dostępny.
+
+**"Wolę żeby samo dodawało" — mechanizm już istnieje, był tylko zablokowany tym samym bugiem**:
+przełącznik "Wypłata z pracy" (widoczny na zrzucie, już WŁĄCZONY) ustawia `p.jd`, a udany
+`commitBankTx` z `jd:true` woła `rememberPaycheckSender(p.storeKey)` (paycheckSenders.ts) —
+od następnego przelewu z TEGO SAMEGO nadawcy appka sama rozpozna go jako pensję i zaksięguje
+bez pytania (`isKnownPaycheckSender` w `bankIngest.ts`). Nic nowego do zbudowania — wystarczyło
+odblokować samo Zatwierdź, żeby ten mechanizm w ogóle miał szansę się wykonać.
+
+**Testy**: brak nowych — czyste przekazanie komunikatu błędu, ten sam brak testów co reszta
+`bankCommit.ts`/`bank-review.tsx` (zbyt mocno sprzężone z Firestore/store, żeby sensownie
+unit-testować bez pełnego mocka). `tsc --noEmit` czyste, `jest --silent` 100/100 suite
+(1302 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: spróbuj zatwierdzić płatność z banku (najlepiej gdy
+akurat jest słaby zasięg, żeby realnie sprawdzić ścieżkę błędu) — albo potwierdź po prostu że
+zwykłe Zatwierdź teraz działa i że kolejny przelew od tego samego nadawcy (z włączonym "Wypłata
+z pracy") faktycznie wchodzi bez pytania.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

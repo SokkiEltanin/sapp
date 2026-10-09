@@ -58,6 +58,13 @@ export interface CommitResult {
   ok: boolean;
   matched: boolean;        // merged into an already-scanned receipt instead of adding
   merchant?: MerchantInfo; // updated trust info (cleanAccepts / auto)
+  // 2026-10-09, user: "nie mogę zatwierdzić" (duży przelew przychodzący, Zatwierdź nic nie
+  // dawało) — `expensesService.add()` to AWAITED Firestore `addDoc` (patrz `withTimeout` w
+  // firebase.ts, 10s) — na słabym/braku sygnału rzuca z CZYTELNYM komunikatem ("Zapis trwa
+  // zbyt długo — sprawdź połączenie"), ale oba `catch {}` niżej ten komunikat wyrzucały,
+  // zostawiając `bank-review.tsx`'s gołe "Nie udało się dodać" — user nie miał jak się
+  // dowiedzieć, że to problem z siecią, nie zepsuty przycisk.
+  error?: string;
 }
 
 // Turn one confirmed bank payment into a real expense: if a scanned receipt with the
@@ -127,8 +134,8 @@ export async function commitBankTx(
       // auto-flags as [JD] even without a "wynagrodzenie" keyword.
       if (p.jd) rememberPaycheckSender(p.storeKey).catch(() => {});
       return { ok: true, matched: false };
-    } catch {
-      return { ok: false, matched: !!dup };
+    } catch (e) {
+      return { ok: false, matched: !!dup, error: e instanceof Error ? e.message : undefined };
     }
   }
 
@@ -178,7 +185,7 @@ export async function commitBankTx(
     }
     await maybeAutoPaySubscription(p);
     return { ok: true, matched: !!match, merchant };
-  } catch {
-    return { ok: false, matched: !!match };
+  } catch (e) {
+    return { ok: false, matched: !!match, error: e instanceof Error ? e.message : undefined };
   }
 }
