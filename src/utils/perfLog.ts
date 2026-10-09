@@ -26,7 +26,7 @@ export interface PerfEntry {
                           // zbyt zajęty, żeby je nawet odpalić na czas)
 }
 
-// ─── Cold-start JS-thread lag sampling ─────────────────────────────────────────
+// ─── JS-thread lag sampling (start + cała sesja) ───────────────────────────────
 // User (2026-09-20): "zawsze te startupy animacje lagują... jak wchodzę i próbuję kliknąć to
 // jest impossible, zrob rejestr żebyś miał realne dane". `msToFirstFrame`/`msToReady` powyżej
 // mówią JAK DŁUGO trwa start, ale nie CZY wątek JS jest w tym czasie zablokowany — a to
@@ -34,24 +34,65 @@ export interface PerfEntry {
 // wątku JS co reszta logiki). Metoda: `setTimeout` zaplanowany na `LAG_SAMPLE_MS` który
 // faktycznie odpala się później = coś innego zajmowało wątek JS w tym czasie — mierzymy o ile
 // później, zamiast zgadywać które z ~10 równoległych `useEffect`ów w `_layout.tsx` jest winne.
+//
+// 2026-10-09 (user: "nadal mam wrażenie że appka laguje, dodaj testową [diagnostykę] żeby
+// lepiej zrozumieć") — próbkowanie dotąd ZATRZYMYWAŁO SIĘ na stałe po `LAG_WINDOW_MS` (8s) od
+// startu, więc mierzyło WYŁĄCZNIE lag przy starcie — zero widoczności w lag, który user
+// zgłasza jako ogólne, ciągłe wrażenie podczas zwykłego używania appki (scroll, nawigacja,
+// minuty/godziny po starcie). Teraz DWIE fazy: pierwsze `LAG_WINDOW_MS` próbkuje gęsto (co
+// `LAG_SAMPLE_MS`=50ms, bez zmiany — to był zawsze cel: złapać dokładnie start), POTEM
+// próbkowanie LECI DALEJ przez całą resztę sesji, tylko rzadziej (`LAG_SAMPLE_MS_IDLE`=500ms —
+// wystarczy, żeby wyłapać zauważalne (>0.5s) zacięcia bez obciążania appki kolejnym timerem co
+// 50ms bez końca). Pauzowane w tle (`pauseLagSampling`/`resumeLagSampling`, wołane z AppState
+// w `_layout.tsx`) — appka w tle i tak jest trzymana przez OS, próbkowanie wtedy mierzyłoby
+// tylko to jak długo appka była zamrożona, nie realny lag UI. `getLiveLagStats()` czyta
+// AKTUALNE, żywe liczniki w dowolnym momencie sesji (nie tylko ten jeden snapshot przy starcie
+// zapisany przez `recordDashboardReady`) — Diagnostyka może je pokazać NA ŻĄDANIE, zaraz po
+// tym jak user poczuje zacięcie, zamiast czekać na kolejny cold start.
 const LAG_SAMPLE_MS = 50;
-const LAG_WINDOW_MS = 8000; // przestań próbkować tyle po JS_START — z zapasem po najdłuższym dotąd starcie
+const LAG_SAMPLE_MS_IDLE = 500;
+const LAG_WINDOW_MS = 8000; // próg przejścia z gęstego próbkowania startu na rzadsze, ciągłe
 
 let maxLagMs = 0;
 let totalLagMs = 0;
 let lagSamples = 0;
 let lagSamplingStarted = false;
+let lagSamplingPaused = false;
+let lagTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleLagSample() {
+  const intervalMs = (Date.now() - JS_START < LAG_WINDOW_MS) ? LAG_SAMPLE_MS : LAG_SAMPLE_MS_IDLE;
   const scheduledAt = Date.now();
-  setTimeout(() => {
+  lagTimer = setTimeout(() => {
+    lagTimer = null;
     const actual = Date.now() - scheduledAt;
-    const lag = Math.max(0, actual - LAG_SAMPLE_MS);
+    const lag = Math.max(0, actual - intervalMs);
     maxLagMs = Math.max(maxLagMs, lag);
     totalLagMs += lag;
     lagSamples++;
-    if (Date.now() - JS_START < LAG_WINDOW_MS) scheduleLagSample();
-  }, LAG_SAMPLE_MS);
+    if (!lagSamplingPaused) scheduleLagSample();
+  }, intervalMs);
+}
+
+// Wołane z AppState listenerem w `_layout.tsx` — appka w tle nie ma po co próbkować (OS i tak
+// zamraża JS, a wznowiony timer zmierzyłby czas zamrożenia jako "lag", fałszywie zawyżając
+// wynik). `resumeLagSampling()` jest bezpieczne nawet jeśli próbkowanie nigdy w ogóle się nie
+// zaczęło (np. wywołane przed `startColdStartLagSampling()`) — po prostu nic nie robi.
+export function pauseLagSampling(): void {
+  lagSamplingPaused = true;
+  if (lagTimer) { clearTimeout(lagTimer); lagTimer = null; }
+}
+
+export function resumeLagSampling(): void {
+  if (!lagSamplingStarted || !lagSamplingPaused || lagTimer) return;
+  lagSamplingPaused = false;
+  scheduleLagSample();
+}
+
+// Żywy, aktualny stan liczników — do odczytu W DOWOLNYM momencie sesji (Diagnostyka), nie
+// tylko to, co `recordDashboardReady()` zapisało raz przy starcie.
+export function getLiveLagStats(): { maxLagMs: number; totalLagMs: number; lagSamples: number; sinceMs: number } {
+  return { maxLagMs, totalLagMs, lagSamples, sinceMs: Date.now() - JS_START };
 }
 
 // Wołane RAZ z `app/_layout.tsx` (efekt, NIE na poziomie modułu) — samo-startujące się przy

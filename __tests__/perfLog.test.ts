@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { markDashboardFirstFrame, recordDashboardReady, getPerfLog, clearPerfLog } from '@/utils/perfLog';
+import { markDashboardFirstFrame, recordDashboardReady, getPerfLog, clearPerfLog, getLiveLagStats, pauseLagSampling, resumeLagSampling } from '@/utils/perfLog';
 
 // `startColdStartLagSampling` deliberately NOT imported/called anywhere in this file — it
 // schedules real `setTimeout`s for up to 8s (patrz komentarz w perfLog.ts), które by wisiały
@@ -61,5 +61,24 @@ describe('perfLog — cold-start timing log', () => {
   test('zepsuty JSON w AsyncStorage → getPerfLog zwraca pustą listę zamiast rzucać', async () => {
     await AsyncStorage.setItem('perf_dashboard_log_v1', '{not json');
     expect(await getPerfLog()).toEqual([]);
+  });
+});
+
+// 2026-10-09, user: "nadal mam wrażenie że appka laguje, dodaj testową [diagnostykę]" —
+// próbkowanie teraz leci przez CAŁĄ sesję (nie tylko pierwsze 8s), odczytywalne w dowolnym
+// momencie przez `getLiveLagStats()`. Sampler sam (prawdziwe timery) świadomie NIE jest tu
+// odpalany (patrz komentarz na górze pliku) — te testy sprawdzają tylko kształt/bezpieczeństwo
+// odczytu i że pauza/wznowienie się nie wysypują, gdy sampler nigdy nie wystartował.
+describe('perfLog — live lag stats (cała sesja)', () => {
+  test('getLiveLagStats zwraca nieujemne liczby, sinceMs rośnie od importu modułu', () => {
+    const live = getLiveLagStats();
+    expect(live.maxLagMs).toBeGreaterThanOrEqual(0);
+    expect(live.totalLagMs).toBeGreaterThanOrEqual(0);
+    expect(live.lagSamples).toBeGreaterThanOrEqual(0);
+    expect(live.sinceMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test('pauseLagSampling/resumeLagSampling nie rzucają, nawet gdy sampler nigdy nie wystartował', () => {
+    expect(() => { pauseLagSampling(); resumeLagSampling(); }).not.toThrow();
   });
 });
