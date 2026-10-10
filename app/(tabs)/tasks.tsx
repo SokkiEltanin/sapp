@@ -360,7 +360,16 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={dm.overlay}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={dm.kav}>
+        {/* 2026-10-10, user: "tutaj w zadaniach klawiatura mi zasłania wszystkiego" — na
+            Androidzie `behavior={undefined}` (wzorzec używany w reszcie appki, bo tam i tak
+            działa globalny `android.softwareKeyboardLayoutMode: "pan"` z app.json na CAŁYM
+            ekranie) to tutaj no-op: ten modal to OSOBNE natywne okno (`<Modal transparent>`),
+            pan-mode go nie resize'uje, więc stopka z przyciskami (Pomodoro/Edytuj/Odłóż/Usuń)
+            zostaje pod klawiaturą. `behavior="height"` każe samemu KeyboardAvoidingView
+            skurczyć się o wysokość klawiatury (działa niezależnie od pan/resize na poziomie
+            Activity) — arkusz (`dm.sheet`, `maxHeight: '85%'` TEGO kontenera) kurczy się razem
+            z nim, więc stopka zostaje widoczna. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={dm.kav}>
           <View style={dm.sheet}>
             <View style={dm.header}>
               <View style={dm.headerLeft}>

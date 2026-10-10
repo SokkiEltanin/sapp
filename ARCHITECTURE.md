@@ -15739,6 +15739,44 @@ Diagnostyka → "Wydajność appki" — "Rejestr zacięć" powinien SAM pokazać
 trwania, bez żadnej Twojej akcji w międzyczasie (nie trzeba już łapać "na żywo" zaraz po
 zacięciu).
 
+## 286. Fix: klawiatura zasłaniała stopkę modala szczegółów zadania (2026-10-10)
+
+User zrzutem ekranu: "Tutaj w zadaniach klawiatura mi zasłania wszystkiego" — w modalu
+szczegółów zadania (`TaskDetailModal`, `app/(tabs)/tasks.tsx`), po dotknięciu pola "DODAJ
+KAMIEŃ MILOWY" (dodawanie podzadania), klawiatura zakrywała stopkę z przyciskami
+Pomodoro/Edytuj/Odłóż/Usuń (a na mniejszych ekranach — także samo pole).
+
+**Root cause**: `KeyboardAvoidingView` w tym modalu miał (jak w ~20 innych miejscach appki)
+`behavior={Platform.OS === 'ios' ? 'padding' : undefined}` — na Androidzie `undefined` to
+no-op, bo WSZYSTKIE pozostałe ekrany polegają na globalnym `android.softwareKeyboardLayoutMode:
+"pan"` (`app.json`), które samo przesuwa CAŁY natywny ekran Activity, żeby pole wejściowe
+zostało widoczne. Ten konkretny modal to jednak `<Modal transparent>` — OSOBNE natywne okno,
+którego pan-mode Activity NIE dotyka, więc bez żadnego innego mechanizmu klawiatura po prostu
+nachodziła na dolną część arkusza bez żadnego przesunięcia.
+
+**Fix**: `behavior="height"` na Androidzie TYLKO w tym modalu (nie zmieniono globalnego
+`softwareKeyboardLayoutMode` ani pozostałych ~20 wystąpień tego samego wzorca — zbyt duży,
+nieprzetestowalny zdalnie blast radius na cały projekt dla jednego zgłoszonego miejsca).
+`KeyboardAvoidingView` z `behavior="height"` sam nasłuchuje zdarzeń klawiatury i kurczy WŁASNĄ
+wysokość o wysokość klawiatury, niezależnie od ustawień Activity — arkusz wewnątrz
+(`dm.sheet`, `maxHeight: '85%'` TEGO kontenera) kurczy się razem z nim, więc stopka zostaje nad
+klawiaturą zamiast pod nią.
+
+**Celowo NIE zrobione tu**: audyt pozostałych ~20 miejsc z tym samym `undefined`-na-Androidzie
+wzorcem — wszystkie są zwykłymi, pełnoekranowymi formularzami (nie `<Modal transparent>`), więc
+globalny pan-mode Activity powinien je obsługiwać poprawnie; TaskDetailModal jest WYJĄTKIEM
+bo renderuje się jako osobne okno. Jeśli user zgłosi podobny problem w innym modalu
+(`<Modal transparent>` z inputem), ten sam fix (`behavior="height"` na Androidzie) jest
+pierwszym podejrzanym.
+
+**Testy**: brak nowych (czysto wizualna/layoutowa zmiana zachowania klawiatury, nie da się
+sensownie zasymulować w Jest bez realnego natywnego renderera). `tsc --noEmit` czyste,
+`jest --silent` 100/100 suite, 1311 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Zadania → otwórz dowolne zadanie → dotknij pole
+"Dodaj kamień milowy" — klawiatura NIE powinna już zasłaniać stopki z przyciskami
+(Pomodoro/Edytuj/Odłóż/Usuń) ani samego pola.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
