@@ -98,11 +98,11 @@ const BOSS_SHADOW_SCALE_X = 0.62, BOSS_SHADOW_SCALE_Y = 0.18;
 // zostaje poprawna też gdyby user kiedyś wyeksportował różne wartości dla obu.
 const SPRITE_OFFSET_Y_AVG = (CAT_OFFSET_Y + BOSS_OFFSET_Y) / 2;
 
-// Rozmiar lecącego pocisku (łapka kotka / broń bossa) — 28→36 (2026-10-08, user: "powiększ
-// trochę projectile jak lecą te ataki"). Jedna stała (jak reszta geometrii wyżej) zamiast
-// magicznej liczby w `s.projectile` ORAZ w ikonach wewnątrz, żeby box i jego zawartość nie
-// rozjechały się przy kolejnej zmianie.
-const PROJECTILE_SIZE = 36;
+// Rozmiar lecącego pocisku (łapka kotka / broń bossa) — 28→36 (2026-10-08), 36→46 (2026-10-10,
+// user: "zwiekszy te leżącą rękę i łapę jeszcze" — jeszcze większe niż poprzedni przyrost).
+// Jedna stała (jak reszta geometrii wyżej) zamiast magicznej liczby w `s.projectile` ORAZ w
+// ikonach wewnątrz, żeby box i jego zawartość nie rozjechały się przy kolejnej zmianie.
+const PROJECTILE_SIZE = 46;
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
@@ -659,6 +659,16 @@ export default function BossFight() {
       // zaatakował, więc pocisk w ogóle nie leci (patrz brak `setBoltFlying` niżej).
       const missed = round.counterOutcome === 'dodged' || round.counterOutcome === 'reflected';
       if (round.counterDmg > 0 || missed) {
+        // 2026-10-10, user: "w kolejnym ataku po krycie pokazuje się na ułamek sekundy kryt i
+        // tak samo z unikami" — `catHit` z POPRZEDNIEJ rundy normalnie zdąży wyblaknąć (fade
+        // 600ms, przerwa między rundami zwykle dłuższa) zanim ten pocisk doleci, ale pod
+        // realnym lagiem wątku JS (potwierdzonym — patrz rejestr zacięć, §284/285) timery
+        // `setTimeout` potrafią odpalić się seriami od razu po odblokowaniu wątku, zgniatając
+        // przerwy między rundami do ułamków sekundy — wtedy stary tekst/kolor nie zdążyłby
+        // wyblaknąć i byłby widoczny przez moment obok nowego rzutu. Jawny reset TU (zamiast
+        // tylko przy lądowaniu ciosu) gwarantuje, że żaden stary wynik nie przetrwa do
+        // momentu startu NOWEGO rzutu, niezależnie od tego jak bardzo zgniecie się timing.
+        setCatHit(null);
         setBoltFlying(true);
         boltTravel.setValue(0);
         Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
@@ -680,7 +690,10 @@ export default function BossFight() {
         }, THROW_MS);
       } else if (round.counterOutcome === 'skipped') {
         // Ten sam rytm co trafienie/unik (THROW_MS opóźnienia) mimo braku pocisku — żeby
-        // runda nie rozstrzygała się wyczuwalnie szybciej niż pozostałe.
+        // runda nie rozstrzygała się wyczuwalnie szybciej niż pozostałe. Reset `catHit` tu
+        // też (patrz komentarz w gałęzi trafienie/unik wyżej) — "pominięcie" to osobny napis,
+        // nie powinien dziedziczyć poprzedniego widocznego stanu pod zgniecionym timingiem.
+        setCatHit(null);
         roundTimer.current = setTimeout(() => {
           if (!alive.current) return;
           haptic.tap();
@@ -700,6 +713,10 @@ export default function BossFight() {
     const playerBeat = () => {
       if (!alive.current) return;
       const round = result.rounds[i];
+      // Patrz komentarz przy `setCatHit(null)` w `counterBeat` wyżej — ten sam zabezpieczenie
+      // dla strony bossa: `lastHit`/"KRYT!" z POPRZEDNIEJ rundy nie może przetrwać do startu
+      // TEGO rzutu, nawet gdyby zgniecione pod lagiem timery odpaliły się seriami.
+      setLastHit(null);
       setPawFlying(true);
       pawTravel.setValue(0);
       Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
@@ -963,9 +980,9 @@ export default function BossFight() {
                     ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego.
                     `RadialGlow` (szara/czerwona poświata) USUNIĘTA (2026-10-08, user: "usun z
                     nich poświaty za nimi czerwone itp") — sama ikona teraz nieco większa
-                    (30→34, patrz `PROJECTILE_SIZE`) zamiast polegać na poświacie, żeby nie
+                    (30→34→42, patrz `PROJECTILE_SIZE`) zamiast polegać na poświacie, żeby nie
                     stracić czytelności w locie. */}
-                <PawPrint size={34} color={palette.coat} fill={palette.coat} />
+                <PawPrint size={42} color={palette.coat} fill={palette.coat} />
               </Animated.View>
             )}
             {/* Kontratak bossa — user (2026-08-12): poprzednio leciał tu ten sam per-bossowy
@@ -982,8 +999,9 @@ export default function BossFight() {
             {boltFlying && target?.attackKind !== 'claw' && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -PROJECTILE_SIZE / 2 }] }]}>
                 {/* `RadialGlow` poświata USUNIĘTA (2026-10-08, jak przy łapce wyżej) — ikona
-                    powiększona (28→32) zamiast niej. */}
-                <Image source={counterPng} style={{ width: 32, height: 32 }} contentFit="contain" />
+                    powiększona (28→32→40, 2026-10-10 user: "zwiekszy te leżącą rękę... jeszcze")
+                    zamiast niej. */}
+                <Image source={counterPng} style={{ width: 40, height: 40 }} contentFit="contain" />
               </Animated.View>
             )}
             </View>

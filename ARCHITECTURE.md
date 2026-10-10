@@ -15777,6 +15777,64 @@ sensownie zasymulować w Jest bez realnego natywnego renderera). `tsc --noEmit` 
 "Dodaj kamień milowy" — klawiatura NIE powinna już zasłaniać stopki z przyciskami
 (Pomodoro/Edytuj/Odłóż/Usuń) ani samego pola.
 
+## 287. Walki: większe pociski + zabezpieczenie przed "stare KRYT/UNIK migają" pod lagiem (2026-10-10)
+
+User: "czasami sie buguja i pokazuje nie to co trzeba (jakby w kolejnym ataku po krycie
+pokazuje sie na ułamek sekundy kryt i tak samo z unikami itp) walki wgle sa poluzowane i nie
+jasne. I zwieksz te leżącą rękę i łapę jeszcze."
+
+**Powiększone pociski** (`boss-fight.tsx`): `PROJECTILE_SIZE` 36→46, łapka (`PawPrint`) 34→42,
+"ręka"/broń bossa (`counterPng`, nie-pazurowy kontratak) 32→40 — kolejny przyrost po już
+istniejącym 2026-10-08 (28→36/30→34/28→32).
+
+**Hipoteza na "stare KRYT/UNIK migają"**: przeanalizowany cały łańcuch `playerBeat`/
+`counterBeat`/`setLastHit`/`setCatHit` — przy NORMALNYM tempie (przerwy między rundami
+420-550ms, fade `bDmgY`/`kDmgY` 600ms) nie znaleziono logicznej luki, która pozwalałaby
+poprzedniej rundzie "przeciekać" w nową. Ale user zgłosił to W TEJ SAMEJ sesji co realne,
+potwierdzone dane lagu wątku JS (§284: pojedynczy skok **6157ms**!) — pod takim lagiem
+`setTimeout`y zaplanowane w regularnych odstępach ODPALAJĄ SIĘ SERIAMI od razu po odblokowaniu
+wątku, zgniatając realne przerwy między rundami do ułamków sekundy (krócej niż fade-out
+poprzedniego wyniku) — DOKŁADNIE objaw "w kolejnym ataku pokazuje się na ułamek sekundy [stary
+wynik]", i wyjaśnia czemu jest *czasami* (zależne od tego czy akurat trafił się freeze), nie
+zawsze (co wskazywałoby na deterministyczny błąd logiki).
+
+**Fix (obronny, niezależny od tego czy hipoteza lagu jest cała prawdą)**: `setLastHit(null)`/
+`setCatHit(null)` wołane TERAZ na START nowego rzutu (`playerBeat`/obie gałęzie trafienie-lub-
+unik i pominięcie w `counterBeat`), nie tylko przy lądowaniu ciosu jak dotąd — gwarantuje że
+ŻADEN poprzedni wynik nie może być widoczny w momencie startu NOWEGO rzutu, niezależnie od
+tego jak bardzo zgniecie się timing pod lagiem. Nie naprawia SAMEGO lagu (to osobny, już
+śledzony wątek — rejestr zacięć §284/285, czeka na konkretne dane z urządzenia), ale usuwa
+WIDOCZNY SKUTEK (miganie nieprawidłowej informacji) niezależnie od przyczyny.
+
+**Drobny porządek** (`battle-layout-lab.tsx`): usunięty martwy `height: 200` w stylesheet
+`tilePortrait` — zawsze i tak nadpisywany inline przez `portraitColHeight` (patrz §173), ale
+mylił czytelnika sugerując że się liczy.
+
+**Zbadany, NIE naprawiony tu: "edytor nie odzwierciedla walki"** — sprawdzone geometrycznie:
+`catSize/bossSize/offsety X,Y/cienie` w `battleLayoutDraftStore.ts`'s `BATTLE_LAYOUT_DEFAULT`
+WCIĄŻ zgadzają się 1:1 z realnymi stałymi w `boss-fight.tsx` (205/150/45/45/10/10/0.45/0.13/
+0.62/0.18 — zero rozjazdu). Znaleziona PRAWDZIWA różnica jest ARCHITEKTONICZNA, nie liczbowa:
+edytor renderuje tło areny jako LOKALNY obrazek+gradient wewnątrz ograniczonego, stałego
+`sceneHeight=420` boksu (`<Image>`+`<LinearGradient>` wewnątrz `s.scene`) — pozostałość z
+architektury SPRZED 2026-09-14. Realna walka od 2026-09-14 renderuje TO SAMO tło
+PEŁNOEKRANOWO, raz, POZA `arena`/`arenaScene` (patrz komentarz w `boss-fight.tsx` przy
+`arenaScene` — "dawny `arenaScene` to teraz zwykły pozycjonujący View, BEZ własnego tła").
+Efekt: nawet przy identycznych offsetach, kadrowanie/przycięcie tła (`contentFit="cover"` w
+INNEJ wysokości boksu) different, więc scena w edytorze NIE wygląda tak samo jak w grze mimo
+że liczby się zgadzają — to może być dokładnie to, co user czuje jako "nie odzwierciedla".
+Pełne przebudowanie edytora na fullscreen (dopasowanie do realnej wysokości ekranu/bez
+boksowania) to WIĘKSZA, ryzykowna zmiana bez możliwości zdalnej weryfikacji wizualnej — NIE
+zgadywana tu, czeka na decyzję usera (patrz NEXT_STEPS.md).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 100/100 suite, 1311 testów (bez zmiany —
+czysto wizualne zmiany + defensywny reset stanu, nie da się sensownie pokryć bez realnego
+natywnego renderera i symulacji lagu wątku JS).
+
+**Priorytet testu na urządzeniu — wysoki**: kilka walk z różnymi bossami — sprawdź czy łapka/
+pięść faktycznie czytają się lepiej w locie, i czy "stare KRYT/UNIK miga" nadal się zdarza
+(jeśli tak mimo fixu — to mocny sygnał że przyczyna jest GDZIE INDZIEJ niż zgnieciony timing,
+warto wtedy wideo/nagranie ekranu zamiast opisu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

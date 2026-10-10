@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🟡 Walki: pociski powiększone + fix na "stare KRYT/UNIK migają" — WYMAGA DECYZJI o edytorze (2026-10-10)
+
+User: "czasami sie buguja... w kolejnym ataku po krycie pokazuje sie na ułamek sekundy kryt...
+walki wgle sa poluzowane. I zwieksz te leżącą rękę i łapę jeszcze. I ten edytor walk w
+ustawieniach nie dziala". Pełny opis w ARCHITECTURE.md §287.
+
+- **Pociski powiększone** (łapka/ręka, `PROJECTILE_SIZE` 36→46) — zrobione.
+- **"Stare KRYT/UNIK migają"** — hipoteza: to SKUTEK potwierdzonego, poważnego lagu wątku JS
+  (§284, skok 6157ms!) zgniatającego timing rund pod obciążeniem. Dodany defensywny reset
+  stanu na start każdego rzutu, usuwa WIDOCZNY SKUTEK niezależnie od przyczyny. **Priorytet
+  testu — wysoki**: jeśli miganie nadal się zdarza MIMO fixu, to przyczyna jest gdzie indziej —
+  wyślij wtedy nagranie ekranu (wideo), sam opis nie wystarczy do dalszej diagnozy.
+- **Edytor układu walki nie odzwierciedla realnej walki — ZNALEZIONA przyczyna, NIE naprawiona**:
+  liczby (pozycje/rozmiary/cienie) WCIĄŻ zgadzają się 1:1 z realną areną — sprawdzone. Prawdziwa
+  różnica jest architektoniczna: edytor renderuje tło areny jako LOKALNY, ograniczony boks
+  (stały `sceneHeight=420`), realna walka od 2026-09-14 renderuje TO SAMO tło PEŁNOEKRANOWO —
+  inne kadrowanie, więc scena "nie wygląda tak samo" mimo zgodnych liczb. **WYMAGA TWOJEJ
+  DECYZJI**: przebudować edytor na fullscreen (większa, ryzykowna zmiana, nie da się zdalnie
+  zweryfikować wizualnie bez Twojego feedbacku na urządzeniu) — chcesz żebym to zrobił, czy to
+  zostaje jako "wystarczająco dobre" przybliżenie?
+
 ## 🆕 Fix: klawiatura zasłaniała stopkę modala szczegółów zadania (2026-10-10)
 
 User zrzutem ekranu: "Tutaj w zadaniach klawiatura mi zasłania wszystkiego". Pełny opis w

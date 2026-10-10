@@ -327,7 +327,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // dodatkowe ~4px rozjazdu w pionie względem realnej areny (2026-09-23, user #7).
   vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%', paddingHorizontal: spacing[3], paddingBottom: spacing[3] },
   tile: { flex: 1, minWidth: 0, alignItems: 'center', padding: spacing[2], gap: 6 },
-  tilePortrait: { height: 200, width: '100%', justifyContent: 'center', alignItems: 'center' },
+  // `height` NIE tutaj — zawsze nadpisywany inline przez `portraitColHeight` (patrz JSX),
+  // dawne sztywne 200 było martwą, mylącą wartością (wygrywa nadpisanie, ale czytelnik mógł
+  // pomyśleć że faktycznie się liczy — patrz root cause #7 w ARCHITECTURE.md §173).
+  tilePortrait: { width: '100%', justifyContent: 'center', alignItems: 'center' },
   spriteBox: { alignItems: 'center', justifyContent: 'center' },
   tileLabel: { fontSize: 12.5, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   hpBlock: { width: '100%', gap: 4, alignItems: 'center' },
