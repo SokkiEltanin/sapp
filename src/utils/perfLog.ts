@@ -60,6 +60,24 @@ let lagSamplingStarted = false;
 let lagSamplingPaused = false;
 let lagTimer: ReturnType<typeof setTimeout> | null = null;
 
+// 2026-10-10, user wkleił realne dane z "Wydajność appki": pojedynczy skok 6157ms + suma
+// 32817ms na 405 próbek w sesji 234s — POTWIERDZONY, poważny lag, ale same zagregowane liczby
+// (max/suma) nie mówią KIEDY się to stało, więc user musiałby pamiętać co robił w danej
+// sekundzie 234-sekundowej sesji na pamięć. Zamiast prosić o zgadywanie, zapamiętujemy same
+// największe skoki z ich ZEGAROWYM czasem (`atWall`, HH:MM:SS) — przy następnym zgłoszeniu
+// user może od razu powiedzieć "a, to było jak przełączałem zakładki o 21:14" zamiast "chyba
+// gdzieś w środku używania appki".
+const SPIKE_MIN_MS = 200; // poniżej tego to zwykły jitter timera, nie realny lag warty śledzenia
+const TOP_SPIKES_N = 5;
+let lagSpikes: { ms: number; atWall: number }[] = [];
+
+function recordLagSpike(ms: number) {
+  if (ms < SPIKE_MIN_MS) return;
+  lagSpikes.push({ ms, atWall: Date.now() });
+  lagSpikes.sort((a, b) => b.ms - a.ms);
+  if (lagSpikes.length > TOP_SPIKES_N) lagSpikes.length = TOP_SPIKES_N;
+}
+
 function scheduleLagSample() {
   const intervalMs = (Date.now() - JS_START < LAG_WINDOW_MS) ? LAG_SAMPLE_MS : LAG_SAMPLE_MS_IDLE;
   const scheduledAt = Date.now();
@@ -70,6 +88,7 @@ function scheduleLagSample() {
     maxLagMs = Math.max(maxLagMs, lag);
     totalLagMs += lag;
     lagSamples++;
+    recordLagSpike(lag);
     if (!lagSamplingPaused) scheduleLagSample();
   }, intervalMs);
 }
@@ -90,9 +109,10 @@ export function resumeLagSampling(): void {
 }
 
 // Żywy, aktualny stan liczników — do odczytu W DOWOLNYM momencie sesji (Diagnostyka), nie
-// tylko to, co `recordDashboardReady()` zapisało raz przy starcie.
-export function getLiveLagStats(): { maxLagMs: number; totalLagMs: number; lagSamples: number; sinceMs: number } {
-  return { maxLagMs, totalLagMs, lagSamples, sinceMs: Date.now() - JS_START };
+// tylko to, co `recordDashboardReady()` zapisało raz przy starcie. `topSpikes` — patrz
+// komentarz przy `recordLagSpike` wyżej — posortowane malejąco, do `TOP_SPIKES_N` pozycji.
+export function getLiveLagStats(): { maxLagMs: number; totalLagMs: number; lagSamples: number; sinceMs: number; topSpikes: { ms: number; atWall: number }[] } {
+  return { maxLagMs, totalLagMs, lagSamples, sinceMs: Date.now() - JS_START, topSpikes: [...lagSpikes] };
 }
 
 // Wołane RAZ z `app/_layout.tsx` (efekt, NIE na poziomie modułu) — samo-startujące się przy

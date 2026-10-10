@@ -81,4 +81,13 @@ describe('perfLog — live lag stats (cała sesja)', () => {
   test('pauseLagSampling/resumeLagSampling nie rzucają, nawet gdy sampler nigdy nie wystartował', () => {
     expect(() => { pauseLagSampling(); resumeLagSampling(); }).not.toThrow();
   });
+
+  // 2026-10-10, user wkleił realne dane (skok 6157ms, suma 32817ms) — same zagregowane liczby
+  // nie mówią KIEDY to było, więc `topSpikes` dorzuca zegarowy czas kilku największych skoków
+  // (patrz `recordLagSpike` w perfLog.ts). Sampler nieodpalony tutaj → pusta lista, nie błąd.
+  test('topSpikes to tablica (pusta, gdy sampler nigdy nie odpalił żadnej próbki)', () => {
+    const live = getLiveLagStats();
+    expect(Array.isArray(live.topSpikes)).toBe(true);
+    expect(live.topSpikes.length).toBe(0);
+  });
 });
