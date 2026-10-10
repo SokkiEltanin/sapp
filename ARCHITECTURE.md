@@ -15675,6 +15675,34 @@ przycisku). Sprawdź też skrzynkę bez własnej grafiki (fallback emoji), jeśl
 istnieje w ofercie — tam `boxLid` (kolorowy pasek) + emoji zostały bez zmian poza usunięciem
 karty/obwódki wokół.
 
+## 284. Diagnostyka: 5 największych skoków lagu z zegarowym czasem (2026-10-10)
+
+User wkleił realne dane z "Wydajność appki" (§281): sesja 234s, lag max **6157ms**
+(pojedynczy, ponad 6-sekundowy freeze), suma **32817ms** na 405 próbek — POTWIERDZONY,
+poważny lag (~14% czasu sesji wątek JS był zablokowany ponad oczekiwany interwał próbkowania).
+Ale same zagregowane liczby (max/suma/próbki) nie mówią KIEDY się to stało — user musiałby
+pamiętać co robił w konkretnej sekundzie 234-sekundowej sesji, żeby to skojarzyć z akcją.
+
+**Fix** (`perfLog.ts`): nowy `recordLagSpike()`, wołany z `scheduleLagSample()`'s timera —
+każdy skok ≥`SPIKE_MIN_MS`=200ms (poniżej to zwykły jitter timera, nie realny lag) trafia do
+`lagSpikes`, posortowanej malejąco, przyciętej do `TOP_SPIKES_N`=5 pozycji, z zegarowym czasem
+(`atWall: Date.now()`). `getLiveLagStats()` zwraca teraz dodatkowo `topSpikes` — ta sama
+tablica. Diagnostyka → "Wydajność appki" (`settings.tsx`) dokleja pod linią "Ta sesja (na
+żywo)" listę "Największe zacięcia tej sesji: HH:MM:SS: Nms" (obie gałęzie alertu — pusta
+historia i główna — plus tekst "Udostępnij"), żeby przy następnym zgłoszeniu user mógł od razu
+powiedzieć co robił o konkretnej godzinie, zamiast zgadywać.
+
+**Celowo NIE zrobione tu**: korelacja z aktualnym ekranem/akcją (np. nazwa route'a w momencie
+skoku) — wymagałoby osobnego, nowego kanału (np. moduł-level "current screen" ustawiany z
+nawigacji, podobnie jak `pauseLagSampling`/`resumeLagSampling` z AppState w `_layout.tsx`).
+Zegarowy czas + pamięć usera to pierwszy, tani krok; jeśli po kilku zgłoszeniach user dalej nie
+będzie w stanie skojarzyć zacięcia z konkretną akcją, DOPIERO wtedy warto dociążyć to
+route-trackingiem.
+
+**Testy**: `__tests__/perfLog.test.ts` — `topSpikes` to tablica (pusta, bo sampler nieodpalony
+w testach, patrz komentarz na górze pliku). `tsc --noEmit` czyste, `jest --silent` 100/100
+suite, 1307 testów (+1).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -2309,10 +2309,17 @@ export default function SettingsScreen() {
             // to są REALNE liczby z tego telefonu, do porównania build-do-buildu.
             const live = getLiveLagStats();
             const liveLine = `Ta sesja (na żywo, od ${Math.round(live.sinceMs / 1000)}s): lag max ${live.maxLagMs}ms, suma ${live.totalLagMs}ms (${live.lagSamples} próbek).`;
+            // 2026-10-10, user wkleił realne dane (skok 6157ms, suma 32817ms) — same zagregowane
+            // liczby nie mówią KIEDY się to stało, więc dorzucamy listę kilku największych skoków
+            // z zegarowym czasem (`atWall`), żeby user mógł od razu skojarzyć "a, to było jak
+            // robiłem X o HH:MM:SS", zamiast zgadywać co robił gdzieś w środku sesji.
+            const spikesLine = live.topSpikes.length > 0
+              ? `\nNajwiększe zacięcia tej sesji:\n${live.topSpikes.map(s => `${new Date(s.atWall).toLocaleTimeString('pl-PL')}: ${s.ms}ms`).join('\n')}`
+              : '';
             const log = await getPerfLog();
             if (log.length === 0) {
-              Alert.alert('Wydajność appki', `${liveLine}\n\nBrak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).`,
-                [{ text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}` }).catch(() => {}); } }, { text: 'OK' }]);
+              Alert.alert('Wydajność appki', `${liveLine}${spikesLine}\n\nBrak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).`,
+                [{ text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}${spikesLine}` }).catch(() => {}); } }, { text: 'OK' }]);
               return;
             }
             const last = log[log.length - 1];
@@ -2327,9 +2334,9 @@ export default function SettingsScreen() {
             const lines = log.slice().reverse().map(fmtEntry);
             Alert.alert(
               `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms, lag max ${last.maxLagMs ?? 0}ms`,
-              `${liveLine}\n\nPrzy starcie — 1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria startów (najnowsze u góry):\n${lines.join('\n')}`,
+              `${liveLine}${spikesLine}\n\nPrzy starcie — 1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria startów (najnowsze u góry):\n${lines.join('\n')}`,
               [
-                { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}\n\n${lines.join('\n')}` }).catch(() => {}); } },
+                { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}${spikesLine}\n\n${lines.join('\n')}` }).catch(() => {}); } },
                 { text: 'Wyczyść historię', onPress: () => clearPerfLog() },
                 { text: 'OK' },
               ],
