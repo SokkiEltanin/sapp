@@ -47,7 +47,7 @@ import { useClassScheduleStore } from '@/store/classScheduleStore';
 import { useWidgetSettingsStore, WidgetTextScale } from '@/store/widgetSettingsStore';
 import { setWidgetAppearance } from '@/services/widgetSync';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
-import { getPerfLog, clearPerfLog, getLiveLagStats } from '@/utils/perfLog';
+import { getPerfLog, clearPerfLog, getLiveLagStats, getLagSpikeLog, clearLagSpikeLog } from '@/utils/perfLog';
 import { getStorageWriteStats } from '@/utils/throttledStorage';
 import { probeHydration, formatWaterDiagnostic } from '@/services/healthConnectService';
 import { haptic } from '@/utils/haptics';
@@ -2309,17 +2309,24 @@ export default function SettingsScreen() {
             // to są REALNE liczby z tego telefonu, do porównania build-do-buildu.
             const live = getLiveLagStats();
             const liveLine = `Ta sesja (na żywo, od ${Math.round(live.sinceMs / 1000)}s): lag max ${live.maxLagMs}ms, suma ${live.totalLagMs}ms (${live.lagSamples} próbek).`;
-            // 2026-10-10, user wkleił realne dane (skok 6157ms, suma 32817ms) — same zagregowane
-            // liczby nie mówią KIEDY się to stało, więc dorzucamy listę kilku największych skoków
-            // z zegarowym czasem (`atWall`), żeby user mógł od razu skojarzyć "a, to było jak
-            // robiłem X o HH:MM:SS", zamiast zgadywać co robił gdzieś w środku sesji.
-            const spikesLine = live.topSpikes.length > 0
-              ? `\nNajwiększe zacięcia tej sesji:\n${live.topSpikes.map(s => `${new Date(s.atWall).toLocaleTimeString('pl-PL')}: ${s.ms}ms`).join('\n')}`
-              : '';
+            // 2026-10-10, user wkleił realne dane (skok 6157ms, suma 32817ms), potem: "a nie
+            // mozesz zrobić rejestrów jakiś automatycznych??" — zamiast prosić usera żeby sam
+            // zgłaszał co robił, KAŻDY zauważalny skok (≥200ms) zapisuje się SAM, trwale
+            // (przeżywa restart appki), razem z EKRANEM na którym się stał
+            // (`setCurrentRoute` w `_layout.tsx`). Pokazujemy ostatnie kilkanaście — nic nie
+            // trzeba już samemu odczytywać "na żywo" ani pamiętać.
+            const spikeLog = await getLagSpikeLog();
+            const spikesLine = spikeLog.length > 0
+              ? `\nRejestr zacięć (ostatnie, najnowsze u góry):\n${spikeLog.slice().reverse().slice(0, 15).map(s => `${new Date(s.at).toLocaleString('pl-PL')} (${s.route}): ${s.ms}ms`).join('\n')}`
+              : '\n\nRejestr zacięć: brak — appka jeszcze nie zauważyła zacięcia ≥200ms od ostatniego czyszczenia.';
             const log = await getPerfLog();
             if (log.length === 0) {
               Alert.alert('Wydajność appki', `${liveLine}${spikesLine}\n\nBrak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).`,
-                [{ text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}${spikesLine}` }).catch(() => {}); } }, { text: 'OK' }]);
+                [
+                  { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}${spikesLine}` }).catch(() => {}); } },
+                  { text: 'Wyczyść rejestr zacięć', onPress: () => clearLagSpikeLog() },
+                  { text: 'OK' },
+                ]);
               return;
             }
             const last = log[log.length - 1];
@@ -2337,7 +2344,10 @@ export default function SettingsScreen() {
               `${liveLine}${spikesLine}\n\nPrzy starcie — 1. klatka / w pełni gotowy / najdłuższa zwłoka wątku JS. Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms / lag max ${avg('maxLagMs')}ms, suma lagu ${avg('totalLagMs')}ms.\n\nHistoria startów (najnowsze u góry):\n${lines.join('\n')}`,
               [
                 { text: 'Udostępnij', onPress: () => { Share.share({ message: `Wydajność appki (Sapp)\n\n${liveLine}${spikesLine}\n\n${lines.join('\n')}` }).catch(() => {}); } },
-                { text: 'Wyczyść historię', onPress: () => clearPerfLog() },
+                // Czyści OBIE historie naraz (start + rejestr zacięć) — trzeci przycisk na
+                // Androidzie to twardy sufit dla Alert.alert, więc jeden wspólny "Wyczyść
+                // historię" zamiast dwóch osobnych.
+                { text: 'Wyczyść historię', onPress: () => { clearPerfLog(); clearLagSpikeLog(); } },
                 { text: 'OK' },
               ],
             );

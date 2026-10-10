@@ -3,20 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕🔴 Lag POTWIERDZONY realnymi danymi — czeka na konkretną akcję do namierzenia (2026-10-10)
+## 🆕🔴 Lag POTWIERDZONY realnymi danymi — rejestr zacięć teraz SAM, automatycznie (2026-10-10)
 
 User wkleił dane z "Wydajność appki": sesja 234s, **lag max 6157ms** (ponad 6-sekundowy
-freeze!), suma 32817ms / 405 próbek. Pełny opis w ARCHITECTURE.md §284. To POTWIERDZA że lag
-jest realny i poważny — ale same liczby nie mówią jaka akcja go wywołała. Diagnostyka
-dorzuca teraz listę 5 największych zacięć z zegarowym czasem (HH:MM:SS), żeby dało się to
-skojarzyć z konkretną czynnością.
+freeze!), suma 32817ms / 405 próbek — POTWIERDZA że lag jest realny i poważny. Potem: "a nie
+mozesz zrobić rejestrów jakiś automatycznych??". Pełny opis w ARCHITECTURE.md §284/§285.
+Każde zauważalne zacięcie (≥200ms) zapisuje się teraz SAMO, trwale (przeżywa restart appki),
+razem z ekranem na którym się stało — zero akcji ze strony usera.
 
 **Priorytet — wysoki, wymaga Twojej akcji**: następnym razem jak appka wyraźnie się zatnie,
-od razu (albo chwilę potem) sprawdź Diagnostyka → "Wydajność appki" → sekcja "Największe
-zacięcia tej sesji" i napisz mi: (a) o której godzinie było, (b) co dokładnie wtedy robiłeś
-(scroll jakiej listy, jaki ekran, jaka akcja — otwieranie paragonu, przełączanie zakładki,
-zapisywanie czegoś). To jedyny sposób żeby namierzyć KONKRETNE miejsce w kodzie zamiast
-zgadywać po całej appce.
+NIE MUSISZ już nic łapać "na żywo" — po prostu kiedykolwiek później wejdź do Diagnostyka →
+"Wydajność appki" → "Rejestr zacięć" i wyślij mi co tam widzisz (czas, ekran, ms). To da
+KONKRETNE miejsce w kodzie do naprawy, zamiast zgadywania po całej appce.
 
 ## 🆕 Skrzynki (sklep pupila) lewitują same, bez karty/przycisku (2026-10-10)
 

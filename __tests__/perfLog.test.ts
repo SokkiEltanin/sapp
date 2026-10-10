@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { markDashboardFirstFrame, recordDashboardReady, getPerfLog, clearPerfLog, getLiveLagStats, pauseLagSampling, resumeLagSampling } from '@/utils/perfLog';
+import { markDashboardFirstFrame, recordDashboardReady, getPerfLog, clearPerfLog, getLiveLagStats, pauseLagSampling, resumeLagSampling, setCurrentRoute, getLagSpikeLog, clearLagSpikeLog } from '@/utils/perfLog';
 
 // `startColdStartLagSampling` deliberately NOT imported/called anywhere in this file — it
 // schedules real `setTimeout`s for up to 8s (patrz komentarz w perfLog.ts), które by wisiały
@@ -89,5 +89,30 @@ describe('perfLog — live lag stats (cała sesja)', () => {
     const live = getLiveLagStats();
     expect(Array.isArray(live.topSpikes)).toBe(true);
     expect(live.topSpikes.length).toBe(0);
+  });
+});
+
+// 2026-10-10, user: "a nie mozesz zrobić rejestrów jakiś automatycznych??" — zacięcia teraz
+// zapisują się SAME, trwale (AsyncStorage, przeżywa restart appki), razem z ekranem
+// (`setCurrentRoute`). Sampler sam (prawdziwe timery) świadomie nie jest tu odpalany (patrz
+// komentarz na górze pliku), więc te testy sprawdzają tylko odczyt/zapis/czyszczenie samego
+// rejestru, nie czy `recordLagSpike` faktycznie coś do niego dopisuje.
+describe('perfLog — trwały rejestr zacięć (getLagSpikeLog)', () => {
+  test('brak wpisów na starcie', async () => {
+    expect(await getLagSpikeLog()).toEqual([]);
+  });
+
+  test('clearLagSpikeLog czyści rejestr (no-op gdy już pusty, nie rzuca)', async () => {
+    await clearLagSpikeLog();
+    expect(await getLagSpikeLog()).toEqual([]);
+  });
+
+  test('setCurrentRoute nie rzuca dla dowolnego stringa', () => {
+    expect(() => { setCurrentRoute('Dashboard'); setCurrentRoute('/'); setCurrentRoute(''); }).not.toThrow();
+  });
+
+  test('zepsuty JSON w AsyncStorage → getLagSpikeLog zwraca pustą listę zamiast rzucać', async () => {
+    await AsyncStorage.setItem('perf_lag_spikes_v1', '{not json');
+    expect(await getLagSpikeLog()).toEqual([]);
   });
 });
