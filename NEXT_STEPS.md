@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🔴 PIERWSZE realne namierzenie laga dzięki rejestrowi: Ustawienia (do 1651ms!) (2026-10-10)
+
+User wkleił rejestr zacięć (automatyczny, §284/285) — zadziałał: klaster 9 skoków w ~4 minuty
+TYLKO w "Ustawienia", timing pasujący do pisania w wyszukiwarce. Pełny opis w ARCHITECTURE.md
+§289. Root cause znaleziony i naprawiony: `sections` w `settings.tsx` to ~1650-liniowy literał
+tablicy budowany OD ZERA na KAŻDY render (bez `useMemo`), mimo że pole wyszukiwania (`query`)
+wcale nie jest w niej czytane — każdy wciśnięty znak marnował pełną odbudowę. Owinięte w
+`useMemo` z mechanicznie (skryptem) wygenerowaną listą 132 zależności. `tsc`/`jest` zielone.
+
+**Priorytet testu na urządzeniu — wysoki**: (1) wpisz coś w wyszukiwarkę Ustawień kilka razy —
+powinno być zauważalnie płynniej; (2) sprawdź że WSZYSTKO dalej działa normalnie (żaden
+toggle/pole nie "zamroziło się" na starej wartości) — to największe ryzyko tej zmiany.
+
+**Dashboard/Finanse też miały skoki w tym samym rejestrze** (929-1160ms, pojedyncze, nie
+klaster jak Ustawienia) — sprawdzone, NIE znaleziono tam analogicznego pojedynczego winowajcy.
+Jeśli rejestr złapie tam kolejny klaster — wyślij, to da kolejny precyzyjny trop.
+
 ## 🆕 Edytor układu walki przebudowany: per-boss/per-tło, jasność, odbicie, Cofnij (2026-10-10)
 
 User: "Tak dawaj edytor lepszy pod każdego bosa możesz dać inny i pod kazde tlo inny i dodaj
