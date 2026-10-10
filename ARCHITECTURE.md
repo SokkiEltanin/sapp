@@ -15835,6 +15835,79 @@ pięść faktycznie czytają się lepiej w locie, i czy "stare KRYT/UNIK miga" n
 (jeśli tak mimo fixu — to mocny sygnał że przyczyna jest GDZIE INDZIEJ niż zgnieciony timing,
 warto wtedy wideo/nagranie ekranu zamiast opisu).
 
+## 288. Edytor układu walki przebudowany: per-boss/per-tło, jasność, odbicie, Cofnij (2026-10-10)
+
+User (po §287's pytaniu o zakres): "Tak dawaj edytor lepszy pod każdego bosa możesz dać inny
+i pod kazde tlo inny i dodaj możliwość mi zmiany jasności tla jakby lub ścinki czarnej
+pomiędzy i modyfikacje typu Odbicie lustrzane i opcje cofnij." Cztery niezależne rozszerzenia
+`/battle-layout-lab` + `battleLayoutDraftStore.ts`, żadne z nich NIE dotyka realnej walki
+(`boss-fight.tsx`) — to dalej poligon do wypracowania liczb przed podpięciem, teraz większym.
+
+**1. Fullscreen tło (fix z §287's "znalezione, nie naprawione")** — edytor renderował tło jako
+LOKALNY, ograniczony boks (`sceneHeight=420` z WŁASNYM `<Image>`+`<LinearGradient>` wewnątrz),
+architektura sprzed 2026-09-14. Teraz identyczna struktura co `boss-fight.tsx`: tło+scrim+mgiełka
+jako `absoluteFillObject` NA POZIOMIE `SafeAreaView`, POD headerem/scrollem, nie w boksie —
+kadrowanie (`contentFit="cover"`) teraz faktycznie identyczne jak w realnej walce.
+
+**2. Per-boss layout** (`perBoss: Record<string, Partial<BattleLayoutDraft>>` w store) —
+pozycja/rozmiar/cień/odbicie każdego bossa zapamiętywane NIEZALEŻNIE pod jego `id`, scalane na
+WIERZCHU bazowego `draft` przy odczycie (`eff = {...draft, ...perBoss[boss.id]}` w komponencie).
+Przełączenie "Boss podglądu" przełącza na WŁASNE wartości tego bossa (fallback na bazowy
+`draft`, dopóki nic nie dostał) — kropka przy nazwie + hint + przycisk "Resetuj tego" pokazują
+się tylko gdy dany boss MA już własny override (`hasBossOverride`).
+
+**3. Per-tło jasność** (`perBg: Record<string, Partial<BgExtra>>`, pole `darken` 0–0.85) —
+osobny, czarny `View` absolutnie wypełniający scenę NAD tłem/gradientem/mgiełką, regulowana
+nieprzezroczystość — nowa sekcja "Jasność tła" (Stepper, krok 0.05). Per TŁO, nie per boss: ten
+sam las użyty w dwóch różnych walkach ma tę samą jasność w obu.
+
+**4. Odbicie lustrzane** — `catFlipped`/`bossFlipped` (boolean, część `BattleLayoutDraft`, więc
+TEŻ per-boss) — `scaleX:-1` na całym `spriteBox` (sprite+poświata+cień, nie tylko samą grafikę —
+cień/poświata są symetryczne, flip ich nie zmienia wizualnie). Nowa sekcja "Odbicie lustrzane",
+dwa przełączniki (Pupil/Boss).
+
+**5. Cofnij** — stos `history: Snapshot[]` (CAŁY stan: `draft`+`perBoss`+`perBg`) w store, max
+40 wpisów. `pushUndoSnapshot()` — czysta akcja, TYLKO dopisuje do historii, świadomie NIE
+dotyka `perBoss`/`perBg` (patrz bug niżej). Wołana PRZED realną zmianą: `Stepper`'s nowy
+`onCommit` (jeden snapshot na naciśnięcie +/−), `Draggable`'s nowy `onGrab`
+(`onPanResponderGrant`, jeden snapshot na CAŁY gest przeciągania, nie na każdy piksel ruchu),
+toggle odbicia. `setBgExtra`/`setBg` same pchają dokładnie jeden snapshot na wywołanie (brak
+osobnego "grab" fazy jak przy przeciąganiu, nie potrzebują flagi). Przycisk Cofnij (ikona) w
+headerze, disabled gdy `history.length===0`.
+
+**Znaleziony i naprawiony bug PODCZAS budowy, przed shipowaniem** — pierwsza wersja kierowała
+"push undo" przez `set(bossId, {}, true)` (pusty patch + flaga) — ale `set()` zawsze MERGUJE
+patch na `perBoss[bossId]`, więc nawet PUSTY patch tworzył `perBoss[bossId] = {}` jako skutek
+uboczny samego pchnięcia historii — np. sam DOTYK przeciąganego sprite'a bez ruchu palca
+(`onPanResponderGrant` fires, `onPanResponderMove` nie) fałszywie oznaczałby bossa jako "ma
+własny układ" mimo zera realnej zmiany. Fix: `pushUndoSnapshot()` to CAŁKOWICIE osobna akcja,
+dotyka WYŁĄCZNIE `history`, nigdy `perBoss`/`perBg`.
+
+**Reset** (ikona w headerze) — TERAZ bardziej destrukcyjny niż dawniej (czyści WSZYSTKIE
+per-boss/per-bg dostrojenia, nie tylko jeden globalny draft) — dostał `Alert.alert` z
+potwierdzeniem ("Resetuj WSZYSTKO?"), czego dawny, mniej ryzykowny Reset nie potrzebował.
+Osobny, mniej destrukcyjny "Resetuj tego [bossa]" (`resetBoss`) czyści TYLKO jednego bossa.
+
+**Eksport** — teraz niesie CAŁY stan (`{draft, perBoss, perBg}`) w jednym JSON, nie tylko
+pojedynczy płaski obiekt — user może dostroić wielu bossów/teł w jednej sesji i wyeksportować
+raz.
+
+**PERSIST_VERSION 1→2** — schemat się zmienił fundamentalnie (perBoss/perBg/flip), stary,
+pojedynczy zapisany draft bez tych pól nie dałby się sensownie zmigrować — `migrate()` jak
+dotąd po prostu zaczyna od świeżych defaultów.
+
+**Testy** (`__tests__/battleLayoutDraftStore.test.ts`, nowy plik, 15 testów): `set()` per-boss
+niezależny i mergujący, `setBg`/`setBgExtra` per-tło niezależne, `pushUndoSnapshot` czysty (nie
+rusza perBoss/perBg — regresja na bug wyżej), `undo()` LIFO wielokrotny i bezpieczny na pustej
+historii, `resetBoss` usuwa tylko jednego, `reset()` czyści wszystko. `tsc --noEmit` czyste,
+`jest --silent` 101/101 suite, 1326 testów (+15).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → Dane → Edytor układu walki — (1) tło
+powinno teraz wyglądać jak w realnej walce (pełny ekran, nie okienko), (2) dostrój jednego
+bossa, przełącz na innego, wróć — wartości pierwszego powinny zostać, (3) suwak "Jasność tła",
+(4) przełącznik odbicia, (5) kilka zmian + Cofnij — czy realnie cofa WIZUALNIE, nie tylko w
+JSON eksportu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
