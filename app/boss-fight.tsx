@@ -1114,8 +1114,23 @@ export default function BossFight() {
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
               <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? (victory.isMenace ? 'NEMESIS POKONANY!' : 'WYDARZENIE POKONANE!') : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : victory.kind === 'mission' ? 'MISJA UKOŃCZONA!' : 'WYGRANA!'}</Text>
-              <View style={{ opacity: 0.6 }}>
-                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad' || victory.isMenace} />
+              {/* 2026-10-10, user zrzutem ekranu "Misja ukończona!": "zrobimy większą ikonkę
+                  bossa i wtedy taka z x na oczach albo czarnobiała szara z rip czy cos ze
+                  pokonany" — prawdziwy filtr grayscale wymagałby nowej natywnej biblioteki
+                  (żadna tu nie jest podpięta, patrz brak `react-native-color-matrix-*`/skia w
+                  package.json — ryzykowny nowy natywny dep na sam efekt wizualny), a X na
+                  oczach wymagałby znajomości współrzędnych oczu KAŻDEGO bossa osobno (BossArt
+                  tego nie wystawia). Zamiast zgadywać: większa ikona (78→120) + mocniejsze
+                  przyciemnienie (0.6→0.4 opacity) + "pieczątka" POKONANY po przekątnej —
+                  czysty RN (View+Text+rotate), czytelne jako "pokonany" niezależnie od
+                  konkretnego bossa, zero nowych zależności. */}
+              <View style={s.vBossDefeated}>
+                <View style={{ opacity: 0.4 }}>
+                  <BossArt id={victory.id} emoji={victory.emoji} size={120} powered={victory.kind === 'raid' || victory.kind === 'mad' || victory.isMenace} />
+                </View>
+                <View style={s.vDefeatedStamp}>
+                  <Text style={s.vDefeatedStampTxt}>POKONANY</Text>
+                </View>
               </View>
               <Text style={s.vName}>{victory.kind === 'campaign' ? `${victory.name} pokonany` : victory.name}</Text>
               {/* Box z ikoną+nazwą TYLKO dla prawdziwego itemu ze statem (kampania) — 2026-08-18,
@@ -1333,6 +1348,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   vBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,8,16,0.94)', paddingHorizontal: 32 },
   vCenter: { alignItems: 'center' },
+  // "Pieczątka" POKONANY na ikonie bossa po wygranej (2026-10-10) — patrz komentarz w JSX.
+  vBossDefeated: { alignItems: 'center', justifyContent: 'center' },
+  vDefeatedStamp: {
+    position: 'absolute', transform: [{ rotate: '-16deg' }],
+    backgroundColor: 'rgba(239,68,68,0.88)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)',
+    borderRadius: 4, paddingHorizontal: 14, paddingVertical: 3,
+  },
+  vDefeatedStampTxt: { color: '#fff', fontWeight: '900', fontSize: 13, letterSpacing: 1.5 },
   vKicker: { fontSize: 14, fontWeight: '900', letterSpacing: 3, color: '#FDE047', marginBottom: 10 },
   vName: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 6, textAlign: 'center' },
   vDefeatSub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 10, textAlign: 'center', maxWidth: 260 },
