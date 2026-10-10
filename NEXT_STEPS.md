@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Skrzynki (sklep pupila) lewitują same, bez karty/przycisku (2026-10-10)
+
+User zrzutem: "zrob zeby skrzynki lewitowały same bez przycisku otoczki i stroke, tylko same
+i po naciśnięciu w nią sie otwiera". Pełny opis w ARCHITECTURE.md §283. Usunięta ciemna
+karta+obwódka wokół zamkniętej skrzynki w `BoxRevealModal.tsx` i osobny przycisk "Otwórz" —
+teraz sama grafika skrzynki buja się i jest klikalna. Czysto wizualna zmiana, zero nowych
+testów. `tsc`/`jest` zielone (1306/1306, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: Pupil → Sklep → stuknij skrzynkę — powinna się
+bujać bez karty/obwódki i otwierać po dotknięciu samej grafiki.
+
 ## 🆕 Fix: paragon Lidl nie łapał opłaty kaucyjnej "Opakowania zwrotne wydania" (2026-10-09)
 
 User: "Nie złapało mi kaucji na takim paragonie :" + wklejony paragon Lidl z 4× "Kaucja PET
