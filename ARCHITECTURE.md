@@ -15953,6 +15953,39 @@ znaków pod rząd) — powinno czuć się zauważalnie płynniej niż dotąd. Sp
 dalej działa normalnie (żaden toggle/pole nie "zamroziło się" na starej wartości) — to
 największe ryzyko przy tej zmianie, mimo mechanicznie wygenerowanej listy zależności.
 
+## 290. Ekran wygranej: większa, "ostemplowana POKONANY" ikona bossa (2026-10-10)
+
+User zrzutem ekranu "Misja ukończona!": "zrobimy większą ikonkę bossa i wtedy taka z x na
+oczach albo czarnobiała szara z rip czy cos ze pokonany xd nie wiem".
+
+**Rozważone i odrzucone**: prawdziwy filtr grayscale (żadna biblioteka color-matrix/skia nie
+jest tu podpięta — nowy natywny dep tylko dla efektu wizualnego to zbyt duże ryzyko/koszt
+buildu na tak mały zysk) i X na oczach (wymagałoby znajomości współrzędnych oczu KAŻDEGO
+bossa osobno — `BossArt` ich nie wystawia, żadnego globalnego rozwiązania).
+
+**Fix** (`boss-fight.tsx`, modal `victory`): ikona bossa 78→120, przyciemnienie 0.6→0.4
+opacity, + nowa "pieczątka" `POKONANY` po przekątnej (`rotate: -16deg`, czerwone tło,
+biała obwódka) — czysty RN (`View`+`Text`+`transform`), czytelne jako "pokonany" NIEZALEŻNIE
+od konkretnego bossa/jego grafiki, zero nowych zależności. Modal `defeat` (boss PRZETRWAŁ, to
+usera kotek przegrywa) świadomie NIE dostał tego samego traktowania — tam boss nie jest
+pokonany, pieczątka byłaby semantycznie błędna.
+
+**Przy okazji, pytanie usera**: "a jak skupuje to pokazuje po skipie ile hp zostało bosowi?"
+— sprawdzone w kodzie: NIE. `finish()` (wołane też przez "Pomiń walkę") ustawia
+`liveBossHp = null`, a `targetRemaining` dla WSZYSTKICH trybów poza raid/nemesis spada wtedy
+na `target.maxHp` (pełne HP) — to ŚWIADOME zachowanie (każda próba kampanii/questu/misji
+startuje od pełnego HP bossa, nie ma trwałego stanu między próbami do pokazania), nie bug.
+Pasek areny i tak jest zasłonięty modalem wyniku w tym momencie. Żaden z modali
+wygranej/przegranej nie pokazuje numerycznie ile HP zostało bossowi — tylko generyczny tekst
+("boss przetrwał"/"kotek zemdlał"). Osobna, nie zrobiona tu funkcja, gdyby user chciał: pokazać
+% pozostałego HP bossa w modalu PRZEGRANEJ (jak blisko było) — nie poproszono o to wprost.
+
+**Testy**: brak nowych (czysto wizualna zmiana). `tsc --noEmit` czyste, `jest --silent`
+101/101 suite, 1326 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: wygraj dowolną walkę — ikona bossa na ekranie
+wygranej powinna być większa i mieć czerwoną pieczątkę "POKONANY" po przekątnej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

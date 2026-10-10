@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ekran wygranej: większa, "ostemplowana POKONANY" ikona bossa (2026-10-10)
+
+User zrzutem ekranu: "zrobimy większą ikonkę bossa i wtedy taka z x na oczach albo
+czarnobiała szara z rip czy cos ze pokonany". Pełny opis w ARCHITECTURE.md §290. Prawdziwy
+grayscale/X-na-oczach odrzucone jako niewykonalne bez nowej natywnej biblioteki / danych o
+współrzędnych oczu per boss — zamiast tego: ikona 78→120, mocniejsze przyciemnienie, czerwona
+"pieczątka" POKONANY po przekątnej (czysty RN, zero nowych zależności).
+
+Przy okazji odpowiedziane pytanie: skip walki NIE pokazuje realnego HP bossa po skipie —
+pasek wraca do pełna (świadome, każda próba startuje od zera), oba modale (wygrana/przegrana)
+pokazują tylko generyczny tekst, nigdy numeryczne HP. `tsc`/`jest` zielone (bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: wygraj dowolną walkę, sprawdź jak wygląda
+pieczątka na ikonie bossa.
+
 ## 🆕🔴 PIERWSZE realne namierzenie laga dzięki rejestrowi: Ustawienia (do 1651ms!) (2026-10-10)
 
 User wkleił rejestr zacięć (automatyczny, §284/285) — zadziałał: klaster 9 skoków w ~4 minuty
