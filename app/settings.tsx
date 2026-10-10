@@ -925,7 +925,20 @@ export default function SettingsScreen() {
     return () => sub.remove();
   }, [activeSectionId]);
 
-  const sections: SettingsSectionDef[] = [
+  // 2026-10-10, user wkleił realny rejestr zacięć: klaster skoków (do 1651ms!) dokładnie w
+  // "Ustawienia", powtarzalnie w kilkusekundowych odstępach (pasuje do pisania w polu
+  // wyszukiwania — każdy znak = re-render). Root cause: `sections` to ~1650-liniowa tablica
+  // literału (setki obiektów + ikony + domknięcia onPress) budowana OD ZERA na KAŻDY render
+  // tego ekranu — a `query` (pole wyszukiwania) NIGDZIE nie jest w niej czytane (sprawdzone
+  // skryptem: `grep -c '\bquery\b'` na tym zakresie linii = 0), więc każde naciśnięcie
+  // klawisza w polu wyszukiwania marnowało pełną odbudowę tej ogromnej tablicy, zanim
+  // `filterSections` w ogóle dotknęło nowego zapytania. `useMemo` tu — tablica deps
+  // wygenerowana MECHANICZNIE (skrypt: każda zmienna zadeklarowana w komponencie PRZED tą
+  // tablicą, sprawdzona czy faktycznie występuje w ciele tablicy — nie na oko, żeby nie
+  // zgubić zależności i nie zostawić starej wartości w zamkniętym domknięciu). `query`/
+  // `activeSectionId` ŚWIADOMIE poza listą — potwierdzone że nieużywane tutaj, więc pisanie
+  // w wyszukiwarce/przełączanie sekcji NIE odbudowuje już tej tablicy wcale.
+  const sections: SettingsSectionDef[] = useMemo(() => [
     {
       id: 'interfejs', title: 'Interfejs', icon: LucideIcons.Palette, color: '#A78BFA',
       keywords: ['ui', 'wygląd', 'wibracje', 'animacje'],
@@ -2568,9 +2581,36 @@ export default function SettingsScreen() {
         },
       ],
     },
-  ];
+  ], [
+    accountNet, activateEmployer, addBankRule, addEmployer, age, applyWidgetAppearance,
+    backfillBusy, backfillDone, balanceInput, balanceOffset, bankAutoAll, bankEnabled,
+    bankPending, bankRules, bankTest, briefingEnabled, briefingHour, briefingMin, budgetInputs,
+    budgetThr, classPrefix, clearNotifications, doBackfill, doSelfTest, employers,
+    eveningHour, eveningMin, googleLinking, googleUser, habitHour, habitMin, habitNotifEnabled,
+    handleAddTagRule, handleDeleteTagRule, handleGoogleSignIn, handleSaveBudgets, hapticsOn,
+    hoursOvrField, manualHoursField, manualSalaryField, moodEnabled, morningEnabled,
+    morningHour, morningMin, newEmployerName, newTag, newTagLimit, newTagPeriod, newTagPerson,
+    notifEnabled, ownNameField, payMonths, paydayDay, paydayEnabled, payers, removeBankRule,
+    resetRuleForm, ruleCat, ruleEditId, ruleKindSel, ruleName, rulePattern, rulePreview,
+    ruleTagsText, ruleText, salaryOvrField, saveAccountBalance, saveBudgetThr, saveClassPrefix,
+    saveManualHours, saveManualSalary, saveOverride, savePayday, saveReminders, saveWorkMode,
+    saveWorkPrefix, selfTestBusy, setBalanceInput, setBankAutoAll, setBankEnabled, setBankTest,
+    setBriefingEnabled, setBriefingHour, setBriefingMin, setBudgetInputs, setClassPrefix,
+    setEveningHour, setEveningMin, setHabitHour, setHabitMin, setHabitNotifEnabled,
+    setHapticsOn, setHoursOvrField, setManualHoursField, setManualSalaryField,
+    setMorningEnabled, setMorningHour, setMorningMin, setNewEmployerName, setNewTag,
+    setNewTagLimit, setNewTagPeriod, setNewTagPerson, setOwnNameField, setPaydayDay,
+    setPaydayEnabled, setRuleCat, setRuleKindSel, setRuleName, setRulePattern, setRuleTagsText,
+    setRuleText, setSalaryOvrField, setThemeMode, setWorkPrefix, startEditRule, styles,
+    tagRules, themeMode, toggleEmployerHidden, toggleMoodNotif, toggleNotifications,
+    toggleSimpleNotifType, typeFlags, updateBankRule, widgetColor, widgetOpacity,
+    widgetTextScale, workDiag, workMode, workPrefix,
+  ]);
 
-  const filtered = filterSections(sections, query);
+  // 2026-10-10 — `filtered`/`searching` zależą TERAZ od zmemoizowanego `sections` (patrz
+  // wyżej) + `query`, więc pisanie w wyszukiwarce przelicza TYLKO filtrowanie (tanie — proste
+  // dopasowanie stringów po już gotowej tablicy), nie całą jej odbudowę.
+  const filtered = useMemo(() => filterSections(sections, query), [sections, query]);
   const searching = query.trim().length > 0;
   const activeSection = activeSectionId ? sections.find(s => s.id === activeSectionId) ?? null : null;
 

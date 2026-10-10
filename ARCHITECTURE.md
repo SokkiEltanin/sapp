@@ -15908,6 +15908,51 @@ bossa, przełącz na innego, wróć — wartości pierwszego powinny zostać, (3
 (4) przełącznik odbicia, (5) kilka zmian + Cofnij — czy realnie cofa WIZUALNIE, nie tylko w
 JSON eksportu.
 
+## 289. Fix: Ustawienia odbudowywały całą listę sekcji (1650 linii) na KAŻDY render (2026-10-10)
+
+User wkleił rejestr zacięć (§284/285) z realnym klastrem: 9 skoków w ~4 minuty, TYLKO w
+"Ustawienia" (do **1651ms**!), tuż po skokach w "Dashboard"/"Finanse". Timing klastra (co
+kilka sekund, powtarzalnie) pasuje dokładnie do pisania w polu wyszukiwania ustawień — każdy
+wciśnięty znak = render.
+
+**Root cause** (`app/settings.tsx`): `const sections: SettingsSectionDef[] = [...]` to literał
+tablicy rozciągnięty na **~1650 linii** (linie 928–2571) — setki obiektów sekcji/wierszy, każdy
+z ikoną, kolorem, `keywords`, i domknięciami `onPress` — budowany OD ZERA przy KAŻDYM renderze
+tego ekranu, bez `useMemo`. `const filtered = filterSections(sections, query)` też bez memo,
+tuż pod spodem. Sprawdzone wprost (`grep -c '\bquery\b'` na zakresie linii tablicy = 0): `query`
+(pole wyszukiwania) NIE JEST w ogóle czytane przy budowie `sections` — czyli KAŻDE naciśnięcie
+klawisza w wyszukiwarce ustawień marnowało pełną odbudowę ~1650-liniowej tablicy (setki nowych
+obiektów + ikon + domknięć) zanim `filterSections` w ogóle dotknęło nowego zapytania. Dokładnie
+ten rodzaj kosztu co "czuję że appka laguje" — tylko na TYM ekranie, stąd klaster TYLKO w
+"Ustawienia" w rejestrze.
+
+**Fix**: `sections` owinięte w `useMemo`. Tablica zależności wygenerowana MECHANICZNIE, nie na
+oko (skrypt Python: wszystkie zmienne zadeklarowane w komponencie PRZED tablicą, przefiltrowane
+do tych faktycznie występujących w jej ciele — 132 z 171 zadeklarowanych) — ręczne wypisanie 132
+zależności z pamięci miałoby realne ryzyko pominięcia jednej i zostawienia starej wartości w
+zamkniętym domknięciu (classic stale-closure bug). `tsc --noEmit` czyste PO wklejeniu tej listy
+potwierdza że każda nazwa faktycznie istnieje w zasięgu (literówka = błąd kompilacji, więc to
+nie tylko "wygląda dobrze", naprawdę się sprawdza). `query`/`activeSectionId` ŚWIADOMIE POZA
+listą zależności — potwierdzone że nieużywane w budowie `sections`, więc pisanie w wyszukiwarce
+/przełączanie aktywnej sekcji TERAZ w ogóle nie odbudowuje tej tablicy. `filtered` też dostało
+`useMemo([sections, query])` — samo filtrowanie (proste dopasowanie stringów po już gotowej,
+zmemoizowanej tablicy) zostaje, to jest tanie, problemem była WYŁĄCZNIE odbudowa `sections`.
+
+**Sprawdzone, NIE znalezione tam samo**: Dashboard (`index.tsx`, 5361 linii) i Finanse
+(`finances.tsx`, już ma 18 `useMemo` na 49 zmiennych top-level) — żadnego analogicznego,
+pojedynczego "ogromna tablica bez memo" wzorca. Ich skoki w tym samym rejestrze (929–1160ms,
+pojedyncze, nie klaster) są prawdopodobnie inną przyczyną — czeka na więcej danych z rejestru
+zanim da się to namierzyć równie precyzyjnie jak Ustawienia tutaj (measure, don't guess).
+
+**Testy**: brak nowych (czysto wydajnościowa zmiana zachowania re-renderów, nie logiki —
+`tsc --noEmit` jest tu silniejszą gwarancją poprawności niż jednostkowy test byłby). `tsc
+--noEmit` czyste, `jest --silent` 101/101 suite, 1326 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → wpisz coś w wyszukiwarkę (kilka
+znaków pod rząd) — powinno czuć się zauważalnie płynniej niż dotąd. Sprawdź też że WSZYSTKO
+dalej działa normalnie (żaden toggle/pole nie "zamroziło się" na starej wartości) — to
+największe ryzyko przy tej zmianie, mimo mechanicznie wygenerowanej listy zależności.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
