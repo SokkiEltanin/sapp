@@ -15703,6 +15703,42 @@ route-trackingiem.
 w testach, patrz komentarz na górze pliku). `tsc --noEmit` czyste, `jest --silent` 100/100
 suite, 1307 testów (+1).
 
+## 285. Rejestr zacięć automatyczny i trwały, nie tylko "na żywo" w pamięci (2026-10-10)
+
+User po §284: "a nie mozesz zrobić rejestrów jakiś automatycznych??" — `topSpikes`/`lagSpikes`
+z §284 żyły TYLKO w pamięci bieżącej sesji (znikały po zamknięciu appki) i user nadal musiał
+sam otworzyć Diagnostykę i ręcznie zgłosić co robił o danej godzinie. User chciał, żeby to
+działo się samo, bez jego udziału.
+
+**Fix** (`perfLog.ts`): nowy trwały rejestr (`perf_lag_spikes_v1` w AsyncStorage, capped na
+`MAX_SPIKE_LOG_ENTRIES`=30, ten sam wzorzec co `perf_dashboard_log_v1`) — `recordLagSpike()`
+teraz PERSYSTUJE każdy skok ≥`SPIKE_MIN_MS` od razu, nie tylko trzyma go w `lagSpikes` do
+końca sesji. Każdy zapisany wpis (`LagSpikeEntry`) niesie `at` (ISO), `ms`, i **`route`** —
+ekran, na którym się stał, czytany z nowego modułowego `currentRoute` (ustawianego przez
+eksportowaną `setCurrentRoute()`). `app/_layout.tsx` woła `setCurrentRoute(info?.label ??
+usagePathname)` w TYM SAMYM efekcie co już istniejący licznik użycia ekranów
+(`useUsageStats().recordOpen`, `usagePathname`/`screenInfoFor`) — zero nowego hooka, tylko
+jedna dodatkowa linia przy już policzonym `info`.
+
+Diagnostyka → "Wydajność appki" (`settings.tsx`) czyta teraz `getLagSpikeLog()` zamiast
+(ulotnej) `live.topSpikes` — pokazuje do 15 ostatnich wpisów jako "DATA GODZINA (Ekran): Nms",
+najnowsze u góry. Przycisk "Wyczyść historię" czyści OBIE historie naraz (`clearPerfLog()` +
+`clearLagSpikeLog()`) — Android ma twardy sufit 3 przycisków na `Alert.alert`, więc świadomie
+NIE dodano osobnego przycisku; pusta-historia-startów gałąź (gdzie i tak jest miejsce na 3.
+przycisk) dostała własny "Wyczyść rejestr zacięć".
+
+**Testy**: `__tests__/perfLog.test.ts`, nowy `describe` — pusty rejestr na starcie,
+`clearLagSpikeLog` nie rzuca na pustym, `setCurrentRoute` nie rzuca dla dowolnego stringa,
+zepsuty JSON → pusta lista (nie wyjątek). Sampler sam (prawdziwe timery) świadomie NIE jest
+odpalany w testach — patrz komentarz na górze pliku — więc to tylko kształt/bezpieczeństwo
+odczytu/zapisu rejestru, nie czy `recordLagSpike` faktycznie coś dopisuje. `tsc --noEmit`
+czyste, `jest --silent` 100/100 suite, 1311 testów (+4).
+
+**Priorytet testu na urządzeniu — wysoki**: następnym razem jak appka się zatnie, wejdź do
+Diagnostyka → "Wydajność appki" — "Rejestr zacięć" powinien SAM pokazać czas, ekran i czas
+trwania, bez żadnej Twojej akcji w międzyczasie (nie trzeba już łapać "na żywo" zaraz po
+zacięciu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

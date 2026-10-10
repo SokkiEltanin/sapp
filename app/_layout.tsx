@@ -1,7 +1,7 @@
 // Import FIRST — its module-eval time is the `JS_START` reference for the cold-start perf
 // log (perfLog.ts) that Diagnostyka reads back. Must stay the very first import so it evals
 // as close to real app launch as this JS bundle can observe.
-import { startColdStartLagSampling, pauseLagSampling, resumeLagSampling } from '@/utils/perfLog';
+import { startColdStartLagSampling, pauseLagSampling, resumeLagSampling, setCurrentRoute } from '@/utils/perfLog';
 import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -294,6 +294,9 @@ export default function RootLayout() {
   useEffect(() => {
     const info = screenInfoFor(usagePathname);
     if (info) useUsageStats.getState().recordOpen(info.id);
+    // Rejestr zacięć (perfLog.ts, 2026-10-10) taguje każdy skok lagu EKRANEM, na którym się
+    // stał — ten sam `info`/`usagePathname` co licznik użycia wyżej, zero dodatkowego kosztu.
+    setCurrentRoute(info?.label ?? usagePathname);
   }, [usagePathname]);
 
   // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila...

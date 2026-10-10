@@ -71,11 +71,55 @@ const SPIKE_MIN_MS = 200; // poniżej tego to zwykły jitter timera, nie realny 
 const TOP_SPIKES_N = 5;
 let lagSpikes: { ms: number; atWall: number }[] = [];
 
+// 2026-10-10, user: "a nie mozesz zrobić rejestrów jakiś automatycznych??" — powyższe
+// `lagSpikes`/`topSpikes` żyją tylko w pamięci TEJ sesji (znikają po zamknięciu appki) i user
+// nadal musiałby sam otworzyć Diagnostykę i ręcznie zgłosić co robił. Rejestr niżej robi to
+// bez udziału usera: KAŻDY skok ≥`SPIKE_MIN_MS` dopisuje się trwale do AsyncStorage (przeżywa
+// restart appki) razem z EKRANEM, na którym się stało (`currentRoute`, ustawiane z
+// `app/_layout.tsx` przy każdej zmianie trasy przez `setCurrentRoute` — ten sam wzorzec co
+// `usagePathname`/`screenInfoFor` dla licznika użycia ekranów, patrz tam). Diagnostyka czyta
+// to jak zwykły log (`getLagSpikeLog`), zero akcji ze strony usera poza samym otwarciem ekranu
+// od czasu do czasu.
+const SPIKE_LOG_KEY = 'perf_lag_spikes_v1';
+const MAX_SPIKE_LOG_ENTRIES = 30;
+let currentRoute = 'start';
+
+export interface LagSpikeEntry { at: string; ms: number; route: string }
+
+export function setCurrentRoute(route: string): void {
+  currentRoute = route;
+}
+
+function persistLagSpike(entry: LagSpikeEntry) {
+  (async () => {
+    try {
+      const raw = await AsyncStorage.getItem(SPIKE_LOG_KEY);
+      const list: LagSpikeEntry[] = raw ? JSON.parse(raw) : [];
+      list.push(entry);
+      while (list.length > MAX_SPIKE_LOG_ENTRIES) list.shift();
+      await AsyncStorage.setItem(SPIKE_LOG_KEY, JSON.stringify(list));
+    } catch {}
+  })();
+}
+
+export async function getLagSpikeLog(): Promise<LagSpikeEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(SPIKE_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+export async function clearLagSpikeLog(): Promise<void> {
+  try { await AsyncStorage.removeItem(SPIKE_LOG_KEY); } catch {}
+}
+
 function recordLagSpike(ms: number) {
   if (ms < SPIKE_MIN_MS) return;
-  lagSpikes.push({ ms, atWall: Date.now() });
+  const now = Date.now();
+  lagSpikes.push({ ms, atWall: now });
   lagSpikes.sort((a, b) => b.ms - a.ms);
   if (lagSpikes.length > TOP_SPIKES_N) lagSpikes.length = TOP_SPIKES_N;
+  persistLagSpike({ at: new Date(now).toISOString(), ms, route: currentRoute });
 }
 
 function scheduleLagSample() {
