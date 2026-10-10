@@ -197,22 +197,20 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
         <View style={st.center} pointerEvents="box-none">
           {(phase === 'closed' || phase === 'opening') && (
             <>
-              <Animated.View style={{ transform: [
-                { translateY: phase === 'closed' ? bobY : 0 },
-                { translateX: phase === 'opening' ? shakeX : 0 },
-                { scale: phase === 'opening' ? openScale : 1 },
-              ] }}>
-                <View style={[st.box, { borderColor: boxColor }]}>
-                  {boxIcon
-                    ? <Image source={boxIcon} style={st.boxImg} resizeMode="contain" />
-                    : (<><View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} /><Text style={st.boxEmoji}>{boxEmoji}</Text></>)}
-                </View>
-              </Animated.View>
-              {phase === 'closed' && (
-                <Pressable onPress={doOpen} style={[st.openBtn, { backgroundColor: boxColor }]} hitSlop={10}>
-                  <Text style={st.openBtnTxt}>Otwórz</Text>
-                </Pressable>
-              )}
+              <Pressable onPress={doOpen} disabled={phase !== 'closed'} hitSlop={20}>
+                <Animated.View style={{ transform: [
+                  { translateY: phase === 'closed' ? bobY : 0 },
+                  { translateX: phase === 'opening' ? shakeX : 0 },
+                  { scale: phase === 'opening' ? openScale : 1 },
+                ] }}>
+                  <View style={st.box}>
+                    {boxIcon
+                      ? <Image source={boxIcon} style={st.boxImg} resizeMode="contain" />
+                      : (<><View style={[st.boxLid, { backgroundColor: boxColor + '55' }]} /><Text style={st.boxEmoji}>{boxEmoji}</Text></>)}
+                  </View>
+                </Animated.View>
+              </Pressable>
+              {phase === 'closed' && <Text style={st.hint}>Stuknij, żeby otworzyć</Text>}
             </>
           )}
           {phase === 'opening' && (
@@ -280,14 +278,17 @@ const st = StyleSheet.create({
   // Skrzynka powiększona (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
   // powiększyć bo jest malutka") — 128×104 → 192×156 (+50%), reszta (emoji/przycisk)
   // przeskalowana proporcjonalnie.
-  box: { width: 192, height: 156, borderRadius: 22, backgroundColor: '#161A1A', borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  // 2026-10-10, user: "zrob zeby skrzynki lewitowały same bez przycisku otoczki i stroke,
+  // tylko same i po naciśnięciu w nią sie otwiera" — karta/obwódka (`backgroundColor`/
+  // `borderWidth`/`borderRadius`/`overflow`) i osobny przycisk "Otwórz" usunięte: sama
+  // grafika skrzynki teraz lewituje (`bob`) i jest klikalna (`Pressable` ją owija w JSX).
+  box: { width: 192, height: 156, alignItems: 'center', justifyContent: 'center' },
   boxLid: { position: 'absolute', top: 0, left: 0, right: 0, height: 44 },
   boxEmoji: { fontSize: 68, marginTop: 16 },
   // Grafika skrzynki (2026-09-11) — gdy `boxIcon` podane (LOOT_BOXES/DAILY_BOX mają własne
   // PNG), zastępuje `boxLid`+`boxEmoji` całkowicie (jedna spójna grafika zamiast dwóch warstw).
   boxImg: { width: '100%', height: '100%' },
-  openBtn: { paddingHorizontal: 34, paddingVertical: 15, borderRadius: 16 },
-  openBtnTxt: { color: '#07160F', fontSize: 16, fontWeight: '900' },
+  hint: { color: '#E7EAEA', fontSize: 13.5, fontWeight: '700', textAlign: 'center', maxWidth: 240 },
   // Błysk "wybuchu" między zamknięciem a reelem (2026-09-12) — rosnące, szybko gasnące
   // koło na środku modala, DOKŁADNIE w momencie cięcia closed→spinning (patrz `doOpen`).
   flash: {

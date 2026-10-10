@@ -15649,6 +15649,32 @@ usera): (1) 4× "Kaucja PET" → 4 pozycje `kind: 'deposit'` po 0,50 zł, (2) `s
 się z `total` (36,93), nie 34,93. `tsc --noEmit` czyste, `jest --silent` 100/100 suite, 1306
 testów (+2).
 
+## 283. Skrzynki (BoxRevealModal) lewitują same, bez przycisku/karty/obwódki (2026-10-10)
+
+User zrzutem ekranu sklepu pupila: "zrob zeby skrzynki lewitowały same bez przycisku otoczki
+i stroke, tylko same i po naciśnięciu w nią sie otwiera jakby". Zamknięta skrzynka w
+`BoxRevealModal.tsx` siedziała w ciemnej karcie (`backgroundColor: '#161A1A'`, `borderWidth:
+3`, `borderRadius: 22`) i miała ODDZIELNY przycisk "Otwórz" pod spodem — user chciał samą
+grafikę skrzynki (bez karty/obwódki), klikalną bezpośrednio, bujającą się (`bob`, już
+istniejący) cały czas.
+
+**Fix**: `st.box` stracił `backgroundColor`/`borderWidth`/`borderRadius`/`overflow` (zostaje
+tylko rozmiar + centrowanie) — dla skrzynek z PNG (`boxIcon`, większość realnych skrzynek w
+sklepie) widać teraz SAMĄ grafikę, bez karty pod spodem. Osobny `Pressable` "Otwórz" USUNIĘTY
+— `doOpen` wisi teraz na `Pressable` OWIJAJĄCYM całą bujającą się skrzynkę (`hitSlop={20}`,
+`disabled` poza fazą `closed`), ten sam wzorzec co `CrateModal.tsx` (skrzynka kota — tam już
+tak działało). Mały hint "Stuknij, żeby otworzyć" pod skrzynką (żeby nie zniknęła cała
+afordancja razem z przyciskiem), też po wzorcu z `CrateModal.tsx`.
+
+**Testy**: brak nowych (czysto wizualna zmiana, bez logiki do testowania). `tsc --noEmit`
+czyste, `jest --silent` 100/100 suite, 1306 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: Pupil → Sklep → stuknij dowolną skrzynkę —
+powinna się bujać bez karty/obwódki i otwierać po dotknięciu samej grafiki (nie osobnego
+przycisku). Sprawdź też skrzynkę bez własnej grafiki (fallback emoji), jeśli taka jeszcze
+istnieje w ofercie — tam `boxLid` (kolorowy pasek) + emoji zostały bez zmian poza usunięciem
+karty/obwódki wokół.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
