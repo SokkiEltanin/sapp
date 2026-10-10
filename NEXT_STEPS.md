@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: klawiatura zasłaniała stopkę modala szczegółów zadania (2026-10-10)
+
+User zrzutem ekranu: "Tutaj w zadaniach klawiatura mi zasłania wszystkiego". Pełny opis w
+ARCHITECTURE.md §286. `TaskDetailModal` (`app/(tabs)/tasks.tsx`) to `<Modal transparent>` —
+osobne natywne okno, którego globalny `android.softwareKeyboardLayoutMode: "pan"` (na którym
+polega ~20 innych ekranów w appce) NIE dotyka. Fix: `behavior="height"` na Androidzie TYLKO w
+tym modalu. **Celowo nie tknięte**: pozostałe ~20 miejsc z tym samym wzorcem — to zwykłe
+pełnoekranowe formularze, nie modale, więc pan-mode powinien je obsługiwać poprawnie; jeśli
+user zgłosi podobny problem gdzie indziej w `<Modal transparent>` z inputem, ten sam fix jest
+pierwszym podejrzanym. `tsc`/`jest` zielone (1311/1311, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Zadania → otwórz dowolne zadanie → dotknij "Dodaj
+kamień milowy" — klawiatura nie powinna już zasłaniać stopki z przyciskami ani samego pola.
+
 ## 🆕🔴 Lag POTWIERDZONY realnymi danymi — rejestr zacięć teraz SAM, automatycznie (2026-10-10)
 
 User wkleił dane z "Wydajność appki": sesja 234s, **lag max 6157ms** (ponad 6-sekundowy
