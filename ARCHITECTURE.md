@@ -16210,6 +16210,49 @@ po pierwszym wejściu na ekran po aktualizacji); (2) stocz realną walkę z akty
 w 1-2 ciosy; (3) po wygranej sprawdź że coins/XP czują się adekwatne do trudności (wyraźnie
 więcej niż przed fixem, nie identyczne).
 
+## 295. Rynek: paczkowe otwieranie skrzynek (długi przycisk = ×5, bez animacji) (2026-10-11)
+
+User: "dodaj mi te skrzynki szybsze otwieranie np natychmiastowo otworzyć 5 i pokazują się
+tylko karty z otwarcia lub losuje się naraz 5 nagród czy coś" — kontynuacja wcześniejszej
+prośby ("Pomiń" spin w BoxRevealModal.tsx, §291), gdzie user po dodaniu przycisku skip nadal
+chciał coś szybszego przy otwieraniu wielu skrzynek z rzędu.
+
+**Rozwiązanie**: długie przytrzymanie skrzynki w Rynku (`app/pet-shop.tsx`, `PressableScale`
+już wspiera `onLongPress`) zamiast zwykłego tapnięcia (`onBuyBox`, niezmienione) kupuje i
+otwiera `BATCH_OPEN_N=5` sztuk NARAZ — zero animacji spinu, wynik wszystkich pięciu gotowy od
+razu. Nowy, lekki komponent `MultiBoxRevealModal.tsx` (osobny od `BoxRevealModal.tsx` — ten
+ma całą maszynerię fazy closed/opening/spinning/revealed, dla paczki niepotrzebną) pokazuje
+siatkę 5 małych kart wyników (ikona + nazwa/kwota, kolor ramki wg rzadkości — ta sama paleta
+co `rewardCell()` w `BoxRevealModal.tsx`) plus sumę zebranych monet.
+
+`onBuyBoxMulti()` (`app/pet-shop.tsx`): potwierdza koszt ×5 przez `ConfirmDialog`
+(`confirmBuy`), potem woła `rollBox()` pięć razy POD RZĄD z lokalną, w locie aktualizowaną
+kopią `ownedCombatItems` (żeby roll #3 w paczce widział upgrade perku przyznany przez roll #1
+— ten sam efekt jakby user otwierał je jedna po drugiej, nie "zamrożony" stan store'u sprzed
+całej paczki) — nagrody przyznawane OD RAZU (`addCoins`/`grantGear`/`grantOrLevelCombatItem`),
+bez pośredniego kroku czekania na animację (w odróżnieniu od `onBuyBox`/`onBoxRevealed`, gdzie
+przyznanie czeka na odsłonę reela — tu nie ma żadnej animacji do zsynchronizowania). Każdy z 5
+rolli loguje się do `boxStatsStore` osobno (`recordBoxOpen` ×5), identycznie jak 5 pojedynczych
+otwarć — statystyki Rynku nie widzą różnicy między trybem pojedynczym a paczkowym.
+
+Gest jest niewidoczny bez podpowiedzi — dodany mały hint pod ladą ("przytrzymaj skrzynkę, żeby
+otworzyć 5 naraz") obok istniejącego licznika odświeżenia zestawu.
+
+**Celowo NIE zrobione**: wybieralna ilość (3/5/10) — user podał konkretnie "5" jako przykład
+("np."), stała `BATCH_OPEN_N` jest jednym miejscem do zmiany gdyby chciał innej liczby, ale
+UI wyboru ilości to osobna, nieproszona rozbudowa.
+
+**Testy**: brak nowych — czysta orkiestracja UI nad już przetestowaną logiką (`rollBox`,
+`grantGear`, `grantOrLevelCombatItem`, `spendCoins`), ten sam powód co inne czysto-UI zmiany w
+tej sesji bez testów. `tsc --noEmit` czyste, `jest --silent` 101/101 suite, 1328 testów (bez
+zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Rynek → przytrzymaj dowolną skrzynkę (drewniana/
+żelazna/złota/boska) — sprawdź że (1) ConfirmDialog pokazuje poprawny koszt ×5, (2) po
+potwierdzeniu modal pokazuje dokładnie 5 kart bez spinu, (3) monety/ekwipunek/perki faktycznie
+się przyznały (sprawdź stan po zamknięciu — ekwipunek w panelu, perki w ekranie bossów), (4)
+zwykłe tapnięcie (pojedyncze otwarcie ze spinem) dalej działa jak wcześniej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

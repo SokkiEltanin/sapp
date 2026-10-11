@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: paczkowe otwieranie skrzynek — przytrzymaj = ×5 naraz, bez animacji (2026-10-11)
+
+User: "dodaj mi te skrzynki szybsze otwieranie np natychmiastowo otworzyć 5 i pokazują się
+tylko karty z otwarcia". Pełny opis w ARCHITECTURE.md §295. Długie przytrzymanie skrzynki w
+Rynku (zamiast zwykłego tapnięcia) kupuje i otwiera 5 naraz, zero animacji spinu — nowy modal
+`MultiBoxRevealModal.tsx` pokazuje od razu siatkę 5 kart wyników + sumę monet. Zwykłe
+tapnięcie (pojedyncze otwarcie ze spinem/"Pomiń") działa dokładnie jak wcześniej. `tsc`/`jest`
+zielone (101/101 suite, 1328 testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Rynek → przytrzymaj skrzynkę — sprawdź koszt ×5 w
+potwierdzeniu, 5 kart w wyniku, i że nagrody (monety/ekwipunek/perki) faktycznie się przyznały.
+
 ## 🆕🔴 Bossy eventowe — 3 potwierdzone bugi naprawione: 1-ciosowa walka, nieskończona energia, słabe nagrody (2026-10-11)
 
 User: "Te eventowe bosy chyba nie mają sensu... pokonuje je na raz (bo sie buguja) albo mam

@@ -10,6 +10,7 @@ import { ChevronLeft, Coins, Check, X } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import MultiBoxRevealModal from '@/components/pet/MultiBoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
@@ -193,6 +194,8 @@ export default function PetShop() {
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  // Paczkowe otwieranie (2026-10-11) — patrz komentarz w MultiBoxRevealModal.tsx.
+  const [multiReveal, setMultiReveal] = useState<{ box: LootBox; rewards: BoxReward[] } | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
   // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
   // tap na kafelku szedł od razu do `onBuyDaily`/ConfirmDialog bez pokazania CO właściwie się
@@ -318,6 +321,45 @@ export default function PetShop() {
       at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
     });
+  };
+
+  // Paczkowe otwieranie (2026-10-11, user: "dodaj mi te skrzynki szybsze otwieranie np
+  // natychmiastowo otworzyć 5 i pokazują się tylko karty z otwarcia") — długie przytrzymanie
+  // skrzynki (zamiast zwykłego tapnięcia = `onBuyBox` wyżej) kupuje i otwiera `BATCH_OPEN_N`
+  // naraz, BEZ animacji spinu (ten sam `rollBox()` co pojedyncze otwarcie, tylko N razy pod
+  // rząd) — `MultiBoxRevealModal` pokazuje od razu gotowe karty wszystkich wyników. Nagrody są
+  // przyznawane TU, od razu (w odróżnieniu od `onBuyBox`/`onBoxRevealed`, gdzie przyznanie
+  // czeka na odsłonę reela) — nie ma tu żadnej animacji do zsynchronizowania z momentem
+  // przyznania, więc pośredni krok tylko komplikowałby kod bez żadnej korzyści dla usera.
+  const BATCH_OPEN_N = 5;
+  const onBuyBoxMulti = (box: LootBox) => {
+    haptic.tap();
+    const totalCost = box.cost * BATCH_OPEN_N;
+    if (coins < totalCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${totalCost}`); return; }
+    confirmBuy(`${box.name} ×${BATCH_OPEN_N}`, totalCost, () => {
+      if (!spendCoins(totalCost)) { haptic.error(); toast.error('Nie udało się kupić skrzynek'); return; }
+      // Lokalna, w locie aktualizowana kopia `ownedCombatItems` — żeby kolejne rolle W TEJ
+      // SAMEJ paczce widziały upgrade'y przyznane wcześniejszymi rollami (ten sam efekt jakby
+      // user otworzył je jedna po drugiej, nie "zamrożony" stan sprzed całej paczki).
+      let localCombat = { ...ownedCombatItems };
+      const rewards: BoxReward[] = [];
+      for (let i = 0; i < BATCH_OPEN_N; i++) {
+        const reward = rollBox(box, petLevel, localCombat);
+        rewards.push(reward);
+        if (reward.type === 'coins') addCoins(reward.coins);
+        else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
+        else if (reward.type === 'combatItem') {
+          grantOrLevelCombatItem(reward.itemId, reward.level);
+          localCombat = { ...localCombat, [reward.itemId]: reward.level };
+        }
+        recordBoxOpen({
+          at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
+          coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+        });
+      }
+      haptic.success();
+      setMultiReveal({ box, rewards });
+    }, `Otwórz ×${BATCH_OPEN_N}`, `${box.blurb}\nnatychmiastowo, bez animacji`);
   };
 
   // Darmowa skrzynka dnia (2026-09-08) — USUNIĘTA z tego ekranu (user: "zostawiłeś skrzynkę
@@ -549,7 +591,7 @@ export default function PetShop() {
               {LOOT_BOXES.map((box, i) => {
                 const afford = coins >= box.cost;
                 return (
-                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 4])]}>
+                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} onLongPress={() => onBuyBoxMulti(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 4])]}>
                     <RadialGlow size={44} color="#000" opacity={0.55} />
                     {/* Własne grafiki skrzynek (2026-09-09, user dostarczył
                         assets/chests/skrzynka_*.png — "dodaj je do rynku naszego") — `emoji`
@@ -571,8 +613,11 @@ export default function PetShop() {
               `s.artPiece`, więc zawsze siedzi pod itemami niezależnie od dostrojenia
               `adjust`, i wygląda jak drewniana tabliczka szyldu sklepu, nie generyczna
               ciemna etykieta. */}
-          <View style={{ alignItems: 'center' }}>
+          <View style={{ alignItems: 'center', gap: spacing[1] }}>
             <View style={s.shopSignPill}><Text style={s.shopSignPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
+            {/* Podpowiedź długiego przytrzymania (2026-10-11) — patrz onBuyBoxMulti wyżej,
+                jedyna wskazówka że ta akcja w ogóle istnieje (gest, nie widoczny przycisk). */}
+            <Text style={s.multiHint}>przytrzymaj skrzynkę, żeby otworzyć {BATCH_OPEN_N} naraz</Text>
           </View>
         </View>
         </View>
@@ -588,6 +633,13 @@ export default function PetShop() {
         boxIcon={reveal?.box.icon}
         onRevealed={onBoxRevealed}
         onClose={() => setReveal(null)}
+      />
+
+      <MultiBoxRevealModal
+        visible={!!multiReveal}
+        boxName={multiReveal?.box.name ?? ''}
+        rewards={multiReveal?.rewards ?? []}
+        onClose={() => setMultiReveal(null)}
       />
 
       <ConfirmDialog
@@ -858,6 +910,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   emptyRow: { position: 'absolute', top: '38%', left: 0, right: 0, alignItems: 'center' },
   shopSignPill: { backgroundColor: '#2A1C10E6', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1.5, borderColor: '#B8863599', marginTop: spacing[1] },
   shopSignPillTxt: { fontSize: 11, fontWeight: '800', color: '#E8C88A', letterSpacing: 0.3 },
+  multiHint: { fontSize: 10, fontWeight: '600', color: c.text.muted },
 
   cellState: { fontSize: 10, color: c.text.muted },
 
