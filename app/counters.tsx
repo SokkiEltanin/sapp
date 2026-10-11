@@ -61,8 +61,19 @@ export default function Counters() {
   const [pickCal, setPickCal] = useState(false);
 
   const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses, meals, foodProducts) : daysSince(cn);
-  const untils = counters.filter(x => x.kind === 'until').sort((a, b) => a.date.localeCompare(b.date));
-  const sinces = counters.filter(x => x.kind === 'since').sort((a, b) => daysFor(b) - daysFor(a));
+  // useMemo (audyt optymalizacji, 2026-10-11) — brak go tu był przeoczeniem (`upcoming` niżej
+  // JEST zmemoizowane). `sinces.sort()` woła `daysFor()` w komparatorze, a dla liczników
+  // `auto` to `autoDaysWithout()` budujące od zera mapę z CAŁEJ tablicy `products` i skanujące
+  // `expenses`/`meals` — O(k log k) pełnych skanów PRZY KAŻDYM renderze (np. każdy znak wpisany
+  // w polu edycji nazwy licznika, które żyje w TYM SAMYM komponencie).
+  const untils = useMemo(
+    () => counters.filter(x => x.kind === 'until').sort((a, b) => a.date.localeCompare(b.date)),
+    [counters],
+  );
+  const sinces = useMemo(
+    () => counters.filter(x => x.kind === 'since').sort((a, b) => daysFor(b) - daysFor(a)),
+    [counters, expenses, meals, foodProducts],
+  );
 
   const upcoming = useMemo(() => {
     const t = todayStr();

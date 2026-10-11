@@ -21,6 +21,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
+import { useDayKey } from '@/hooks/useDayKey';
 
 const MONTHS_BACK = 6;
 
@@ -99,7 +100,7 @@ export default function StatsScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { expenses, setExpenses } = useExpensesStore();
-  const today = new Date();
+  const dayKey = useDayKey();
   const { width: screenW } = useWindowDimensions();
   const chartW = screenW - 64; // outer padding (16*2) + card padding (16*2)
   const [budgets, setBudgets]           = useState<MonthlyBudgets>({});
@@ -115,12 +116,21 @@ export default function StatsScreen() {
     }
   }, []);
 
-  // Selected month base
-  const monthBase  = subMonths(today, monthOffset);
-  const start      = startOfMonth(monthBase);
-  const end        = endOfMonth(monthBase);
-  const prevStart  = startOfMonth(subMonths(monthBase, 1));
-  const prevEnd    = endOfMonth(subMonths(monthBase, 1));
+  // Selected month base — useMemo (audyt optymalizacji, 2026-10-11): `today`/`monthBase`/
+  // `start`/`end`/`prevStart`/`prevEnd` były NOWYMI obiektami `Date` na KAŻDY render (bez
+  // useMemo), co rozbijało całą memoizację niżej — `thisMonth`/`prevMonth` (deps: start/end)
+  // nigdy nie trafiały w cache referencyjnie → `dailyData`/`catBreakdown`/`catTransactions`
+  // (zależne od nich) też nigdy. `dayKey` (patrz useDayKey.ts) daje rollover o północy mimo
+  // stabilnej referencji w ciągu dnia.
+  const { today, monthBase, start, end, prevStart, prevEnd } = useMemo(() => {
+    const today = new Date();
+    const monthBase = subMonths(today, monthOffset);
+    const start = startOfMonth(monthBase);
+    const end = endOfMonth(monthBase);
+    const prevStart = startOfMonth(subMonths(monthBase, 1));
+    const prevEnd = endOfMonth(subMonths(monthBase, 1));
+    return { today, monthBase, start, end, prevStart, prevEnd };
+  }, [monthOffset, dayKey]);
   const isCurrentMonth = monthOffset === 0;
 
   const prevMonth  = useCallback((e: Expense) => inMonth(e, prevStart, prevEnd), [prevStart, prevEnd]);
@@ -135,7 +145,7 @@ export default function StatsScreen() {
       const inc = expenses.filter(e => isIncome(e)  && inMonth(e, s, en)).reduce((a, e) => a + e.amount, 0);
       return { label: format(d, 'LLL', { locale: pl }), expenses: exp, income: inc, balance: inc - exp, isSelected: i === MONTHS_BACK - 1 - monthOffset };
     });
-  }, [expenses, monthOffset]);
+  }, [expenses, monthOffset, today]);
   const maxMonthly = Math.max(...monthlyData.flatMap(m => [m.expenses, m.income]), 1);
 
   // ── Daily for selected month

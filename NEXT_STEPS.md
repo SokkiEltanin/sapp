@@ -3,6 +3,39 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Runda audytu optymalizacji — 10 fixów, pet/walki + ekrany główne/store'y (2026-10-11)
+
+User: "Okej dawaj optymalizacje". Dwa równoległe background-audyty (jeden pod walki/pet/
+animacje, drugi pod ekrany główne/store'y), świadomie pomijające już naprawione w poprzednich
+rundach winowajców. Pełny opis w ARCHITECTURE.md §293. Skrót:
+
+- **CatArt.tsx** → `memo()` — pole "Imię pupila" w edytorze re-renderowało cały animowany SVG
+  kotek na każdy znak.
+- **CatArtStatic/GroundShadow/RadialGlow/BossArt** → `memo()` — re-renderowały się na każdy tik
+  rundy walki mimo stabilnych propsów.
+- **GearPanel.tsx** — 12+ pełnych skanów `ownedGear` na render → jeden `useMemo`.
+- **CrateModal.tsx** — `setInterval` liczenia monet mógł tykać dalej po zamknięciu modala w
+  trakcie animacji → cleanup w `useRef`/`useEffect`.
+- **expenses/stats.tsx** — `Date` tworzone na nowo co render rozbijały CAŁĄ memoizację
+  (`dailyData`/`catBreakdown`/`catTransactions`) → jeden `useMemo` z `useDayKey()`.
+- **CalendarGrid.tsx + WeekStrip.tsx** — każda cela skanowała CAŁE `events`/`tasks` osobno →
+  jedna mapa dzień→dane w `useMemo` + `memo()`; caller filtruje do widocznego miesiąca.
+- **counters.tsx** — `untils`/`sinces` bez `useMemo`, `sort()` wołał kosztowną
+  `autoDaysWithout()` na każdy render (np. każdy znak w edycji nazwy licznika).
+- **vehicles.tsx** — lista pickera liczona nawet z zamkniętym modalem → `useMemo`.
+- **health.tsx / boss-fight.tsx** — gołe `useMoodStore()`/`useCalendarStore()` bez selektora na
+  dużych/hot-path ekranach → selektor/`useShallow`.
+
+Czysto wydajnościowa runda, zero zmiany logiki. `tsc`/`jest` zielone (101/101 suite, 1326
+testów, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni, szczególnie Kalendarz**: przebudowa CalendarGrid z
+per-cela skanów na mapę dzień→dane to NAJWIĘKSZE ryzyko tej rundy — przełącz kilka miesięcy,
+sprawdź że eventy/zadania/kropki-nastroju są nadal poprawnie przypisane do właściwych dni
+(szczególnie wielodniowe eventy i zadania z `scheduledDate`). Reszta: wpisywanie imienia
+pupila (płynność), walka z bossem (portrety się nie migają), Ekwipunek, szybkie otwórz→zamknij
+skrzynki, Finanse→Statystyki, Liczniki, Pojazdy→przypisz wydatek.
+
 ## 🆕 Fix: powiadomienie "Wypłata?" strzelało mimo auto-zaksięgowanej wypłaty (2026-10-11)
 
 User zrzutem: "Bez sensu mnie pyta o wylate skoro już wypłata jest dodana... do finansow

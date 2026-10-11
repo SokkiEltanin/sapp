@@ -16061,6 +16061,90 @@ sesji — §278/279 — też bez testów). `tsc --noEmit` czyste, `jest --silent
 sprawdź że po tym jak bank automatycznie zaksięguje wypłatę, powiadomienie faktycznie nie
 strzeli ponownie tego miesiąca.
 
+## 293. Runda audytu optymalizacji — 10 fixów (walki/pet + ekrany główne/store'y) (2026-10-11)
+
+User: "Okej dawaj optymalizacje". Dwa równoległe background-agenty (Explore), każdy
+przeszukujący inny obszar, z wyraźną instrukcją NIE powtarzać już naprawionych w poprzednich
+rundach winowajców (ustawienia §289, scan.tsx, dashboard snapshot/memo, 1Hz timer, throttled
+persist, `bestMoodWeek`, projectile/flash §287, battle-layout-lab §288). Wszystkie 10
+znalezisk — realne, nie kosmetyczne — zostało wdrożone w tej samej rundzie.
+
+**Walki/pet/animacje** (agent 1):
+1. `CatArt.tsx` — `export default memo(CatArt)`. Poprzednio w `PetCustomizeModal.tsx` pełen
+   animowany ~60-węzłowy SVG kotek (idle breathe/blink/glance/ear-flutter) re-renderował się
+   na KAŻDY znak wpisywany w polu "Imię pupila" (oba żyją w tym samym komponencie, dzielą
+   `draft` state). `palette` (z `paletteById()`, lookup w stałej tablicy `CAT_PALETTES`) i
+   reszta propsów są referencyjnie stabilne — memo realnie łapie.
+2. `CatArtStatic.tsx`, `GroundShadow.tsx`, `RadialGlow.tsx`, `BossArt.tsx` — wszystkie cztery
+   `export default memo(...)`. Renderowane w JSX areny `boss-fight.tsx`, re-renderowane na
+   KAŻDY tik rundy walki (`setPawFlying`/`setLastHit`/`setLiveBossHp`/...), mimo że ich propsy
+   (paleta/rozmiar/id) są stabilne przez całą walkę — zmienia się tylko pasek HP/tekst obrażeń,
+   nie portrety. Dokładnie ten sam wzorzec co już dawno zmemoizowane karty dashboardu, którego
+   wizualizacje walki nigdy nie dostały.
+3. `GearPanel.tsx` — `slotButton()` (×6 na render) i `GearSlotModal`'s `tabRow` (×6) robiły
+   WŁASNE pełne `Object.entries(ownedGear).some(...)` skany (12+ pełnych przejść/render) zamiast
+   jednego. Zamienione na jeden `useMemo` budujący `Set<GearSlot>` slotów z niezałożonymi
+   kopiami. `groupOwnedBySlot(ownedGear, slot)` w `GearSlotModal` (pełny `Object.entries`+sort,
+   liczony od zera przy KAŻDYM renderze, np. rozwijaniu grupy itemu) owinięty w `useMemo`
+   (hook przeniesiony PRZED `if (!slot) return null` — zasady hooków).
+4. `CrateModal.tsx` — `setInterval` liczący animację monet żył jako lokalna zmienna w
+   `doOpen()`, nigdy nie czyszczona; zamknięcie modala w trakcie liczenia (okno ~720ms)
+   zostawiało interwał tykający dalej, wołający `setShown` na niewidocznym komponencie.
+   Przeniesiony do `useRef`, czyszczony w `useEffect` cleanup przy zmianie `visible`/unmount.
+
+**Ekrany główne/store'y** (agent 2):
+5. `app/expenses/stats.tsx` — `today`/`monthBase`/`start`/`end`/`prevStart`/`prevEnd` były
+   NOWYMI obiektami `Date` na KAŻDY render (bez `useMemo`), co rozbijało CAŁĄ memoizację niżej:
+   `thisMonth`/`prevMonth` (`useCallback` z deps `[start,end]`/`[prevStart,prevEnd]`) nigdy nie
+   trafiały w cache referencyjnie → `dailyData`/`catBreakdown`/`catTransactions` (zależne od
+   nich) też nigdy. Owinięte w jeden `useMemo` z deps `[monthOffset, dayKey]` (`useDayKey()` —
+   współdzielony hook z `useExpenses.ts`, daje rollover o północy mimo stabilnej referencji w
+   ciągu dnia). Przy okazji odblokowało memoizację trzech NIŻSZYCH memosów (linie z `today` w
+   deps), które z tego samego powodu nigdy realnie nie cache'owały.
+6. `CalendarGrid.tsx` + `WeekStrip.tsx` — każda cela (do ~42 w gridzie, 7 w strip) robiła 3-6
+   WŁASNYCH pełnych skanów `events`/`tasks` (`filter`/`find`/`some`) — a caller (ekran
+   kalendarza, `app/(tabs)/stats.tsx`) przekazuje WSZYSTKIE eventy/zadania appki, niefiltrowane
+   do miesiąca. Oba komponenty: jeden `useMemo` budujący mapę dzień→{events,tasks,mood} zamiast
+   skanu per cela, plus `React.memo`. Dodatkowo w callerze: nowy `monthEvents`/`monthTasks`
+   (`useMemo` filtrujący `allEvents`/`tasks` do WIDOCZNEGO miesiąca przed przekazaniem do
+   `CalendarGrid` — `WeekStrip` świadomie zostawiony z pełną listą, bo tydzień może rozjeżdżać
+   się na dwa miesiące, a filtrowanie po `viewYear`/`viewMonth` by to zgubiło) i `useShallow` na
+   dotąd gołym `useCalendarStore()` (łapał też `isLoading` bez potrzeby).
+7. `app/counters.tsx` — `untils`/`sinces` liczone bez `useMemo` (przeoczenie — `upcoming` dwie
+   linie niżej JEST zmemoizowane). `sinces.sort()` woła `daysFor()` w komparatorze, która dla
+   liczników `auto` to `autoDaysWithout()` — buduje od zera mapę z CAŁEJ tablicy `products` i
+   skanuje `expenses`/`meals`, O(k log k) razy na render. Stan modala edycji (nazwa/data) żyje w
+   TYM SAMYM komponencie, więc każdy znak w polu edycji przeliczał WSZYSTKIE liczniki od zera.
+8. `app/vehicles.tsx` — lista pickera transakcji (`filter`+`sort`+`slice(50)` po CAŁEJ
+   `expenses`) żyła jako goły JSX wewnątrz `<Modal visible={!!picker}>` — dzieci Modala w RN są
+   renderowane (kod JS wykonywany) NIEZALEŻNIE od `visible`, więc liczyło się to na KAŻDY render
+   ekranu, również z zamkniętym pickerem. Wyciągnięte do `useMemo` z guardem `if (!picker)
+   return []`. Przy okazji: goły `useExpensesStore()` → `useShallow` (łapał
+   filters/isLoading/pendingSync/error bez potrzeby).
+9. `app/(tabs)/health.tsx` — goły `useMoodStore()` → `useMoodStore(s => s.entries)`. Ekran ma
+   `lazy: false` (zawsze zamontowany) i jest jednym z największych w `app/(tabs)`, więc łapał
+   pełny re-render na KAŻDĄ zmianę w moodStore gdziekolwiek w appce (dashboard, zakładka
+   Nastrój...), nie tylko realną zmianę `entries`.
+10. `app/boss-fight.tsx` — goły `useCalendarStore()` DOSŁOWNIE pod już naprawionym (2026-09-20)
+    `useExpensesStore` — ten sam bug, przeoczony dla sąsiedniej linii. `useShallow` ograniczający
+    subskrypcję do `events`/`gcalEvents` (łapał też tasks/selectedDate/isLoading na hot-pathie
+    walki).
+
+**Testy**: brak nowych — czysto wydajnościowa runda (memoizacja/selektory/cleanup, zero zmiany
+logiki/zachowania). `tsc --noEmit` czyste, `jest --silent` 101/101 suite, 1326 testów (bez
+zmiany).
+
+**Priorytet testu na urządzeniu — średni**: (1) Pupil → Edytuj → wpisz imię — powinno być
+zauważalnie płynniej; (2) walka z bossem — sprawdź że portrety/cienie się NIE "migają"/nie
+gubią wyglądu między rundami; (3) Ekwipunek — rozwijanie grup itemów, przełączanie slotów;
+(4) otwórz kilka skrzynek z rzędu i zamknij modal W TRAKCIE liczenia monet (szybkie
+otwórz→zamknij) — sprawdź że appka się nie wywraca; (5) Finanse → Statystyki — przełączaj
+miesiące/filtr dzienny/kategorie, sprawdź że liczby się zgadzają; (6) Kalendarz — przełączaj
+miesiące/tryb widoku, sprawdź że eventy/zadania/nastrój nadal widoczne poprawnie na
+wszystkich dniach (to NAJWIĘKSZE ryzyko tej zmiany — przebudowa z per-cela skanów na mapę);
+(7) Liczniki — dodawanie/edycja, sortowanie "od" wciąż poprawne; (8) Pojazdy → przypisz
+wydatek — picker nadal pokazuje właściwą listę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

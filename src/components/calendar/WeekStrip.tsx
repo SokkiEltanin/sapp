@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { CalendarEvent, MoodEntry, MOOD_COLORS, Task, eventCoversDay } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -29,36 +30,49 @@ interface Props {
   onSelectDate: (date: string) => void;
 }
 
-export default function WeekStrip({ selectedDate, events, tasks, moodEntries = [], weekOffset, onSelectDate }: Props) {
+function WeekStrip({ selectedDate, events, tasks, moodEntries = [], weekOffset, onSelectDate }: Props) {
   const today = toDateStr(new Date());
 
   // Start from Monday of selectedDate's week + weekOffset
   const base = getMondayOfWeek(selectedDate);
   base.setDate(base.getDate() + weekOffset * 7);
 
-  const days = Array.from({ length: 7 }, (_, i) => {
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date(base);
     d.setDate(base.getDate() + i);
     return { date: toDateStr(d), day: d.getDate(), dow: d.getDay() };
-  });
+  }), [base.getTime()]);
 
-  const hasEv = (date: string) => events.some(e => eventCoversDay(e, date));
-  const hasTk = (date: string) => tasks.some(t => t.deadline?.startsWith(date) && t.status !== 'done');
-  const hasUrgent = (date: string) => tasks.some(
-    t => t.deadline?.startsWith(date) && t.status !== 'done' && t.priority === 'high'
-  );
-  const moodFor = (date: string) => moodEntries.find(e => e.date === date);
+  // useMemo (audyt optymalizacji, 2026-10-11) — poprzednio każda z 7 cel robiła 3 WŁASNE pełne
+  // skany `events`/`tasks` (ten sam wzorzec już naprawiony w CalendarGrid.tsx, patrz tamten
+  // komentarz) — jeden przebieg po 7 widocznych dniach.
+  const byDay = useMemo(() => {
+    type Bucket = { hasEv: boolean; hasTk: boolean; hasUrgent: boolean; mood?: MoodEntry };
+    const map = new Map<string, Bucket>();
+    for (const { date } of days) {
+      const dayEv = events.some(e => eventCoversDay(e, date));
+      const dayTasks = tasks.filter(t => t.deadline?.startsWith(date) && t.status !== 'done');
+      map.set(date, {
+        hasEv: dayEv,
+        hasTk: dayTasks.length > 0,
+        hasUrgent: dayTasks.some(t => t.priority === 'high'),
+        mood: moodEntries.find(e => e.date === date),
+      });
+    }
+    return map;
+  }, [days, events, tasks, moodEntries]);
 
   return (
     <View style={styles.strip}>
       {days.map(({ date, day, dow }) => {
         const sel = date === selectedDate;
         const isTd = date === today;
-        const ev = hasEv(date);
-        const tk = hasTk(date);
-        const urgent = hasUrgent(date);
+        const b = byDay.get(date);
+        const ev = !!b?.hasEv;
+        const tk = !!b?.hasTk;
+        const urgent = !!b?.hasUrgent;
         const isWeekend = dow === 0 || dow === 6;
-        const mood = moodFor(date);
+        const mood = b?.mood;
         const moodBg = mood && !sel ? MOOD_COLORS[mood.mood] + '20' : undefined;
 
         return (
@@ -94,6 +108,8 @@ export default function WeekStrip({ selectedDate, events, tasks, moodEntries = [
     </View>
   );
 }
+
+export default memo(WeekStrip);
 
 const styles = StyleSheet.create({
   strip: {

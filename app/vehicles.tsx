@@ -10,6 +10,7 @@ import {
   Fuel, Wrench, ChevronDown, ChevronUp, Check, Link2, RotateCcw, Star,
 } from 'lucide-react-native';
 
+import { useShallow } from 'zustand/react/shallow';
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
@@ -60,7 +61,12 @@ interface MForm { label: string; date: string; intervalMonths: string; expenseId
 export default function VehiclesScreen() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const { expenses, setExpenses, updateExpense } = useExpensesStore();
+  // useShallow (audyt optymalizacji, 2026-10-11) — gołe `useExpensesStore()` subskrybowało cały
+  // store (filters/isLoading/pendingSync/error — nic z tego tu nie jest używane), re-renderując
+  // ekran na każde tło-sync wydatków gdziekolwiek w appce.
+  const { expenses, setExpenses, updateExpense } = useExpensesStore(useShallow((st) => ({
+    expenses: st.expenses, setExpenses: st.setExpenses, updateExpense: st.updateExpense,
+  })));
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -224,6 +230,18 @@ export default function VehiclesScreen() {
   };
 
   const linkedExpense = mForm.expenseId ? expenses.find(e => e.id === mForm.expenseId) : undefined;
+
+  // useMemo (audyt optymalizacji, 2026-10-11) — ten filter+sort+slice po CAŁEJ (niefiltrowanej)
+  // tablicy `expenses` żył jako goły JSX wewnątrz `<Modal visible={!!picker}>`; dzieci Modala
+  // są renderowane (kod JS wykonywany) NIEZALEŻNIE od `visible` w RN, więc liczyło się to na
+  // KAŻDY render tego ekranu, również gdy picker był zamknięty.
+  const pickerExpenses = useMemo(() => {
+    if (!picker) return [];
+    return expenses
+      .filter(e => (!e.type || e.type === 'expense') && (picker.mode === 'link' ? true : !e.vehicleId))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .slice(0, 50);
+  }, [expenses, picker]);
 
   return (
     <SafeAreaView style={s.root} edges={['top']}>
@@ -556,10 +574,7 @@ export default function VehiclesScreen() {
           <View style={s.pickerCard}>
             <Text style={s.sheetTitle}>{picker?.mode === 'link' ? 'Wybierz transakcję' : `Przypisz do „${picker?.vehicle.name}"`}</Text>
             <ScrollView style={{ marginTop: spacing[2] }}>
-              {expenses
-                .filter(e => (!e.type || e.type === 'expense') && (picker?.mode === 'link' ? true : !e.vehicleId))
-                .sort((a, b) => (a.date < b.date ? 1 : -1))
-                .slice(0, 50)
+              {pickerExpenses
                 .map(e => (
                   <TouchableOpacity key={e.id} style={s.exRow} onPress={() => picker && (picker.mode === 'link' ? linkToMaintenance(e) : attachExpense(picker.vehicle, e))} activeOpacity={0.7}>
                     <View style={{ flex: 1 }}>

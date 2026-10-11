@@ -56,6 +56,18 @@ export default function GearPanel({ children }: { children: ReactNode }) {
   // już ma tę samą optymalizację (2026-09-09) — ten komponent po prostu nigdy jej nie dostał.
   const { ownedGear, equippedGear } = usePetStore(useShallow((s) => ({ ownedGear: s.ownedGear, equippedGear: s.equippedGear })));
   const [openSlot, setOpenSlot] = useState<GearSlot | null>(null);
+  // useMemo (audyt optymalizacji, 2026-10-11) — poprzednio KAŻDY z 6 `slotButton()` robił
+  // własny pełny `Object.entries(ownedGear).some(...)` skan (6 pełnych przejść na render tego
+  // permanentnie zamontowanego panelu); jeden przebieg budujący Set slotów wystarcza.
+  const unequippedSlots = useMemo(() => {
+    const set = new Set<GearSlot>();
+    for (const [id, inst] of Object.entries(ownedGear)) {
+      if (!inst) continue;
+      const item = gearById(inst.itemId);
+      if (item && equippedGear[item.slot] !== id) set.add(item.slot);
+    }
+    return set;
+  }, [ownedGear, equippedGear]);
 
   const slotButton = (slot: GearSlot) => {
     const equippedId = equippedGear[slot];
@@ -65,9 +77,7 @@ export default function GearPanel({ children }: { children: ReactNode }) {
     const equippedInst = equippedId ? ownedGear[equippedId] : undefined;
     const equippedItem = equippedInst ? gearById(equippedInst.itemId) : undefined;
     const meta = equippedInst ? RARITY_META[equippedInst.rarity] : null;
-    const hasUnequippedInSlot = Object.entries(ownedGear).some(
-      ([id, inst]) => inst && id !== equippedId && gearById(inst.itemId)?.slot === slot,
-    );
+    const hasUnequippedInSlot = unequippedSlots.has(slot);
     const Icon = SLOT_ICON[slot];
     // Ciemny jednolity slot (2026-10-04, user: "sloty... ciemne jednolite a jedyne co to
     // lekko na ramce gradient bardzo delikatny ogarniający jaka to rzadkość" — dawne pełne
@@ -129,8 +139,23 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
   // moge je sprzedac i wtedy wybieram ile"). Sprzedaje N najsłabszych niezałożonych kopii.
   const [groupSell, setGroupSell] = useState<{ item: GearItemDef; candidates: { id: string; inst: GearInstance }[]; qty: number } | null>(null);
 
+  // useMemo (audyt optymalizacji, 2026-10-11) — `groupOwnedBySlot` robi pełny
+  // `Object.entries(ownedGear)`+sort; liczone od zera na KAŻDY render tego modala (np. przy
+  // rozwijaniu/zwijaniu grupy itemu), mimo że `ownedGear`/`slot` się nie zmieniały. Hook musi
+  // być wywołany przed poniższym early return (reguły hooków), stąd ternary wewnątrz.
+  const groups = useMemo(() => (slot ? groupOwnedBySlot(ownedGear, slot) : []), [ownedGear, slot]);
+  // Ten sam Set co w `GearPanel` wyżej — jeden przebieg zamiast 6 pełnych skanów w `tabRow`.
+  const unequippedSlots = useMemo(() => {
+    const set = new Set<GearSlot>();
+    for (const [id, inst] of Object.entries(ownedGear)) {
+      if (!inst) continue;
+      const item = gearById(inst.itemId);
+      if (item && equippedGear[item.slot] !== id) set.add(item.slot);
+    }
+    return set;
+  }, [ownedGear, equippedGear]);
+
   if (!slot) return null;
-  const groups = groupOwnedBySlot(ownedGear, slot);
   const equippedId = equippedGear[slot];
   const equippedInst = equippedId ? ownedGear[equippedId] : undefined;
   const equippedItem = equippedInst ? gearById(equippedInst.itemId) : undefined;
@@ -311,10 +336,7 @@ function GearSlotModal({ slot, onSelectSlot, onClose }: { slot: GearSlot | null;
             {GEAR_SLOTS.map(sl => {
               const TabIcon = SLOT_ICON[sl];
               const active = sl === slot;
-              const slEquippedId = equippedGear[sl];
-              const hasDot = Object.entries(ownedGear).some(
-                ([id, inst]) => inst && id !== slEquippedId && gearById(inst.itemId)?.slot === sl,
-              );
+              const hasDot = unequippedSlots.has(sl);
               return (
                 <TouchableOpacity key={sl} onPress={() => { haptic.tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpandedItemId(null); onSelectSlot(sl); }} style={[s.tab, active && s.tabActive]}>
                   <TabIcon size={19} color={active ? c.accent.blue : c.text.muted} strokeWidth={1.8} />

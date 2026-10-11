@@ -138,7 +138,11 @@ export default function HealthScreen() {
   const [monthData, setMonthData]       = useState<HealthDayPoint[]>([]); // 30-day from watch
   const [fromWatch, setFromWatch]       = useState(false);                // HC delivered data
 
-  const { entries } = useMoodStore();
+  // Selektor pojedynczego pola (audyt optymalizacji, 2026-10-11) — gołe `useMoodStore()`
+  // subskrybowało cały store (todayEntry/isLoading/pendingSync — nic z tego tu nie jest
+  // używane), re-renderując ten duży, zawsze zamontowany (lazy: false) ekran na każdą zmianę
+  // w moodStore gdziekolwiek w appce.
+  const entries = useMoodStore(s => s.entries);
   const waterSyncVersion = useHabitsSync(s => s.version);
   const bumpHabits = useHabitsSync(s => s.bump);
   const pomodoroIsRunning = usePomodoroStore(s => s.isRunning);
