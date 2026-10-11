@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BoxRevealModal: przycisk "Pomiń" spin + naprawiony kolor wypełniaczy reela (2026-10-11)
+
+User: "zastanawiam sie zeby mocy otwierać je szybciej... nie chce czekać na animacje do
+końca... kolor monetek sie nie zgadza bo losuje szary czasami i daje jak niebieski lub
+zielony a tego nie widac". Pełny opis w ARCHITECTURE.md §291. (1) nowy przycisk "Pomiń"
+podczas kręcenia reela (~3.4s), ten sam wzorzec co "Pomiń walkę" w boss-fight.tsx — skacze
+dokładnie na wylosowaną nagrodę. (2) root cause koloru znaleziony: wypełniacze reela brały
+INNĄ paletę (`RARITY_META`, ma zielony) niż realny możliwy wynik dla monet/perków
+(`CRATE_META`, bez zielonego) — teraz obie strony używają tej samej palety. `tsc`/`jest`
+zielone (bez zmiany, czysto wizualna zmiana).
+
+**Priorytet testu na urządzeniu — średni**: otwórz kilka skrzynek z rzędu, sprawdź "Pomiń"
+(czy ląduje dokładnie na nagrodzie) i czy kolory w locie czują się teraz spójniejsze.
+
 ## 🆕 Ekran wygranej: większa, "ostemplowana POKONANY" ikona bossa (2026-10-10)
 
 User zrzutem ekranu: "zrobimy większą ikonkę bossa i wtedy taka z x na oczach albo

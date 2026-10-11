@@ -49,10 +49,20 @@ const FILLER_ICONS: { icon?: any; emoji?: string }[] = [
   ...(Object.keys(COMBAT_ITEMS) as CombatItemId[]).map(id => ({ icon: COMBAT_ITEMS[id].icons[0] })),
   { emoji: '🪙' }, { emoji: '🪙' }, { emoji: '🪙' },
 ];
-// Głównie common/rare obwódki, rzadki błysk epickiego/legendarnego/mitycznego dla smaku —
-// czysto kosmetyczne, nie powiązane z realną rzadkością danego wypełniacza.
-const FILLER_COLORS = [RARITY_META.common.color, RARITY_META.common.color, RARITY_META.common.color,
-  RARITY_META.rare.color, RARITY_META.rare.color, RARITY_META.epic.color, RARITY_META.legendary.color, RARITY_META.mythic.color];
+// 2026-10-11, user: "mam wrażenie ze kolor monetek sie nie zgadza bo losuje szary czasami i
+// daje jak niebieski lub zielony a tego nie widac" — ROOT CAUSE: te kolory wypełniaczy brały
+// `RARITY_META` (paleta RZADKOŚCI EKWIPUNKU: szary/ZIELONY/niebieski/różowy/fiolet), a realny
+// wylosowany wynik dla monet/perków bossa koloruje się `CRATE_META` (paleta TIERU SKRZYNKI:
+// szary/niebieski/FIOLET/złoty — patrz `rewardCell` niżej) — DWIE RÓŻNE palety z tym samym
+// słowem "rare"/"epic" ale innym kolorem (`RARITY_META.rare`=zielony vs `CRATE_META.rare`=
+// niebieski, `RARITY_META.epic`=niebieski vs `CRATE_META.epic`=fiolet). Efekt: user widział w
+// locie zielony (niemożliwy wynik dla monet — ta paleta go w ogóle nie ma) i mylił niebieski
+// `RARITY_META.epic` z niebieskim `CRATE_META.rare`. Fix: wypełniacze biorą TERAZ `CRATE_META`
+// — ta sama paleta co realny możliwy wynik (dla gearu też, bo gear i tak dostaje WŁASNY kolor
+// z `RARITY_META` dopiero na trafionej komórce `rewardCell`, nigdy z wypełniaczy) — każdy
+// kolor widziany w locie jest teraz faktycznie osiągalnym wynikiem, nie fałszywą obietnicą.
+const FILLER_COLORS = [CRATE_META.basic.color, CRATE_META.basic.color, CRATE_META.basic.color,
+  CRATE_META.rare.color, CRATE_META.rare.color, CRATE_META.epic.color, CRATE_META.legendary.color];
 
 function rewardCell(reward: BoxReward): ReelCell {
   if (reward.type === 'gear') {
@@ -115,6 +125,12 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   const shake = useRef(new Animated.Value(0)).current;
   const openScale = useRef(new Animated.Value(1)).current;
   const flash = useRef(new Animated.Value(0)).current;
+  // "Pomiń" (2026-10-11, user: "zeby mocy otwierać je szybciej tez jak juz otworzyłem sporo
+  // nie chce czekać na animacje do końca") — ten sam wzorzec co "Pomiń walkę" w
+  // boss-fight.tsx: wynik jest już wylosowany (`reward` prop), spin to czysto kosmetyczny
+  // ~3.4s pokaz. `finalXRef` trzyma dokładny cel spinu (liczony raz w `doOpen`), żeby skip
+  // mógł skoczyć TAM, nie zostawić reela zatrzymanego w dowolnym miejscu w połowie komórki.
+  const finalXRef = useRef(0);
 
   useEffect(() => {
     if (!visible) return;
@@ -135,6 +151,30 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   const meta = reward
     ? (reward.type === 'gear' ? RARITY_META[reward.rarity] : CRATE_META[reward.rarity])
     : CRATE_META.basic;
+
+  // Wyodrębnione z `.start(() => {...})` w `doOpen` (2026-10-11) — wołane zarówno gdy reel
+  // naturalnie dojedzie do celu, JAK I przez `skipSpin` niżej, żeby nie duplikować logiki
+  // "co się dzieje w momencie odsłony" w dwóch miejscach.
+  const onReelLanded = () => {
+    if (!reward) return;
+    onRevealed?.();
+    setPhase('revealed');
+    haptic.success();
+    Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
+    const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
+    const em = reward.type === 'coins' ? '🪙' : '✨';
+    setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
+      sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
+      emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
+  };
+
+  const skipSpin = () => {
+    if (phase !== 'spinning') return;
+    haptic.tap();
+    reelX.stopAnimation();
+    reelX.setValue(finalXRef.current);
+    onReelLanded();
+  };
 
   const doOpen = () => {
     if (phase !== 'closed' || !reward) return;
@@ -162,18 +202,14 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
         // bo target ma 5 komórek zapasu PO sobie w REEL_LENGTH, patrz stałe wyżej).
         const jitter = (Math.random() - 0.5) * REEL_ITEM_W * 0.6;
         const finalX = reelWindowW / 2 - (REEL_TARGET_INDEX * REEL_ITEM_W + REEL_ITEM_W / 2) + jitter;
+        finalXRef.current = finalX;
         Animated.timing(reelX, {
           toValue: finalX, duration: 3400, easing: Easing.bezier(0.1, 0.7, 0.2, 1), useNativeDriver: true,
-        }).start(() => {
-          onRevealed?.();
-          setPhase('revealed');
-          haptic.success();
-          Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-          const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
-          const em = reward.type === 'coins' ? '🪙' : '✨';
-          setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
-            sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
-            emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
+        }).start(({ finished }) => {
+          // `finished:false` = przerwane przez `skipSpin`'s `stopAnimation()` — ten już sam
+          // wywołał `onReelLanded()`, więc TU trzeba go pominąć, inaczej odpaliłby się
+          // podwójnie (raz z `skipSpin`, raz z tego callbacku).
+          if (finished) onReelLanded();
         });
       });
     });
@@ -217,23 +253,31 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
             <Animated.View pointerEvents="none" style={[st.flash, { opacity: flashOpacity, transform: [{ scale: flashScale }] }]} />
           )}
           {phase === 'spinning' && (
-            <View style={[st.reelWindow, { width: reelWindowW }]}>
-              <Animated.View style={[st.reelStrip, { transform: [{ translateX: reelX }] }]}>
-                {reel.map(cell => (
-                  <View key={cell.key} style={st.reelCellOuter}>
-                    <View style={[st.reelCell, { borderColor: cell.color }]}>
-                      {cell.icon
-                        ? <Image source={cell.icon} style={st.reelCellImg} resizeMode="contain" />
-                        : <Text style={st.reelCellEmoji}>{cell.emoji}</Text>}
+            <>
+              <View style={[st.reelWindow, { width: reelWindowW }]}>
+                <Animated.View style={[st.reelStrip, { transform: [{ translateX: reelX }] }]}>
+                  {reel.map(cell => (
+                    <View key={cell.key} style={st.reelCellOuter}>
+                      <View style={[st.reelCell, { borderColor: cell.color }]}>
+                        {cell.icon
+                          ? <Image source={cell.icon} style={st.reelCellImg} resizeMode="contain" />
+                          : <Text style={st.reelCellEmoji}>{cell.emoji}</Text>}
+                      </View>
                     </View>
-                  </View>
-                ))}
-              </Animated.View>
-              <View style={st.reelFadeL} pointerEvents="none" />
-              <View style={st.reelFadeR} pointerEvents="none" />
-              <View style={[st.reelPointerTri, { left: reelWindowW / 2 - 10 }]} pointerEvents="none" />
-              <View style={[st.reelPointerBar, { left: reelWindowW / 2 - 2 }]} pointerEvents="none" />
-            </View>
+                  ))}
+                </Animated.View>
+                <View style={st.reelFadeL} pointerEvents="none" />
+                <View style={st.reelFadeR} pointerEvents="none" />
+                <View style={[st.reelPointerTri, { left: reelWindowW / 2 - 10 }]} pointerEvents="none" />
+                <View style={[st.reelPointerBar, { left: reelWindowW / 2 - 2 }]} pointerEvents="none" />
+              </View>
+              {/* "Pomiń" (2026-10-11) — ten sam wzorzec co "Pomiń walkę" w boss-fight.tsx:
+                  wynik jest już wylosowany, spin to czysto kosmetyczny pokaz, user otwierający
+                  wiele skrzynek z rzędu nie chce czekać ~3.4s za każdym razem. */}
+              <Pressable onPress={skipSpin} hitSlop={12}>
+                <Text style={st.skipTxt}>Pomiń</Text>
+              </Pressable>
+            </>
           )}
           {phase === 'revealed' && (
             <>
@@ -289,6 +333,8 @@ const st = StyleSheet.create({
   // PNG), zastępuje `boxLid`+`boxEmoji` całkowicie (jedna spójna grafika zamiast dwóch warstw).
   boxImg: { width: '100%', height: '100%' },
   hint: { color: '#E7EAEA', fontSize: 13.5, fontWeight: '700', textAlign: 'center', maxWidth: 240 },
+  // "Pomiń" (2026-10-11) — ten sam styl co "Pomiń walkę" w boss-fight.tsx, dla spójności.
+  skipTxt: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textAlign: 'center', textDecorationLine: 'underline' },
   // Błysk "wybuchu" między zamknięciem a reelem (2026-09-12) — rosnące, szybko gasnące
   // koło na środku modala, DOKŁADNIE w momencie cięcia closed→spinning (patrz `doOpen`).
   flash: {

@@ -15986,6 +15986,47 @@ wygranej/przegranej nie pokazuje numerycznie ile HP zostało bossowi — tylko g
 **Priorytet testu na urządzeniu — niski**: wygraj dowolną walkę — ikona bossa na ekranie
 wygranej powinna być większa i mieć czerwoną pieczątkę "POKONANY" po przekątnej.
 
+## 291. BoxRevealModal: przycisk "Pomiń" spin + naprawiony kolor wypełniaczy reela (2026-10-11)
+
+User: "zastanawiam sie zeby mocy otwierać je szybciej tez jak juz otworzyłem sporo nie chce
+czekać na animacje do końca... mam wrażenie ze kolor monetek sie nie zgadza bo losuje szary
+czasami i daje jak niebieski lub zielony a tego nie widac jest tylko monet szary i żółty".
+
+**1. "Pomiń"** — ten sam wzorzec co "Pomiń walkę" w `boss-fight.tsx`: nagroda jest już
+wylosowana PRZED animacją (`reward` prop, patrz komentarz na górze pliku), ~3.4s kręcenia
+reela to czysto kosmetyczny pokaz. Logika "co się dzieje gdy reel dojedzie do celu"
+wyodrębniona do `onReelLanded()` (dawniej żyła tylko w `.start(() => {...})` callbacku) —
+wołana ZARÓWNO naturalnie (reel dojechał, `finished:true`) JAK I z nowego `skipSpin()`
+(`reelX.stopAnimation()` + `reelX.setValue(finalXRef.current)` żeby skoczyć DOKŁADNIE na cel,
+nie zostawić reela w połowie komórki). **Pułapka złapana PRZED shipowaniem**: `stopAnimation()`
+TEŻ odpala oryginalny `.start(callback)` (z `finished:false`) — bez guardu `onReelLanded()`
+odpaliłby się podwójnie (raz z `skipSpin`, raz z przerwanego callbacku). Fix: oryginalny
+callback sprawdza `finished` i wywołuje `onReelLanded()` TYLKO gdy `true`.
+
+**2. Kolor wypełniaczy reela — root cause znaleziony**: `FILLER_COLORS` (losowe, czysto
+kosmetyczne obwódki komórek PODCZAS kręcenia) brały `RARITY_META` (paleta RZADKOŚCI
+EKWIPUNKU: szary/**zielony**/niebieski/różowy/fiolet), a realny wylosowany wynik dla monet/
+perków bossa koloruje się `CRATE_META` (paleta TIERU SKRZYNKI: szary/niebieski/**fiolet**/
+złoty, patrz `rewardCell`) — DWIE RÓŻNE palety z tym samym słowem "rare"/"epic" ale innym
+kolorem (`RARITY_META.rare`=zielony vs `CRATE_META.rare`=niebieski, `RARITY_META.epic`=
+niebieski vs `CRATE_META.epic`=fiolet). User widział w locie zielony — kolor NIEOSIĄGALNY dla
+monet (ta paleta go w ogóle nie ma) — i niebieski `RARITY_META.epic` łatwo pomylić z
+niebieskim `CRATE_META.rare` (ten sam dokładnie odcień `#4DA8FF`, inne znaczenie). Fix:
+`FILLER_COLORS` bierze TERAZ `CRATE_META` — ta sama paleta co realny możliwy wynik dla
+monet/perków (gear i tak dostaje WŁASNY kolor z `RARITY_META` dopiero na trafionej komórce,
+nigdy z wypełniaczy, więc nie dotyczy go ten fix) — każdy kolor widziany w locie jest teraz
+faktycznie osiągalnym wynikiem.
+
+**Testy**: brak nowych (czysto wizualna zmiana + interakcja animacji, nie da się sensownie
+pokryć bez realnego natywnego renderera). `tsc --noEmit` czyste, `jest --silent` 101/101
+suite, 1326 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: otwórz kilka skrzynek z rzędu w sklepiku —
+sprawdź że "Pomiń" podczas kręcenia reela skacze DOKŁADNIE na wylosowaną nagrodę (nie
+zatrzymuje się w połowie komórki) i że karta wyniku/konfetti/przyznanie nagrody działa
+identycznie jak bez skipu. Sprawdź też czy kolory w locie "czują się" teraz spójniejsze z
+tym co faktycznie wypada.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
