@@ -209,9 +209,28 @@ export function eventBossFromKey(eventKey: string): EventBoss | undefined {
 // realnie bliżej ~×2.5 całkowitego ryzyka walki, czyli faktycznie "o wiele trudniejsze", nie
 // kosmetyczna zmiana. Test niżej (`eventHpFor / eventAsBoss`) ma podniesiony górny próg
 // hitsNeeded zgodnie z tą przebudową.
-export const eventHpFor = (level: number) => 480 + Math.max(0, level) * 14;
-export const eventCoins = (level: number) => 40 + Math.max(0, level) * 4;
-export const eventXp   = (level: number) => 250 + Math.max(0, level) * 25;
+// PRZEKALIBROWANE na REALNĄ moc ataku gracza (2026-10-11, user: "pokonuje je na raz... albo
+// mam nieskończoność energi albo dają słabe nadrogu" — zgłoszenie zbadane audytem). Stara
+// wersja (`480+level×14`, czysta funkcja `level`) była testowana/kalibrowana WYŁĄCZNIE na
+// `atkStatBonus=0`/zero bonusów z łupu-gearu (patrz test niżej) — dokładnie ten sam błąd,
+// jaki miały kiedyś questBossy (`minibosses.ts`, "Fix 2026-08-15 #2"): realny gracz z
+// zakupionym atkStatBonus i bonusami z pokonanych bossów kampanii zadaje W RZECZYWISTOŚCI
+// kilka razy więcej obrażeń niż ta "vanilla" kalibracja zakładała, więc event boss padał w
+// 1-2 ciosy zamiast zamierzonych ~8-12 — stąd "pokonuje je na raz". Fix: ten sam wzorzec co
+// `questBossHpFor` — HP = `atkPower(atkStatBonus, level, bonuses) × stała`, więc trudność
+// skaluje się z CAŁĄ realną mocą gracza, nie tylko poziomem. `EVENT_BOSS_TARGET_HITS=9`
+// (środek dawnego zamierzonego zakresu 8-12 z testu-strażnika niżej) — event to rzadsza,
+// cięższa walka niż codzienny questBoss (`QUEST_BOSS_TARGET_HITS=4`), ale wciąż kończalna w
+// jednej sesji.
+const EVENT_BOSS_TARGET_HITS = 9;
+export const eventHpFor = (atkStatBonus: number, level: number, bonuses: Bonuses) =>
+  Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * EVENT_BOSS_TARGET_HITS);
+// Przeskalowane RAZEM z buffem HP ×1.6 z 2026-09-12 (2026-10-11, ten sam audyt) — ten buff
+// podbił TYLKO `eventHpFor`, zostawiając `eventCoins`/`eventXp` nietknięte od 2026-08-12, więc
+// współczynnik nagroda/ryzyko spadł ~36% mimo że ryzyko (kwadratowy mechanizm kontrataku,
+// patrz komentarz wyżej) wzrosło ~2,5×. ×1.5 tu odtwarza z grubsza oryginalny współczynnik.
+export const eventCoins = (level: number) => Math.round((40 + Math.max(0, level) * 4) * 1.5);
+export const eventXp   = (level: number) => Math.round((250 + Math.max(0, level) * 25) * 1.5);
 
 // ── Nemesis (kind='menace') — TRWAŁY bank HP, bez timera, bez limitu prób (2026-08-18, user:
 // "ten drugi niech nie ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby
@@ -242,12 +261,12 @@ export const MENACE_ITEM_DROP_CHANCE = 0.08;
 // nigdy go nie czyta (victory modal ma osobny fallback "Medal wydarzenia").
 const EVENT_PLACEHOLDER_LOOT: BossLoot = { id: '', name: '', emoji: '', desc: '', bonus: {} };
 
-// EventBoss + aktualny poziom → Boss-kształtny obiekt gotowy do simulateFight(). Brak
+// EventBoss + aktualna moc gracza → Boss-kształtny obiekt gotowy do simulateFight(). Brak
 // guard/regenPct (żaden event boss ich dziś nie ma — czysta różnorodność HP/motywu na razie).
-export function eventAsBoss(eventBoss: EventBoss, level: number): Boss {
+export function eventAsBoss(eventBoss: EventBoss, atkStatBonus: number, level: number, bonuses: Bonuses): Boss {
   return {
     id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji,
-    order: 0, unlockLevel: 0, hp: eventHpFor(level),
+    order: 0, unlockLevel: 0, hp: eventHpFor(atkStatBonus, level, bonuses),
     weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel,
     loot: EVENT_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: eventBoss.taunt,
     attackKind: eventBoss.attackKind,

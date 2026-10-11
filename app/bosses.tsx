@@ -10,7 +10,7 @@ import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
-import { gearCombatBonuses } from '@/utils/gear';
+import { gearCombatBonuses, gearAtkFlat } from '@/utils/gear';
 import { raidForWeek, raidHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
@@ -93,6 +93,10 @@ export default function Bosses() {
     const gear = gearCombatBonuses(equippedGear, ownedGear);
     return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   }, [ownedItems, equippedGear, ownedGear]);
+  // "WSZĘDZIE gdzie liczy się realna moc ataku... musi wołać effectiveAtkStat, nie goły
+  // atkStatBonus" (patrz ten sam komentarz w boss-fight.tsx) — używane niżej do eventHpFor,
+  // żeby wyświetlany eventMaxHp zgadzał się z tym co realnie liczy walka.
+  const effectiveAtkStat = useMemo(() => atkStatBonus + gearAtkFlat(equippedGear, ownedGear), [atkStatBonus, equippedGear, ownedGear]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
   // Sufit banku (2026-08-19) — TA SAMA formuła co `syncEnergyRegen()` w petStore.ts, żeby
   // pigułka energii i realny cap nigdy nie pokazywały różnych liczb (user: "mam napisane 4
@@ -130,7 +134,7 @@ export default function Bosses() {
   // `syncEventEnergy()` zasila oba.
   const reload = useCallback(() => {
     syncEnergyRegen();
-    syncEventEnergy(eventDailyAttempts(level), 0);
+    syncEventEnergy(eventDailyAttempts(level), 0, eventEnergyMax);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
     // Nemesis (2026-08-18): trwały bank jak raid — ensure na KAŻDY reload (no-op jeśli id się
     // nie zmienił, patrz menaceEnsure w petStore.ts). Liczone TU niezależnie od `eventBoss`
@@ -146,7 +150,7 @@ export default function Bosses() {
       sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
     });
     if (eb && eb.kind === 'menace') menaceEnsure(eb.id, menaceHpFor(level));
-  }, [syncEnergyRegen, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
+  }, [syncEnergyRegen, syncEventEnergy, level, eventEnergyMax, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
   useFocusEffect(reload);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu
@@ -216,7 +220,7 @@ export default function Bosses() {
   // raidRemaining wyżej — patrz menaceHpFor/menaceAsBoss tam. ZAMROŻONY na `menaceMaxHpBanked`
   // (2026-10-04, audyt walki, ten sam fix co raidMaxHp) — bez tego level-up W TRAKCIE klepania
   // tego nemesis cofał pasek/% tu identycznie jak w boss-fight.tsx przed fixem.
-  const eventMaxHp = eventHpFor(level);
+  const eventMaxHp = eventHpFor(effectiveAtkStat, level, bonuses);
   const menaceMaxHp = isMenace ? (menaceId === eventBoss!.id ? menaceMaxHpBanked : menaceHpFor(level)) : 0;
   const menaceRemaining = isMenace ? (menaceId === eventBoss!.id ? menaceHp : menaceMaxHp) : 0;
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;

@@ -16145,6 +16145,71 @@ wszystkich dniach (to NAJWIĘKSZE ryzyko tej zmiany — przebudowa z per-cela sk
 (7) Liczniki — dodawanie/edycja, sortowanie "od" wciąż poprawne; (8) Pojazdy → przypisz
 wydatek — picker nadal pokazuje właściwą listę.
 
+## 294. Bossy eventowe (WYDARZENIE) — 3 potwierdzone bugi: jednouderzeniowa walka, nieskończona energia, słabe nagrody (2026-10-11)
+
+User zrzutem ekranu + opisem: "Te eventowe bosy chyba nie mają sensu... pokonuje je na raz
+(bo sie buguja) albo mam nieskończoność energi albo dają słabe nadrogu". Background-audyt
+(Explore) zbadał cały tor "WYDARZENIE" (`kind: 'seasonal'` w `seasonalEvents.ts` — osobny od
+`raid` i `menace`) i potwierdził WSZYSTKIE trzy jako realne, cytowalne bugi, nie
+nieporozumienie mechaniki.
+
+**1. "Pokonuje je na raz"** — `eventHpFor(level)` (`seasonalEvents.ts`) było czystą funkcją
+`level`, kalibrowaną i TESTOWANĄ wyłącznie na `atkStatBonus=0`/zero bonusów z łupu-gearu
+(`__tests__/seasonalEvents.test.ts`, stary `noBonus`). Dokładnie ten sam błąd klasy co kiedyś
+questBossy (`minibosses.ts`, "Fix 2026-08-15 #2") — realny gracz z zakupionym `atkStatBonus`
++ bonusami z pokonanych bossów kampanii/gear zadaje kilka razy więcej obrażeń niż ta
+"vanilla" kalibracja zakładała (przykład z raportu: Lv29, `atkStatBonus=200`,
+`bonuses.atk=0.3` → ~521 dmg/cios, event miał 886 HP = 1 cios z krytem). **Fix**: `eventHpFor`
+przebudowane na TEN SAM wzorzec co `questBossHpFor` — `atkPower(atkStatBonus, level,
+bonuses) × EVENT_BOSS_TARGET_HITS` (=9, środek dawnego zamierzonego zakresu 8-12), zamiast
+czystej funkcji `level`. `eventAsBoss()` przyjmuje teraz `atkStatBonus`/`bonuses` — oba call
+site'y (`app/bosses.tsx` podgląd HP, `app/boss-fight.tsx` realna walka) wołają z
+`effectiveAtkStat` (= `atkStatBonus` + `gearAtkFlat`, ta sama zasada co przy
+questBoss/missionBoss/raid/menace — "WSZĘDZIE gdzie liczy się realna moc ataku" — patrz
+komentarz w `boss-fight.tsx`), `bosses.tsx` wcześniej tego nie liczył wcale (nowy
+`effectiveAtkStat` useMemo tam, analogiczny do `boss-fight.tsx`).
+
+**2. "Nieskończoność energii"** — **znany, raz już zgłoszony bug, nigdy naprawiony do końca**
+(patrz §84/`ARCHITECTURE.md:6291-6337`, zrzut "15/2", teraz "49/4" — bank rósł DALEJ).
+`syncEventEnergy()` (`petStore.ts`) dopisywał dzienną deltę do trwałej puli `eventEnergy`
+BEZ ŻADNEGO capu, w odróżnieniu od energii kampanii (`energyRegenTick`, twardo capowana do
+`max`). Poprzedni fix (2026-09-12) świadomie zmienił TYLKO wyświetlany sufit (z inwestycji na
+poziom pupila), zostawiając realny bank rosnącym bez granic — ta decyzja się nie sprawdziła.
+**Fix**: `syncEventEnergy(todayEnergy, mult, max)` — nowy trzeci parametr, `eventEnergy:
+Math.min(max, ...)`. Capuje OD RAZU (nie tylko nowe przyrosty) — pierwszy `reload()` po
+aktualizacji ścina istniejącą nadwyżkę do bieżącego sufitu (`eventDailyAttempts(level)`).
+Wołane z `app/bosses.tsx` (jedyny call site) z `eventEnergyMax` (ta sama zmienna co pigułka w
+headerze — jedna prawda, bez rozjazdu).
+
+**3. "Słabe nagrody"** — policzalny rebalans-gap z `git log`: commit `d0cd015` (2026-09-12)
+podbił `eventHpFor` ×1.6 (realnie ~×2.5 ryzyka — kwadratowy mechanizm kontrataku, ten sam co
+przy `BOSSES`), ale `eventCoins`/`eventXp` zostały NIETKNIĘTE od pierwszego commitu
+(2026-08-12) — współczynnik coins/HP spadł ~36% mimo ~2,5× wyższego ryzyka. W odróżnieniu od
+MAD, które przeszło DWIE pełne przebudowy krzywej nagród właśnie z powodu złego sprzężenia
+trudność↔nagroda (§136/§139), event nigdy takiej korekty nie dostał. **Fix**:
+`eventCoins`/`eventXp` ×1.5 (odtwarza z grubsza oryginalny współczynnik nagroda/ryzyko sprzed
+podwyżki trudności).
+
+**Celowo NIE zmienione**: brak dropu przedmiotu bojowego dla eventu (nemesis ma
+`MENACE_ITEM_DROP_CHANCE=0.08`, event tylko medal+coins+xp) — zgłoszony przez audyt jako
+możliwe dalsze usprawnienie, ale to osobna decyzja projektowa (nowa mechanika, nie fix buga),
+odłożona do wyraźnej prośby.
+
+**Testy**: `__tests__/seasonalEvents.test.ts` — zaktualizowana sygnatura `eventHpFor`/
+`eventAsBoss` (teraz `atkStatBonus`/`bonuses`, nie goły `level`) we wszystkich istniejących
+testach, plus 2 NOWE: "rośnie z atkStatBonus/bonuses na STAŁYM poziomie" (dowodzi że HP
+faktycznie reaguje na realną moc, nie tylko level) i "zabijalny w rozsądnej liczbie ciosów
+(~5-13) też przy REALNEJ inwestycji gracza" (regresja wprost dla "pokonuje je na raz" —
+Lv2/25/50/100 z `atkStatBonus=200`/`bonuses.atk=0.3`). `tsc --noEmit` czyste, `jest --silent`
+101/101 suite, 1328 testów (+2).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) Bossy → karta WYDARZENIE — sprawdź że
+pigułka energii "X/Y" w headerze NIE pokazuje już absurdalnej nadwyżki (X nie większe niż Y
+po pierwszym wejściu na ekran po aktualizacji); (2) stocz realną walkę z aktywnym eventem
+("Jesienna Demeter" aktywna do 14.10) — powinna trwać kilka-kilkanaście rund, nie kończyć się
+w 1-2 ciosy; (3) po wygranej sprawdź że coins/XP czują się adekwatne do trudności (wyraźnie
+więcej niż przed fixem, nie identyczne).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
