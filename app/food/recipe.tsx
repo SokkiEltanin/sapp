@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -51,6 +51,29 @@ interface Candidate {
   source: 'curated' | 'base';
   semi?: boolean;   // półprodukt (baza) — podbity i oznaczony w liście składników
 }
+
+// Wiersz listy kandydatów-składników — memo (audyt optymalizacji, 2026-10-11, dokończenie
+// §298 — ten sam wzorzec co `CandidateRow`/`LibraryRow` w app/food/add.tsx). Lista potrafi
+// mieć do ~32 pozycji (8 ulubionych/własnych + 24 z bazy offline) i cały ekran ma WŁASNY stan
+// picker'a porcji (kcal100/qtyText/gramsOverride) w TYM SAMYM komponencie — bez memo każdy
+// znak wpisany w modalu porcji przerysowywał całą, niewidoczną pod nim listę. `onOpen` MUSI
+// być stabilne (useCallback w RecipeBuilder, patrz tam) — inaczej memo nic nie daje.
+const CandidateRow = memo(function CandidateRow({ cand, index, onOpen, s }: {
+  cand: Candidate; index: number; onOpen: (cand: Candidate) => void; s: ReturnType<typeof makeS>;
+}) {
+  return (
+    <TouchableOpacity onPress={() => onOpen(cand)} style={[s.candRow, index > 0 && s.itemBorder]}>
+      <View style={{ flex: 1 }}>
+        <View style={s.candNameRow}>
+          <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+          {cand.semi && <View style={s.semiBadge}><Text style={s.semiBadgeTxt}>PÓŁPRODUKT</Text></View>}
+        </View>
+        <Text style={s.candMeta}>{cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}{cand.source === 'curated' ? '  ·  moje' : ''}</Text>
+      </View>
+      <Plus size={18} color={ACCENT} />
+    </TouchableOpacity>
+  );
+});
 
 export default function RecipeBuilder() {
   const c = useColors();
@@ -205,18 +228,18 @@ export default function RecipeBuilder() {
     return Array.from(new Set(list));
   }, [sel]);
 
-  const openPicker = (cand: Candidate, role: 'ing' | 'addon' = 'ing') => {
+  const openPicker = useCallback((cand: Candidate, role: 'ing' | 'addon' = 'ing') => {
     haptic.tap();
     const u: FoodUnit = cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g';
     setSel(cand); setPickRole(role); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
     setPasteOpen(false); setPasteText('');
-  };
-  const addNew = () => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); };
+  }, []);
+  const addNew = useCallback(() => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); }, [query, openPicker]);
 
   // ── tryb "Nie wiem ile czego" — dodaj bez pytania o gramy/jednostkę, domyślnie
   // "średnio" (tier 2); podbicie/zmniejszenie tieru PO dodaniu jest opcjonalne. ──
-  const addRoughIngredient = (cand: Candidate) => {
+  const addRoughIngredient = useCallback((cand: Candidate) => {
     haptic.tap();
     const kcalPer100g = cand.kcalPer100g ?? 0;
     const grams = ROUGH_TIER_GRAMS[2];
@@ -228,7 +251,14 @@ export default function RecipeBuilder() {
     const item: MealItem = { name: cand.name, productId, qty: 1, unit: 'g', grams, kcal: Math.round(grams / 100 * kcalPer100g) };
     setIngs(prev => [...prev, item]);
     setQuery('');
-  };
+  }, [upsertProductByName]);
+  // Wspólne, stabilne wejście dla `CandidateRow.onOpen` (audyt optymalizacji, 2026-10-11) —
+  // ta sama gałąź co dawniej inline w JSX (`prep === 'rough' && ... ? addRoughIngredient : openPicker`),
+  // tylko teraz jedna referencja zamiast nowego closure co render.
+  const tapCandidate = useCallback((cand: Candidate) => {
+    if (prep === 'rough' && cand.kcalPer100g != null) addRoughIngredient(cand);
+    else openPicker(cand);
+  }, [prep, addRoughIngredient, openPicker]);
   // Zmiana tieru PO dodaniu — odzyskuje gęstość ze stosunku kcal/grams (oba ustawione
   // z tej samej gęstości przy dodaniu), więc nie trzeba osobno pamiętać kcal/100g.
   const setRoughTier = (i: number, tier: 1 | 2 | 3) => {
@@ -410,16 +440,7 @@ export default function RecipeBuilder() {
         )}
         <View style={s.card}>
           {candidates.map((cand, i) => (
-            <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => prep === 'rough' && cand.kcalPer100g != null ? addRoughIngredient(cand) : openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
-              <View style={{ flex: 1 }}>
-                <View style={s.candNameRow}>
-                  <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-                  {cand.semi && <View style={s.semiBadge}><Text style={s.semiBadgeTxt}>PÓŁPRODUKT</Text></View>}
-                </View>
-                <Text style={s.candMeta}>{cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}{cand.source === 'curated' ? '  ·  moje' : ''}</Text>
-              </View>
-              <Plus size={18} color={ACCENT} />
-            </TouchableOpacity>
+            <CandidateRow key={cand.productId ?? `b-${cand.name}`} cand={cand} index={i} onOpen={tapCandidate} s={s} />
           ))}
         </View>
 

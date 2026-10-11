@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -71,6 +71,67 @@ interface LibEntry {
   ingredients: string[];   // składniki (do szukania „po składniku")
   ingHay: string;          // znormalizowane składniki, sklejone (haystack)
 }
+
+// A cooked dish (recipe product) → the normal grams picker (weigh your portion). Czysta
+// funkcja, zero domknięć nad stanem komponentu — na poziomie modułu (nie wewnątrz FoodAdd),
+// żeby `tapEntry`/`editTrayItem` mogły ją wołać bez wymuszania nowej referencji co render
+// (audyt optymalizacji, 2026-10-11, patrz LibraryRow/CandidateRow niżej).
+function productToCandidate(p: FoodProduct): Candidate {
+  return {
+    name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
+    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
+    unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: true, source: 'curated',
+  };
+}
+
+// Wiersz biblioteki posiłków (danie/złożenie) — memo (audyt optymalizacji, 2026-10-11): dotąd
+// `renderLibRow` był zwykłą funkcją zwracającą JSX, wywoływaną WEWNĄTRZ renderu `FoodAdd` —
+// nie osobnym komponentem, więc React nie mógł pominąć jej poddrzewa przy re-renderze
+// rodzica. Ekran ma WŁASNY stan picker'a ilości (kcal100/qtyText/gramsOverride/pasteText) W
+// TYM SAMYM komponencie co te listy (do ~74-84 pozycji) — każdy znak wpisany w polu "kcal/100g"
+// czy "ile gramów" w modalu przeliczał/rekonsyliował CAŁĄ, niewidoczną pod spodem listę.
+// `onTap`/`onPin` MUSZĄ być stabilne (useCallback w FoodAdd, patrz tam) — inaczej memo nic nie
+// daje, nowe closure na każdy render i tak łamałoby porównanie propsów.
+const LibraryRow = memo(function LibraryRow({ entry, index, onTap, onPin, s, secondaryColor }: {
+  entry: LibEntry & { note?: string }; index: number;
+  onTap: (e: LibEntry) => void; onPin: (e: LibEntry) => void;
+  s: ReturnType<typeof makeS>; secondaryColor: string;
+}) {
+  return (
+    <TouchableOpacity onPress={() => onTap(entry)} onLongPress={() => onPin(entry)} delayLongPress={400} style={[s.candRow, index > 0 && s.itemBorder]}>
+      <Star size={15} color={ACCENT} fill={entry.pinned ? ACCENT : 'transparent'} />
+      <View style={{ flex: 1 }}>
+        <View style={s.candNameRow}>
+          <View style={s.kindTag}>
+            {entry.kind === 'dish' ? <ChefHat size={10} color={secondaryColor} /> : <Layers size={10} color={secondaryColor} />}
+            <Text style={[s.kindTagTxt, { color: secondaryColor }]}>{entry.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
+          </View>
+          <Text style={s.candName} numberOfLines={1}>{entry.name}</Text>
+        </View>
+        <Text style={s.candMeta}>{entry.meta}{entry.note ? `  ·  ${entry.note}` : ''}</Text>
+      </View>
+      <Plus size={18} color={ACCENT} />
+    </TouchableOpacity>
+  );
+});
+
+// Wiersz pojedynczego produktu — ten sam wzorzec/powód co LibraryRow wyżej.
+const CandidateRow = memo(function CandidateRow({ cand, index, onOpen, s }: {
+  cand: Candidate; index: number; onOpen: (cand: Candidate) => void; s: ReturnType<typeof makeS>;
+}) {
+  return (
+    <TouchableOpacity onPress={() => onOpen(cand)} style={[s.candRow, index > 0 && s.itemBorder]}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+        <Text style={s.candMeta}>
+          {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
+          {cand.source === 'curated' ? '  ·  moje' : ''}
+        </Text>
+      </View>
+      <Plus size={18} color={ACCENT} />
+    </TouchableOpacity>
+  );
+});
 
 export default function FoodAdd() {
   const c = useColors();
@@ -407,7 +468,10 @@ export default function FoodAdd() {
     return Array.from(new Set(list));
   }, [sel]);
 
-  const openPicker = (cand: Candidate, editIndex: number | null = null) => {
+  // useCallback (audyt optymalizacji, 2026-10-11) — ZERO realnych zależności (same stabilne
+  // settery stanu), ale bez useCallback dostawał NOWĄ referencję co render i tak łamałby
+  // memo() na CandidateRow/LibraryRow niżej mimo ich własnego memo() — patrz komentarz tam.
+  const openPicker = useCallback((cand: Candidate, editIndex: number | null = null) => {
     haptic.tap();
     // With a kitchen scale the grams path is the accurate one, so default to 'g' when
     // the food is density-based (kcal/100g) — UNLESS this exact product already has a
@@ -424,7 +488,7 @@ export default function FoodAdd() {
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
     setPasteOpen(false); setPasteText('');
     setEditItemIndex(editIndex);   // null = dopisz nową; liczba = zamień istniejącą pozycję
-  };
+  }, []);
 
   // Stuknięcie pozycji w „Twój posiłek" → picker z jej ILOŚCIĄ/jednostką → zapis ZASTĘPUJE
   // tę pozycję (a nie dopisuje). Tylko produkty; złożenia/dania edytuje się przez usuń+dodaj.
@@ -445,18 +509,18 @@ export default function FoodAdd() {
     setGramsOverride(it.unit !== 'g' && it.grams > 0 ? String(it.grams) : '');
   };
 
-  // A cooked dish (recipe product) → the normal grams picker (weigh your portion).
-  const productToCandidate = (p: FoodProduct): Candidate => ({
-    name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
-    unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: true, source: 'curated',
-  });
-  const tapEntry = (e: LibEntry) => {
+  // useCallback (audyt optymalizacji, 2026-10-11) — `productToCandidate` jest teraz czystą
+  // funkcją modułową (patrz góra pliku), więc te dwie potrzebują tylko stabilnych setterów/
+  // store'owych akcji jako zależności.
+  const tapEntry = useCallback((e: LibEntry) => {
     haptic.tap();
     if (e.kind === 'preset' && e.preset) { setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(e.preset); }
     else if (e.kind === 'dish' && e.product) openPicker(productToCandidate(e.product));
-  };
-  const pinEntry = (e: LibEntry) => { haptic.tap(); e.kind === 'dish' ? togglePinProduct(e.id) : togglePinPreset(e.id); };
+  }, [openPicker]);
+  const pinEntry = useCallback((e: LibEntry) => {
+    haptic.tap();
+    e.kind === 'dish' ? togglePinProduct(e.id) : togglePinPreset(e.id);
+  }, [togglePinProduct, togglePinPreset]);
   // Compose "danie + dodatki": open the dish's portion picker, then you add toppings and
   // save the whole thing as a preset ("Naleśniki z nutellą").
   const composeFromDish = (p: FoodProduct) => {
@@ -593,35 +657,16 @@ export default function FoodAdd() {
     return p && isRecipeProduct(p) ? 'danie' : 'produkt';
   };
 
-  // Wiersz biblioteki (danie/kompozycja) — reużywany w szukaniu i przeglądaniu.
+  // Wiersz biblioteki (danie/kompozycja) — reużywany w szukaniu i przeglądaniu. Renderuje
+  // teraz zmemoizowany `LibraryRow`/`CandidateRow` (patrz góra pliku) zamiast surowego JSX —
+  // `tapEntry`/`pinEntry`/`openPicker` są już `useCallback`-owane, `s` jest już stabilne
+  // (`useMemo` na `c`), więc memo realnie pomija wiersze, których dane się nie zmieniły.
   const renderLibRow = (e: LibEntry & { note?: string }, i: number) => (
-    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
-      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
-      <View style={{ flex: 1 }}>
-        <View style={s.candNameRow}>
-          <View style={s.kindTag}>
-            {e.kind === 'dish' ? <ChefHat size={10} color={c.text.secondary} /> : <Layers size={10} color={c.text.secondary} />}
-            <Text style={[s.kindTagTxt, { color: c.text.secondary }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
-          </View>
-          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
-        </View>
-        <Text style={s.candMeta}>{e.meta}{e.note ? `  ·  ${e.note}` : ''}</Text>
-      </View>
-      <Plus size={18} color={ACCENT} />
-    </TouchableOpacity>
+    <LibraryRow key={e.key} entry={e} index={i} onTap={tapEntry} onPin={pinEntry} s={s} secondaryColor={c.text.secondary} />
   );
   // Wiersz pojedynczego produktu.
   const renderSingle = (cand: Candidate, i: number) => (
-    <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
-      <View style={{ flex: 1 }}>
-        <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-        <Text style={s.candMeta}>
-          {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-          {cand.source === 'curated' ? '  ·  moje' : ''}
-        </Text>
-      </View>
-      <Plus size={18} color={ACCENT} />
-    </TouchableOpacity>
+    <CandidateRow key={cand.productId ?? `b-${cand.name}`} cand={cand} index={i} onOpen={openPicker} s={s} />
   );
 
   return (
