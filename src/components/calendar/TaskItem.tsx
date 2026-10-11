@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Check, Clock, Flame } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
@@ -17,7 +18,12 @@ interface Props {
   onPress?: (id: string) => void;
 }
 
-export default function TaskItem({ task, index, onToggle, onPress }: Props) {
+// memo (audyt optymalizacji, 2026-10-11) — wiersz renderowany w pętli `.map()` w stats.tsx
+// (dzienny widok zadań kalendarza, 2 miejsca) wewnątrz ekranu z wieloma niezwiązanymi
+// `useState` (viewYear/viewMonth/calMode/weekOffset/...) — dowolna ich zmiana re-renderowała
+// też tę listę bez potrzeby. Listy są z natury małe (zadania jednego dnia), więc impact niski,
+// ale fix jest praktycznie darmowy.
+function TaskItem({ task, index, onToggle, onPress }: Props) {
   const done = task.status === 'done';
   const high = task.priority === 'high';
 
@@ -52,6 +58,8 @@ export default function TaskItem({ task, index, onToggle, onPress }: Props) {
     </View>
   );
 }
+
+export default memo(TaskItem);
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: spacing[2] },

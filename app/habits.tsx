@@ -783,6 +783,18 @@ export default function HabitsScreen() {
     [habits, todayDone],
   );
 
+  // useMemo (audyt optymalizacji, 2026-10-11) — `getStreak`/`getLast7` (bez sztywnego górnego
+  // limitu kroków, `MAX_STREAK_LOOKBACK_DAYS` to tylko bezpiecznik) były wołane na ŻYWO w JSX
+  // dla KAŻDEGO nawyku na KAŻDY render tego ekranu — w tym re-rendery z zupełnie niezwiązanych
+  // zmian UI (otwarcie/zamknięcie siatki miesiąca, modal edycji, dialog usuwania). Oba są już
+  // `useCallback`-owane w `useHabits.ts` (deps `[habits, completions, frozen, ...]`), więc ten
+  // przebieg realnie przelicza się TYLKO gdy dane faktycznie się zmieniły.
+  const habitStats = useMemo(() => {
+    const map = new Map<string, { streak: number; last7: ReturnType<typeof getLast7> }>();
+    for (const h of habits) map.set(h.id, { streak: getStreak(h.id), last7: getLast7(h.id) });
+    return map;
+  }, [habits, getStreak, getLast7]);
+
   const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null);
   const handleDelete = (habit: Habit) => { haptic.tap(); setConfirmDelete(habit); };
 
@@ -867,8 +879,8 @@ export default function HabitsScreen() {
                   habit={habit}
                   done={isDone}
                   count={count}
-                  streak={getStreak(habit.id)}
-                  last7={getLast7(habit.id)}
+                  streak={habitStats.get(habit.id)?.streak ?? 0}
+                  last7={habitStats.get(habit.id)?.last7 ?? []}
                   onToggle={() => {
                     haptic[isDone ? 'tap' : 'success']();
                     toggle(habit.id);

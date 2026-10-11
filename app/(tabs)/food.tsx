@@ -208,6 +208,18 @@ export default function Food() {
     } catch { Alert.alert('Diagnostyka', 'Nie udało się odczytać (brak Health Connect?).'); }
   };
 
+  // useMemo (audyt optymalizacji, 2026-10-11) — `weekBalance`/`avgStats` niżej RAZEM robiły 37
+  // pełnych `.filter()` przejść po CAŁEJ, nigdy nie archiwizowanej historii `meals` — a
+  // `loadBody()` (patrz `useFocusEffect`/`AppState` listener w tym pliku) odpala się przy
+  // KAŻDYM foregroundzie appki, nie tylko po dodaniu posiłku, więc te skany powtarzały się
+  // non-stop, rosnąc z całkowitą liczbą zalogowanych posiłków w historii konta. Jeden przebieg
+  // budujący mapę dzień→suma kcal, czytany przez oba memosy niżej jako `.get(key) ?? 0`.
+  const kcalByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of meals) map.set(m.date, (map.get(m.date) ?? 0) + m.kcal);
+    return map;
+  }, [meals]);
+
   // ── Bilans tygodnia: spalone (zegarek) vs zjedzone (dziennik) ──────────────
   const weekBalance = useMemo(() => {
     const p = (n: number) => String(n).padStart(2, '0');
@@ -217,14 +229,14 @@ export default function Food() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-      const eatenD = meals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
+      const eatenD = kcalByDay.get(key) ?? 0;
       const burnD = key === today ? burn : (burnByDay[key] ?? 0);   // today uses the resting+movement model
       days.push({ key, label: dow[d.getDay()], eaten: eatenD, burn: burnD, balance: burnD - eatenD });
     }
     const logged = days.filter(x => x.eaten > 0);                 // only count days you actually logged food
     const cumDeficit = logged.reduce((s, x) => s + x.balance, 0);
     return { days, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700 };
-  }, [meals, burnByDay, burn, today]);
+  }, [kcalByDay, burnByDay, burn, today]);
 
   // 30-day averages — "ile ze średnich": ile spalasz / jesz / deficyt na dzień, i ile
   // POWINIENEŚ jeść przy swoim celu (target liczony od średniego spalania).
@@ -236,7 +248,7 @@ export default function Food() {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
       const b = key === today ? burn : (burnByDay[key] ?? 0);
-      const eatenD = meals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
+      const eatenD = kcalByDay.get(key) ?? 0;
       if (b > 0) { burnSum += b; burnDays++; }
       if (eatenD > 0) { eatSum += eatenD; eatDays++; }
       if (b > 0 && eatenD > 0) { balSum += b - eatenD; balDays++; }
@@ -249,7 +261,7 @@ export default function Food() {
       recommended: avgBurn > 0 ? targetIntake(avgBurn, goalMode, manualGoal) : 0,
       eatDays,
     };
-  }, [meals, burnByDay, burn, today, goalMode, manualGoal]);
+  }, [kcalByDay, burnByDay, burn, today, goalMode, manualGoal]);
 
   // Prognoza wagi z REALNEGO jedzenia: przy średnim dziennym bilansie ile ważysz do celu.
   const weightProjection = useMemo(() => {

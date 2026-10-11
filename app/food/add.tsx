@@ -212,17 +212,22 @@ export default function FoodAdd() {
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
 
-  // recent meals to repeat ("to samo co wczoraj") — distinct by summary, newest first
+  // recent meals to repeat ("to samo co wczoraj") — distinct by summary, newest first.
+  // useMemo (audyt optymalizacji, 2026-10-11) — poprzednio `[...storeMeals].sort(...)` kopiowało
+  // i sortowało CAŁĄ, nigdy nie archiwizowaną historię posiłków (rośnie z latami używania) tylko
+  // po to, żeby znaleźć 6 odróżnialnych wpisów — na KAŻDE wejście na ten ekran ("Co zjadłem"
+  // otwierane wielokrotnie dziennie). Teraz: jeden O(n) przebieg wybierający najnowszy wpis per
+  // sygnatura (Map), sortowanie tylko po DYSTYNKTYWNYCH sygnaturach (dużo mniejszy zbiór niż
+  // cała historia), nie po całej tablicy.
   const recentMeals: MealEntry[] = useMemo(() => {
-    const seen = new Set<string>();
-    const out: MealEntry[] = [];
-    for (const m of [...storeMeals].sort((a, b) => b.ts - a.ts)) {
+    const bestBySig = new Map<string, MealEntry>();
+    for (const m of storeMeals) {
       const sig = m.items.map(i => i.name).join('|');
-      if (!sig || seen.has(sig)) continue;
-      seen.add(sig); out.push(m);
-      if (out.length >= 6) break;
+      if (!sig) continue;
+      const existing = bestBySig.get(sig);
+      if (!existing || m.ts > existing.ts) bestBySig.set(sig, m);
     }
-    return out;
+    return [...bestBySig.values()].sort((a, b) => b.ts - a.ts).slice(0, 6);
   }, [storeMeals]);
 
   // ── meal library: kompozycje (presety) + dania (przepisy) = GŁÓWNY widok ──
