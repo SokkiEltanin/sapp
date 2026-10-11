@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 // A soft circular glow — center-out radial falloff, not a flat solid disc. RN's
@@ -6,7 +7,7 @@ import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 // fade in one direction and can't reproduce "opacity drops from the center" evenly
 // on all sides. Purely presentational — wrap it in Animated.View for pulse/scale,
 // same as the flat Views it replaces.
-export default function RadialGlow({ size, color, opacity = 0.55 }: {
+function RadialGlow({ size, color, opacity = 0.55 }: {
   size: number; color: string; opacity?: number;
 }) {
   return (
@@ -21,3 +22,7 @@ export default function RadialGlow({ size, color, opacity = 0.55 }: {
     </Svg>
   );
 }
+
+// memo: pure/presentational, re-rendered every combat round tick (boss-fight.tsx) with
+// unchanged props — re-parsing this SVG per round was wasted work.
+export default memo(RadialGlow);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 // Soft elliptical "ground" shadow under a sprite (2026-09-03, user: "musimy jakoś wyróżnić
@@ -6,7 +7,7 @@ import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 // RadialGlow (RN has no radial gradient on plain Views), but stretched non-uniformly
 // (`preserveAspectRatio="none"`) into a flattened ellipse instead of a circle — a shadow
 // under someone's feet is wide and shallow, not round.
-export default function GroundShadow({ width, height, opacity = 0.4 }: {
+function GroundShadow({ width, height, opacity = 0.4 }: {
   width: number; height: number; opacity?: number;
 }) {
   return (
@@ -21,3 +22,7 @@ export default function GroundShadow({ width, height, opacity = 0.4 }: {
     </Svg>
   );
 }
+
+// memo: pure/presentational, re-rendered every combat round tick (boss-fight.tsx) with
+// unchanged props — re-parsing this SVG per round was wasted work.
+export default memo(GroundShadow);

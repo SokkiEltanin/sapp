@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View } from 'react-native';
 import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask, Pattern } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
@@ -20,7 +21,7 @@ import { TAIL_D, TAIL_AXIS_DEG } from '@/components/pet/CatTail';
 // `Paw`, `LX`/`RX`/`EYY`/`CHEEK_L`, `TAIL_D`/`TAIL_AXIS_DEG`) są stamtąd zaimportowane,
 // nie przepisane, żeby zmiana kształtu w CatArt.tsx nie mogła po cichu rozjechać wyglądu
 // tego bliźniaka.
-export default function CatArtStatic({
+function CatArtStatic({
   size = 150, expression = 'happy', palette = DEFAULT_PALETTE, stripes = false,
   eyeColor = '', noseColor = '', whiskers = false, legStripes = false,
 }: {
@@ -154,3 +155,7 @@ export default function CatArtStatic({
     </View>
   );
 }
+
+// memo: pure/presentational, re-rendered every combat round tick (boss-fight.tsx) with
+// unchanged props — re-parsing this ~30-node SVG per round was wasted work.
+export default memo(CatArtStatic);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Image, Text, View } from 'react-native';
 import { bossPng, poweredBossPng } from '@/utils/bossIcons';
 import RadialGlow from '@/components/ui/RadialGlow';
@@ -25,7 +26,7 @@ import RadialGlow from '@/components/ui/RadialGlow';
 // (nie generyczny placeholder), ale całkiem czarny i bez detali, więc rozpoznawalny "coś tu
 // jest" bez zdradzania KTO to. Emoji-fallback dostaje analogiczne czarne kółko (emoji nie da
 // się przekolorować jak Image).
-export default function BossArt({ id, emoji, size = 74, powered = false, mystery = false }: {
+function BossArt({ id, emoji, size = 74, powered = false, mystery = false }: {
   id: string; emoji: string; size?: number; powered?: boolean; mystery?: boolean;
 }) {
   const png = bossPng(id);
@@ -78,3 +79,7 @@ export default function BossArt({ id, emoji, size = 74, powered = false, mystery
     </View>
   );
 }
+
+// memo: pure/presentational, re-rendered every combat round tick (boss-fight.tsx) with
+// unchanged props.
+export default memo(BossArt);

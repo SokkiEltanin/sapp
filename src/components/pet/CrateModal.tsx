@@ -33,11 +33,18 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
   const shake = useRef(new Animated.Value(0)).current;
   const bob = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
+  // Audyt optymalizacji (2026-10-11): `iv` w `doOpen` żył jako lokalna zmienna, nigdy
+  // czyszczona — zamknięcie modala W TRAKCIE liczenia monet (okno ~720ms) zostawiało interwał
+  // tykający dalej i wołający `setShown` na odmontowanym/niewidocznym komponencie.
+  const coinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setPhase('closed'); setResult(null); setShown(0); setFlies([]);
     shake.setValue(0); burst.setValue(0);
+    return () => {
+      if (coinIntervalRef.current) { clearInterval(coinIntervalRef.current); coinIntervalRef.current = null; }
+    };
   }, [visible]);
 
   // idle bob while closed
@@ -72,7 +79,11 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
       const n = roll.tier === 'legendary' ? 18 : roll.tier === 'epic' ? 13 : roll.tier === 'rare' ? 9 : 6;
       setFlies(Array.from({ length: n }).map((_, i) => ({ id: i, dx: (Math.random() - 0.5) * 280, dy: -(50 + Math.random() * 230), emoji: i % 3 === 0 ? '✨' : '🪙' })));
       let c = 0; const step = Math.max(1, Math.round(roll.coins / 24));
-      const iv = setInterval(() => { c = Math.min(roll.coins, c + step); setShown(c); if (c >= roll.coins) clearInterval(iv); }, 30);
+      coinIntervalRef.current = setInterval(() => {
+        c = Math.min(roll.coins, c + step);
+        setShown(c);
+        if (c >= roll.coins) { clearInterval(coinIntervalRef.current!); coinIntervalRef.current = null; }
+      }, 30);
       onOpened?.();
     });
   };

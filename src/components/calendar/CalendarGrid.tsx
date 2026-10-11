@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { CalendarEvent, MoodEntry, MOOD_COLORS, Task, eventCoversDay } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -22,7 +23,7 @@ interface Props {
   detailed?: boolean;
 }
 
-export default function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate, onEventPress, onTaskPress, detailed = false }: Props) {
+function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate, onEventPress, onTaskPress, detailed = false }: Props) {
   const numDays = daysInMonth(year, month);
   const offset = startOffset(year, month);
   const today = new Date();
@@ -35,18 +36,44 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
   while (cells.length % 7 !== 0) cells.push(null);
 
   const ds = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
-  // wielodniowe eventy liczą się na KAŻDYM dniu zakresu (nie tylko pierwszym)
-  const eventsFor = (day: number) => events.filter(e => eventCoversDay(e, ds(day)));
+
+  // useMemo (audyt optymalizacji, 2026-10-11): poprzednio KAŻDA z ~42 cel robiła 3-4 WŁASNE
+  // pełne skany `events`/`tasks` (`eventsFor`/`evColor`/`hasEv`/`hasTk`/`hasHighTk`/`moodFor`)
+  // — a caller (`stats.tsx`) przekazuje WSZYSTKIE eventy/zadania appki, niefiltrowane do
+  // miesiąca. Jeden przebieg budujący mapę dzień→dane, liczony tylko gdy realnie coś się
+  // zmieniło (nie na każdy render tego ZAWSZE zamontowanego — `lazy: false` — ekranu).
+  const byDay = useMemo(() => {
+    type Bucket = { events: CalendarEvent[]; deadlineTasks: Task[]; allTasks: Task[]; mood?: MoodEntry };
+    const map = new Map<string, Bucket>();
+    const bucket = (d: string): Bucket => {
+      let v = map.get(d);
+      if (!v) { v = { events: [], deadlineTasks: [], allTasks: [] }; map.set(d, v); }
+      return v;
+    };
+    for (let day = 1; day <= numDays; day++) {
+      const d = ds(day);
+      for (const e of events) if (eventCoversDay(e, d)) bucket(d).events.push(e);
+    }
+    for (const t of tasks) {
+      if (t.status === 'done') continue;
+      const dlKey = t.deadline?.slice(0, 10);
+      if (dlKey) { const b = bucket(dlKey); b.deadlineTasks.push(t); b.allTasks.push(t); }
+      if (t.scheduledDate && t.scheduledDate !== dlKey) bucket(t.scheduledDate).allTasks.push(t);
+    }
+    for (const m of moodEntries) bucket(m.date).mood = m;
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, tasks, moodEntries, numDays, year, month]);
+
+  const eventsFor = (day: number) => byDay.get(ds(day))?.events ?? [];
   const evColor = (day: number) => {
-    const ev = events.find(e => eventCoversDay(e, ds(day)));
+    const ev = byDay.get(ds(day))?.events[0];
     return ev ? (ev.color ?? colors.tabs.calendar) : null;
   };
-  const hasEv = (day: number) => events.some(e => eventCoversDay(e, ds(day)));
-  const hasTk = (day: number) => tasks.some(t => t.deadline?.startsWith(ds(day)) && t.status !== 'done');
-  const hasHighTk = (day: number) => tasks.some(
-    t => t.deadline?.startsWith(ds(day)) && t.status !== 'done' && t.priority === 'high',
-  );
-  const moodFor = (day: number) => moodEntries.find(e => e.date === ds(day));
+  const hasEv = (day: number) => (byDay.get(ds(day))?.events.length ?? 0) > 0;
+  const hasTk = (day: number) => (byDay.get(ds(day))?.deadlineTasks.length ?? 0) > 0;
+  const hasHighTk = (day: number) => !!byDay.get(ds(day))?.deadlineTasks.some(t => t.priority === 'high');
+  const moodFor = (day: number) => byDay.get(ds(day))?.mood;
 
   return (
     <View style={[styles.grid, detailed && styles.gridDetailed]}>
@@ -87,9 +114,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
             // ── Detailed (Samsung/Google Calendar style) ──────────────────────
             if (detailed) {
               const dayEvs = eventsFor(day);
-              const dayTks = tasks.filter(t =>
-                (t.deadline?.startsWith(d) || t.scheduledDate === d) && t.status !== 'done'
-              );
+              const dayTks = byDay.get(d)?.allTasks ?? [];
 
               return (
                 <Pressable
@@ -195,6 +220,8 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
     </View>
   );
 }
+
+export default memo(CalendarGrid);
 
 const styles = StyleSheet.create({
   grid: { paddingHorizontal: spacing[3], paddingBottom: spacing[3] },

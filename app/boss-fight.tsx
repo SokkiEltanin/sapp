@@ -179,7 +179,11 @@ export default function BossFight() {
   // `useExpensesStore()` na EKRANIE WALKI (hot path, częste re-rendery podczas animacji rund)
   // subskrybował cały store wydatków, choć tu używane jest tylko `expenses`.
   const expenses = useExpensesStore((st) => st.expenses);
-  const { events, gcalEvents } = useCalendarStore();
+  // useShallow (audyt optymalizacji, 2026-10-11) — ten sam wzorzec co `useExpensesStore` wyżej
+  // został pominięty dla `useCalendarStore`: gołe `useCalendarStore()` na EKRANIE WALKI
+  // subskrybowało cały store (tasks/selectedDate/isLoading), choć tu używane są tylko
+  // `events`/`gcalEvents`.
+  const { events, gcalEvents } = useCalendarStore(useShallow((s) => ({ events: s.events, gcalEvents: s.gcalEvents })));
   const { settings: workSettings } = useWorkStore();
 
   const [victory, setVictory] = useState<VictoryInfo | null>(null);

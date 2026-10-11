@@ -17,6 +17,7 @@ import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
 import TaskItem from '@/components/calendar/TaskItem';
 import DayTimelineH from '@/components/calendar/DayTimelineH';
+import { useShallow } from 'zustand/react/shallow';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -270,8 +271,15 @@ export default function CalendarTabScreen() {
   const insets = useSafeAreaInsets();
   const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(255,255,255,0.10)', accent: '#ECEEEE', accentDim: 'rgba(236,238,238,0.12)', muted: 'rgba(236,238,238,0.5)' }), [colors]);
   const styles = useMemo(() => makeStyles(colors, VP), [colors, VP]);
+  // useShallow (audyt optymalizacji, 2026-10-11) — gołe `useCalendarStore()` subskrybowało
+  // CAŁY store (w tym `isLoading`), re-renderując ten duży, zawsze zamontowany ekran na każdą
+  // zmianę w kalendarzu, nie tylko na zmianę pól faktycznie tu używanych.
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
-    useCalendarStore();
+    useCalendarStore(useShallow((s) => ({
+      events: s.events, tasks: s.tasks, selectedDate: s.selectedDate,
+      setEvents: s.setEvents, setTasks: s.setTasks, updateTask: s.updateTask,
+      setSelectedDate: s.setSelectedDate, setLoading: s.setLoading,
+    })));
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
 
@@ -429,6 +437,31 @@ export default function CalendarTabScreen() {
     [expenses, selectedDate],
   );
 
+  // Audyt optymalizacji (2026-10-11): `allEvents`/`tasks` to WSZYSTKIE eventy/zadania appki
+  // (niefiltrowane do widocznego miesiąca) — `CalendarGrid` (zawsze zamontowany, lazy: false)
+  // skanował je w całości na każdą zmianę w KTÓRYMKOLWIEK z nich, gdziekolwiek w appce.
+  // Filtrowanie do widocznego miesiąca obcina to do realnie potrzebnego zakresu.
+  const monthRange = useMemo(() => {
+    const monthStart = `${viewYear}-${pad(viewMonth + 1)}-01`;
+    const lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const monthEnd = `${viewYear}-${pad(viewMonth + 1)}-${pad(lastDay)}`;
+    return { monthStart, monthEnd };
+  }, [viewYear, viewMonth]);
+
+  const monthEvents = useMemo(
+    () => allEvents.filter(e => (e.endDate || e.date).slice(0, 10) >= monthRange.monthStart && e.date.slice(0, 10) <= monthRange.monthEnd),
+    [allEvents, monthRange],
+  );
+
+  const monthTasks = useMemo(
+    () => tasks.filter(t => {
+      const dl = t.deadline?.slice(0, 10);
+      return (!!dl && dl >= monthRange.monthStart && dl <= monthRange.monthEnd)
+        || (!!t.scheduledDate && t.scheduledDate >= monthRange.monthStart && t.scheduledDate <= monthRange.monthEnd);
+    }),
+    [tasks, monthRange],
+  );
+
   const modalEvents = useMemo(
     () => dayModalDate ? allEvents.filter(e => e.date.startsWith(dayModalDate)) : [],
     [allEvents, dayModalDate],
@@ -540,8 +573,8 @@ export default function CalendarTabScreen() {
                 year={viewYear}
                 month={viewMonth}
                 selectedDate={selectedDate}
-                events={allEvents}
-                tasks={tasks}
+                events={monthEvents}
+                tasks={monthTasks}
                 moodEntries={moodEntries}
                 onSelectDate={handleSelectDate}
                 onEventPress={(id) => openCalEntry(id)}
@@ -556,8 +589,8 @@ export default function CalendarTabScreen() {
                   year={viewYear}
                   month={viewMonth}
                   selectedDate={selectedDate}
-                  events={allEvents}
-                  tasks={tasks}
+                  events={monthEvents}
+                  tasks={monthTasks}
                   moodEntries={moodEntries}
                   onSelectDate={handleSelectDate}
                 />

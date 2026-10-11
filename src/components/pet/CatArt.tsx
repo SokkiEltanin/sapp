@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View, StyleSheet, Text, Vibration } from 'react-native';
 import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
@@ -46,7 +46,7 @@ export function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink
   );
 }
 
-export default function CatArt({
+function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
   eyeColor = '', noseColor = '', whiskers = false, legStripes = false, attack = 0, shopkeeper = false,
@@ -629,6 +629,11 @@ export default function CatArt({
     </Pressable>
   );
 }
+
+// memo: `palette`/`onPress`/... are referentially stable across re-renders of callers that
+// hold other, unrelated state alongside this (e.g. PetCustomizeModal's name-draft TextInput) —
+// without it, every keystroke in that modal re-rendered this whole ~60-node idle-animated SVG.
+export default memo(CatArt);
 
 // One floating reaction: rises, scales in, fades. A real vector heart/sparkle — the old
 // cat threw emoji, which the user cut ("mniej emotek, więcej prawdziwych efektów").
