@@ -86,17 +86,30 @@ export default function MultiBoxRevealModal({ visible, boxName, rewards, onClose
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [sold, setSold] = useState<Set<number>>(new Set());
-  const [confirmSell, setConfirmSell] = useState(false);
+  // Pojedynczy "co dokładnie sprzedajemy po potwierdzeniu" zamiast osobnego boola
+  // (2026-10-11) — wspólny dla przycisku "zaznaczone" I nowego "wszystkie" niżej, żeby oba
+  // dzieliły tę samą ścieżkę potwierdzenia zamiast duplikować stan/logikę.
+  const [pendingSell, setPendingSell] = useState<{ items: { i: number; e: MultiRewardEntry }[]; total: number } | null>(null);
 
   useEffect(() => {
     if (!visible) return;
-    setSelected(new Set()); setSold(new Set()); setConfirmSell(false);
+    setSelected(new Set()); setSold(new Set()); setPendingSell(null);
   }, [visible]);
 
   const totalCoins = rewards.reduce((sum, e) => sum + (e.reward.type === 'coins' ? e.reward.coins : 0), 0);
-  const selectedEntries = [...selected].map(i => rewards[i]);
-  const sellTotal = selectedEntries.reduce((sum, e) => sum + e.sellCoins, 0);
-  const anyBetterSelected = selectedEntries.some(e => e.betterThanEquipped);
+  // Indeksowane WYŁĄCZNIE z aktualnego `rewards` (2026-10-11, fix crasha "Cannot read property
+  // 'sellCoins' of undefined") — poprzednia wersja robiła `[...selected].map(i => rewards[i])`:
+  // przy zamykaniu modala pet-shop.tsx w TYM SAMYM renderze ustawia `visible=false` I
+  // `rewards=[]` (jeden `setMultiReveal(null)`), więc `selected` ze starymi indeksami wskazywał
+  // poza granice świeżo opróżnionej tablicy → `rewards[i]` było `undefined`, `.sellCoins` na nim
+  // wywalało TypeError. Licząc od `rewards.map(...)` zamiast od `selected` wprost, nieistniejący
+  // indeks po prostu nie pojawia się w wyniku zamiast dawać `undefined`.
+  const sellableIndexed = rewards
+    .map((e, i) => ({ i, e }))
+    .filter(({ i, e }) => !!e.instanceId && !sold.has(i));
+  const selectedItems = sellableIndexed.filter(({ i }) => selected.has(i));
+  const selectedTotal = selectedItems.reduce((sum, { e }) => sum + e.sellCoins, 0);
+  const allTotal = sellableIndexed.reduce((sum, { e }) => sum + e.sellCoins, 0);
 
   const toggle = (i: number) => {
     if (sold.has(i)) return;
@@ -104,13 +117,24 @@ export default function MultiBoxRevealModal({ visible, boxName, rewards, onClose
     setSelected(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   };
 
-  const doSell = () => {
-    const ids = selectedEntries.map(e => e.instanceId).filter((id): id is string => !!id);
+  const doSell = (items: { i: number; e: MultiRewardEntry }[], total: number) => {
+    const ids = items.map(({ e }) => e.instanceId).filter((id): id is string => !!id);
     if (ids.length === 0) return;
     onSellSelected(ids);
-    toast.success(`Sprzedano ${ids.length} — +${sellTotal} 🪙`);
-    setSold(s => new Set([...s, ...selected]));
-    setSelected(new Set());
+    toast.success(`Sprzedano ${ids.length} — +${total} 🪙`);
+    const idxSet = new Set(items.map(({ i }) => i));
+    setSold(s => new Set([...s, ...idxSet]));
+    setSelected(s => { const n = new Set(s); idxSet.forEach(i => n.delete(i)); return n; });
+  };
+
+  // Wspólne wejście dla "Sprzedaj zaznaczone" i "Sprzedaj wszystkie" (2026-10-11, user:
+  // "dodaj od razu że sprzedaje wszystkie dropy") — jeśli COKOLWIEK w paczce jest lepsze niż
+  // założone, pytamy raz (ConfirmDialog), inaczej sprzedajemy od razu.
+  const attemptSell = (items: { i: number; e: MultiRewardEntry }[], total: number) => {
+    if (items.length === 0) return;
+    haptic.tap();
+    if (items.some(({ e }) => e.betterThanEquipped)) setPendingSell({ items, total });
+    else doSell(items, total);
   };
 
   return (
@@ -126,12 +150,14 @@ export default function MultiBoxRevealModal({ visible, boxName, rewards, onClose
           </ScrollView>
           {totalCoins > 0 && <Text style={st.totalTxt}>Razem monety: +{totalCoins} 🪙</Text>}
 
-          {selected.size > 0 && (
-            <Pressable
-              style={st.sellBtn}
-              onPress={() => { haptic.tap(); if (anyBetterSelected) setConfirmSell(true); else doSell(); }}
-            >
-              <Text style={st.sellBtnTxt}>Sprzedaj zaznaczone ({selected.size}) — +{sellTotal} 🪙</Text>
+          {selectedItems.length > 0 && (
+            <Pressable style={st.sellBtn} onPress={() => attemptSell(selectedItems, selectedTotal)}>
+              <Text style={st.sellBtnTxt}>Sprzedaj zaznaczone ({selectedItems.length}) — +{selectedTotal} 🪙</Text>
+            </Pressable>
+          )}
+          {sellableIndexed.length > 0 && (
+            <Pressable style={st.sellAllBtn} onPress={() => attemptSell(sellableIndexed, allTotal)}>
+              <Text style={st.sellAllBtnTxt}>Sprzedaj wszystkie ({sellableIndexed.length}) — +{allTotal} 🪙</Text>
             </Pressable>
           )}
 
@@ -142,14 +168,14 @@ export default function MultiBoxRevealModal({ visible, boxName, rewards, onClose
       </Pressable>
     </Modal>
     <ConfirmDialog
-      visible={confirmSell}
+      visible={!!pendingSell}
       title="Sprzedać mimo że lepsze?"
-      message={`${anyBetterSelected ? 'Część zaznaczonych itemów ma' : 'Zaznaczony item ma'} wyższy stat niż to, co masz teraz założone — sprzedaż da +${sellTotal} 🪙, ale tracisz realne wzmocnienie. Na pewno?`}
+      message={`${(pendingSell?.items.length ?? 0) > 1 ? 'Część z nich ma' : 'Ten item ma'} wyższy stat niż to, co masz teraz założone — sprzedaż da +${pendingSell?.total ?? 0} 🪙, ale tracisz realne wzmocnienie. Na pewno?`}
       confirmLabel="Sprzedaj"
       cancelLabel="Zatrzymaj"
       destructive
-      onConfirm={() => { doSell(); setConfirmSell(false); }}
-      onCancel={() => setConfirmSell(false)}
+      onConfirm={() => { if (pendingSell) doSell(pendingSell.items, pendingSell.total); setPendingSell(null); }}
+      onCancel={() => setPendingSell(null)}
     />
     </>
   );
@@ -173,6 +199,8 @@ const st = StyleSheet.create({
   totalTxt: { color: '#FBBF24', fontSize: 13, fontWeight: '800' },
   sellBtn: { alignSelf: 'stretch', paddingVertical: 11, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(239,68,68,0.5)', alignItems: 'center' },
   sellBtnTxt: { color: '#EF4444', fontSize: 12.5, fontWeight: '800' },
+  sellAllBtn: { alignSelf: 'stretch', paddingVertical: 11, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(251,191,36,0.5)', alignItems: 'center' },
+  sellAllBtnTxt: { color: '#FBBF24', fontSize: 12.5, fontWeight: '800' },
   btn: { paddingHorizontal: 26, paddingVertical: 13, borderRadius: 14, backgroundColor: '#4DA8FF' },
   btnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
 });

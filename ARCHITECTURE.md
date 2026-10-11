@@ -16398,6 +16398,66 @@ posiłki" nadal pokazuje właściwe 6 pozycji; (2) ekran Jedzenie → bilans tyg
 nadal poprawne dla każdego nawyku; (4) Zadania + dashboard → zmiana wydarzenia w kalendarzu
 gdzie indziej nie powinna już zauważalnie "szarpać" tych dwóch ekranów.
 
+## 299. Fix: crash przy zamykaniu paczki skrzynek po sprzedaży + "Sprzedaj wszystkie" + walka: HP bossa po pominięciu + skaczące sprite'y (2026-10-11)
+
+User zgłosił crash ekranu ("Coś się wykrzaczyło" / `Cannot read property 'sellCoins' of
+undefined`) ze zrzutem stosu wskazującym `MultiBoxRevealModal`, plus poprosił przy okazji o
+"sprzedaj wszystkie dropy" w tym samym modalu. Osobno, dwa wcześniej zgłoszone bugi walki
+(§ niżej) zostały wdrożone po potwierdzeniu usera ("Dawaj napisałem wyżej").
+
+1. **Fix crasha w `MultiBoxRevealModal.tsx`** — `sellTotal`/`selectedEntries` liczyło się jako
+   `[...selected].map(i => rewards[i])`, czyli WPROST z indeksów trzymanych w stanie
+   `selected`. `pet-shop.tsx` zamyka modal przez `onClose={() => setMultiReveal(null)}` —
+   JEDNO wywołanie `setMultiReveal(null)` zmienia `visible` NA `false` I `rewards` (przez
+   `multiReveal?.rewards ?? []`) na pustą tablicę W TYM SAMYM renderze. RN `Modal` nie
+   odmontowuje dzieci na `visible=false` (tylko chowa natywnie) — więc ten render i tak się
+   wykonuje, z `selected` wciąż trzymającym stare indeksy (np. {0,1,2}) i świeżo opróżnionym
+   `rewards`. `rewards[0]` na pustej tablicy = `undefined`, `.sellCoins` na nim = crash.
+   Naprawione przez przeliczenie wprost z `rewards.map((e,i)=>({i,e})).filter(...)` zamiast z
+   `selected` — nieistniejący indeks po prostu nie pojawia się w wyniku zamiast dać
+   `undefined`, strukturalnie odporne na przyszłe podobne wyścigi niezależnie od przyczyny.
+2. **"Sprzedaj wszystkie" (user: "dodaj od razu że sprzedaje wszystkie dropy")** — nowy
+   przycisk obok "Sprzedaj zaznaczone", sprzedaje WSZYSTKIE jeszcze-niesprzedane karty
+   ekwipunku w paczce naraz (nie tylko zaznaczone). Oba przyciski dzielą teraz wspólne wejście
+   `attemptSell(items, total)` → jeśli cokolwiek w grupie ma `betterThanEquipped`, jeden
+   wspólny `ConfirmDialog` (stan `pendingSell` zamiast osobnego boola), inaczej sprzedaż od
+   razu — ten sam wzorzec ostrzegania co "zaznaczone" z §297, bez duplikacji.
+3. **Walka: HP bossa pokazane po przegranej/pominięciu** (user: "nie jest napisane po
+   pominięciu walki ile boss ma hp pozostalego... nie wiem czy byłem blisko czy nie") —
+   `simulateFight` rozstrzyga CAŁĄ walkę na starcie (`result.bossHpLeft` znane natychmiast,
+   zanim animacja/"Pomiń walkę" w ogóle ruszy), więc wystarczyło przenieść tę już-znaną
+   liczbę do stanu modala przegranej zamiast polegać na `liveBossHp` (ten `finish()` zawsze
+   zeruje, animowany czy pominięty). `defeat` dostał `bossHpLeft`/`bossMaxHp`, modal
+   "PRZEGRANA"/"BOSS PRZETRWAŁ" pokazuje teraz pasek + "Zostało bossowi: X / Y HP" (ten sam
+   `tileHpTrack`/`tileHpFill` co pasek na żywo w arenie).
+4. **Fix: skaczące sprite'y kotka/bossa** (user: "boss i kotek skaczą caly czas bo pokazują
+   sie te napisy... jak znika to spadają niżej a jak pojawia sie te skaczą góra dół") —
+   przyczyna NIE leżała w samych linijkach mechaniki (regen bossa/uzdrowienie kotka/cierń pod
+   "Motywem"), tylko w `s.scroll` (`justifyContent:'flex-end'`, CELOWE zakotwiczenie sceny do
+   "ziemi" tła lokacji, §282-ish). Gdy total wysokość treści scrolla zmienia się (bo te
+   linijki per-rundowo znikają/wracają — `guarded` jest wrodzoną, stałą przez całą walkę cechą
+   bossa więc NIE miga, ale `healed`/`catHit.healed`/`thornDmg` SĄ zależne od wyniku danej
+   rundy), flex-end przelicza cały blok OD NOWA i sprite'y WYŻEJ (poza bezpośrednim sąsiedztwem
+   zmiany) też skaczą. Naprawione przez 3 ZAWSZE zamontowane sloty stałej wysokości
+   (`MECH_ROW_H = 20`) dla tych 3 per-rundowych linijek — treść warunkowa W ŚRODKU slotu, nie
+   warunkowy render całego `View`a — więc total wysokość treści jest teraz stała niezależnie
+   ile z nich akurat ma treść, i `flex-end` przestaje mieć co przeliczać.
+
+**Testy**: brak nowych — (1)/(2) to naprawa + rozszerzenie czysto-UI logiki już pokrytej przez
+`sellGear`/`gearSellValue` (testowane w §297), (3)/(4) to przeniesienie już policzonej liczby
+do stanu + czysto layoutowy fix bez zmiany logiki walki. `tsc --noEmit` czyste, `jest --silent`
+101/101 suite, 1333 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) Rynek → przytrzymaj skrzynkę (paczka ×5) →
+zaznacz kilka kart → "Sprzedaj zaznaczone" → zamknij modal ("Super!" LUB tap w tło) →
+sprawdź że apka NIE crashuje (to był dokładny trigger zgłoszonego błędu). (2) Ta sama paczka →
+"Sprzedaj wszystkie" → sprawdź że WSZYSTKIE jeszcze-niesprzedane karty ekwipunku się sprzedają,
+monety się zgadzają, karty zostają jako "sprzedano". (3) Dowolna walka → "Pomiń walkę" z
+przegraną (lub niedokończoną) → w modalu powinno być widoczne ile HP zostało bossowi. (4)
+Dowolna walka z bossem o regeneracji/przeciwko któremu masz cierń/uzdrowienie — obserwuj
+kotka/bossa przez kilka rund, sprite'y NIE powinny już "podskakiwać" gdy linijki
+regen/cierń/uzdrowienie pojawiają się i znikają.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
