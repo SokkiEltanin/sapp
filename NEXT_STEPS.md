@@ -3,6 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🔴 Fix: crash przy zamykaniu paczki skrzynek po sprzedaży + "Sprzedaj wszystkie" + walka: HP bossa po pominięciu + skaczące sprite'y (2026-10-11)
+
+User zgłosił REALNY crash (zrzut ekranu "Coś się wykrzaczyło" / `Cannot read property
+'sellCoins' of undefined` w `MultiBoxRevealModal`). Pełny opis w ARCHITECTURE.md §299.
+
+- **Fix crasha** — zamykanie paczki skrzynek (`pet-shop.tsx` → `setMultiReveal(null)`)
+  zmieniało `rewards` na `[]` W TYM SAMYM renderze co `visible=false`; stare indeksy w stanie
+  `selected` wskazywały poza świeżo opróżnioną tablicę → `rewards[i]` dawało `undefined` →
+  crash na `.sellCoins`. Przeliczanie teraz wprost z `rewards.map(...)` zamiast z `selected`.
+- **"Sprzedaj wszystkie"** — nowy przycisk obok "Sprzedaj zaznaczone" w tym samym modalu
+  (user: "dodaj od razu że sprzedaje wszystkie dropy").
+- **Walka: HP bossa po "Pomiń walkę"/przegranej** — modal przegranej pokazuje teraz pasek +
+  "Zostało bossowi: X / Y HP" (user: "nie wiem czy byłem blisko czy nie").
+- **Fix: skaczące sprite'y kotka/bossa** — linijki mechaniki (regen bossa/uzdrowienie
+  kotka/cierń) dostały stałe sloty wysokości zamiast warunkowego renderu całego wiersza, więc
+  `justifyContent:'flex-end'` na scrollu przestaje przeliczać (i przesuwać) całą scenę co
+  rundę (user: "boss i kotek skaczą caly czas... Góra dol Góra dol").
+
+`tsc`/`jest` zielone (101/101 suite, 1333 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) Rynek → paczka ×5 → zaznacz kilka → "Sprzedaj
+zaznaczone" → zamknij modal → **sprawdź że apka NIE crashuje** (dokładny trigger zgłoszonego
+błędu). (2) Ta sama paczka → "Sprzedaj wszystkie". (3) Walka → "Pomiń walkę" z przegraną →
+HP bossa widoczne w modalu. (4) Walka z regenerującym się bossem/cierniem/uzdrowieniem →
+sprite'y NIE powinny już podskakiwać między rundami.
+
 ## 🆕 Runda audytu optymalizacji — jedzenie + zadania/nawyki/nastrój, 8 fixów (2026-10-11)
 
 User: "optymalizuj dalej". Pełny opis w ARCHITECTURE.md §298. Skrót:

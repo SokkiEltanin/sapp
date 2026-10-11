@@ -104,6 +104,20 @@ const SPRITE_OFFSET_Y_AVG = (CAT_OFFSET_Y + BOSS_OFFSET_Y) / 2;
 // ikonach wewnątrz, żeby box i jego zawartość nie rozjechały się przy kolejnej zmianie.
 const PROJECTILE_SIZE = 46;
 
+// Stała wysokość KAŻDEGO slotu reaktywnej linijki mechaniki, która WŁĄCZA/WYŁĄCZA SIĘ
+// per-rundę (2026-10-11, user: "boss i kotek skaczą caly czas bo pokazują sie te napisy...
+// jak znika to spadają niżej a jak pojawia sie te skaczą góra dół"). Przyczyna NIE była w
+// samych linijkach, tylko w `s.scroll` niżej (`justifyContent:'flex-end'`, celowo —
+// zakotwicza scenę do "ziemi" tła lokacji): gdy total wysokość treści scrolla się zmienia,
+// flex-end przelicza cały blok OD NOWA, więc sprite'y WYŻEJ też skaczą. `guarded` jest
+// wrodzoną cechą bossa (stała przez całą walkę, patrz FightResult w bosses.ts) więc nie
+// miga — ale regen bossa/cierń/uzdrowienie kotka SĄ per-rundowe (zależą od tego czy cios
+// akurat wylądował/trafił procent), więc te 3 linijki realnie znikają i wracają w trakcie
+// JEDNEJ walki. Każda z nich dostaje teraz ZAWSZE zamontowany slot tej wysokości (treść
+// warunkowa, kontener nie) — total wysokość treści przestaje fluktuować niezależnie od tego
+// która/ile z nich akurat mają treść, więc flex-end przestaje przesuwać scenę.
+const MECH_ROW_H = 20;
+
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
 
@@ -191,7 +205,13 @@ export default function BossFight() {
   // wyczerpania bezpieczeństwa-sufitu rund bez zabicia bossa (patrz MAX_FIGHT_ROUNDS w
   // bosses.ts — walka teraz leci do faktycznego 0 HP jednej ze stron, nie sztywnych 3
   // rund). `result.won`/`result.catFainted` z simulateFight NIE są dopełnieniem siebie.
-  const [defeat, setDefeat] = useState<{ fainted: boolean } | null>(null);
+  // `bossHpLeft`/`bossMaxHp` (2026-10-11, user: "nie jest napisane po pominięciu walki ile
+  // boss ma hp pozostalego... nie wiem czy byłem blisko czy nie") — walka jest już CAŁA
+  // rozstrzygnięta w `simulateFight` ZANIM animacja/pominięcie w ogóle się zaczną (`result`
+  // domknięty na starcie attackRoundBased), więc `result.bossHpLeft` jest znane natychmiast,
+  // niezależnie czy user obejrzał animację czy wcisnął "Pomiń walkę" — wystarczy przenieść je
+  // do stanu modala przegranej zamiast polegać na `liveBossHp` (ten `finish()` zawsze zeruje).
+  const [defeat, setDefeat] = useState<{ fainted: boolean; bossHpLeft: number; bossMaxHp: number } | null>(null);
   // Potwierdzenie "Wróć natychmiast" z popupu misji-w-drodze niżej (2026-08-20) — ten sam
   // `ConfirmDialog` wzorzec co w `app/pet.tsx`, żeby anulowanie misji wyglądało identycznie
   // niezależnie skąd user je odpala.
@@ -587,7 +607,7 @@ export default function BossFight() {
           setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: coinsWon, xp: raidXp(level) });
         } else if (result.catFainted) {
           haptic.error();
-          setDefeat({ fainted: true });
+          setDefeat({ fainted: true, bossHpLeft: result.bossHpLeft, bossMaxHp: roundBoss.hp });
           logFightAttempt('raid', raid.id, raid.name, level, fightDetail);
         } else {
           // Wyczerpanie sufitu rund bez rozstrzygnięcia (rzadkie, patrz MAX_FIGHT_ROUNDS) —
@@ -638,7 +658,7 @@ export default function BossFight() {
         }
       } else {
         haptic.error();
-        setDefeat({ fainted: result.catFainted });
+        setDefeat({ fainted: result.catFainted, bossHpLeft: result.bossHpLeft, bossMaxHp: roundBoss.hp });
         // id/name TU muszą się zgadzać z tym co wpisują odpowiednie akcje-nagrody wyżej przy
         // wygranej (NIE zawsze target.id/target.name — event loguje pod eventKey, mission pod
         // stałym 'mission', mad pod id BAZOWEGO bossa, nie wariantu), inaczej ta sama walka
@@ -1033,19 +1053,41 @@ export default function BossFight() {
                 (2026-09-14, user: "przycisk walki od teraz będzie lewitował na dole jak
                 navbar" — patrz `s.floatingBar` po zamknięciu ScrollView niżej), więc te
                 linijki już nic pod sobą nie przesuwają — floating bar ma stałą pozycję
-                niezależnie od tego ile ich jest widocznych. */}
+                niezależnie od tego ile ich jest widocznych. `guarded` jest wrodzoną cechą
+                bossa (stała przez CAŁĄ walkę, patrz komentarz przy `guarded: boolean` w
+                FightResult, bosses.ts) więc nie miga per-rundę — zostaje POZA zarezerwowanym
+                blokiem niżej, bo nie jest źródłem jittera. */}
             {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
-            {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
-            {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
+            {/* Te 3 linijki NATOMIAST są per-rundowe — potrafią zniknąć/wrócić w trakcie
+                JEDNEJ walki (regen trafia prawie zawsze ale nie w ostatniej rundzie,
+                cierń/uzdrowienie zależą od tego czy kontratak/trafienie akurat wylądowały) —
+                stąd skakanie sprite'ów opisane przez usera (2026-10-11). Każda dostaje ZAWSZE
+                zamontowany slot stałej wysokości (`MECH_ROW_H`, patrz komentarz na górze
+                pliku) z treścią warunkową W ŚRODKU, nie warunkowym renderem całego `View`a —
+                gdyby zamiast tego zarezerwować jeden wspólny `minHeight` na kontenerze, to
+                tylko DOLNA granica: gdyby kiedyś wszystkie 3 pokazały się naraz, blok i tak
+                urósłby ponad rezerwację i sprite'y zaskoczyłyby przy ich zniknięciu. Stała
+                liczba slotów = naprawdę stała wysokość, niezależnie ile z nich akurat ma
+                treść, więc `justifyContent:'flex-end'` na `s.scroll` (celowe zakotwiczenie
+                sceny do "ziemi" — patrz komentarz przy stylu) przestaje przeliczać całą scenę
+                WYŻEJ przy każdej zmianie. */}
+            <View style={[s.mechRow, { height: MECH_ROW_H }]}>
+              {!!lastHit?.healed && <><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></>}
+            </View>
+            <View style={[s.mechRow, { height: MECH_ROW_H }]}>
+              {!!catHit?.healed && <><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></>}
+            </View>
             {/* Item "Cierń" liczył się już wcześniej w silniku, ale bez własnego pola w
                 FightRound UI nie miało jak pokazać że w ogóle coś zrobił — user (2026-08-11):
                 "nie widzę żeby był aktywny jakoś podczas walki realnie". */}
-            {!!lastHit?.thornDmg && (
-              <View style={s.mechRow}>
-                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} contentFit="contain" />
-                <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
-              </View>
-            )}
+            <View style={[s.mechRow, { height: MECH_ROW_H }]}>
+              {!!lastHit?.thornDmg && (
+                <>
+                  <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} contentFit="contain" />
+                  <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
+                </>
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -1186,6 +1228,15 @@ export default function BossFight() {
                     : 'Kotek zemdlał — HP resetuje się, spróbuj ponownie, kiedy będziesz gotowy.')
                   : 'Przeciwnik zbyt szybko się leczy/broni — wróć mocniejszy (staty, poziom, łup) i spróbuj znów.'}
               </Text>
+              {/* Pozostałe HP bossa (2026-10-11, user: "nie wiem czy byłem blisko czy nie") —
+                  pokazuje na jak blisko zwycięstwa było, zwłaszcza po "Pomiń walkę" gdzie
+                  animacja (a z nią `liveBossHp`) nigdy się nie odegrała. */}
+              <View style={s.vBossHpBlock}>
+                <View style={s.tileHpTrack}>
+                  <View style={[s.tileHpFill, { width: `${Math.max(0, Math.round(defeat.bossHpLeft / defeat.bossMaxHp * 100))}%` }]} />
+                </View>
+                <Text style={s.vBossHpTxt}>Zostało bossowi: {defeat.bossHpLeft} / {defeat.bossMaxHp} HP</Text>
+              </View>
             </View>
           )}
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
@@ -1363,6 +1414,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vKicker: { fontSize: 14, fontWeight: '900', letterSpacing: 3, color: '#FDE047', marginBottom: 10 },
   vName: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 6, textAlign: 'center' },
   vDefeatSub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 10, textAlign: 'center', maxWidth: 260 },
+  vBossHpBlock: { marginTop: 14, width: 200, alignItems: 'center', gap: 5 },
+  vBossHpTxt: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.65)' },
   vLoot: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.lg, paddingVertical: spacing[3], paddingHorizontal: spacing[5], marginTop: spacing[4] },
   vLootName: { fontSize: 15, fontWeight: '800', color: '#fff', marginTop: 4 },
   vLootDesc: { fontSize: 12, color: '#2AC68F', fontWeight: '700', marginTop: 1 },
