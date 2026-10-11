@@ -9,6 +9,7 @@ import { subscriptionsService } from '@/services/subscriptionsService';
 import { matchSubscriptionForPayment, isConfidentSubMatch, subscriptionPriceChanged, queueSubConfirm } from '@/utils/subscriptionAuto';
 import { advanceNextBillingDate } from '@/utils/recurringBills';
 import { rememberPaycheckSender } from '@/utils/paycheckSenders';
+import { setPaydayHandledMonth, getPaydayConfig, currentMonth } from '@/utils/payday';
 
 // A bank payment that settles a subscription: if it's a CONFIDENT match (same
 // currency + close amount) advance the billing date silently, so the "zapłaciłeś?"
@@ -132,7 +133,23 @@ export async function commitBankTx(
       st.addExpense(exp);
       // Teach the paycheck-sender memory so next month's transfer from this employer
       // auto-flags as [JD] even without a "wynagrodzenie" keyword.
-      if (p.jd) rememberPaycheckSender(p.storeKey).catch(() => {});
+      if (p.jd) {
+        rememberPaycheckSender(p.storeKey).catch(() => {});
+        // 2026-10-11, user: "Bez sensu mnie pyta o wylate skoro już wypłata jest dodana...
+        // do finansow automatycznie wypadło" — `setPaydayHandledMonth` (payday.ts) był dotąd
+        // wołany TYLKO z ręcznego "Wypłata?" modala (`confirmPayday()` w index.tsx). Bank
+        // auto-add (ta gałąź) nigdy go nie informował, że miesiąc jest już załatwiony, więc
+        // zaplanowane powiadomienie "Wypłata?" nadal strzelało mimo że pieniądze realnie już
+        // wpadły z banku. Oznacz miesiąc jako handled TU TEŻ i od razu odśwież zaplanowane
+        // powiadomienie (ten sam wzorzec co `confirmPayday()`) — nie czekaj aż user sam
+        // otworzy Dashboard, żeby `refreshPaydayReminder`'s `useFocusEffect` złapał zmianę.
+        const month = currentMonth();
+        setPaydayHandledMonth(month).catch(() => {});
+        getPaydayConfig()
+          .then(cfg => import('@/services/notificationsService')
+            .then(({ notificationsService }) => notificationsService.refreshPaydayReminder(cfg.enabled, cfg.day, month)))
+          .catch(() => {});
+      }
       return { ok: true, matched: false };
     } catch (e) {
       return { ok: false, matched: !!dup, error: e instanceof Error ? e.message : undefined };
