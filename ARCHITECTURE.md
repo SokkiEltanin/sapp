@@ -16458,6 +16458,43 @@ Dowolna walka z bossem o regeneracji/przeciwko któremu masz cierń/uzdrowienie 
 kotka/bossa przez kilka rund, sprite'y NIE powinny już "podskakiwać" gdy linijki
 regen/cierń/uzdrowienie pojawiają się i znikają.
 
+## 300. Dokończenie rundy optymalizacji: memoizacja wierszy listy w app/food/add.tsx + app/food/recipe.tsx (2026-10-11)
+
+Kontynuacja §298, celowo odłożona tam część ("Celowo NIE zrobione: ekstrakcja `CandidateRow`/
+`LibraryRow`... wymaga najpierw przepisania handlerów na `useCallback`"). Oba pliki dostają
+teraz ten refaktor w jednym komicie:
+
+**`app/food/add.tsx`** — `LibraryRow`/`CandidateRow` jako moduł-level `memo()` (zamiast
+`renderLibRow`/`renderSingle` jako zwykłych funkcji zwracających JSX WEWNĄTRZ renderu —
+React nie mógł pominąć ich poddrzewa przy re-renderze rodzica). `productToCandidate`
+wyniesiony na poziom modułu (czysta funkcja, inaczej nowa referencja co render mimo że
+logicznie czysta). `openPicker`/`tapEntry`/`pinEntry` opakowane w `useCallback` — bez tego
+memo na wierszu i tak nic by nie dało (nowe closure jako prop co render łamie porównanie).
+
+**`app/food/recipe.tsx`** — prostszy (jedna lista `candidates`, bez rozróżnienia
+biblioteka/pojedynczy produkt, bez pinowania), dostaje ten sam wzorzec w mniejszym zakresie:
+
+1. Nowy moduł-level `CandidateRow` (memo) — ten sam kształt co w `add.tsx`, plus odznaka
+   "PÓŁPRODUKT" (`cand.semi`, specyficzna dla recipe.tsx — półprodukty z bazy offline jak
+   naleśniki skaczą na górę listy, żeby łatwo dodać je do nowego dania).
+2. `openPicker`/`addNew`/`addRoughIngredient` opakowane w `useCallback` (wcześniej zwykłe
+   domknięcia, nowa referencja na KAŻDY render — memo na wierszu nic by bez tego nie dało).
+3. Nowy `tapCandidate` (`useCallback`, deps `[prep, addRoughIngredient, openPicker]`) — jedna
+   stabilna referencja zastępująca dawne inline `() => prep === 'rough' && ... ? addRoughIngredient(cand) : openPicker(cand)`
+   tworzone od nowa w każdej iteracji `.map()`.
+4. `ings.map` (lista składników TEGO dania, w budowie) świadomie NIE dostał tego samego
+   traktowania — typowo kilka-kilkanaście pozycji, nie ~32 jak `candidates`, niski priorytet
+   względem reszty rundy.
+
+**Testy**: brak nowych — czysto wydajnościowy refaktor (memo/useCallback, zero zmiany
+zachowania/renderowanego JSX). `tsc --noEmit` czyste, `jest --silent` 101/101 suite, 1333
+testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Przepis → wyszukaj/dodaj kilka składników z listy
+kandydatów (własne + z bazy), sprawdź że tapnięcie wciąż otwiera picker porcji poprawnie, a w
+trybie "Nie wiem ile czego" dodaje od razu bez pytania — bez zmiany zachowania względem
+poprzedniej wersji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

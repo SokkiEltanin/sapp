@@ -29,6 +29,19 @@ błędu). (2) Ta sama paczka → "Sprzedaj wszystkie". (3) Walka → "Pomiń wal
 HP bossa widoczne w modalu. (4) Walka z regenerującym się bossem/cierniem/uzdrowieniem →
 sprite'y NIE powinny już podskakiwać między rundami.
 
+## 🆕 Dokończenie rundy optymalizacji: memoizacja wierszy w app/food/add.tsx + recipe.tsx (2026-10-11)
+
+Odłożona część audytu z §298 poniżej (wymagała najpierw `useCallback` na handlerach). Pełny
+opis w ARCHITECTURE.md §300. `LibraryRow`/`CandidateRow` jako `memo()` w obu plikach,
+`openPicker`/`tapEntry`/`pinEntry`/`addNew`/`addRoughIngredient` jako `useCallback`. Czysto
+wydajnościowe, zero zmiany zachowania.
+
+`tsc`/`jest` zielone (101/101 suite, 1333 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: "Co zjadłem" i Przepis → dodawanie/edycja pozycji z
+listy (własne + biblioteka + baza), pin/odpinanie w "Co zjadłem" → zachowanie identyczne jak
+przed zmianą.
+
 ## 🆕 Runda audytu optymalizacji — jedzenie + zadania/nawyki/nastrój, 8 fixów (2026-10-11)
 
 User: "optymalizuj dalej". Pełny opis w ARCHITECTURE.md §298. Skrót:
