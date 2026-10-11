@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🔴 Fix: Edytor układu walki — przeciąganie przerywane przez ScrollView (2026-10-11)
+
+User: "I ten edytor do poprawy nic sie nie da ustawic xddd". Pełny opis w ARCHITECTURE.md
+§296. Root cause: element przeciągany (`Draggable` w `battle-layout-lab.tsx`) żyje wewnątrz
+głównego `ScrollView` ekranu, a jego `PanResponder` nigdy nie bronił się przed przejęciem
+gestu przez ten `ScrollView` — każdy przeciąg z choćby minimalną pionową składową odpalał
+scroll strony i przerywał ruch w połowie. Ten gap istniał od PIERWSZEJ wersji edytora (sierpień),
+nie regresja z ostatniej przebudowy. Fix: `onPanResponderTerminationRequest`/
+`onShouldBlockNativeResponder`/`onMoveShouldSetPanResponder` na `PanResponder`. `tsc`/`jest`
+zielone (101/101 suite, 1328 testów, bez zmiany — gesty dotykowe nie są testowalne w Jest).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → Dane → Edytor układu walki —
+przeciągnij kotka/bossa/pasek HP gestem z wyraźną pionową składową (to dokładnie ten
+przypadek co wcześniej odpalał scroll) i sprawdź że element podąża za palcem przez CAŁY gest.
+Sprawdź też że sama strona dalej normalnie się przewija. **Jeśli po tym fixie dalej coś nie
+daje się ustawić — sprawdź konkretnie CZY to przeciąganie czy przyciski +/- (steppery) w
+dolnych sekcjach** (Rozmiar/Pozycja/Cień) — steppery nie używały tego samego mechanizmu, więc
+jeśli one też nie działają, to osobny, jeszcze nieznaleziony problem.
+
 ## 🆕 Rynek: paczkowe otwieranie skrzynek — przytrzymaj = ×5 naraz, bez animacji (2026-10-11)
 
 User: "dodaj mi te skrzynki szybsze otwieranie np natychmiastowo otworzyć 5 i pokazują się

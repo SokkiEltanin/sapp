@@ -127,8 +127,10 @@ interface BattleLayoutDraftState extends Snapshot {
 // `BATTLE_LAYOUT_DEFAULT`, czyli przy każdym ręcznym zsynchronizowaniu z boss-fight.tsx),
 // zustand automatycznie PORZUCA przeterminowany persisted draft i startuje od świeżego
 // defaultu — bez czekania aż user się zorientuje i wciśnie Reset sam.
-// 2→3 (2026-10-10) — schemat się zmienił (perBoss/perBg/catFlipped/bossFlipped), stary
-// pojedynczy draft bez tych pól i tak nie da się sensownie zmigrować.
+// 1→2 (2026-10-10) — schemat się zmienił (perBoss/perBg/catFlipped/bossFlipped), stary
+// pojedynczy draft bez tych pól i tak nie da się sensownie zmigrować. (Komentarz tu błędnie
+// mówił "2→3" aż do 2026-10-11 — sama liczba w kodzie była poprawna od razu, patrz commit
+// ebdd716, tylko opisujący ją komentarz miał literówkę o jeden numer w przód.)
 const PERSIST_VERSION = 2;
 
 const snapshotOf = (s: Snapshot): Snapshot => ({

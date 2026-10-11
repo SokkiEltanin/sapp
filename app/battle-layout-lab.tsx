@@ -102,10 +102,21 @@ function Draggable({ x, y, onDrag, onGrab, children }: {
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => { startRef.current = posRef.current; onGrabRef.current?.(); },
       onPanResponderMove: (_e: GestureResponderEvent, g: PanResponderGestureState) => {
         onDragRef.current(startRef.current.x + g.dx, startRef.current.y + g.dy);
       },
+      // 2026-10-11, user: "ten edytor do poprawy nic sie nie da ustawic" — root cause: ten
+      // PanResponder żyje WEWNĄTRZ `ScrollView` (patrz JSX niżej), a bez tych dwóch handlerów
+      // RN domyślnie POZWALA rodzicowi (ScrollView) przejąć gest w dowolnym momencie ruchu —
+      // każdy przeciąg z choćby minimalną pionową składową (czyli praktycznie każdy ludzki
+      // gest) odpalał scroll strony i PRZERYWAŁ `onPanResponderMove` w połowie, więc kotek/boss/
+      // paski HP więzły tam gdzie akurat ScrollView ukradł responder. Ten gap istniał od
+      // PIERWSZEJ wersji edytora (2026-08, commit 42fa780) — nie regresja z ostatniej rundy,
+      // po prostu nigdy wcześniej nie zgłoszony tak jednoznacznie.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     }),
   ).current;
 
