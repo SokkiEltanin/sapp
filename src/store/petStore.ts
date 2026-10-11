@@ -380,7 +380,7 @@ interface PetState {
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };  // zużywa eventEnergy (wspólna pula, patrz komentarz przy raidWeek)
   raidClaim: (weekKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   // wydarzenia
-  syncEventEnergy: (todayEnergy: number, mult: number) => void;
+  syncEventEnergy: (todayEnergy: number, mult: number, max: number) => void;
   spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
   eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   // nemesis — bez energii (nielimitowane próby), trwały bank jak raid
@@ -847,15 +847,24 @@ export const usePetStore = create<PetState>()(
         bossLog: [...s.bossLog, { kind: 'raid', id: weekKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Identical shape to syncEnergy/syncRaidEnergy, targeting the event's own bank.
-      syncEventEnergy: (todayEnergy, mult) => {
+      // CAPOWANE do `max` (2026-10-11, user: "mam nieskończoność energi" — zgłoszenie
+      // zbadane audytem, potwierdzony bug). Poprzednia wersja ŚWIADOMIE nie capowała banku
+      // (patrz historyczny komentarz przy `eventDailyAttempts` w bosses.ts, 2026-09-12) —
+      // zmieniono wtedy TYLKO wyświetlany sufit (z inwestycji na poziom), zostawiając realny
+      // bank rosnącym bez granic. To się nie sprawdziło: bank rósł dalej (49 zamiast 15 z
+      // poprzedniego zgłoszenia), pigułka "49/4" robiła z deklarowanego sufitu fikcję, a event
+      // (jednorazowa, czasowa walka) przestawał być w ogóle ograniczony próbami. `max` capuje
+      // TERAZ — zarówno dalszy przyrost, jak i od razu ścina istniejącą nadwyżkę (clamp przy
+      // pierwszym sync po aktualizacji, nie tylko nowe delty).
+      syncEventEnergy: (todayEnergy, mult, max) => {
         const t = todayISO();
         const s = get();
         const grantedToday = s.eventEnergyDate === t ? s.eventEnergyToday : 0;
         const target = Math.round(todayEnergy * (1 + mult));
         const delta = target - grantedToday;
-        if (delta <= 0 && s.eventEnergyDate === t) return;
+        if (delta <= 0 && s.eventEnergyDate === t && s.eventEnergy <= max) return;
         set({
-          eventEnergy: s.eventEnergy + Math.max(0, delta),
+          eventEnergy: Math.min(max, s.eventEnergy + Math.max(0, delta)),
           eventEnergyDate: t,
           eventEnergyToday: Math.max(grantedToday, target),
         });

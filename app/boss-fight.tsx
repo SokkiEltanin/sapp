@@ -256,7 +256,7 @@ export default function BossFight() {
   const eventBoss = currentEventBoss(now, menaceCtx);
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
   const isMenace = eventBoss?.kind === 'menace';
-  const eventMaxHp = eventHpFor(level);
+  const eventMaxHp = eventHpFor(effectiveAtkStat, level, bonuses);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — TYLKO sezonowe mają jeszcze
   // timer/FLAT próbę dzienną. Nemesis (2026-08-18, user: "niech nie ma timera... nielimitowany
@@ -509,7 +509,7 @@ export default function BossFight() {
       kind === 'campaign' ? campaignBoss :
       kind === 'raid' ? raidAsBoss(raid, raidRealStart, raidCounterHp) :
       kind === 'event' && eventBoss && isMenace ? menaceAsBoss(eventBoss, menaceSessionHp) :
-      kind === 'event' && eventBoss ? eventAsBoss(eventBoss, level) :
+      kind === 'event' && eventBoss ? eventAsBoss(eventBoss, effectiveAtkStat, level, bonuses) :
       kind === 'quest' ? questBoss :
       kind === 'mad' ? madBoss :
       kind === 'mission' ? missionBoss :

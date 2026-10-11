@@ -139,29 +139,53 @@ describe('seasonalEvents — eventBossFromKey', () => {
 // zostało przebalansowane pod TEN model — testy pilnują, żeby ktoś przypadkiem nie wrócił do
 // starej (o rząd wielkości większej) skali, która przy nowym modelu byłaby praktycznie
 // niewygrywalna (patrz komentarz przy eventHpFor w seasonalEvents.ts).
+//
+// PRZEKALIBROWANE na realną moc gracza (2026-10-11, user: "pokonuje je na raz") — stara
+// wersja brała tylko `level`, testowana WYŁĄCZNIE na zerowej inwestycji (`noBonus`/
+// `atkStatBonus=0`); realny gracz z niezerowym atkStatBonus/bonuses zabijał bossa w 1-2
+// ciosy. Testy niżej teraz pilnują OBU profili: zerowej inwestycji (nowy gracz) I realnej
+// (gracz z zakupionym atkStatBonus + bonusami z lootu/gear) — żeby regresja do "tylko level"
+// nie mogła się po cichu wkraść z powrotem.
 describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 2026-08-12)', () => {
   test('rośnie z poziomem, nigdy nie spada poniżej bazy', () => {
-    expect(eventHpFor(0)).toBeGreaterThan(0);
-    expect(eventHpFor(50)).toBeGreaterThan(eventHpFor(1));
+    expect(eventHpFor(0, 0, ZERO)).toBeGreaterThan(0);
+    expect(eventHpFor(0, 50, ZERO)).toBeGreaterThan(eventHpFor(0, 1, ZERO));
   });
 
-  // Górny próg podniesiony 10→13 (2026-09-12, PODBITE ×1.6 — patrz komentarz przy eventHpFor
-  // w seasonalEvents.ts, user: "bosy te czerwone energii muszą być o wiele trudniejsze
-  // względem realnych danych") — nadal skończona, jednosesyjna walka, tylko wyraźnie cięższa.
-  test('zabijalny w rozsądnej liczbie ciosów (~8-12) na bazowych statach, na kilku poziomach', () => {
-    const noBonus = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+  test('rośnie z atkStatBonus/bonuses na STAŁYM poziomie (realna moc gracza, nie tylko level)', () => {
+    const invested: Bonuses = { atk: 0.3, dodge: 0, crit: 0, energyMult: 0 };
+    expect(eventHpFor(200, 29, invested)).toBeGreaterThan(eventHpFor(0, 29, ZERO));
+  });
+
+  // Górny próg podniesiony 10→13 (2026-09-12, PODBITE ×1.6) — nadal skończona, jednosesyjna
+  // walka, tylko wyraźnie cięższa.
+  test('zabijalny w rozsądnej liczbie ciosów (~8-12) na BAZOWYCH statach, na kilku poziomach', () => {
     for (const level of [2, 25, 50, 100]) {
-      const hp = eventHpFor(level);
-      const hit = atkPower(0, level, noBonus); // dolna granica (bez wariancji/krytu)
+      const hp = eventHpFor(0, level, ZERO);
+      const hit = atkPower(0, level, ZERO); // dolna granica (bez wariancji/krytu)
       const hitsNeeded = hp / hit;
       expect(hitsNeeded).toBeGreaterThan(2);   // nie trywialne
       expect(hitsNeeded).toBeLessThan(13);     // ale realnie kończy się w jednej walce
     }
   });
 
+  // Regresja dla "pokonuje je na raz" (2026-10-11) — REALNA inwestycja (atkStatBonus kupiony
+  // za monety + bonusy z pokonanych bossów kampanii/gear) nie może sprowadzać walki do 1-2
+  // ciosów — `eventHpFor` musi skalować się z TĄ SAMĄ mocą, którą realnie liczy walka.
+  test('zabijalny w rozsądnej liczbie ciosów (~5-13) też przy REALNEJ inwestycji gracza', () => {
+    const invested: Bonuses = { atk: 0.3, dodge: 0, crit: 0, energyMult: 0 };
+    for (const level of [2, 25, 50, 100]) {
+      const hp = eventHpFor(200, level, invested);
+      const hit = atkPower(200, level, invested);
+      const hitsNeeded = hp / hit;
+      expect(hitsNeeded).toBeGreaterThan(4);   // nie 1-2 ciosy mimo inwestycji
+      expect(hitsNeeded).toBeLessThan(13);
+    }
+  });
+
   test('kontratak nie zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
     for (const level of [2, 25, 50, 100]) {
-      const hp = eventHpFor(level);
+      const hp = eventHpFor(0, level, ZERO);
       const counter = counterDamage(hp, 0); // stały % max HP, ta sama wartość co w każdej rundzie
       expect(counter).toBeLessThan(100);
     }
@@ -169,11 +193,11 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
 
   test('eventAsBoss przenosi tożsamość eventBossa i podpina hp z eventHpFor', () => {
     const eb = MENACE_POOL.overtime;
-    const boss = eventAsBoss(eb, 40);
+    const boss = eventAsBoss(eb, 0, 40, ZERO);
     expect(boss.id).toBe(eb.id);
     expect(boss.name).toBe(eb.name);
     expect(boss.weakness).toBe(eb.weakness);
-    expect(boss.hp).toBe(eventHpFor(40));
+    expect(boss.hp).toBe(eventHpFor(0, 40, ZERO));
     expect(boss.guard).toBeUndefined();
     expect(boss.regenPct).toBeUndefined();
   });

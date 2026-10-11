@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕🔴 Bossy eventowe — 3 potwierdzone bugi naprawione: 1-ciosowa walka, nieskończona energia, słabe nagrody (2026-10-11)
+
+User: "Te eventowe bosy chyba nie mają sensu... pokonuje je na raz (bo sie buguja) albo mam
+nieskończoność energi albo dają słabe nadrogu". Pełny opis w ARCHITECTURE.md §294. Audyt
+potwierdził wszystkie trzy jako realne bugi (nie nieporozumienie):
+
+1. **HP eventu przekalibrowane** (`eventHpFor`) — liczyło się tylko z poziomu, testowane na
+   zerowej inwestycji gracza. Realny gracz z zakupionym atakiem/bonusami z łupu zabijał
+   bossa w 1-2 ciosy. Teraz skaluje się z CAŁĄ realną mocą ataku (ten sam wzorzec co
+   questBossy), docelowo ~8-12 ciosów niezależnie od inwestycji.
+2. **Energia eventowa teraz capowana** (`syncEventEnergy`) — bank rósł bez żadnego sufitu
+   (znany, raz już zgłoszony bug — "15/2" wtedy, "49/4" teraz, nigdy realnie nie naprawiony).
+   Teraz twardo capowany do aktualnego sufitu, od razu ścina istniejącą nadwyżkę.
+3. **Nagrody podbite ×1.5** (`eventCoins`/`eventXp`) — zostały nietknięte, gdy HP/trudność
+   podbito ×1.6 (realnie ~×2.5 ryzyka) we wrześniu — współczynnik nagroda/ryzyko spadł ~36%.
+
+`tsc`/`jest` zielone (101/101 suite, 1328 testów, +2 nowe regresyjne dla punktu 1).
+
+**Priorytet testu na urządzeniu — wysoki**: Bossy → WYDARZENIE — sprawdź pigułkę energii (nie
+powinna już pokazywać absurdalnej nadwyżki po pierwszym wejściu po aktualizacji), stocz realną
+walkę z "Jesienna Demeter" (aktywna do 14.10) — powinna trwać kilka-kilkanaście rund, nie
+kończyć się od razu — i sprawdź że nagroda za wygraną czuje się adekwatna.
+
 ## 🆕 Runda audytu optymalizacji — 10 fixów, pet/walki + ekrany główne/store'y (2026-10-11)
 
 User: "Okej dawaj optymalizacje". Dwa równoległe background-audyty (jeden pod walki/pet/
