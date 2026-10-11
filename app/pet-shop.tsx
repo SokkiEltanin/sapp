@@ -10,7 +10,7 @@ import { ChevronLeft, Coins, Check, X } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
-import MultiBoxRevealModal from '@/components/pet/MultiBoxRevealModal';
+import MultiBoxRevealModal, { MultiRewardEntry } from '@/components/pet/MultiBoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
@@ -22,7 +22,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { useBoxStats } from '@/store/boxStatsStore';
-import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, parseGearInstanceId, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
+import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, parseGearInstanceId, gearSellValue, isBetterThanEquipped, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -180,11 +180,11 @@ export default function PetShop() {
   // `ownedItems`/`buyItem`/`grantStartup` USUNIĘTE z tego selektora (2026-09-11) — jedyne ich
   // użycie tu było w gałęziach 'color'/'startup' skrzynek, wyciętych z puli dropów.
   const { coins, xp, addCoins, spendCoins,
-    dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
+    dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear, sellGear,
     ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore(useShallow((s) => ({
     coins: s.coins, xp: s.xp, addCoins: s.addCoins,
     spendCoins: s.spendCoins, dayClaims: s.dayClaims, grantGear: s.grantGear,
-    buyDailyGear: s.buyDailyGear, equippedGear: s.equippedGear, ownedGear: s.ownedGear,
+    buyDailyGear: s.buyDailyGear, equippedGear: s.equippedGear, ownedGear: s.ownedGear, sellGear: s.sellGear,
     ownedCombatItems: s.ownedCombatItems, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
     activePotion: s.activePotion, buyPotion: s.buyPotion,
   })));
@@ -194,8 +194,12 @@ export default function PetShop() {
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  // Id przyznanej instancji gearu z `reveal` (2026-10-11, "mogę od razu loot sprzedać") — puste
+  // gdy slot pełny (grantGear() zwraca '' i kieruje do GearOverflowModal zamiast, patrz
+  // komentarz przy grantGear w petStore.ts) — wtedy po prostu brak przycisku "Sprzedaj" tutaj.
+  const [grantedGearId, setGrantedGearId] = useState<string | null>(null);
   // Paczkowe otwieranie (2026-10-11) — patrz komentarz w MultiBoxRevealModal.tsx.
-  const [multiReveal, setMultiReveal] = useState<{ box: LootBox; rewards: BoxReward[] } | null>(null);
+  const [multiReveal, setMultiReveal] = useState<{ box: LootBox; rewards: MultiRewardEntry[] } | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
   // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
   // tap na kafelku szedł od razu do `onBuyDaily`/ConfirmDialog bez pokazania CO właściwie się
@@ -299,6 +303,7 @@ export default function PetShop() {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
       const reward = rollBox(box, petLevel, ownedCombatItems);
       haptic.success();
+      setGrantedGearId(null);
       setReveal({ box, reward });
     }, 'Otwórz', odds);
   };
@@ -310,8 +315,9 @@ export default function PetShop() {
     const { box, reward } = reveal;
     if (reward.type === 'coins') addCoins(reward.coins);
     // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
-    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
-    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
+    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts. Zapamiętany id
+    // (2026-10-11) zasila przycisk "Sprzedaj" na odsłonie — patrz `sellInfo` niżej.
+    else if (reward.type === 'gear') setGrantedGearId(grantGear(reward.itemId, reward.rarity, reward.value) || null);
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — czysta obserwacja wyniku
     // `rollBox()`, żadna wartość ekonomii się tu nie zmienia. `daily:false` bo to
@@ -322,6 +328,20 @@ export default function PetShop() {
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
     });
   };
+
+  // "Sprzedaj" na odsłonie (2026-10-11, user: "mogę od razu loot sprzedać jak nie chcę i
+  // pokazuje wtedy jak cos jest lepsze niż założone to czy na pewno") — `null` gdy nic do
+  // sprzedania (nie-gear nagroda, albo slot pełny → `grantedGearId` puste, patrz wyżej).
+  const sellInfo = useMemo(() => {
+    if (!reveal || reveal.reward.type !== 'gear' || !grantedGearId) return null;
+    const item = gearById(reveal.reward.itemId);
+    if (!item) return null;
+    return {
+      coins: gearSellValue(item, reveal.reward.rarity),
+      betterThanEquipped: isBetterThanEquipped(equippedGear, ownedGear, item.slot, reveal.reward.value),
+      onSell: () => sellGear(grantedGearId),
+    };
+  }, [reveal, grantedGearId, equippedGear, ownedGear, sellGear]);
 
   // Paczkowe otwieranie (2026-10-11, user: "dodaj mi te skrzynki szybsze otwieranie np
   // natychmiastowo otworzyć 5 i pokazują się tylko karty z otwarcia") — długie przytrzymanie
@@ -342,15 +362,28 @@ export default function PetShop() {
       // SAMEJ paczce widziały upgrade'y przyznane wcześniejszymi rollami (ten sam efekt jakby
       // user otworzył je jedna po drugiej, nie "zamrożony" stan sprzed całej paczki).
       let localCombat = { ...ownedCombatItems };
-      const rewards: BoxReward[] = [];
+      // Wzbogacone wpisy (2026-10-11, "mogę wybrać które chce sprzedać") — `equippedGear`/
+      // `ownedGear` to STABILNY snapshot z zamknięcia (grant NIGDY nie zmienia equippedGear,
+      // tylko dokłada do ownedGear), więc "lepsze niż założone" liczone RAZ per item jest
+      // poprawne dla wszystkich 5 rolli w paczce, nie tylko pierwszego.
+      const rewards: MultiRewardEntry[] = [];
       for (let i = 0; i < BATCH_OPEN_N; i++) {
         const reward = rollBox(box, petLevel, localCombat);
-        rewards.push(reward);
-        if (reward.type === 'coins') addCoins(reward.coins);
-        else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
-        else if (reward.type === 'combatItem') {
+        if (reward.type === 'coins') {
+          addCoins(reward.coins);
+          rewards.push({ reward, instanceId: null, sellCoins: 0, betterThanEquipped: false });
+        } else if (reward.type === 'gear') {
+          const instanceId = grantGear(reward.itemId, reward.rarity, reward.value) || null;
+          const item = gearById(reward.itemId);
+          rewards.push({
+            reward, instanceId,
+            sellCoins: item ? gearSellValue(item, reward.rarity) : 0,
+            betterThanEquipped: item ? isBetterThanEquipped(equippedGear, ownedGear, item.slot, reward.value) : false,
+          });
+        } else if (reward.type === 'combatItem') {
           grantOrLevelCombatItem(reward.itemId, reward.level);
           localCombat = { ...localCombat, [reward.itemId]: reward.level };
+          rewards.push({ reward, instanceId: null, sellCoins: 0, betterThanEquipped: false });
         }
         recordBoxOpen({
           at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
@@ -361,6 +394,9 @@ export default function PetShop() {
       setMultiReveal({ box, rewards });
     }, `Otwórz ×${BATCH_OPEN_N}`, `${box.blurb}\nnatychmiastowo, bez animacji`);
   };
+  // Sprzedaż zaznaczonych kart na odsłonie paczki — czyste wywołanie sellGear × N, podsumowanie
+  // (toast/stan "sprzedano") robi już sam MultiBoxRevealModal.
+  const onSellSelectedFromMulti = (instanceIds: string[]) => { instanceIds.forEach(id => sellGear(id)); };
 
   // Darmowa skrzynka dnia (2026-09-08) — USUNIĘTA z tego ekranu (user: "zostawiłeś skrzynkę
   // dnia miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA" — dolny rząd lady to teraz
@@ -632,7 +668,8 @@ export default function PetShop() {
         boxEmoji={reveal?.box.emoji ?? '🎁'}
         boxIcon={reveal?.box.icon}
         onRevealed={onBoxRevealed}
-        onClose={() => setReveal(null)}
+        onClose={() => { setReveal(null); setGrantedGearId(null); }}
+        sellInfo={sellInfo}
       />
 
       <MultiBoxRevealModal
@@ -640,6 +677,7 @@ export default function PetShop() {
         boxName={multiReveal?.box.name ?? ''}
         rewards={multiReveal?.rewards ?? []}
         onClose={() => setMultiReveal(null)}
+        onSellSelected={onSellSelectedFromMulti}
       />
 
       <ConfirmDialog

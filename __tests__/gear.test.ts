@@ -2,7 +2,7 @@ import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT, GEAR_SLOT_CAP,
   gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots, gearSellValue,
   gearCombatBonuses, gearFlatHp, gearCoinsMult, gearAtkFlat, fmtGearStat,
-  countInSlot, isSlotFull,
+  countInSlot, isSlotFull, isBetterThanEquipped,
 } from '@/utils/gear';
 import { atkPower } from '@/utils/bosses';
 
@@ -308,5 +308,42 @@ describe('gear — countInSlot/isSlotFull (limit slotu ekwipunku, 2026-10-06)', 
 
   test('pusty ekwipunek nigdy nie jest pełny', () => {
     expect(isSlotFull({}, 'helm')).toBe(false);
+  });
+});
+
+// 2026-10-11, user: "mogę od razu loot sprzedać jak nie chcę i pokazuje wtedy jak cos jest
+// lepsze niż założone to czy na pewno" — ostrzeżenie przed sprzedażą loota wprost z odsłony
+// skrzynki (BoxRevealModal.tsx/MultiBoxRevealModal.tsx).
+describe('gear — isBetterThanEquipped (2026-10-11)', () => {
+  test('puste "założone" (brak equippedGear[slot]) → zawsze false, niezależnie od value', () => {
+    expect(isBetterThanEquipped({}, {}, 'helm', 999)).toBe(false);
+  });
+
+  test('założona instancja zniknęła z ownedGear (niespójny stan) → false, nie crashuje', () => {
+    const equipped = { helm: 'ghost:001' };
+    expect(isBetterThanEquipped(equipped, {}, 'helm', 50)).toBe(false);
+  });
+
+  test('wyższy surowy .value niż założone → true', () => {
+    const equipped = { helm: 'helm_slomiany:001' };
+    const owned = { 'helm_slomiany:001': { rarity: 'common' as const, value: 10 } };
+    expect(isBetterThanEquipped(equipped, owned, 'helm', 15)).toBe(true);
+  });
+
+  test('niższy lub równy .value niż założone → false (równe NIE jest "lepsze")', () => {
+    const equipped = { helm: 'helm_slomiany:001' };
+    const owned = { 'helm_slomiany:001': { rarity: 'common' as const, value: 10 } };
+    expect(isBetterThanEquipped(equipped, owned, 'helm', 10)).toBe(false);
+    expect(isBetterThanEquipped(equipped, owned, 'helm', 5)).toBe(false);
+  });
+
+  test('porównuje TYLKO w obrębie podanego slotu — inny slot nie wpływa', () => {
+    const equipped = { helm: 'helm_slomiany:001', buty: 'buty_plocienne:001' };
+    const owned = {
+      'helm_slomiany:001': { rarity: 'common' as const, value: 10 },
+      'buty_plocienne:001': { rarity: 'legendary' as const, value: 999 },
+    };
+    // Nowy helm 15 > założony helm 10 → true, mimo że buty mają dużo wyższe value (inny slot).
+    expect(isBetterThanEquipped(equipped, owned, 'helm', 15)).toBe(true);
   });
 });

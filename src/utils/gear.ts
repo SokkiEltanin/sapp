@@ -467,3 +467,24 @@ export function gearCoinsMult(
   if (!owned) return 1;
   return 1 + owned.value;
 }
+
+// "Czy to lepsze niż to co mam założone w tym slocie" (2026-10-11, user: "pokazuje wtedy jak
+// cos jest lepsze niż założone to czy na pewno" — ostrzeżenie przed sprzedażą loota wprost z
+// odsłony skrzynki, patrz BoxRevealModal.tsx/MultiBoxRevealModal.tsx). Porównuje SUROWY
+// `.value` — to DOKŁADNIE ta sama liczba, którą sumują gearCombatBonuses/gearFlatHp/
+// gearAtkFlat wyżej, więc "więcej" tu znaczy dosłownie "realnie mocniejsze", niezależnie od
+// tego czy to ten sam item czy inny w tym samym slocie (oba feedują ten sam wzór). Pusty slot
+// (nic założone) → nigdy "lepsze niż założone" (brak punktu odniesienia) — zwykła sprzedaż
+// bez ostrzeżenia.
+export function isBetterThanEquipped(
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
+  slot: GearSlot,
+  value: number,
+): boolean {
+  const equippedId = equippedGear[slot];
+  if (!equippedId) return false;
+  const equipped = ownedGear[equippedId];
+  if (!equipped) return false;
+  return value > equipped.value;
+}

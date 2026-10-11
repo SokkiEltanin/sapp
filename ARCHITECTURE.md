@@ -16295,5 +16295,61 @@ dokładnie ten przypadek który wcześniej odpalał scroll) i sprawdź że eleme
 za palcem przez CAŁY gest, nie tylko pierwsze kilka pikseli. Sprawdź też że sama strona dalej
 daje się normalnie przewijać (np. przeciągnij palcem zaczynając NAD/POZA elementami
 przeciąganymi) — fix nie powinien zablokować zwykłego scrolla.
+
+## 297. Rynek/skrzynka dnia: sprzedaż loota wprost z odsłony, z ostrzeżeniem "lepsze niż założone" (2026-10-11)
+
+User: "doaj od razu że jak losuje ze skrzyne mogę od razu loot sprzedać jak nie chcę i
+pokazuje wtedy jak cosjest lepsze niż założone to czy na pewno i moe wybrać które chce
+sprzedać". Trzy wymagania, wszystkie wdrożone:
+
+1. **Sprzedaż od razu z odsłony** — `BoxRevealModal.tsx` (pojedyncze otwarcie, Rynek +
+   skrzynka dnia w `pet.tsx`) dostał nowy prop `sellInfo?: {coins, betterThanEquipped,
+   onSell} | null`. Pod głównym "Super!" pojawia się drugorzędny link "Sprzedaj za N 🪙" gdy
+   `reward.type === 'gear'` i grant się powiódł (pusty string z `grantGear()` = slot pełny →
+   kolejka `pendingGearOverflow`/`GearOverflowModal`, wtedy brak przycisku, inny mechanizm
+   już to obsługuje). Wołający (`pet-shop.tsx`/`pet.tsx`) łapie zwrócone `grantGear()` id
+   instancji w nowym stanie `grantedGearId` (`onBoxRevealed`/`onDailyBoxRevealed`) i liczy
+   `sellInfo` przez `useMemo`.
+2. **Ostrzeżenie "lepsze niż założone"** — nowy czysty helper `isBetterThanEquipped()`
+   (`gear.ts`) porównuje SUROWY `.value` nowego dropu z `.value` aktualnie założonej instancji
+   w TYM SAMYM slocie (ta sama liczba, którą sumują `gearCombatBonuses`/`gearFlatHp`/
+   `gearAtkFlat` — "więcej" tu znaczy dosłownie "realnie mocniejsze", niezależnie czy to ten
+   sam item czy inny w tym slocie). Pusty slot (nic założone) → zawsze `false`, zero
+   ostrzeżenia. Gdy `betterThanEquipped`, tap "Sprzedaj" pokazuje `ConfirmDialog`
+   ("Sprzedać mimo że lepsze?") zamiast sprzedawać od razu.
+3. **Wybór KTÓRE sprzedać (paczka ×5)** — `MultiBoxRevealModal.tsx` (z §295) rozszerzony:
+   `rewards` to teraz `MultiRewardEntry[]` (`{reward, instanceId, sellCoins,
+   betterThanEquipped}`, liczone RAZ w `onBuyBoxMulti` zaraz po `grantGear()` — `equippedGear`
+   nie zmienia się w trakcie paczki, więc jeden snapshot starczy na wszystkie 5 porównań).
+   Każda karta EKWIPUNKU (nie monety/perki — te nie mają mechaniki sprzedaży) jest zaznaczalna
+   (checkbox, tap = toggle), karty z `betterThanEquipped` dostają żółty tag "lepsze!". Nowy
+   przycisk "Sprzedaj zaznaczone (N) — +X 🪙" pod listą; jeśli którykolwiek zaznaczony jest
+   "lepszy niż założone", jeden wspólny `ConfirmDialog` zanim sprzeda CAŁĄ zaznaczoną grupę.
+   Sprzedane karty zostają na miejscu (nie znikają — unika przeskoku layoutu), przyciemnione +
+   tag "sprzedano", odznaczone i nieklikalne.
+
+**Celowo NIE zrobione**: ta sama funkcja dla `CrateModal.tsx` (skrzynka sardynek z głaskania,
+`openCrate()` w petStore) — inny, jednorazowy (nie paczkowy) flow, user explicite mówił o
+"losowaniu ze skrzyni" w kontekście Rynku/paczki ×5, nad którymi właśnie pracowaliśmy; dodanie
+tam tej samej opcji to osobna, nieproszona rozbudowa, czeka na wyraźną prośbę.
+
+**Testy**: nowy `describe('gear — isBetterThanEquipped')` w `__tests__/gear.test.ts` (5
+testów: pusty slot, niespójny stan ownedGear, wyższe/niższe/równe value, izolacja per-slot).
+Reszta (UI orkiestracja w BoxRevealModal/MultiBoxRevealModal/pet-shop.tsx/pet.tsx) bez nowych
+testów — czysta kompozycja już przetestowanych `sellGear`/`grantGear`/`gearSellValue`, ten sam
+powód co inne czysto-UI zmiany w tej sesji. `tsc --noEmit` czyste, `jest --silent` 101/101
+suite, 1333 testy (+5).
+
+**Priorytet testu na urządzeniu — wysoki**: (1) Rynek → tapnij skrzynkę, wylosuj ekwipunek →
+sprawdź przycisk "Sprzedaj" pod "Super!" — jeśli to Twój jedyny item w tym slocie (nic
+założone), sprzedaż powinna być NATYCHMIASTOWA bez pytania; jeśli masz coś gorszego założone
+w tym slocie, też natychmiastowa; jeśli masz coś LEPSZEGO/RÓWNEGO założone, powinno dopytać.
+(2) Przytrzymaj skrzynkę (paczka ×5) → zaznacz kilka kart ekwipunku → "Sprzedaj zaznaczone" →
+sprawdź że monety faktycznie przybyły i że sprzedane karty zostają widoczne jako
+przyciemnione/"sprzedano". (3) Skrzynka dnia na `/pet` → to samo co (1).
+
+---
+
+*Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

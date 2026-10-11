@@ -22,7 +22,7 @@ import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/u
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
-import { gearCombatBonuses, gearFlatHp, gearAtkFlat } from '@/utils/gear';
+import { gearCombatBonuses, gearFlatHp, gearAtkFlat, gearById, gearSellValue, isBetterThanEquipped } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
@@ -72,7 +72,7 @@ export default function Pet() {
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem, grantOrLevelCombatItem,
-    equippedGear, ownedGear, activePotion, syncPotionExpiry } = usePetStore(useShallow((s) => ({
+    equippedGear, ownedGear, sellGear, activePotion, syncPotionExpiry } = usePetStore(useShallow((s) => ({
     name: s.name, xp: s.xp, coins: s.coins, careTick: s.careTick, catColor: s.catColor, catStripes: s.catStripes,
     catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor, catWhiskers: s.catWhiskers,
     catLegStripes: s.catLegStripes, petCat: s.petCat, affection: s.affection, affectionDay: s.affectionDay,
@@ -84,7 +84,7 @@ export default function Pet() {
     ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
     upgradeCombatItem: s.upgradeCombatItem, equipCombatItem: s.equipCombatItem,
     unequipCombatItem: s.unequipCombatItem, grantOrLevelCombatItem: s.grantOrLevelCombatItem,
-    equippedGear: s.equippedGear, ownedGear: s.ownedGear, activePotion: s.activePotion,
+    equippedGear: s.equippedGear, ownedGear: s.ownedGear, sellGear: s.sellGear, activePotion: s.activePotion,
     syncPotionExpiry: s.syncPotionExpiry,
   })));
   const lvl = levelFromXp(xp);
@@ -219,6 +219,9 @@ export default function Pet() {
   const [cancelMissionConfirm, setCancelMissionConfirm] = useState(false);
   const onCancelMission = () => { haptic.tap(); setCancelMissionConfirm(true); };
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  // Id przyznanej instancji gearu z `boxReveal` (2026-10-11, "mogę od razu loot sprzedać") —
+  // ten sam wzorzec co `grantedGearId` w pet-shop.tsx (puste gdy slot pełny → GearOverflowModal).
+  const [grantedGearId, setGrantedGearId] = useState<string | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
   const recordBoxOpen = useBoxStats(st => st.recordOpen);
@@ -229,6 +232,7 @@ export default function Pet() {
     // gałęzie miały ich obsłużyć, teraz rollBox() nigdy ich nie zwraca.
     const reward = rollBox(DAILY_BOX, lvl.level, ownedCombatItems);
     haptic.success();
+    setGrantedGearId(null);
     setBoxReveal({ box: DAILY_BOX, reward });
   };
   // Przyznanie nagrody PRZESUNIĘTE do odsłony reela (2026-10-02, patrz komentarz przy
@@ -239,8 +243,9 @@ export default function Pet() {
     const { reward } = boxReveal;
     if (reward.type === 'coins') addCoins(reward.coins);
     // grantGear (2026-09-18) zawsze przyznaje NOWĄ, trwałą instancję — żadnej kompensaty
-    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts.
-    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity, reward.value);
+    // monetami do pokazania, patrz komentarz przy `GearInstance` w gear.ts. Zapamiętany id
+    // (2026-10-11) zasila przycisk "Sprzedaj" na odsłonie — patrz `sellInfo` niżej.
+    else if (reward.type === 'gear') setGrantedGearId(grantGear(reward.itemId, reward.rarity, reward.value) || null);
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     // Log do statystyk Rynku (boxStatsStore, 2026-09-15) — `daily:true` bo to darmowa
     // Skrzynka dnia (cost 0), odróżniona od płatnej Drewnianej (ten sam BoxId 'sardine'),
@@ -250,6 +255,17 @@ export default function Pet() {
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
     });
   };
+  // "Sprzedaj" na odsłonie (2026-10-11) — ten sam wzorzec co w pet-shop.tsx.
+  const boxSellInfo = useMemo(() => {
+    if (!boxReveal || boxReveal.reward.type !== 'gear' || !grantedGearId) return null;
+    const item = gearById(boxReveal.reward.itemId);
+    if (!item) return null;
+    return {
+      coins: gearSellValue(item, boxReveal.reward.rarity),
+      betterThanEquipped: isBetterThanEquipped(equippedGear, ownedGear, item.slot, boxReveal.reward.value),
+      onSell: () => sellGear(grantedGearId),
+    };
+  }, [boxReveal, grantedGearId, equippedGear, ownedGear, sellGear]);
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
@@ -764,7 +780,8 @@ export default function Pet() {
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         boxIcon={boxReveal?.box.icon}
         onRevealed={onDailyBoxRevealed}
-        onClose={() => setBoxReveal(null)}
+        onClose={() => { setBoxReveal(null); setGrantedGearId(null); }}
+        sellInfo={boxSellInfo}
       />
       <PetCustomizeModal
         visible={customizeOpen}

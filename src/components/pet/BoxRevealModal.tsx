@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image, useWindowDimensions } from 'react-native';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
 import { RARITY_META, gearById, GEAR_ITEMS } from '@/utils/gear';
 import { itemById, COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 
 // Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz.
 function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }) {
@@ -101,10 +103,18 @@ function buildReel(reward: BoxReward): ReelCell[] {
 // instancje (patrz `GearInstance` w gear.ts) KAŻDY wylosowany gear jest zawsze naprawdę
 // przyznany, nigdy po cichu kompensowany/odrzucany, więc karta "EKWIPUNEK! <nazwa>" już
 // zawsze mówi prawdę — nie potrzeba osobnej "uczciwej" wersji na duplikat.
-export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, onRevealed, onClose }: {
+export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, boxIcon, onRevealed, onClose, sellInfo }: {
   visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; boxIcon?: any;
   onRevealed?: () => void; onClose: () => void;
+  // Sprzedaż loota WPROST z odsłony (2026-10-11, user: "mogę od razu loot sprzedać jak nie
+  // chcę i pokazuje wtedy jak cos jest lepsze niż założone to czy na pewno") — tylko dla
+  // `reward.type === 'gear'` (coins/combatItem nie mają mechaniki sprzedaży w tej appce).
+  // Wołający (pet-shop.tsx/pet.tsx) liczy `coins`/`betterThanEquipped` (zna equippedGear/
+  // ownedGear) i wykonuje REALNĄ sprzedaż w `onSell` — ten komponent zostaje czysto
+  // prezentacyjny, tylko dopytuje (ConfirmDialog) gdy `betterThanEquipped`.
+  sellInfo?: { coins: number; betterThanEquipped: boolean; onSell: () => void } | null;
 }) {
+  const [confirmSell, setConfirmSell] = useState(false);
   // Nowa faza `opening` (2026-09-12, user: "Animacja otwierania skrzynki możemy ja
   // powiększyć bo jest malutka i zrobic takie epickie przejście po kliknięciu otworz do
   // tego cesowego otwierania") — dotąd `doOpen()` przechodziło closed→spinning W TEJ SAMEJ
@@ -135,7 +145,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
   useEffect(() => {
     if (!visible) return;
     setPhase('closed'); setFlies([]); setReel([]); reelX.setValue(0); burst.setValue(0);
-    shake.setValue(0); openScale.setValue(1); flash.setValue(0);
+    shake.setValue(0); openScale.setValue(1); flash.setValue(0); setConfirmSell(false);
   }, [visible]);
 
   useEffect(() => {
@@ -228,6 +238,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
     : 'MONETY';
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={st.overlay} onPress={phase === 'revealed' ? onClose : undefined}>
         <View style={st.center} pointerEvents="box-none">
@@ -308,11 +319,43 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, bo
               <Pressable style={[st.btn, { backgroundColor: meta.color }]} onPress={onClose}>
                 <Text style={st.btnTxt}>Super!</Text>
               </Pressable>
+              {reward?.type === 'gear' && sellInfo && (
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => {
+                    haptic.tap();
+                    if (sellInfo.betterThanEquipped) { setConfirmSell(true); return; }
+                    sellInfo.onSell();
+                    toast.success(`Sprzedano — +${sellInfo.coins} 🪙`);
+                    onClose();
+                  }}
+                >
+                  <Text style={st.sellTxt}>Sprzedaj za {sellInfo.coins} 🪙</Text>
+                </Pressable>
+              )}
             </>
           )}
         </View>
       </Pressable>
     </Modal>
+    {!!sellInfo && (
+      <ConfirmDialog
+        visible={confirmSell}
+        title="Sprzedać mimo że lepsze?"
+        message={`${reward?.type === 'gear' ? reward.name : 'Ten przedmiot'} ma wyższy stat niż to, co masz teraz założone w tym slocie. Sprzedaż da +${sellInfo.coins} 🪙, ale tracisz realne wzmocnienie. Na pewno?`}
+        confirmLabel="Sprzedaj"
+        cancelLabel="Zatrzymaj"
+        destructive
+        onConfirm={() => {
+          sellInfo.onSell();
+          toast.success(`Sprzedano — +${sellInfo.coins} 🪙`);
+          setConfirmSell(false);
+          onClose();
+        }}
+        onCancel={() => setConfirmSell(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -335,6 +378,9 @@ const st = StyleSheet.create({
   hint: { color: '#E7EAEA', fontSize: 13.5, fontWeight: '700', textAlign: 'center', maxWidth: 240 },
   // "Pomiń" (2026-10-11) — ten sam styl co "Pomiń walkę" w boss-fight.tsx, dla spójności.
   skipTxt: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textAlign: 'center', textDecorationLine: 'underline' },
+  // "Sprzedaj" na odsłonie (2026-10-11) — ten sam wzorzec co skipTxt powyżej (drugorzędna,
+  // podkreślona akcja pod głównym przyciskiem), nie pełnoprawny `st.btn`.
+  sellTxt: { fontSize: 12.5, fontWeight: '700', color: 'rgba(255,255,255,0.75)', textAlign: 'center', textDecorationLine: 'underline', marginTop: 10 },
   // Błysk "wybuchu" między zamknięciem a reelem (2026-09-12) — rosnące, szybko gasnące
   // koło na środku modala, DOKŁADNIE w momencie cięcia closed→spinning (patrz `doOpen`).
   flash: {

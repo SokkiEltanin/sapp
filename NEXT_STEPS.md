@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sprzedaż loota wprost z odsłony skrzynki + ostrzeżenie "lepsze niż założone" (2026-10-11)
+
+User: "doaj od razu że jak losuje ze skrzyne mogę od razu loot sprzedać jak nie chcę i
+pokazuje wtedy jak cosjest lepsze niż założone to czy na pewno i moe wybrać które chce
+sprzedać". Pełny opis w ARCHITECTURE.md §297.
+
+- **Pojedyncze otwarcie** (Rynek + skrzynka dnia) — pod "Super!" nowy link "Sprzedaj za N 🪙",
+  natychmiastowy, chyba że nowy item jest LEPSZY niż to co masz założone w tym slocie — wtedy
+  dopytuje (ConfirmDialog).
+- **Paczka ×5** (przytrzymanie skrzynki) — każda karta ekwipunku zaznaczalna (checkbox),
+  "lepsze niż założone" oznaczone żółtym tagiem, przycisk "Sprzedaj zaznaczone (N)" sprzedaje
+  całą grupę naraz (jeden wspólny confirm jeśli którykolwiek jest "lepszy").
+
+`tsc`/`jest` zielone (101/101 suite, 1333 testy, +5 nowych na `isBetterThanEquipped`).
+
+**Priorytet testu na urządzeniu — wysoki**: otwórz skrzynkę (pojedynczo i paczką ×5), spróbuj
+sprzedać wylosowany ekwipunek od razu — sprawdź że (1) natychmiastowa sprzedaż działa gdy nic
+lepszego nie tracisz, (2) dopytuje gdy item jest lepszy niż założony, (3) w paczce zaznaczenie
+kilku kart + "Sprzedaj zaznaczone" faktycznie dolicza monety i oznacza karty jako sprzedane.
+
 ## 🆕🔴 Fix: Edytor układu walki — przeciąganie przerywane przez ScrollView (2026-10-11)
 
 User: "I ten edytor do poprawy nic sie nie da ustawic xddd". Pełny opis w ARCHITECTURE.md
