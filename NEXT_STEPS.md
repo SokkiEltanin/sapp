@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: powiadomienie "Wypłata?" strzelało mimo auto-zaksięgowanej wypłaty (2026-10-11)
+
+User zrzutem: "Bez sensu mnie pyta o wylate skoro już wypłata jest dodana... do finansow
+automatycznie wypadło". Pełny opis w ARCHITECTURE.md §292. `setPaydayHandledMonth()` był
+wołany TYLKO z ręcznego modala "Wypłata?" — automatyczne księgowanie z banku (`commitBankTx`,
+gałąź rozpoznanego nadawcy wynagrodzenia) nigdy nie informowało tej flagi, mimo że pieniądze
+realnie już wpadły. Fix: `bankCommit.ts` ustawia flagę i od razu odświeża/kasuje zaplanowane
+powiadomienie, dokładnie jak ręczne potwierdzenie. Dotyczy obu ścieżek bankowych (ręczne
+"Zatwierdź" i w pełni automatyczna kolejka). `tsc`/`jest` zielone (bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: jeśli masz powiadomienie "Wypłata?" włączone,
+sprawdź w kolejnym miesiącu że po auto-zaksięgowaniu wypłaty z banku powiadomienie faktycznie
+nie strzeli ponownie.
+
 ## 🆕 BoxRevealModal: przycisk "Pomiń" spin + naprawiony kolor wypełniaczy reela (2026-10-11)
 
 User: "zastanawiam sie zeby mocy otwierać je szybciej... nie chce czekać na animacje do

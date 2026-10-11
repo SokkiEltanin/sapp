@@ -16027,6 +16027,40 @@ zatrzymuje się w połowie komórki) i że karta wyniku/konfetti/przyznanie nagr
 identycznie jak bez skipu. Sprawdź też czy kolory w locie "czują się" teraz spójniejsze z
 tym co faktycznie wypada.
 
+## 292. Fix: powiadomienie "Wypłata?" strzelało mimo auto-zaksięgowanej wypłaty z banku (2026-10-11)
+
+User zrzutem ekranu powiadomień: "Bez sensu mnie pyta o wylate skoro już wypłata jest dodana
+😭 do finansow automatycznie wypadło".
+
+**Root cause**: `setPaydayHandledMonth()` (`payday.ts`) — flaga "ten miesiąc już załatwiony",
+którą czyta `refreshPaydayReminder()` zanim w ogóle zaplanuje powiadomienie "Wypłata?" — był
+wołany TYLKO z jednego miejsca: ręcznego modala `confirmPayday()` w `index.tsx` (user wpisuje
+kwotę i potwierdza). Automatyczne księgowanie wypłaty z banku (`commitBankTx` w
+`bankCommit.ts`, gałąź `p.jd` — rozpoznany nadawca wynagrodzenia, ten sam mechanizm co
+`isKnownPaycheckSender`/`rememberPaycheckSender` z wcześniejszej sesji) NIGDY nie informowało
+`payday.ts`, że miesiąc jest już załatwiony — mimo że pieniądze realnie już wpadły do
+przychodów. Efekt: zaplanowane powiadomienie nadal strzelało, pytając o coś co appka już
+sama wie.
+
+**Fix** (`bankCommit.ts`): w gałęzi `if (p.jd)` (obok już istniejącego
+`rememberPaycheckSender`) dopisane `setPaydayHandledMonth(currentMonth())` — oznacza miesiąc
+jako załatwiony TAK SAMO jak ręczne potwierdzenie. Dodatkowo od razu wołane
+`notificationsService.refreshPaydayReminder(cfg.enabled, cfg.day, month)` (ten sam wzorzec co
+`confirmPayday()`) — kasuje/przeplanowuje JUŻ zaplanowane powiadomienie natychmiast, zamiast
+czekać aż user sam otworzy Dashboard i `useFocusEffect` złapie zmianę przy kolejnym foreground.
+Dotyczy OBU ścieżek bankowych (ręczne "Zatwierdź" w przeglądzie I w pełni automatyczna kolejka)
+— obie przechodzą przez TEN SAM `commitBankTx`, jedną funkcję, jedno miejsce fixu.
+
+**Testy**: brak nowych — `bankCommit.ts` nie ma istniejącego pliku testów w tym repo (silnie
+sprzężony z async store'em/Firestore, ten sam powód co poprzednie fixy w tym pliku w tej
+sesji — §278/279 — też bez testów). `tsc --noEmit` czyste, `jest --silent` 101/101 suite,
+1326 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: jeśli masz jeszcze włączone powiadomienie
+"Wypłata?" w Ustawieniach, poczekaj do następnego miesiąca (albo poproś o ręczny test) i
+sprawdź że po tym jak bank automatycznie zaksięguje wypłatę, powiadomienie faktycznie nie
+strzeli ponownie tego miesiąca.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
