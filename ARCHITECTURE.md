@@ -16253,8 +16253,47 @@ potwierdzeniu modal pokazuje dokładnie 5 kart bez spinu, (3) monety/ekwipunek/p
 się przyznały (sprawdź stan po zamknięciu — ekwipunek w panelu, perki w ekranie bossów), (4)
 zwykłe tapnięcie (pojedyncze otwarcie ze spinem) dalej działa jak wcześniej.
 
----
+## 296. Fix: Edytor układu walki — przeciąganie przerywane przez ScrollView (2026-10-11)
 
-*Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
+User zrzutem ekranu: "I ten edytor do poprawy nic sie nie da ustawic xddd". Root cause
+znaleziony w kodzie (`Draggable` w `app/battle-layout-lab.tsx`): element przeciągany żyje
+WEWNĄTRZ głównego `ScrollView` ekranu, a jego `PanResponder` nigdy nie bronił się przed
+przejęciem gestu — bez `onPanResponderTerminationRequest`/`onShouldBlockNativeResponder`, RN
+domyślnie POZWALA rodzicowi (tu: `ScrollView`) przejąć responder w dowolnym momencie ruchu.
+Każdy przeciąg z choćby minimalną pionową składową (czyli praktycznie każdy ludzki gest)
+odpalał scroll strony i PRZERYWAŁ `onPanResponderMove` w połowie, więc kotek/boss/paski HP
+więzły tam, gdzie akurat `ScrollView` ukradł gest — realnie nic nie dawało się ustawić
+przeciąganiem. **Ten gap istniał od PIERWSZEJ wersji edytora** (2026-08, commit 42fa780) —
+nie regresja z przebudowy §288/ostatniej rundy, po prostu nigdy wcześniej nie zgłoszony tak
+jednoznacznie (poprzednie zgłoszenia — §173/§282/§287/§288 — dotyczyły geometrii/skali/tła,
+nie samej mechaniki przeciągania).
+
+**Fix**: `PanResponder.create` w `Draggable` dostał `onPanResponderTerminationRequest: () =>
+false` (JS-owa warstwa responder-systemu — nie oddawaj gestu nikomu w trakcie przeciągania) +
+`onShouldBlockNativeResponder: () => true` (Android-specific — nie pozwól natywnemu
+`ScrollView` ukraść touch poza warstwą JS) + `onMoveShouldSetPanResponder: () => true` (dla
+pewności przy negocjacji odpowiedzialności w trakcie ruchu, nie tylko na starcie dotyku).
+Steppery (`TouchableOpacity`-owe przyciski +/-) nie są dotknięte tym bugiem — nie żyją w
+żadnym PanResponderze — więc jeśli user po tym fixie dalej zgłosi że konkretny stepper nic
+nie robi, to osobny, jeszcze nieznaleziony problem, nie ten sam root cause.
+
+Przy okazji: poprawiony mylący komentarz w `battleLayoutDraftStore.ts` — twierdził że
+`PERSIST_VERSION` zmieniło się "2→3" (2026-10-10), ale realnie (sprawdzone `git blame`/`git
+show` na commit ebdd716) zmieniło się poprawnie "1→2" — sam numer w kodzie był od razu
+prawidłowy, tylko OPISUJĄCY go komentarz miał błędną liczbę. Nie wpływało to na działanie
+(wersja faktycznie się zwiększyła, migracja działa poprawnie), ale to DOKŁADNIE ten sam rodzaj
+pułapki co "ROOT CAUSE ustalony 2026-09-23" opisany kawałek wyżej w tym samym pliku — mylący
+komentarz o wersji jest dokładnie tym, przed czym ten mechanizm miał chronić.
+
+**Testy**: brak nowych — `PanResponder`/gesty dotykowe nie są sensownie testowalne w Jest bez
+realnego renderera dotykowego (ten sam ograniczenie co animacje). `tsc --noEmit` czyste,
+`jest --silent` 101/101 suite, 1328 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki**: Ustawienia → Dane → Edytor układu walki — spróbuj
+przeciągnąć kotka/bossa/dowolny pasek HP (szczególnie gestem z WYRAŹNĄ pionową składową, to
+dokładnie ten przypadek który wcześniej odpalał scroll) i sprawdź że element faktycznie podąża
+za palcem przez CAŁY gest, nie tylko pierwsze kilka pikseli. Sprawdź też że sama strona dalej
+daje się normalnie przewijać (np. przeciągnij palcem zaczynając NAD/POZA elementami
+przeciąganymi) — fix nie powinien zablokować zwykłego scrolla.
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
