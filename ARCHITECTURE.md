@@ -16348,6 +16348,56 @@ w tym slocie, też natychmiastowa; jeśli masz coś LEPSZEGO/RÓWNEGO założone
 sprawdź że monety faktycznie przybyły i że sprzedane karty zostają widoczne jako
 przyciemnione/"sprzedano". (3) Skrzynka dnia na `/pet` → to samo co (1).
 
+## 298. Runda audytu optymalizacji — jedzenie + zadania/nawyki/nastrój (2026-10-11)
+
+User: "optymalizuj dalej" — dwa równoległe background-audyty poza już naprawionymi obszarami
+(PR #402: pet/walki + kalendarz/finanse/liczniki/pojazdy/boss-fight). 8 fixów wdrożonych:
+
+1. `app/(tabs)/food.tsx` — `weekBalance`/`avgStats` robiły RAZEM 37 pełnych `.filter()`
+   przejść po CAŁEJ, nigdy nie archiwizowanej historii `meals` — a `loadBody()` odpala się na
+   KAŻDYM foregroundzie appki (`useFocusEffect` + `AppState` listener), nie tylko po dodaniu
+   posiłku. Nowy `kcalByDay` — jeden `useMemo` budujący `Map<data, sumaKcal>` z `meals`, czytany
+   przez oba memosy jako `.get(key) ?? 0` zamiast `meals.filter(m => m.date === key)`.
+2. `app/food/add.tsx` — `recentMeals` kopiowało i sortowało CAŁĄ historię posiłków
+   (`[...storeMeals].sort(...)`) tylko po to, żeby znaleźć 6 odróżnialnych wpisów, na KAŻDE
+   wejście na ekran "Co zjadłem". Teraz: jeden O(n) przebieg wybierający najnowszy wpis per
+   sygnatura (Map), sortowanie tylko dystynktywnych sygnatur (dużo mniejszy zbiór).
+3. `src/hooks/useTasks.ts` — gołe `useCalendarStore()` (łapało `events`/`gcalEvents`/
+   `selectedDate`) w hooku wołanym na DWÓCH zawsze zamontowanych ekranach (Zadania + dashboard)
+   → `useShallow` z nazwanymi polami.
+4. `src/hooks/useMoodCheckIn.ts` — gołe `useMoodStore()` (łapało `entries`/`pendingSync`) na
+   dashboardzie → `useShallow`.
+5. `app/(tabs)/stats.tsx` — gołe `useMoodStore()` PRZEOCZONE w PR #402 w TYM SAMYM pliku, trzy
+   linie pod już naprawionym analogicznym `useCalendarStore()` → `useMoodStore(s => s.entries)`.
+6. `app/habits.tsx` — `getStreak`/`getLast7` (bez sztywnego górnego limitu kroków) wołane na
+   żywo w JSX dla każdego nawyku na każdy render, w tym z zupełnie niezwiązanych zmian UI
+   (siatka miesiąca, modal edycji, dialog usuwania) → nowy `habitStats` `useMemo` (Map
+   habit.id→{streak,last7}), deps na już-`useCallback`-owanych `getStreak`/`getLast7` z
+   `useHabits.ts` (realnie przelicza się tylko gdy dane faktycznie się zmieniły).
+7. `src/components/calendar/TaskItem.tsx` — brak `React.memo`, wiersz w pętli `.map()` w
+   dziennym widoku zadań kalendarza (`stats.tsx`, 2 miejsca) wewnątrz ekranu z wieloma
+   niezwiązanymi `useState`.
+8. `app/(tabs)/mood.tsx` — `avgMood`/`avgEnergy` liczone wprost w body renderu (`.map()+avg()`
+   nad już zmemoizowanym `last30`) zamiast w `useMemo`.
+
+**Celowo NIE zrobione**: ekstrakcja `CandidateRow`/`LibraryRow` jako `React.memo` w
+`app/food/add.tsx`/`app/food/recipe.tsx` (audyt: "Medium-High"/"Medium") — same dane list
+(`candidates`/`libMatches`) są już poprawnie zmemoizowane, ale `tapEntry`/`pinEntry`/
+`openPicker` NIE są `useCallback`-owane, więc samo opakowanie wierszy w `memo()` nic by nie
+dało (nowe closure na każdy render i tak łamałyby porównanie propsów) — realna naprawa wymaga
+najpierw przepisania tych handlerów na `useCallback` w całym (~1000-liniowym) pliku, większy,
+bardziej ryzykowny refaktor niż reszta tej rundy. Odłożone do osobnej, celowej zmiany.
+
+**Testy**: brak nowych — czysto wydajnościowa runda (memoizacja/selektory/Map zamiast
+filter+reduce, zero zmiany zachowania). `tsc --noEmit` czyste, `jest --silent` 101/101 suite,
+1333 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: (1) "Co zjadłem" → sprawdź że sekcja "ostatnie
+posiłki" nadal pokazuje właściwe 6 pozycji; (2) ekran Jedzenie → bilans tygodnia/średnie 30-dni
+→ liczby bez zmian; (3) Nawyki → otwórz/zamknij siatkę miesiąca, edytuj nawyk → serie/last7
+nadal poprawne dla każdego nawyku; (4) Zadania + dashboard → zmiana wydarzenia w kalendarzu
+gdzie indziej nie powinna już zauważalnie "szarpać" tych dwóch ekranów.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

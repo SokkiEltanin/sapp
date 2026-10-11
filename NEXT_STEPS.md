@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Runda audytu optymalizacji — jedzenie + zadania/nawyki/nastrój, 8 fixów (2026-10-11)
+
+User: "optymalizuj dalej". Pełny opis w ARCHITECTURE.md §298. Skrót:
+
+- **food.tsx** — bilans tygodnia/średnie 30-dni robiły 37 pełnych skanów całej historii
+  posiłków na KAŻDY foreground appki → jedna mapa dzień→kcal.
+- **food/add.tsx** — "ostatnie posiłki" sortowało CAŁĄ historię na każde wejście na ekran →
+  jeden przebieg + sort tylko dystynktywnych pozycji.
+- **useTasks.ts / useMoodCheckIn.ts / stats.tsx** — gołe `useCalendarStore()`/`useMoodStore()`
+  bez selektora na zawsze zamontowanych ekranach (Zadania, dashboard, kalendarz) → selektory.
+- **habits.tsx** — serie/last7 liczone na żywo dla każdego nawyku na każdy render → `useMemo`.
+- **TaskItem.tsx / mood.tsx** — drobne memo (wiersz listy / średnie).
+
+**Celowo NIE zrobione**: memoizacja wierszy list w `food/add.tsx`/`food/recipe.tsx` — wymaga
+najpierw przepisania kilku handlerów na `useCallback`, większy refaktor, odłożony osobno.
+
+`tsc`/`jest` zielone (101/101 suite, 1333 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — średni**: "Co zjadłem" (ostatnie posiłki), ekran Jedzenie
+(bilans/średnie), Nawyki (serie po otwarciu/zamknięciu siatki miesiąca), Zadania + dashboard.
+
 ## 🆕 Sprzedaż loota wprost z odsłony skrzynki + ostrzeżenie "lepsze niż założone" (2026-10-11)
 
 User: "doaj od razu że jak losuje ze skrzyne mogę od razu loot sprzedać jak nie chcę i

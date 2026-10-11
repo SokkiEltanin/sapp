@@ -776,8 +776,12 @@ export default function MoodScreen() {
   };
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
   const last30 = useMemo(() => entries.filter(e => e.date >= dateMinusDays(30)), [entries]);
-  const avgMood = avg(last30.map(e => e.mood));
-  const avgEnergy = avg(last30.map(e => e.energy));
+  // useMemo (audyt optymalizacji, 2026-10-11) — `last30` samo jest zmemoizowane, ale to
+  // `.map()+avg()` nad nim nie było — liczyło się na KAŻDY render (np. `setRefreshing`/
+  // `setModalOpen`), nie tylko gdy `last30` faktycznie się zmieniło. Niski impact (≤30
+  // elementów), ale tani fix spójny z resztą sekcji w tym pliku, które już to robią.
+  const avgMood = useMemo(() => avg(last30.map(e => e.mood)), [last30]);
+  const avgEnergy = useMemo(() => avg(last30.map(e => e.energy)), [last30]);
   // 7-day trend vs the previous 7 days (past-info / average, na górze).
   const trend7 = useMemo(() => {
     const d7 = dateMinusDays(7), d14 = dateMinusDays(14);

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useShallow } from 'zustand/react/shallow';
 import { useCalendarStore } from '@/store/calendarStore';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
@@ -70,8 +71,16 @@ export async function markTaskDone(id: string): Promise<void> {
 }
 
 export function useTasks() {
+  // useShallow (audyt optymalizacji, 2026-10-11) — gołe `useCalendarStore()` subskrybowało
+  // CAŁY store (events/gcalEvents/selectedDate też), a ten hook jest wołany na DWÓCH zawsze
+  // zamontowanych ekranach (`app/(tabs)/tasks.tsx`, `app/(tabs)/index.tsx` dashboard) —
+  // każda zmiana wydarzenia/synca Google Calendar/wybranego dnia GDZIEKOLWIEK re-renderowała
+  // oba, mimo że żadne z nich nie czyta tu nic poza `tasks`.
   const { tasks, isLoading, setTasks, addTask, updateTask, deleteTask, setLoading } =
-    useCalendarStore();
+    useCalendarStore(useShallow((s) => ({
+      tasks: s.tasks, isLoading: s.isLoading, setTasks: s.setTasks,
+      addTask: s.addTask, updateTask: s.updateTask, deleteTask: s.deleteTask, setLoading: s.setLoading,
+    })));
 
   useEffect(() => { load(); }, []);
 

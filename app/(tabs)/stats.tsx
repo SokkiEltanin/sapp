@@ -280,7 +280,11 @@ export default function CalendarTabScreen() {
       setEvents: s.setEvents, setTasks: s.setTasks, updateTask: s.updateTask,
       setSelectedDate: s.setSelectedDate, setLoading: s.setLoading,
     })));
-  const { entries: moodEntries } = useMoodStore();
+  // Selektor pojedynczego pola (audyt optymalizacji, 2026-10-11) — przeoczone w poprzedniej
+  // rundzie tego samego audytu TRZY LINIE wyżej (ten sam fix dla `useCalendarStore`) — gołe
+  // `useMoodStore()` łapało też `isLoading`/`pendingSync`, re-renderując ten duży, zawsze
+  // zamontowany ekran kalendarza na każdy zapis nastroju gdziekolwiek w appce.
+  const moodEntries = useMoodStore(s => s.entries);
   const { expenses } = useExpensesStore();
 
   const now = new Date();
