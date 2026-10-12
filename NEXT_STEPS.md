@@ -3,6 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Runda audytu optymalizacji 4 — dashboard/praca + finanse/liczniki + gołe selektory (2026-10-12)
+
+User: "dawaj optymalizacje dalej". Pełny opis w ARCHITECTURE.md §301. Skrót:
+
+- **`statWidgets.ts` (`bucketValue`/`metricSeries`)** — dashboard (zawsze zamontowany) robił
+  do 108 pełnych skanów historii wydatków na KAŻDY render panelu "Przegląd" → indeks
+  miesiąc/dzień keszowany po referencji tablicy. **Pierwszy test tego pliku w ogóle**
+  (`__tests__/statWidgets.test.ts`, +6) — zero testów istniało mimo że liczy realne pieniądze.
+- **`index.tsx` `workMonthly`** — ~24 przebiegi po historii kalendarza → jedna mapa per
+  miesiąc.
+- **`expenses/stats.tsx`** — 4 memosy (miesięczny/dzienny/jedzenie/30-dniowy wykres) → jeden
+  indeks dzień→wydatki + zakresowy lookup.
+- **`weekly.tsx`** — zadania i wydatki per dzień tygodnia → dwie mapy zamiast ~19 przebiegów.
+- **`useExpenses.ts` `stats`** — 6 przebiegów → 1.
+- **`expenses/add.tsx` `monthSpendByCat`** — liczone bez `useMemo` w formularzu tekstowym.
+- **`counters/[id].tsx` `autoDaysWithout`** — bez `useMemo`.
+- **8 ekranów z gołym `useXStore()`** bez selektora → `useShallow`/pojedyncze pola
+  (`settings.tsx`, `weekly.tsx`, `work/history.tsx`, `work/add.tsx`, `bosses.tsx`,
+  `expenses/stats.tsx`, `expenses/audit.tsx`, `expenses/[id].tsx`).
+
+`tsc`/`jest` zielone (102/102 suite, 1339 testów, +6).
+
+**Priorytet testu na urządzeniu — wysoki** (dotyka realnych pieniędzy/godzin pracy): panel
+"Przegląd" na dashboardzie (wszystkie kafle + tydzień/miesiąc), panel "Praca" na dashboardzie,
+Finanse → Statystyki (wszystkie wykresy, przełączanie miesięcy), `/weekly`, licznik w trybie
+"auto" — wszędzie liczby powinny być identyczne jak przed zmianą.
+
 ## 🆕🔴 Fix: crash przy zamykaniu paczki skrzynek po sprzedaży + "Sprzedaj wszystkie" + walka: HP bossa po pominięciu + skaczące sprite'y (2026-10-11)
 
 User zgłosił REALNY crash (zrzut ekranu "Coś się wykrzaczyło" / `Cannot read property

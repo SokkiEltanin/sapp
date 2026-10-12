@@ -52,6 +52,17 @@ export default function CounterDetail() {
 
   const counter = counters.find(cn => cn.id === id);
 
+  // `useMemo` (2026-10-12, audyt optymalizacji runda 4) — `autoDaysWithout` skanuje CAŁĄ
+  // historię `expenses` i `meals` (szuka ostatniego pasującego wpisu); ekran ma własny stan
+  // tekstowy (tytuł/notatka nowego zadania), więc bez memoizacji KAŻDY wpisany znak
+  // przerysowywał komponent i uruchamiał ten skan od nowa. Musi siedzieć PRZED `if
+  // (!counter)` niżej (counter może zniknąć np. po usunięciu licznika w trakcie — hooki nie
+  // mogą być warunkowe), stąd osobny null/kind-guard w ciele zamiast przy wywołaniu.
+  const autoSinceN = useMemo(() => {
+    if (!counter || counter.kind === 'until' || counter.mode !== 'auto') return 0;
+    return autoDaysWithout(counter, expenses, meals, foodProducts);
+  }, [counter, expenses, meals, foodProducts]);
+
   const [notes, setNotes] = useState<Note[]>([]);
   const loadNotes = useCallback(() => { getAllNotes().then(setNotes).catch(() => {}); }, []);
   useFocusEffect(loadNotes);
@@ -93,7 +104,7 @@ export default function CounterDetail() {
   const bigLabel = !isUntil ? '' : over ? 'minęło'
     : during ? (endLeft > 1 ? `koniec za ${endLeft} dni` : endLeft === 1 ? 'ostatni dzień!' : 'kończy się dziś!')
     : untilLabel(left);
-  const sinceN = !isUntil ? (counter.mode === 'auto' ? autoDaysWithout(counter, expenses, meals, foodProducts) : daysSince(counter)) : 0;
+  const sinceN = !isUntil ? (counter.mode === 'auto' ? autoSinceN : daysSince(counter)) : 0;
 
   // Quick relative-date chips for a linked task, anchored on the event's own date —
   // "muszę się spakować, więc dzień przed wyjazdem" was the user's own example.

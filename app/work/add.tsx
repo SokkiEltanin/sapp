@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
@@ -133,7 +134,10 @@ const makeDp = (c: any) => StyleSheet.create({
 export default function AddWorkShift() {
   const colors = useColors();
   const s = useMemo(() => makeS(colors), [colors]);
-  const { settings, addShift: storeAdd, setSettings } = useWorkStore();
+  // Selektor (2026-10-12, audyt optymalizacji runda 4) — `workStore` trzyma też `shifts`/
+  // `isLoading`; bez useShallow ten ekran re-renderował się na każdą zmianę zmian w historii,
+  // nie tylko ustawień.
+  const { settings, addShift: storeAdd, setSettings } = useWorkStore(useShallow(s => ({ settings: s.settings, addShift: s.addShift, setSettings: s.setSettings })));
 
   const [date, setDate]         = useState(todayStr());
   const [startTime, setStart]   = useState('08:00');

@@ -129,6 +129,42 @@ function weekLabel(offset: number): string {
 function inMonth(e: Expense, ym: string) { return (e.date ?? '').slice(0, 7) === ym; }
 function inWeek(e: Expense, dates: string[]) { const s = new Set(dates); return s.has((e.date ?? '').slice(0, 10)); }
 
+// Indeks `ctx.expenses` po miesiącu/dniu, keszowany po REFERENCJI tablicy (WeakMap, 2026-10-12,
+// audyt optymalizacji runda 4). `bucketValue` niżej woła się per METRYKA × SERIA × WIADRO —
+// `WeeklyBoard.tsx` samo robi do 9 kafli × 2 serie × 6 wiader = do 108 wywołań NA JEDEN render
+// dashboardu (lazy:false, zawsze zamontowany) — a każde z nich liczyło `ctx.expenses.filter(...)`
+// OD NOWA na PEŁNEJ, nieograniczonej historii wydatków. `ctx.expenses` to ta sama referencja
+// tablicy w obrębie jednego renderu (pole store'a Zustand — zmienia się tylko gdy dane faktycznie
+// się zmienią), więc WeakMap keszuje indeks po tej referencji: pierwsze wywołanie buduje go RAZ
+// (jeden przebieg po całej historii), pozostałe ~107 tylko czytają z niego.
+const expenseIndexCache = new WeakMap<Expense[], { byMonth: Map<string, Expense[]>; byDay: Map<string, Expense[]> }>();
+function expenseIndexFor(expenses: Expense[]): { byMonth: Map<string, Expense[]>; byDay: Map<string, Expense[]> } {
+  const cached = expenseIndexCache.get(expenses);
+  if (cached) return cached;
+  const byMonth = new Map<string, Expense[]>();
+  const byDay = new Map<string, Expense[]>();
+  for (const e of expenses) {
+    const d = (e.date ?? '').slice(0, 10);
+    if (d.length < 10) continue;
+    const m = d.slice(0, 7);
+    let monthArr = byMonth.get(m); if (!monthArr) { monthArr = []; byMonth.set(m, monthArr); } monthArr.push(e);
+    let dayArr = byDay.get(d); if (!dayArr) { dayArr = []; byDay.set(d, dayArr); } dayArr.push(e);
+  }
+  const idx = { byMonth, byDay };
+  expenseIndexCache.set(expenses, idx);
+  return idx;
+}
+// `exp` zawężone do TEGO wiadra (miesiąc: bezpośredni lookup po `ym`; tydzień: 7 lookupów po
+// dniu, złączonych) zamiast pełnej historii — switch niżej w `bucketValue` dalej woła `pred(e)`
+// wewnątrz swoich filtrów (zawsze prawdziwe dla już-zawężonego `exp`, więc zero zmiany
+// zachowania), ale skanuje tylko wpisy z tego wiadra, nie całą historię.
+function bucketExpenses(ctx: StatCtx, periodYm: string | undefined, days: string[] | undefined): Expense[] {
+  const idx = expenseIndexFor(ctx.expenses);
+  if (periodYm) return idx.byMonth.get(periodYm) ?? [];
+  if (days) return days.flatMap(d => idx.byDay.get(d) ?? []);
+  return ctx.expenses;
+}
+
 const GROUP_TAG: Record<string, string> = { cheeseKg: 'nabiał', meatKg: 'mięso', fruitKg: 'owoce', vegKg: 'warzywa' };
 const SWEETS_TAGS = ['słodycze'];
 
@@ -149,8 +185,8 @@ function itemKg(it: { name?: string; weightKg?: number; quantity?: number }, wme
 // ─── Core numeric metric for one period bucket ────────────────────────────────
 
 function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean,
-                     moodPred: (d: string) => boolean, tag?: string, periodYm?: string): number {
-  const exp = ctx.expenses;
+                     moodPred: (d: string) => boolean, tag?: string, periodYm?: string, days?: string[]): number {
+  const exp = bucketExpenses(ctx, periodYm, days);
   switch (metric) {
     case 'tagSpend': {
       // Wyłączenie self-transferu (2026-09-17) — ten sam kształt buga co §93/§104: siostrzany
@@ -318,13 +354,13 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
 }
 
 // Build predicates for a period bucket (offset back).
-function predsFor(period: Period, offset: number): { exp: (e: Expense) => boolean; day: (d: string) => boolean; label: string; ym?: string } {
+function predsFor(period: Period, offset: number): { exp: (e: Expense) => boolean; day: (d: string) => boolean; label: string; ym?: string; days?: string[] } {
   if (period === 'month') {
     const ym = monthKey(offset);
     return { exp: e => inMonth(e, ym), day: d => d.slice(0, 7) === ym, label: monthLabel(offset), ym };
   }
   const ds = weekDates(offset); const set = new Set(ds);
-  return { exp: e => inWeek(e, ds), day: d => set.has(d.slice(0, 10)), label: weekLabel(offset), ym: undefined };
+  return { exp: e => inWeek(e, ds), day: d => set.has(d.slice(0, 10)), label: weekLabel(offset), days: ds };
 }
 
 // ─── Public compute ───────────────────────────────────────────────────────────
@@ -357,7 +393,7 @@ export function metricNumber(metric: string, ctx: StatCtx, period: Period, tag?:
     };
   }
   const p = predsFor(period, 0);
-  const value = bucketValue(metric, ctx, p.exp, p.day, tag, p.ym);
+  const value = bucketValue(metric, ctx, p.exp, p.day, tag, p.ym, p.days);
   return { value, unit, sub: period === 'month' ? 'ten miesiąc' : 'ten tydzień' };
 }
 
@@ -366,7 +402,7 @@ export function metricSeries(metric: string, ctx: StatCtx, period: Period, n = 6
   const values: number[] = []; const labels: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
     const p = predsFor(period, i);
-    values.push(bucketValue(metric, ctx, p.exp, p.day, tag, p.ym));
+    values.push(bucketValue(metric, ctx, p.exp, p.day, tag, p.ym, p.days));
     labels.push(p.label);
   }
   return { values, labels, unit: def?.unit ?? '' };

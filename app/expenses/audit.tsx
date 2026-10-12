@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -17,7 +18,9 @@ function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 export default function FinanceAuditScreen() {
   const colors = useColors();
   const s = useMemo(() => makeS(colors), [colors]);
-  const { expenses, setExpenses } = useExpensesStore();
+  // Selektor (2026-10-12, audyt optymalizacji runda 4) — bez tego re-render na każdą
+  // niezwiązaną zmianę w expensesStore (np. `isLoading`/`filters`/`pendingSync`).
+  const { expenses, setExpenses } = useExpensesStore(useShallow(s => ({ expenses: s.expenses, setExpenses: s.setExpenses })));
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});

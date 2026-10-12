@@ -11,6 +11,7 @@ import {
   Flame, Moon, Timer,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useShallow } from 'zustand/react/shallow';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useTasks } from '@/hooks/useTasks';
@@ -145,8 +146,11 @@ export default function WeeklyScreen() {
 
   const { tasks }                        = useTasks();
   const { habits, getLast7, completions } = useHabits();
-  const { expenses, setExpenses }         = useExpensesStore();
-  const { entries: mood, setEntries: setMoodEntries } = useMoodStore();
+  // Selektory zamiast gołych wywołań (2026-10-12, audyt optymalizacji runda 4) — bez tego
+  // ten ekran re-renderował się na KAŻDĄ zmianę w tych store'ach (np. `isLoading`/`filters`
+  // w expensesStore, `pendingSync` w moodStore), nie tylko tę jedną odczytywaną tu.
+  const { expenses, setExpenses } = useExpensesStore(useShallow(s => ({ expenses: s.expenses, setExpenses: s.setExpenses })));
+  const { entries: mood, setEntries: setMoodEntries } = useMoodStore(useShallow(s => ({ entries: s.entries, setEntries: s.setEntries })));
 
   useEffect(() => {
     if (expenses.length === 0) {
@@ -180,21 +184,35 @@ export default function WeeklyScreen() {
 
   // ── Tasks ──────────────────────────────────────────────────────────────────
 
-  const weekTasks = useMemo(() => {
-    const [from, to] = [dates[0], dates[6]];
-    return tasks.filter(t => {
+  // Jeden przebieg po `tasks` → zadania pogrupowane per dzień (2026-10-12, audyt
+  // optymalizacji runda 4) — `weekTasks`/`completedThisWeek`/`taskDailyDone` osobno skanowały
+  // CAŁĄ listę zadań (do 9 pełnych przebiegów łącznie: 1+1+7 dni) na ten sam, wąski
+  // tygodniowy zakres. `dates` to zawsze 7 KOLEJNYCH dni, więc "dzień ∈ dates" ⟺ oryginalne
+  // porównanie `d >= from && d <= to` — ten sam wynik, jeden przebieg zamiast dziewięciu.
+  const tasksByAnchorDay = useMemo(() => {
+    const map = new Map<string, typeof tasks>();
+    for (const t of tasks) {
       const d = (t.deadline ?? t.scheduledDate ?? t.updatedAt ?? '').split('T')[0];
-      return d >= from && d <= to;
-    });
-  }, [tasks, dates]);
+      const arr = map.get(d); if (arr) arr.push(t); else map.set(d, [t]);
+    }
+    return map;
+  }, [tasks]);
 
-  const completedThisWeek = useMemo(() =>
-    tasks.filter(t => t.status === 'done' && t.updatedAt.split('T')[0] >= dates[0] && t.updatedAt.split('T')[0] <= dates[6]),
-    [tasks, dates]);
+  const doneByUpdatedDay = useMemo(() => {
+    const map = new Map<string, typeof tasks>();
+    for (const t of tasks) {
+      if (t.status !== 'done') continue;
+      const d = t.updatedAt.split('T')[0];
+      const arr = map.get(d); if (arr) arr.push(t); else map.set(d, [t]);
+    }
+    return map;
+  }, [tasks]);
 
-  const taskDailyDone = useMemo(() =>
-    dates.map(d => tasks.filter(t => t.status === 'done' && t.updatedAt.split('T')[0] === d).length),
-    [tasks, dates]);
+  const weekTasks = useMemo(() => dates.flatMap(d => tasksByAnchorDay.get(d) ?? []), [tasksByAnchorDay, dates]);
+
+  const completedThisWeek = useMemo(() => dates.flatMap(d => doneByUpdatedDay.get(d) ?? []), [doneByUpdatedDay, dates]);
+
+  const taskDailyDone = useMemo(() => dates.map(d => (doneByUpdatedDay.get(d) ?? []).length), [doneByUpdatedDay, dates]);
 
   const maxTaskDay = Math.max(...taskDailyDone, 1);
 
@@ -284,25 +302,30 @@ export default function WeeklyScreen() {
   // praktycznie same zera. Dolna granica (`>= dates[0]`) działała przypadkiem poprawnie
   // (dłuższy string z prefiksem TEGO dnia i tak sortuje się ≥ gołej daty), więc bug był
   // niewidoczny w testach ad-hoc sprawdzających tylko "czy coś się liczy".
-  const weekExp = useMemo(() =>
-    expenses.filter(e => isExpense(e) && e.date >= dates[0] && e.date.slice(0, 10) <= dates[6])
-      .reduce((s, e) => s + e.amount, 0),
-    [expenses, dates]);
+  // Jeden przebieg po `expenses` → sumy wydatek/przychód per dzień (2026-10-12, audyt
+  // optymalizacji runda 4) — `weekExp`/`weekInc`/`prevExp`/`expDailyV` osobno skanowały
+  // CAŁĄ, rosnącą historię wydatków (do 10 pełnych przebiegów łącznie: 1+1+1+7 dni), mimo
+  // że każdy z nich patrzy tylko na wąski zakres dni (tydzień/dzień). Bucketowanie po
+  // `.slice(0,10)` jest przy okazji POPRAWNIEJSZE niż oryginalne porównanie stringów (patrz
+  // komentarz o buggy dolnej granicy wyżej) — dopasowanie po dniu zamiast leksykograficznym
+  // porównaniu pełnego timestampu z gołą datą, bez polegania na przypadkowej poprawności.
+  const dayTotals = useMemo(() => {
+    const map = new Map<string, { exp: number; inc: number }>();
+    for (const e of expenses) {
+      const d = e.date.slice(0, 10);
+      let t = map.get(d); if (!t) { t = { exp: 0, inc: 0 }; map.set(d, t); }
+      if (isExpense(e)) t.exp += e.amount;
+      else if (isIncome(e)) t.inc += e.amount;
+    }
+    return map;
+  }, [expenses]);
 
-  const weekInc = useMemo(() =>
-    expenses.filter(e => isIncome(e) && e.date >= dates[0] && e.date.slice(0, 10) <= dates[6])
-      .reduce((s, e) => s + e.amount, 0),
-    [expenses, dates]);
-
-  const prevExp = useMemo(() =>
-    expenses.filter(e => isExpense(e) && e.date >= prevDates[0] && e.date.slice(0, 10) <= prevDates[6])
-      .reduce((s, e) => s + e.amount, 0),
-    [expenses, prevDates]);
+  const weekExp = useMemo(() => dates.reduce((s, d) => s + (dayTotals.get(d)?.exp ?? 0), 0), [dayTotals, dates]);
+  const weekInc = useMemo(() => dates.reduce((s, d) => s + (dayTotals.get(d)?.inc ?? 0), 0), [dayTotals, dates]);
+  const prevExp = useMemo(() => prevDates.reduce((s, d) => s + (dayTotals.get(d)?.exp ?? 0), 0), [dayTotals, prevDates]);
 
   const expDiff   = weekExp - prevExp;
-  const expDailyV = useMemo(() =>
-    dates.map(d => expenses.filter(e => isExpense(e) && e.date.slice(0, 10) === d).reduce((s, e) => s + e.amount, 0)),
-    [expenses, dates]);
+  const expDailyV = useMemo(() => dates.map(d => dayTotals.get(d)?.exp ?? 0), [dayTotals, dates]);
   const maxExpDay = Math.max(...expDailyV, 1);
 
   // ── Pomodoro ───────────────────────────────────────────────────────────────

@@ -48,37 +48,31 @@ export function useExpenses() {
     const isExpense = (e: Expense) => (!e.type || e.type === 'expense') && !isSelfTransfer(e);
     const isIncome = (e: Expense) => e.type === 'income' && !isSelfTransfer(e);
 
-    const thisWeek = expenses
-      .filter((e) => isExpense(e) && isWithinInterval(parseISO(e.date), { start: thisWeekStart, end: thisWeekEnd }))
-      .reduce((s, e) => s + e.amount, 0);
-
-    const lastWeek = expenses
-      .filter((e) => isExpense(e) && isWithinInterval(parseISO(e.date), { start: lastWeekStart, end: lastWeekEnd }))
-      .reduce((s, e) => s + e.amount, 0);
-
-    const monthExpenses = expenses
-      .filter((e) => isExpense(e) && isWithinInterval(parseISO(e.date), { start: monthStart, end: monthEnd }))
-      .reduce((s, e) => s + e.amount, 0);
-
-    const monthIncome = expenses
-      .filter((e) => isIncome(e) && isWithinInterval(parseISO(e.date), { start: monthStart, end: monthEnd }))
-      .reduce((s, e) => s + e.amount, 0);
-
-    const allByCat = expenses
-      .filter(isExpense)
-      .reduce<Record<string, number>>((acc, e) => {
-        acc[e.category] = (acc[e.category] ?? 0) + e.amount;
-        return acc;
-      }, {});
+    // Jeden przebieg po `expenses` zamiast 6 osobnych `.filter().reduce()` (2026-10-12,
+    // audyt optymalizacji runda 4) — ta sama lista była skanowana od nowa dla
+    // thisWeek/lastWeek/monthExpenses/monthIncome/allByCat/monthCategorySpend, w tym
+    // `parseISO(e.date)` wołane po kilka razy NA TEN SAM wpis. Każdy wpis klasyfikowany
+    // raz (exp/inc), data parsowana raz, i dokładana do wszystkich kubełków, do których
+    // faktycznie pasuje — ten sam wynik, 1/6 przebiegów.
+    let thisWeek = 0, lastWeek = 0, monthExpenses = 0, monthIncome = 0;
+    const allByCat: Record<string, number> = {};
+    const monthCategorySpend: Record<string, number> = {};
+    for (const e of expenses) {
+      const d = parseISO(e.date);
+      if (isExpense(e)) {
+        allByCat[e.category] = (allByCat[e.category] ?? 0) + e.amount;
+        if (isWithinInterval(d, { start: thisWeekStart, end: thisWeekEnd })) thisWeek += e.amount;
+        if (isWithinInterval(d, { start: lastWeekStart, end: lastWeekEnd })) lastWeek += e.amount;
+        if (isWithinInterval(d, { start: monthStart, end: monthEnd })) {
+          monthExpenses += e.amount;
+          monthCategorySpend[e.category] = (monthCategorySpend[e.category] ?? 0) + e.amount;
+        }
+      } else if (isIncome(e) && isWithinInterval(d, { start: monthStart, end: monthEnd })) {
+        monthIncome += e.amount;
+      }
+    }
     const topCatKey = Object.entries(allByCat).sort((a, b) => b[1] - a[1])[0]?.[0] as ExpenseCategory | undefined;
     const topCategory = topCatKey ? (CATEGORY_META as any)[topCatKey]?.label : undefined;
-
-    const monthCategorySpend = expenses
-      .filter(e => isExpense(e) && isWithinInterval(parseISO(e.date), { start: monthStart, end: monthEnd }))
-      .reduce<Record<string, number>>((acc, e) => {
-        acc[e.category] = (acc[e.category] ?? 0) + e.amount;
-        return acc;
-      }, {});
 
     return { thisWeek, lastWeek, monthExpenses, monthIncome, topCategory, monthCategorySpend };
   }, [expenses, dayKey]);

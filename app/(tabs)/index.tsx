@@ -1571,13 +1571,26 @@ export default function DashboardScreen() {
     const dur = (e: typeof allEvents[number]) => shiftHours(e);
     const rate = (workEarnings?.perSecond ?? 0) * 3600;
     const now = new Date();
+
+    // Jeden przebieg po `allEvents` → wydarzenia pracy pogrupowane per miesiąc (2026-10-12,
+    // audyt optymalizacji runda 4) — ZASTĘPUJE ~24 osobne `.filter()`/pętle po PEŁNEJ,
+    // rosnącej historii kalendarza (6× dla `months`, 12× dla `best12`, 4× dla `upcoming`,
+    // plus pełne pętle dla bieżącego miesiąca/roku) jednym grupowaniem + tanimi operacjami
+    // na już-wyciętych, miesiąc-rozmiarowych listach zamiast całej historii za każdym razem.
+    const eventsByMonth = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      if (!isWork(e)) continue;
+      const ym = (e.date ?? '').slice(0, 7);
+      if (ym.length < 7) continue;
+      let arr = eventsByMonth.get(ym); if (!arr) { arr = []; eventsByMonth.set(ym, arr); } arr.push(e);
+    }
+    const hoursOf = (ym: string) => (eventsByMonth.get(ym) ?? []).reduce((s, e) => s + dur(e), 0);
+
     const months = Array.from({ length: 6 }, (_, idx) => {
       const i = 5 - idx;
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      const hours = allEvents
-        .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
-        .reduce((s, e) => s + dur(e), 0);
+      const hours = hoursOf(ym);
       return { ym, label: MONTH_SHORT[d.getMonth()], hours, earnings: Math.round(hours * rate), isCurrent: i === 0 };
     });
     // This month: split worked-so-far vs still-scheduled (gcal holds future shifts),
@@ -1591,8 +1604,7 @@ export default function DashboardScreen() {
     // jeszcze nie przepracowane") — `day <= today` used to dump a shift entirely
     // into `workedH` the instant its date matched today, even hours before it
     // started.
-    for (const e of allEvents) {
-      if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ymCur) continue;
+    for (const e of (eventsByMonth.get(ymCur) ?? [])) {
       const h = dur(e); const day = (e.date ?? '').slice(0, 10);
       if (day < today) {
         workedH += h; if (h > 0) dayset.add(day);
@@ -1614,17 +1626,18 @@ export default function DashboardScreen() {
     const avgEarnings = prior.length ? Math.round(prior.reduce((a, m) => a + m.earnings, 0) / prior.length) : 0;
     // This calendar year + shifts this month + best of the last 12 months.
     const yearPrefix = `${now.getFullYear()}-`;
-    let yearHours = 0, shiftCount = 0;
-    for (const e of allEvents) {
-      if (!isWork(e)) continue;
-      const ym = (e.date ?? '').slice(0, 7);
-      if (ym.startsWith(yearPrefix) && ym <= ymCur) yearHours += dur(e);
-      if (ym === ymCur && (e.date ?? '').slice(0, 10) <= today && dur(e) > 0) shiftCount++;
+    let yearHours = 0;
+    for (const [ym, evs] of eventsByMonth) {
+      if (ym.startsWith(yearPrefix) && ym <= ymCur) yearHours += evs.reduce((s, e) => s + dur(e), 0);
+    }
+    let shiftCount = 0;
+    for (const e of (eventsByMonth.get(ymCur) ?? [])) {
+      if ((e.date ?? '').slice(0, 10) <= today && dur(e) > 0) shiftCount++;
     }
     const best12 = Array.from({ length: 12 }, (_, k) => {
       const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
       const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      const h = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym).reduce((s, e) => s + dur(e), 0);
+      const h = hoursOf(ym);
       return { label: MONTH_SHORT[d.getMonth()], year: d.getFullYear(), hours: h, earnings: Math.round(h * rate) };
     });
     const bestMonth = best12.reduce((m, x) => (x.earnings > m.earnings ? x : m), best12[0]);
@@ -1634,8 +1647,7 @@ export default function DashboardScreen() {
       const d = new Date(now.getFullYear(), now.getMonth() + 1 + k, 1);
       const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
       let h = 0; const dset = new Set<string>();
-      for (const e of allEvents) {
-        if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ym) continue;
+      for (const e of (eventsByMonth.get(ym) ?? [])) {
         const dd = dur(e); h += dd; if (dd > 0) dset.add((e.date ?? '').slice(0, 10));
       }
       return { ym, label: MONTH_SHORT[d.getMonth()], year: d.getFullYear(), hours: h, shifts: dset.size, earnings: Math.round(h * rate) };

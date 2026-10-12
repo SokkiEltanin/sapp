@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
@@ -152,10 +153,14 @@ const WIDGET_BG_COLORS = ['#1A1C1C', '#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24',
 export default function SettingsScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { entries: moodEntries } = useMoodStore();
-  const { expenses } = useExpensesStore();
-  const { tasks, events, gcalEvents } = useCalendarStore();
-  const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
+  // Selektory zamiast gołych wywołań (2026-10-12, audyt optymalizacji runda 4) — ten ekran
+  // ma ~2900 linii i trzyma się zamontowany przez całą sesję ustawień; bez selektorów
+  // re-renderował się na KAŻDĄ zmianę w tych 4 store'ach (np. `selectedDate`/`isLoading` w
+  // calendarStore, `filters`/`pendingSync` w expensesStore/moodStore), nie tylko te pola.
+  const moodEntries = useMoodStore(s => s.entries);
+  const expenses = useExpensesStore(s => s.expenses);
+  const { tasks, events, gcalEvents } = useCalendarStore(useShallow(s => ({ tasks: s.tasks, events: s.events, gcalEvents: s.gcalEvents })));
+  const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore(useShallow(s => ({ settings: s.settings, setSettings: s.setSettings })));
   const themeMode = useThemeStore(s => s.mode);
   const { birthdate, gender, trainingLevel, setBirthdate, setGender, setTrainingLevel } = useProfileStore();
   const age = ageFrom(birthdate);
