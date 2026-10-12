@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -51,8 +52,10 @@ function daysInMonth(year: number, month0: number) {
 export default function WorkHistory() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { expenses } = useExpensesStore();
-  const { events, gcalEvents } = useCalendarStore();
+  // Selektory (2026-10-12, audyt optymalizacji runda 4) — bez tego re-render na każdą
+  // niezwiązaną zmianę w tych store'ach (np. `isLoading`/`filters`/`selectedDate`).
+  const expenses = useExpensesStore(s => s.expenses);
+  const { events, gcalEvents } = useCalendarStore(useShallow(s => ({ events: s.events, gcalEvents: s.gcalEvents })));
   const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
 
   const [employers, setEmployers] = useState<Employer[]>([]);

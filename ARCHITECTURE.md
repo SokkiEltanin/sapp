@@ -16495,6 +16495,85 @@ kandydatów (własne + z bazy), sprawdź że tapnięcie wciąż otwiera picker p
 trybie "Nie wiem ile czego" dodaje od razu bez pytania — bez zmiany zachowania względem
 poprzedniej wersji.
 
+## 301. Runda audytu optymalizacji 4 — dashboard/praca + finanse/liczniki + gołe selektory (2026-10-12)
+
+User: "dawaj optymalizacje dalej". Dwa równoległe audyty (dashboard/ustawienia/praca/focus/
+pomodoro/usage-stats/class-schedule/water-calendar/weekly; finanse/wydatki/achievements/pet-
+reszta) + wdrożenie HIGH/MEDIUM znalezisk. LOW znaleziska (konwencja stylów w search.tsx/
+notes.tsx bez listy wierszy, `DashEditRow` bez memo w trybie edycji dashboardu) świadomie
+pominięte — sami agenci ocenili je jako niski realny wpływ, nie ANR-ryzyko.
+
+1. **`src/utils/statWidgets.ts` — `bucketValue`/`metricSeries` (NAJWYŻSZY wpływ)** —
+   `WeeklyBoard.tsx` (dashboard, `lazy:false`, zawsze zamontowany) liczy do 9 kafli × 2 serie ×
+   6 wiader = do 108 wywołań `bucketValue` na JEDEN render, a każde z nich skanowało `.filter()`
+   CAŁĄ, nieograniczoną historię `ctx.expenses` od nowa. Nowy `expenseIndexFor()` — indeks
+   miesiąc/dzień, keszowany w `WeakMap<Expense[], {byMonth,byDay}>` po REFERENCJI tablicy
+   `ctx.expenses` (stabilna w obrębie jednego renderu — pole store'a Zustand). Nowa
+   `bucketExpenses(ctx, periodYm, days)` zwraca JUŻ zawężone `exp` (miesiąc: bezpośredni lookup
+   po `ym`; tydzień: 7 lookupów po dniu) zamiast pełnej historii — reszta `bucketValue`
+   (switch z ~20 typami metryk) działa BEZ ZMIAN na mniejszym wejściu. `predsFor` dostał nowe
+   pole `days` (lista dni tygodnia) do przekazania przez `metricNumber`/`metricSeries`. Nowy
+   plik testów `__tests__/statWidgets.test.ts` (6 testów: spend/income/net/miesiąc/tydzień,
+   metricSeries na 3 wiadrach, tagSpend) — ZERO testów istniało wcześniej na ten plik mimo że
+   liczy realne pieniądze.
+2. **`app/(tabs)/index.tsx` — `workMonthly`** — jeden `useMemo` robił ~24 osobne przebiegi po
+   `allEvents` (6× dla `months`, 12× dla `best12`, 4× dla `upcoming`, plus pełne pętle dla
+   bieżącego miesiąca/roku). Nowy `eventsByMonth: Map<ym, CalendarEvent[]>` budowany RAZ,
+   wszystkie pochodne (`months`/`best12`/`upcoming`/`yearHours`/bieżący miesiąc) czytają z
+   mapy zamiast filtrować `allEvents` od nowa za każdym razem.
+3. **`app/expenses/stats.tsx`** — `monthlyData`/`dailyData`/`foodStats`/`thirtyDayData` osobno
+   skanowały CAŁĄ historię wydatków (~100 pełnych przebiegów łącznie). Nowy `dayIndex: Map<
+   yyyy-MM-dd, Expense[]>` + `expensesInRange(start,end)` (chodzi PO DNIACH w zakresie,
+   lookupy z mapy) — wszystkie 4 memosy czytają z indeksu zamiast z `expenses` wprost.
+4. **`app/weekly.tsx`** — `weekTasks`/`completedThisWeek`/`taskDailyDone` (do 9 przebiegów po
+   `tasks`) i `weekExp`/`weekInc`/`prevExp`/`expDailyV` (do 10 przebiegów po `expenses`)
+   każdy osobno filtrował całą historię. Nowe `tasksByAnchorDay`/`doneByUpdatedDay` (Map per
+   dzień) i `dayTotals` (Map dzień→{exp,inc}) — jeden przebieg każdy, reszta to tanie lookupy
+   po `dates`/`prevDates` (zawsze 7 kolejnych dni). Bucketowanie wydatków po `.slice(0,10)`
+   jest przy okazji POPRAWNIEJSZE niż oryginalne porównanie stringów (dawny komentarz o
+   "działa przez przypadek" dla dolnej granicy) — dopasowanie po dniu, nie leksykograficzne
+   porównanie pełnego timestampu z gołą datą.
+5. **`src/hooks/useExpenses.ts` — `stats`** — 6 osobnych `.filter().reduce()` nad `expenses`
+   (thisWeek/lastWeek/monthExpenses/monthIncome/allByCat/monthCategorySpend), w tym
+   `parseISO(e.date)` wołane po kilka razy NA TEN SAM wpis → jeden przebieg, data parsowana
+   raz, dokładana do wszystkich pasujących kubełków.
+6. **`app/expenses/add.tsx` — `monthSpendByCat`** — liczone WPROST w ciele renderu (bez
+   `useMemo`) na formularzu tekstowym — każdy wpisany znak skanował całą historię wydatków.
+   Opakowane w `useMemo`.
+7. **`app/counters/[id].tsx` — `autoDaysWithout`** — wołane wprost w ciele renderu (skanuje
+   `expenses`+`meals`) na ekranie z polami tekstowymi (tytuł/notatka zadania) → nowy
+   `autoSinceN` `useMemo`, umieszczony PRZED `if (!counter) return` (hooki nie mogą być
+   warunkowe — `counter` może zniknąć w trakcie, np. po usunięciu licznika).
+8. **Gołe `useXStore()` bez selektora** (re-render na KAŻDĄ zmianę w store, nie tylko
+   odczytywane pola) — dopięte selektorami/`useShallow`: `app/settings.tsx` (moodStore/
+   expensesStore/calendarStore/workStore, ~2900-liniowy ekran), `app/weekly.tsx`
+   (expensesStore/moodStore), `app/work/history.tsx` (expensesStore/calendarStore),
+   `app/work/add.tsx` (workStore — też ma `shifts`/`isLoading`), `app/bosses.tsx`
+   (calendarStore/workStore — ten plik dostał już raz ten fix w rundzie 3, ale przeoczył te
+   dwa gołe wywołania obok już-poprawionych), `app/expenses/stats.tsx`, `app/expenses/
+   audit.tsx`, `app/expenses/[id].tsx` (wszystkie trzy: expensesStore).
+
+**Celowo NIE zrobione** (LOW, ocena agentów audytu): konwencja stylów bez `themedStyles(...)`
+w `app/search.tsx`/`app/notes.tsx` (nie per-wiersz listy, więc nie realne ANR-ryzyko, tylko
+niespójność); `DashEditRow.tsx` bez `React.memo` (tylko w trybie edycji sekcji dashboardu,
+ograniczona liczba wierszy, nie ciągle widoczne).
+
+**Testy**: nowy `__tests__/statWidgets.test.ts` (+6, patrz punkt 1) — pierwsze pokrycie
+testowe dla `bucketValue`/`metricNumber`/`metricSeries`, które wcześniej nie miały ŻADNYCH
+testów mimo liczenia realnych pieniędzy; zweryfikowało że refaktor na indeks dał te same
+liczby. Reszta — czysto wydajnościowe przełożenie `.filter()`/`.reduce()` na `Map`, zero
+zmiany logiki/zachowania, bez nowych testów (ten sam powód co poprzednie rundy). `tsc --noEmit`
+czyste, `jest --silent` 102/102 suite, 1339 testów (+6).
+
+**Priorytet testu na urządzeniu — wysoki** (dotyka realnych pieniędzy/godzin pracy): (1)
+Dashboard → panel "Przegląd" (WeeklyBoard) → sprawdź że wszystkie kafle (Wydatki/Przychody/
+Kroki/Sen/Nastrój/Praca/Zadania/Waga/Słodycze) i przełącznik tydzień/miesiąc pokazują te same
+liczby co przed zmianą. (2) Dashboard → panel "Praca" → miesiące/najlepszy miesiąc/nadchodzące
+zmiany → liczby bez zmian. (3) Finanse → Statystyki → wykres 6-miesięczny/dzienny/30-dniowy/
+sekcja jedzenia → liczby bez zmian, zwłaszcza przy przełączaniu miesięcy strzałkami. (4)
+Tygodniowy przegląd (`/weekly`) → zadania/wydatki per dzień → liczby bez zmian. (5) Licznik z
+trybem "auto" (np. "dni bez X") → nadal liczy poprawnie po dodaniu nowego wydatku/posiłku.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

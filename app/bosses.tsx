@@ -83,8 +83,12 @@ export default function Bosses() {
   // `useExpensesStore()` subskrybował cały store (filters/isLoading/pendingSync...) na
   // ekranie, który już wcześniej w tej sesji dostał ten sam fix dla usePetStore.
   const expenses = useExpensesStore((st) => st.expenses);
-  const { events, gcalEvents } = useCalendarStore();
-  const { settings: workSettings } = useWorkStore();
+  // Ten sam fix co `expenses` wyżej (2026-10-12, audyt optymalizacji runda 4) — ten plik
+  // dostał już raz przejście po usePetStore/useExpensesStore (runda 3), ale przeoczyło te
+  // dwa gołe wywołania obok: `calendarStore` trzyma też `tasks`/`selectedDate`/`isLoading`,
+  // `workStore` też `shifts`/`isLoading` — ekran re-renderował się na KAŻDĄ ich zmianę.
+  const { events, gcalEvents } = useCalendarStore(useShallow((s) => ({ events: s.events, gcalEvents: s.gcalEvents })));
+  const workSettings = useWorkStore((s) => s.settings);
 
   // Krok 8 — gear dokłada się do bonusów z lootu (te same wzory co boss-fight.tsx/pet.tsx),
   // energyMult stąd zasila syncEventEnergy niżej.

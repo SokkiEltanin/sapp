@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Switch, Modal,
@@ -356,7 +357,12 @@ const makeIe = themedStyles((c: any) => StyleSheet.create({
 
 export default function ExpenseDetailScreen() {
   const { id, edit: editParam } = useLocalSearchParams<{ id: string; edit?: string }>();
-  const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore();
+  // Selektor (2026-10-12, audyt optymalizacji runda 4) — bez tego re-render na każdą
+  // niezwiązaną zmianę w expensesStore (np. `isLoading`/`filters`/`pendingSync`) podczas gdy
+  // ten ekran edycji jest długo otwarty.
+  const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore(useShallow(s => ({
+    expenses: s.expenses, updateExpense: s.updateExpense, deleteExpense: s.deleteExpense, setExpenses: s.setExpenses,
+  })));
   const expense = expenses.find(e => e.id === id);
   const colors = useColors();
   const s = useMemo(() => makeS(colors), [colors]);

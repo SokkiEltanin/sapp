@@ -189,9 +189,14 @@ export default function AddExpenseModal() {
   );
 
   const nowM = monthISO();
-  const monthSpendByCat = expenses
+  // `useMemo` (2026-10-12, audyt optymalizacji runda 4) — wcześniej liczone WPROST w ciele
+  // renderu, bez memoizacji: ten ekran to formularz tekstowy (kwota/notatka/tagi), więc
+  // KAŻDY wpisany znak przerysowywał komponent i skanował CAŁĄ historię wydatków od nowa
+  // tylko po to, żeby policzyć paski budżetu w siatce kategorii.
+  const monthSpendByCat = useMemo(() => expenses
     .filter(e => (!e.type || e.type === 'expense') && e.date.startsWith(nowM))
-    .reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] ?? 0) + e.amount; return acc; }, {});
+    .reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] ?? 0) + e.amount; return acc; }, {}),
+  [expenses, nowM]);
 
   const toggleTag = (tag: string) =>
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -99,7 +100,10 @@ function pctLabel(curr: number, prev: number): { text: string; color: string } |
 export default function StatsScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { expenses, setExpenses } = useExpensesStore();
+  // Selektor (2026-10-12, audyt optymalizacji runda 4) — bez tego re-render na każdą
+  // niezwiązaną zmianę w expensesStore (np. `isLoading`/`filters`/`pendingSync`), na ekranie
+  // który już i tak liczy sporo (monthlyData/dailyData/catBreakdown/...).
+  const { expenses, setExpenses } = useExpensesStore(useShallow(s => ({ expenses: s.expenses, setExpenses: s.setExpenses })));
   const dayKey = useDayKey();
   const { width: screenW } = useWindowDimensions();
   const chartW = screenW - 64; // outer padding (16*2) + card padding (16*2)
@@ -136,16 +140,43 @@ export default function StatsScreen() {
   const prevMonth  = useCallback((e: Expense) => inMonth(e, prevStart, prevEnd), [prevStart, prevEnd]);
   const thisMonth  = useCallback((e: Expense) => inMonth(e, start, end),         [start, end]);
 
+  // Indeks `expenses` po dniu + zakresowy lookup (2026-10-12, audyt optymalizacji runda 4) —
+  // `monthlyData`/`dailyData`/`foodStats`/`thirtyDayData` niżej osobno skanowały CAŁĄ,
+  // rosnącą historię wydatków per miesiąc/dzień (~100 pełnych przebiegów łącznie: 12 dla
+  // monthlyData, do 31 dla dailyData, 3 dla foodStats, 60 dla thirtyDayData). Budowany RAZ,
+  // zakresowe zapytania (miesiąc/dzień/tydzień) chodzą po DNIACH w zakresie (lookupy z mapy)
+  // zamiast po całej historii za każdym razem.
+  const dayIndex = useMemo(() => {
+    const map = new Map<string, Expense[]>();
+    for (const e of expenses) {
+      const d = e.date.slice(0, 10);
+      const arr = map.get(d); if (arr) arr.push(e); else map.set(d, [e]);
+    }
+    return map;
+  }, [expenses]);
+  const expensesInRange = useCallback((s: Date, en: Date): Expense[] => {
+    const out: Expense[] = [];
+    const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const endD = new Date(en.getFullYear(), en.getMonth(), en.getDate());
+    while (cur <= endD) {
+      const bucket = dayIndex.get(format(cur, 'yyyy-MM-dd'));
+      if (bucket) out.push(...bucket);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  }, [dayIndex]);
+
   // ── 6-month trend (always based on today, not selected month)
   const monthlyData = useMemo(() => {
     return Array.from({ length: MONTHS_BACK }, (_, i) => {
       const d  = subMonths(today, MONTHS_BACK - 1 - i);
       const s  = startOfMonth(d); const en = endOfMonth(d);
-      const exp = expenses.filter(e => isExpense(e) && inMonth(e, s, en)).reduce((a, e) => a + e.amount, 0);
-      const inc = expenses.filter(e => isIncome(e)  && inMonth(e, s, en)).reduce((a, e) => a + e.amount, 0);
+      const rows = expensesInRange(s, en);
+      const exp = rows.filter(isExpense).reduce((a, e) => a + e.amount, 0);
+      const inc = rows.filter(isIncome).reduce((a, e) => a + e.amount, 0);
       return { label: format(d, 'LLL', { locale: pl }), expenses: exp, income: inc, balance: inc - exp, isSelected: i === MONTHS_BACK - 1 - monthOffset };
     });
-  }, [expenses, monthOffset, today]);
+  }, [expensesInRange, monthOffset, today]);
   const maxMonthly = Math.max(...monthlyData.flatMap(m => [m.expenses, m.income]), 1);
 
   // ── Daily for selected month
@@ -154,13 +185,13 @@ export default function StatsScreen() {
     return Array.from({ length: daysInMonth }, (_, i) => {
       const date = new Date(monthBase.getFullYear(), monthBase.getMonth(), i + 1);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const total = expenses
-        .filter(e => isExpense(e) && e.date.startsWith(dateStr) && (dailyFilter === 'all' || e.category === 'groceries'))
+      const total = (dayIndex.get(dateStr) ?? [])
+        .filter(e => isExpense(e) && (dailyFilter === 'all' || e.category === 'groceries'))
         .reduce((s, e) => s + e.amount, 0);
       const isToday = isCurrentMonth && i + 1 === today.getDate();
       return { date: dateStr, total, isToday, day: i + 1 };
     });
-  }, [expenses, monthBase, dailyFilter]);
+  }, [dayIndex, monthBase, dailyFilter]);
   const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
 
   // ── Category breakdown for selected month (with vs prev month)
@@ -273,9 +304,10 @@ export default function StatsScreen() {
   const foodStats = useMemo(() => {
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const weekEnd   = endOfWeek(today, { weekStartsOn: 1 });
-    const thisGroc  = expenses.filter(e => isExpense(e) && thisMonth(e) && e.category === 'groceries');
-    const prevGroc  = expenses.filter(e => isExpense(e) && prevMonth(e) && e.category === 'groceries');
-    const weekGroc  = expenses.filter(e => isExpense(e) && e.category === 'groceries' && isWithinInterval(parseISO(e.date), { start: weekStart, end: weekEnd }));
+    const isGroc = (e: Expense) => isExpense(e) && e.category === 'groceries';
+    const thisGroc  = expensesInRange(start, end).filter(isGroc);
+    const prevGroc  = expensesInRange(prevStart, prevEnd).filter(isGroc);
+    const weekGroc  = expensesInRange(weekStart, weekEnd).filter(isGroc);
 
     const thisTotal = thisGroc.reduce((s, e) => s + e.amount, 0);
     const prevTotal = prevGroc.reduce((s, e) => s + e.amount, 0);
@@ -300,7 +332,7 @@ export default function StatsScreen() {
       }
     }
     return { thisTotal, prevTotal, weekTotal, dailyRate, projection, daysElapsed, daysInMonth, byTag };
-  }, [expenses, thisMonth, prevMonth, today, monthBase, isCurrentMonth]);
+  }, [expensesInRange, start, end, prevStart, prevEnd, today, monthBase, isCurrentMonth]);
 
   // ── 30-day line chart data
   const thirtyDayData = useMemo(() => {
@@ -308,11 +340,12 @@ export default function StatsScreen() {
       const d = new Date(today);
       d.setDate(today.getDate() - 29 + i);
       const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const exp = expenses.filter(e => isExpense(e) && e.date.startsWith(ds)).reduce((s, e) => s + e.amount, 0);
-      const inc = expenses.filter(e => isIncome(e)  && e.date.startsWith(ds)).reduce((s, e) => s + e.amount, 0);
+      const rows = dayIndex.get(ds) ?? [];
+      const exp = rows.filter(isExpense).reduce((s, e) => s + e.amount, 0);
+      const inc = rows.filter(isIncome).reduce((s, e) => s + e.amount, 0);
       return { ds, exp, inc, day: d.getDate(), month: d.getMonth() };
     });
-  }, [expenses]);
+  }, [dayIndex, today]);
 
   // ── Top 3 most expensive products per unit price: this week + this month
   const topProducts = useMemo(() => {
