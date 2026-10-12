@@ -1,5 +1,6 @@
 import { BoxOpenEvent } from '@/store/boxStatsStore';
 import { BoxId, BOX_RANK } from '@/utils/petBoxes';
+import { gearById, gearSellValue, GearRarity } from '@/utils/gear';
 
 // Agregacja logu otwarć skrzynek (boxStatsStore.ts) do statystyk per typ skrzynki —
 // procent dropów wg typu/rzadkości + zysk/strata w monetach. Czysto obliczeniowe, nic tu
@@ -17,7 +18,18 @@ export interface BoxTypeStats {
   opens: number;
   totalCost: number;
   totalCoinsWon: number;
-  netCoins: number; // totalCoinsWon - totalCost — dodatnie = skrzynka "opłaca się" w samych monetach
+  netCoins: number; // totalCoinsWon - totalCost — TYLKO surowe monety, bez wartości dropniętego ekwipunku
+  // Potencjał (2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna jak kupię za 35 a
+  // dropnę item wart 69 to jestem na plusie, nie na minusie, bo mam potencjał") — `netCoins`
+  // wyżej liczył SAME monety z nagród typu 'coins', ignorując że dropnięty ekwipunek też ma
+  // realną wartość (dokładnie tę, za którą dałoby się go sprzedać — ten sam `gearSellValue`
+  // co przycisk "Sprzedaj" na odsłonie skrzynki). `totalGearSellValue` sumuje tę potencjalną
+  // wartość WSZYSTKICH dropów ekwipunku (niezależnie czy user faktycznie je sprzedał, czy
+  // założył — "potencjał" to wartość W MOMENCIE dropu, nie to co user z nią później zrobił).
+  // `totalPotentialCoins`/`netPotential` to WŁAŚCIWA miara opłacalności skrzynki.
+  totalGearSellValue: number;
+  totalPotentialCoins: number; // totalCoinsWon + totalGearSellValue
+  netPotential: number; // totalPotentialCoins - totalCost — dodatnie = skrzynka realnie się opłaca
   coinsOpens: number;
   gearOpens: number;
   combatItemOpens: number;
@@ -62,16 +74,28 @@ export function computeBoxStats(events: BoxOpenEvent[]): BoxTypeStats[] {
       .sort((a, b) => b.count - a.count);
 
     const gearRarityMap = new Map<string, number>();
+    // Potencjalna wartość WSZYSTKICH dropów ekwipunku (patrz komentarz przy `totalGearSellValue`
+    // w interfejsie) — `gearSellValue` zależy TYLKO od tieru itemu (unlockLevel) i rzadkości,
+    // nie od konkretnego rolla statu, więc nie trzeba było logować `value` w BoxOpenEvent,
+    // wystarczy `itemId`+`rarity`. Starsze wpisy sprzed 2026-10-12 nie mają `itemId` (jeszcze
+    // nie logowanego) — liczą się jako 0 potencjału, nie crashują (graceful degradation na
+    // historycznym logu, nie da się go dociągnąć wstecz bez tej informacji).
+    let totalGearSellValue = 0;
     for (const e of gearEvs) {
       const r = e.rarity ?? 'common';
       gearRarityMap.set(r, (gearRarityMap.get(r) ?? 0) + 1);
+      const item = e.itemId ? gearById(e.itemId) : undefined;
+      if (item) totalGearSellValue += gearSellValue(item, r as GearRarity);
     }
     const gearRarityBreakdown: RarityCount[] = [...gearRarityMap.entries()]
       .map(([rarity, count]) => ({ rarity, count, pct: (count / opens) * 100 }))
       .sort((a, b) => b.count - a.count);
 
+    const totalPotentialCoins = totalCoinsWon + totalGearSellValue;
+
     result.push({
       boxId, daily, opens, totalCost, totalCoinsWon, netCoins: totalCoinsWon - totalCost,
+      totalGearSellValue, totalPotentialCoins, netPotential: totalPotentialCoins - totalCost,
       coinsOpens: coinEvs.length, gearOpens: gearEvs.length, combatItemOpens: combatItemEvs.length,
       coinsPct: (coinEvs.length / opens) * 100, gearPct: (gearEvs.length / opens) * 100, combatItemPct: (combatItemEvs.length / opens) * 100,
       coinRarityBreakdown, gearRarityBreakdown,

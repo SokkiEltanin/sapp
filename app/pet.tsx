@@ -253,6 +253,7 @@ export default function Pet() {
     recordBoxOpen({
       at: Date.now(), boxId: DAILY_BOX.id, daily: true, cost: 0, rewardType: reward.type,
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+      itemId: reward.type === 'gear' ? reward.itemId : undefined,
     });
   };
   // "Sprzedaj" na odsłonie (2026-10-11) — ten sam wzorzec co w pet-shop.tsx.

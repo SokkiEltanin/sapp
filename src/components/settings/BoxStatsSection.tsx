@@ -26,7 +26,10 @@ export default function BoxStatsSection() {
 
   const groups = useMemo(() => computeBoxStats(events), [events]);
   const totalOpens = groups.reduce((sum, g) => sum + g.opens, 0);
-  const totalNet = groups.reduce((sum, g) => sum + g.netCoins, 0);
+  // `netPotential` (2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna... jak
+  // dropnę item wart 69 to jestem na plusie nie na minusie bo mam potencjał") — dolicza
+  // wartość sprzedażową dropniętego ekwipunku, nie tylko surowe monety (`netCoins`).
+  const totalNet = groups.reduce((sum, g) => sum + g.netPotential, 0);
 
   return (
     <View style={s.card}>
@@ -51,7 +54,7 @@ export default function BoxStatsSection() {
       ) : (
         <>
           <Text style={s.totalLine}>
-            {totalOpens} otwarć łącznie · bilans monet: <Text style={{ color: totalNet >= 0 ? c.accent.green : c.accent.red, fontWeight: '800' }}>{totalNet >= 0 ? '+' : ''}{totalNet}</Text>
+            {totalOpens} otwarć łącznie · bilans (z potencjałem ekwipunku): <Text style={{ color: totalNet >= 0 ? c.accent.green : c.accent.red, fontWeight: '800' }}>{totalNet >= 0 ? '+' : ''}{totalNet}</Text>
           </Text>
           <PressableScale onPress={() => { haptic.tap(); setConfirmReset(true); }}>
             <View style={s.resetBtn}>

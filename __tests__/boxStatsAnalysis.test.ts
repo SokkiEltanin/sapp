@@ -61,4 +61,45 @@ describe('computeBoxStats', () => {
   test('pusty log → pusta lista grup', () => {
     expect(computeBoxStats([])).toEqual([]);
   });
+
+  // 2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna jak kupię za 35 a dropnę
+  // item wart 69 to jestem na plusie nie na minusie bo mam potencjał" — dotąd dropnięty
+  // ekwipunek w ogóle nie wchodził do bilansu (netCoins liczył SAME monety), więc skrzynka
+  // z samym ekwipunkiem zawsze wyglądała na czystą stratę równą kosztowi. `netPotential`
+  // dolicza wartość sprzedażową dropów (`gearSellValue`, ta sama formuła co przycisk
+  // "Sprzedaj" na odsłonie) — helm_slomiany to tier 0 (TIER_BASE_COST=40), 'mythic'
+  // (mult 4.2) → round(40*4.2*0.4) = 67.
+  test('netPotential dolicza wartość sprzedażową dropów ekwipunku — drop wart więcej niż koszt = PLUS, nie minus', () => {
+    const events = [
+      ev({ rewardType: 'gear', coins: undefined, rarity: 'mythic', itemId: 'helm_slomiany', cost: 35 }),
+    ];
+    const [g] = computeBoxStats(events);
+    expect(g.totalCost).toBe(35);
+    expect(g.totalCoinsWon).toBe(0);
+    expect(g.netCoins).toBe(-35); // stara miara — same monety, ignoruje ekwipunek
+    expect(g.totalGearSellValue).toBe(67);
+    expect(g.totalPotentialCoins).toBe(67);
+    expect(g.netPotential).toBe(67 - 35); // = +32, NIE -35
+    expect(g.netPotential).toBeGreaterThan(0);
+  });
+
+  test('netPotential sumuje monety realne + wartość sprzedażową WSZYSTKICH dropów ekwipunku w grupie', () => {
+    const events = [
+      ev({ rewardType: 'coins', coins: 10, rarity: 'basic' }),
+      ev({ rewardType: 'gear', rarity: 'common', itemId: 'helm_slomiany' }),   // round(40*1*0.4) = 16
+      ev({ rewardType: 'gear', rarity: 'legendary', itemId: 'helm_slomiany' }), // round(40*3*0.4) = 48
+    ];
+    const [g] = computeBoxStats(events);
+    expect(g.totalCoinsWon).toBe(10);
+    expect(g.totalGearSellValue).toBe(16 + 48);
+    expect(g.totalPotentialCoins).toBe(10 + 16 + 48);
+    expect(g.netPotential).toBe(10 + 16 + 48 - g.totalCost);
+  });
+
+  test('stary wpis bez itemId (sprzed tego fixu) liczy się jako 0 potencjału, nie crashuje', () => {
+    const events = [ev({ rewardType: 'gear', rarity: 'legendary', itemId: undefined })];
+    const [g] = computeBoxStats(events);
+    expect(g.totalGearSellValue).toBe(0);
+    expect(g.netPotential).toBe(g.netCoins);
+  });
 });

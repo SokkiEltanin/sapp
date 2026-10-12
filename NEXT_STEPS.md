@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: statystyki skrzynek ignorowały wartość dropniętego ekwipunku (2026-10-12)
+
+User: "jak kupię za 35 a dropnę item wart 69 to jestem na plusie nie na minusie bo mam
+potencjał". Pełny opis w ARCHITECTURE.md §303. `netCoins` liczyło TYLKO surowe monety —
+ekwipunek = zero w bilansie, więc skrzynka z samym ekwipunkiem zawsze wyglądała na czystą
+stratę. Nowe `netPotential` (monety + wartość sprzedażowa dropów ekwipunku, ta sama formuła
+co przycisk "Sprzedaj") — to teraz wyświetlany bilans w Ustawienia → Pupil → "Statystyki
+skrzynek" i pełnym panelu `/box-stats`, z osobną linijką pokazującą ile to realne monety a
+ile potencjał.
+
+`tsc`/`jest` zielone (102/102 suite, 1342 testy, +3 w `boxStatsAnalysis.test.ts`).
+
+**Priorytet testu na urządzeniu — średni**: otwórz kilka skrzynek z ekwipunkiem w dropie →
+bilans w statystykach skrzynek powinien być dodatni (lub mniej ujemny) gdy drop jest wart
+więcej niż koszt, z widoczną linijką "+X potencjału z ekwipunku".
+
 ## 🆕 Mapa kampanii bossów + przywrócony edytor sceny Rynku (2026-10-12)
 
 User zapowiedział nowe tła/bossy (kotek na razie BEZ zmian). Pełny opis w ARCHITECTURE.md

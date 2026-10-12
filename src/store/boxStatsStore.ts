@@ -22,6 +22,13 @@ export interface BoxOpenEvent {
   rewardType: 'coins' | 'gear' | 'combatItem';
   coins?: number; // gdy rewardType === 'coins'
   rarity?: string; // coins/combatItem: CrateTier; gear: GearRarity
+  // `itemId` (2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna jak kupię za 35 a
+  // dropnę item wart 69 to jestem na plusie") — gdy rewardType === 'gear', pozwala
+  // `computeBoxStats` policzyć POTENCJALNĄ wartość dropu (`gearSellValue(gearById(itemId),
+  // rarity)`, ta sama cena co przycisk "Sprzedaj" na odsłonie) zamiast liczyć go jako zero w
+  // bilansie — dotąd ekwipunek w ogóle nie wchodził do "zysk/strata", tylko surowe nagrody
+  // monetowe, więc bilans wyglądał na stratę nawet przy dropach wartych więcej niż koszt.
+  itemId?: string;
 }
 
 const EVENTS_MAX = 3000;

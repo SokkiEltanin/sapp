@@ -16642,6 +16642,49 @@ czarna sylwetka + widoczna mgła, NIE da się ich tapnąć. (4) Rynek → ikonka
 otwiera panel edytora jak dawniej. (5) Ustawienia → Pupil → "Edytor sceny Rynku" → otwiera
 Rynek z OD RAZU otwartym panelem.
 
+## 303. Fix: statystyki skrzynek ignorowały wartość dropniętego ekwipunku (liczyły stratę zamiast zysku) (2026-10-12)
+
+User: "Popraw mi staty skrzynek wtedy zeby bylo widac i brało pod uwagę wszystkie coiny
+realnej dropy po cenie sprzedaży jak sprzedaje to przecież muszę widzieć czy skrzynka jest
+opłacalny jak kupię za 35 a dropnę item wart 69 to jestem na plusie nie na minusie bo mam
+potencjał". Realny bug: `netCoins` w `boxStatsAnalysis.ts` sumowało WYŁĄCZNIE nagrody typu
+`'coins'` — ekwipunek dropnięty ze skrzynki liczył się jako **zero** w bilansie, więc
+skrzynka, z której wypadł sam ekwipunek, zawsze wyglądała na czystą stratę równą kosztowi,
+niezależnie jak wartościowy był drop.
+
+1. **`src/store/boxStatsStore.ts`** — `BoxOpenEvent` dostał nowe, opcjonalne pole `itemId`
+   (gdy `rewardType === 'gear'`). `gearSellValue(item, rarity)` zależy TYLKO od tieru itemu
+   (`unlockLevel`) i rzadkości, NIE od konkretnego rolla statu (`value`) — wystarczy
+   `itemId`+`rarity` (już logowane), zero potrzeby logować dodatkowo `value`.
+2. **3 miejsca logowania** (`app/pet-shop.tsx` ×2 — pojedyncze i paczkowe otwarcie,
+   `app/pet.tsx` ×1 — skrzynka dnia) — `recordBoxOpen({..., itemId: reward.type === 'gear' ?
+   reward.itemId : undefined})`.
+3. **`src/utils/boxStatsAnalysis.ts`** — nowe pola na `BoxTypeStats`: `totalGearSellValue`
+   (suma `gearSellValue(gearById(itemId), rarity)` po wszystkich dropach ekwipunku w grupie —
+   TA SAMA formuła/wartość co przycisk "Sprzedaj" na odsłonie skrzynki, §297),
+   `totalPotentialCoins` (`totalCoinsWon + totalGearSellValue`), `netPotential`
+   (`totalPotentialCoins - totalCost` — WŁAŚCIWA miara opłacalności). Stare `netCoins`
+   ZOSTAJE (surowe monety, bez ekwipunku) — obie liczby razem pokazują ile bilansu to
+   realne monety a ile potencjał. Stare wpisy z logu sprzed tego fixu (bez `itemId`) liczą się
+   jako 0 potencjału, bez crasha — nie da się ich dociągnąć wstecz bez tej informacji.
+4. **UI** (`BoxStatsSection.tsx` w Ustawieniach, `app/box-stats.tsx` pełny panel) —
+   wyświetlany "bilans" przełączony z `netCoins` na `netPotential` (per-grupa `netPill` też).
+   Nowa linijka transparentności (user: "żeby było widać") — "+X potencjału z ekwipunku (po
+   sprzedaży)" pod sumą ogólną I pod każdą kartą skrzynki z osobna, gdy `totalGearSellValue >
+   0` — rozróżnia realne monety od niezrealizowanej wartości (user NIE sprzedał itemu, tylko
+   mógłby), żeby liczba nie wyglądała jak gotówka na koncie.
+
+**Testy**: `__tests__/boxStatsAnalysis.test.ts` +3 — dokładny scenariusz z prośby usera
+(koszt 35, drop `helm_slomiany` rarity `mythic` → `gearSellValue` = round(40×4.2×0.4) = 67,
+`netPotential` = +32, podczas gdy stare `netCoins` dalej pokazuje -35), sumowanie wielu
+dropów w jednej grupie, i wpis bez `itemId` (0 potencjału, bez crasha). `tsc --noEmit` czyste,
+`jest --silent` 102/102 suite, 1342 testy (+3).
+
+**Priorytet testu na urządzeniu — średni**: Ustawienia → Pupil → "Statystyki skrzynek" oraz
+pełny panel (`/box-stats`) → otwórz kilka skrzynek z realnym ekwipunkiem w dropie → sprawdź że
+bilans jest teraz dodatni (albo mniej ujemny) gdy dropnięty item jest wart więcej niż koszt, i
+że widać linijkę "+X potencjału z ekwipunku" pod sumą i pod kartą danej skrzynki.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
