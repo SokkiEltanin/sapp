@@ -4,8 +4,8 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, X } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft, Coins, Check, X, SlidersHorizontal } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -214,6 +214,11 @@ export default function PetShop() {
   const [adjustLoaded, setAdjustLoaded] = useState(false);
   const [editScene, setEditScene] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  // Wejście z Ustawienia → Pupil → "Edytor sceny Rynku" (`MarketLayoutLabSection.tsx`,
+  // 2026-10-12) — `?editScene=1` otwiera panel od razu, zamiast wymagać dodatkowego tapnięcia
+  // ukrytej ikonki w headerze po nawigacji.
+  const { editScene: editSceneParam } = useLocalSearchParams<{ editScene?: string }>();
+  useEffect(() => { if (editSceneParam === '1') setEditScene(true); }, [editSceneParam]);
   useEffect(() => {
     AsyncStorage.getItem(ADJUST_KEY).then(raw => {
       if (raw) { try { setAdjust({ ...DEFAULT_ADJUST, ...JSON.parse(raw) }); } catch {} }
@@ -429,11 +434,16 @@ export default function PetShop() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
         <View style={s.coinPill}><Coins size={13} color="#FBBF24" /><Text style={s.coinTxt}>{coins}</Text></View>
-        {/* Trigger edytora sceny USUNIĘTY z UI (2026-09-10, user: "to już jest finalne
-            ustawienie pupilowego rynku... wywal mi opcje zmiany, ale zostaw w kodzie na
-            wszelki") — sam edytor (stan `editScene`, modal niżej, `stepImgAdjust` itd.)
-            ZOSTAJE w pliku nietknięty, tylko nie ma już jak go otworzyć z normalnego ekranu.
-            Odkomentuj ten TouchableOpacity, żeby go z powrotem wpiąć. */}
+        {/* Trigger edytora sceny PRZYWRÓCONY (2026-10-12, user: "przywróć edycje
+            SKLEPIKARZA bo będzie chyba nowa grafika później") — był wyłączony z UI
+            2026-09-10 gdy ówczesna grafika była uznana za finalną ("wywal mi opcje zmiany
+            ale zostaw w kodzie"); zapowiedziana nowa grafika Rynku/sklepikarza oznacza że
+            dostrajanie znów będzie potrzebne, więc wraca — identyczny TouchableOpacity co
+            przed usunięciem (patrz historia #175), `editScene`/modal/`stepImgAdjust` nigdy
+            nie zostały stamtąd ruszone. */}
+        <TouchableOpacity onPress={() => { haptic.tap(); setEditScene(true); }} hitSlop={10} style={{ marginLeft: spacing[2] }}>
+          <SlidersHorizontal size={18} color={c.text.muted} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
