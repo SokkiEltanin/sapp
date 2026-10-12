@@ -60,7 +60,14 @@ export default function BoxStatsScreen() {
   const groups = useMemo(() => computeBoxStats(events), [events]);
   const totalOpens = groups.reduce((sum, g) => sum + g.opens, 0);
   const totalCost = groups.reduce((sum, g) => sum + g.totalCost, 0);
-  const totalNet = groups.reduce((sum, g) => sum + g.netCoins, 0);
+  // `netPotential` (2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna... jak
+  // dropnę item wart 69 to jestem na plusie nie na minusie bo mam potencjał") — dolicza
+  // wartość sprzedażową dropniętego ekwipunku (tę samą co przycisk "Sprzedaj" na odsłonie),
+  // nie tylko surowe monety z nagród 'coins' jak dawne `netCoins`. `totalGearValue` osobno,
+  // żeby pokazać ILE z bilansu to realne monety a ile potencjał ekwipunku (przejrzystość —
+  // patrz `s.summaryRow` niżej, trzeci kafelek pokazuje rozbicie).
+  const totalNet = groups.reduce((sum, g) => sum + g.netPotential, 0);
+  const totalGearValue = groups.reduce((sum, g) => sum + g.totalGearSellValue, 0);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -88,9 +95,19 @@ export default function BoxStatsScreen() {
           </View>
           <View style={s.summaryTile}>
             <Text style={[s.summaryVal, { color: totalNet >= 0 ? c.accent.green : c.accent.red }]}>{totalNet >= 0 ? '+' : ''}{totalNet}</Text>
-            <Text style={s.summaryLabel}>bilans monet</Text>
+            <Text style={s.summaryLabel}>bilans (z ekwipunkiem)</Text>
           </View>
         </View>
+        {/* Rozbicie bilansu (2026-10-12, user: "musze widzieć czy skrzynka jest opłacalna") —
+            ile z `totalNet` wyżej to REALNE monety (nagrody typu 'coins') a ile to POTENCJAŁ
+            (wartość sprzedażowa dropniętego ekwipunku, niezrealizowana dopóki user go nie
+            sprzeda) — bez tego "+32" wyglądałoby jak gotówka, a w praktyce część jest
+            "na papierze", dopóki nie sprzedasz itemu. */}
+        {totalGearValue > 0 && (
+          <Text style={s.gearValueNote}>
+            w tym {totalGearValue} z potencjalnej wartości sprzedaży dropniętego ekwipunku (nie monety, dopóki nie sprzedasz)
+          </Text>
+        )}
 
         {groups.length === 0 ? (
           <View style={s.card}><Text style={s.empty}>Jeszcze za mało danych — otwórz kilka skrzynek.</Text></View>
@@ -131,11 +148,18 @@ function BoxCard({ g, s, c }: { g: BoxTypeStats; s: ReturnType<typeof makeStyles
         </View>
         {!g.daily && (
           <View style={s.netPill}>
-            <Coins size={11} color={g.netCoins >= 0 ? c.accent.green : c.accent.red} />
-            <Text style={[s.netPillTxt, { color: g.netCoins >= 0 ? c.accent.green : c.accent.red }]}>{g.netCoins >= 0 ? '+' : ''}{g.netCoins}</Text>
+            <Coins size={11} color={g.netPotential >= 0 ? c.accent.green : c.accent.red} />
+            <Text style={[s.netPillTxt, { color: g.netPotential >= 0 ? c.accent.green : c.accent.red }]}>{g.netPotential >= 0 ? '+' : ''}{g.netPotential}</Text>
           </View>
         )}
       </View>
+
+      {/* Rozbicie bilansu per skrzynka (2026-10-12) — ten sam powód co summaryRow wyżej:
+          `netPill` miesza realne monety z potencjałem sprzedaży ekwipunku, ta linijka pokazuje
+          ile z tego to konkretnie potencjał. */}
+      {!g.daily && g.totalGearSellValue > 0 && (
+        <Text style={s.gearValueNote}>+{g.totalGearSellValue} potencjału z ekwipunku (po sprzedaży)</Text>
+      )}
 
       {/* Rozkład typu nagrody — monety/ekwipunek/umiejętność jako jeden pasek segmentowy. */}
       <View style={s.typeBar}>
@@ -210,6 +234,7 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
   intro: { fontSize: 12, color: c.text.muted, lineHeight: 17 },
   summaryRow: { flexDirection: 'row', gap: spacing[2] },
+  gearValueNote: { fontSize: 10.5, color: c.text.muted, lineHeight: 14 },
   summaryTile: {
     flex: 1, alignItems: 'center', gap: 2,
     backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,

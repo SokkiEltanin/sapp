@@ -331,6 +331,7 @@ export default function PetShop() {
     recordBoxOpen({
       at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
       coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+      itemId: reward.type === 'gear' ? reward.itemId : undefined,
     });
   };
 
@@ -393,6 +394,7 @@ export default function PetShop() {
         recordBoxOpen({
           at: Date.now(), boxId: box.id, daily: false, cost: box.cost, rewardType: reward.type,
           coins: reward.type === 'coins' ? reward.coins : undefined, rarity: reward.rarity,
+          itemId: reward.type === 'gear' ? reward.itemId : undefined,
         });
       }
       haptic.success();
