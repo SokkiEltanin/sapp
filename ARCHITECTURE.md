@@ -16574,6 +16574,74 @@ sekcja jedzenia → liczby bez zmian, zwłaszcza przy przełączaniu miesięcy s
 Tygodniowy przegląd (`/weekly`) → zadania/wydatki per dzień → liczby bez zmian. (5) Licznik z
 trybem "auto" (np. "dni bez X") → nadal liczy poprawnie po dodaniu nowego wydatku/posiłku.
 
+## 302. Mapa kampanii bossów + przywrócony edytor sceny Rynku (2026-10-12)
+
+User zapowiedział wgranie nowych teł/bossów (kotek ZOSTAJE bez zmian na razie — "za duzo
+roboty przy animacjach", czeka na lepsze AI do edycji) i poprosił o dwie rzeczy.
+
+1. **Mapa kampanii** (user: "chciałem zrobić MAPĘ jakby na której są te bosy i w nie się
+   klika i idzie po kolei jak teraz a reszta mapy zasłonięta jest mgłą") — nowy
+   `src/components/bosses/CampaignMap.tsx`, podpięty w `app/bosses.tsx` jako ZAMIANA dawnej
+   płaskiej listy "pokonani (zwinięci) + reszta z kłódkami" pod hero-cardem aktualnego bossa
+   (hero card ZOSTAJE bez zmian — taunt/energia/WALCZ nadal tam mieszkają, mapa jest
+   wizualnym przeglądem postępu + skrótem WALCZ na aktualnym węźle).
+   - Wężowa ścieżka (węzły pozycjonowane sinusoidalnie wokół środka, nie siatka) renderowana
+     wewnątrz pionowego `ScrollView` — kampania ma już 44 bossów, user celuje w ~100+
+     (generuje "kilka dziennie"), więc NIE wszystko naraz na ekranie.
+   - SVG `Path` łączący środki węzłów: pełna trasa w stonowanym kolorze (`border.default`),
+     NAD nią druga, krótsza `Path` tylko do aktualnego węzła w akcencie (#38BDF8) — czyta się
+     jako "oświetlony przebyty odcinek", bez masek/clipów.
+   - Węzły: pokonane (`i < currentIdx`) — `BossArt` normalnie, przyciemnione (opacity 0.6) +
+     zielona odznaka ✓, tap pokazuje toast z nazwą+lootem. Aktualny (`i === currentIdx`) —
+     pełny kolor + pierścień-halo, tap = `goFight` (nawigacja do `/boss-fight`, TA SAMA ścieżka
+     co dawny przycisk WALCZ). Zablokowane (`i > currentIdx`) — `BossArt mystery` (reużyta
+     ISTNIEJĄCA czarna-sylwetka-sztuczka z §"mystery bossowie", nie nowy kod) + odznaka kłódki,
+     bez interakcji.
+   - **Mgła** (user: "reszta mapy zasłonięta jest mgłą") — `LinearGradient` (transparent →
+     prawie-opak) naciągnięty TUŻ nad aktualnym węzłem, sięgający do dołu trasy —
+     `pointerEvents="none"`. Kampania w 100% ukończona (`currentIdx >= bosses.length`) → brak
+     mgły w ogóle (świadomy edge-case fix, inaczej "przyklejałaby się" do ostatniego,
+     POKONANEGO węzła).
+   - `defeatedIds` celowo NIE jest osobnym propem — kampania leci ściśle sekwencyjnie
+     (`current = BOSSES.find(b => !defeatedBosses.includes(b.id))`, zawsze ciągły prefiks),
+     więc "pokonany" ⟺ "indeks < currentIdx" w tej samej tablicy `bosses`, bez duplikowania
+     źródła prawdy.
+   - `CampaignMap` jest `memo()`-owany (ekran-rodzic re-renderuje się często, np. odliczanie
+     energii) — `onPressCurrent` MUSI być stabilne żeby to coś dawało: nowy `goFight` w
+     `bosses.tsx` to `useCallback(() => router.push(...), [])`, zastąpił dawne inline
+     `() => { haptic.tap(); router.push(...) }` (haptic teraz w środku `CampaignMap`'s
+     wrappera, nie duplikowany).
+2. **Przywrócony edytor sceny Rynku** (user: "przywróć edycje SKLEPIKARZA bo będzie chyba
+   nowa grafika później nawet gdzieś w ustawieniach jak edytor walk") — edytor (`ArtAdjust`,
+   `editScene` stan, modal, `stepImgAdjust`, `IMG_GROUPS` — 9 niezależnie dostrajalnych
+   warstw sceny Rynku, w tym "Sklepikarz") NIGDY nie został usunięty z `pet-shop.tsx`, tylko
+   jego UI-trigger (ikonka w headerze) był świadomie wyłączony 2026-09-10 (#175, user: "to już
+   jest finalne ustawienie... zostaw w kodzie na wszelki") gdy ówczesna grafika była uznana za
+   skończoną. Zapowiedź nowej grafiki = trigger wraca:
+   - Header `pet-shop.tsx` odzyskał identyczny `TouchableOpacity`+`SlidersHorizontal` co przed
+     usunięciem (1:1 z historii #175, `setEditScene(true)` on tap).
+   - Nowy wpis w Ustawieniach (user: "nawet gdzieś w ustawieniach jak edytor walk") —
+     `src/components/settings/MarketLayoutLabSection.tsx`, dokładny wzorzec-karta
+     `BattleLayoutLabSection` (sąsiad, Ustawienia → Pupil), link do
+     `/pet-shop?editScene=1`. `pet-shop.tsx` dostał nowy `useLocalSearchParams` odczyt —
+     `editScene=1` w URL otwiera panel OD RAZU po wejściu, bez dodatkowego tapnięcia ukrytej
+     ikonki.
+
+**Celowo NIE zrobione**: zmiana samego kotka (user explicite: "nie będziemy zmieniać bo za
+duzo roboty przy animacjach, poczekam jak AI będzie zdolne do takich edycji").
+
+**Testy**: brak nowych — czysto UI (nowy komponent prezentacyjny + przywrócenie istniejącego,
+nietkniętego od miesiąca kodu edytora). `tsc --noEmit` czyste, `jest --silent` 102/102 suite,
+1339 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (nowy UI, zero pokrycia testami): (1) Bossy →
+zakładka Kampania → mapa scrolluje płynnie, auto-startuje blisko aktualnego węzła (nie na
+samej górze listy pokonanych), aktualny węzeł da się tapnąć → idzie do walki. (2) Tapnij
+pokonanego bossa na mapie → toast z nazwą+lootem. (3) Zablokowani bossowie dalej na trasie —
+czarna sylwetka + widoczna mgła, NIE da się ich tapnąć. (4) Rynek → ikonka suwaków w headerze
+otwiera panel edytora jak dawniej. (5) Ustawienia → Pupil → "Edytor sceny Rynku" → otwiera
+Rynek z OD RAZU otwartym panelem.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

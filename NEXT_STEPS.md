@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Mapa kampanii bossów + przywrócony edytor sceny Rynku (2026-10-12)
+
+User zapowiedział nowe tła/bossy (kotek na razie BEZ zmian). Pełny opis w ARCHITECTURE.md
+§302.
+
+- **Mapa kampanii** — nowy `CampaignMap.tsx`, zastąpił listę "pokonani+reszta z kłódkami" pod
+  hero-cardem w `app/bosses.tsx`. Wężowa ścieżka, SVG-linia, mgła nad niepokonanymi, tap na
+  aktualnym = WALCZ, tap na pokonanym = toast z lootem.
+- **Edytor sceny Rynku przywrócony** — ikonka suwaków w headerze `/pet-shop` (była wyłączona
+  od 2026-09-10 "bo finalne", kod nigdy nie zniknął) + nowy link w Ustawienia → Pupil →
+  "Edytor sceny Rynku" (`?editScene=1` otwiera panel od razu).
+
+`tsc`/`jest` zielone (102/102 suite, 1339 testów, bez zmiany — czysto UI, zero testów).
+
+**Priorytet testu na urządzeniu — wysoki (zero pokrycia testami, nowy UI)**: Bossy → Kampania
+→ mapa scrolluje/auto-startuje blisko aktualnego węzła, tap na aktualnym idzie do walki, tap
+na pokonanym pokazuje toast, zablokowani mają czarną sylwetkę + widoczną mgłę. Rynek → ikonka
+suwaków otwiera edytor. Ustawienia → Pupil → "Edytor sceny Rynku" → otwiera Rynek z OD RAZU
+otwartym panelem.
+
 ## 🆕 Runda audytu optymalizacji 4 — dashboard/praca + finanse/liczniki + gołe selektory (2026-10-12)
 
 User: "dawaj optymalizacje dalej". Pełny opis w ARCHITECTURE.md §301. Skrót:

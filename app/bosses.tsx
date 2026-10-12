@@ -3,13 +3,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, ChevronDown, ChevronUp, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-native';
+import { ChevronLeft, Zap, Lock, Swords, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
+import CampaignMap from '@/components/bosses/CampaignMap';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts } from '@/utils/bosses';
 import { gearCombatBonuses, gearAtkFlat } from '@/utils/gear';
 import { raidForWeek, raidHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -176,16 +177,11 @@ export default function Bosses() {
   // Patrz komentarz przy `bossViewOverride` wyżej — bez ręcznego override domyślnie "mad"
   // gdy kampania skończona (`!current`), inaczej "campaign".
   const bossView = bossViewOverride ?? (current ? 'campaign' : 'mad');
-  // Pokonani bossowie zwijani w liście (2026-08-20, user: "bossy te pokonane sa zwinięte w
-  // liscie") — kampania rośnie do 22 bossów, im dalej user zajdzie, tym dłuższa lista
-  // pełnowymiarowych, identycznych "Pokonany ✓" wierszy przed aktualnym/zablokowanymi. Bossy
-  // pokonane są zawsze CIĄGŁYM prefiksem `BOSSES` (kampania leci sekwencyjnie, patrz `current`
-  // wyżej), więc dzielimy tablicę raz na `defeatedList`/`restList` zamiast filtrować w pętli.
-  // Domyślnie ZWINIĘTE (true) — user zobaczy od razu aktualnego/zablokowanych bez przewijania.
-  const [defeatedCollapsed, setDefeatedCollapsed] = useState(true);
-  const currentIdx = current ? BOSSES.findIndex(b => b.id === current.id) : BOSSES.length;
-  const defeatedList = BOSSES.slice(0, currentIdx);
-  const restList = BOSSES.slice(currentIdx);
+  // Nawigacja do walki kampanii — WYCIĄGNIĘTA do `useCallback` (2026-10-12, mapa kampanii)
+  // specjalnie po to, żeby `CampaignMap`'s `memo()` miało sens: bez stabilnej referencji tu
+  // inline `() => router.push(...)` tworzyłby nowe closure na KAŻDY render tego ekranu
+  // (odliczanie energii re-renderuje go często), łamiąc porównanie propsów memo.
+  const goFight = useCallback(() => router.push('/boss-fight' as any), []);
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -419,51 +415,11 @@ export default function Bosses() {
           </View>
         )}
 
-        {/* campaign list — pokonani (zawsze ciągły prefiks, patrz komentarz przy
-            `defeatedList` wyżej) domyślnie zwinięci pod jeden nagłówek, żeby lista nie rosła
-            do 22 identycznych "Pokonany ✓" wierszy w miarę postępu. */}
-        <View style={{ gap: spacing[2] }}>
-          {defeatedList.length > 0 && (
-            <PressableScale onPress={() => { haptic.tap(); setDefeatedCollapsed(v => !v); }}>
-              <View style={s.collapseRow}>
-                <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
-                <Text style={s.collapseTxt}>Pokonani bossowie ({defeatedList.length})</Text>
-                {defeatedCollapsed ? <ChevronDown size={16} color={c.text.muted} /> : <ChevronUp size={16} color={c.text.muted} />}
-              </View>
-            </PressableScale>
-          )}
-          {!defeatedCollapsed && defeatedList.map(b => (
-            <View key={b.id} style={s.row}>
-              <View style={{ opacity: 0.5 }}>
-                <BossArt id={b.id} emoji={b.emoji} size={32} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
-                <Text style={s.rowSub}>Pokonany · {b.loot.name}</Text>
-              </View>
-              <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
-            </View>
-          ))}
-          {restList.map(b => {
-            const isCur = current?.id === b.id;
-            // 2026-08-17 — lock w liście to teraz czysto "jeszcze nie doszedłeś tu w
-            // kolejności" (nie def, nie current), NIE poziom — patrz komentarz przy `current`
-            // wyżej. Wciąż informacyjne (lista nie ma własnego przycisku walki, tylko hero
-            // card current-bossa wyżej), ale już nie sugeruje nieistniejącego wymogu poziomu.
-            const lock = !isCur;
-            return (
-              <View key={b.id} style={[s.row, isCur && { borderColor: '#38BDF8' }]}>
-                <BossArt id={b.id} emoji={b.emoji} size={32} mystery={lock} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.rowName} numberOfLines={1}>{lock ? mysteryBossName(b.id) : b.name}</Text>
-                  <Text style={s.rowSub}>{lock ? 'Pokonaj poprzednich' : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
-                </View>
-                {lock ? <Lock size={15} color={c.text.muted} />
-                  : <View style={[s.rowBadge, { backgroundColor: '#38BDF822' }]}><Swords size={13} color="#38BDF8" /></View>}
-              </View>
-            );
-          })}
-        </View>
+        {/* Mapa kampanii (2026-10-12) — zastąpiła dawną płaską listę "pokonani (zwinięci) +
+            reszta z kłódkami" (patrz CampaignMap.tsx dla pełnego uzasadnienia). Hero card
+            wyżej ZOSTAJE jedynym miejscem z taunt/energią — mapa to wizualny przegląd
+            postępu + skrót WALCZ na aktualnym węźle. */}
+        <CampaignMap bosses={BOSSES} currentId={current?.id ?? null} onPressCurrent={goFight} />
         </>)}
 
         {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 50+, tylko po pokonaniu normalnej
