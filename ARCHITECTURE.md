@@ -16736,6 +16736,55 @@ NAWODNIENIE → "Kalendarz wody" w modalu → nadal działa jak dotąd. (4) `/wa
 domyślnie widoczny pasek ostatnich 7 dni + hero streak, BEZ pełnej siatki → "Pokaż pełny
 kalendarz" rozwija miesiąc/rok jak dawniej, edycja dnia (tap) działa w OBU widokach.
 
+## 305. Mapa kampanii — przebudowa: tło-mapa, popupy zamiast hero cardu, pokonani na szaro+X (2026-10-13)
+
+User przysłał zrzut ekranu świeżo wdrożonej mapy (§302) + gotową grafikę topograficznej mapy
+(pergamin, kontury) i poprosił o cztery zmiany: "wrzuć tę mapę w tło zmniejsz jasność... żeby
+to wyglądało jak podróż... ta ikonka aktualna niech się pokazuje jak inne mała i po kliknięciu
+pokazuje się powiększony i przycisk walki popup... a tak pokonani niech na szaro się pokazują
+albo przekreśleni czarnym X... i elementów niech będą popupy gdzieś przy krawędziach żeby to
+było pełnoekranowe".
+
+1. **Tło-mapa** — przysłana grafika zapisana jako `assets/lokalizacje/
+   LOKALIZACJA_MAPA_KAMPANII.jpg` (Freepik, topograficzny pergamin). Trasa bywa dużo wyższa
+   niż jedna grafika (kampania ~44 bossów, celuje w ~100+), więc zwykły RN `Image` z
+   `resizeMode="repeat"` (NIE `expo-image` — ten nie ma natywnego tile'owania) kafelkuje ją
+   pionowo zamiast rozciągać jeden obrazek na całą, bardzo wysoką treść. Ciemny
+   `LinearGradient` scrim NA WIERZCHU (user: "zmniejsz jasność") — ten sam trójstopniowy,
+   schodzący-w-dół przepis co tło lokacji w boss-fight.tsx, dla spójności wizualnej.
+2. **Dawny hero card USUNIĘTY** (duży portret/taunt/WALCZ aktualnego bossa, renderowany NAD
+   mapą w `bosses.tsx`) — węzeł aktualnego bossa na samej mapie już miał TEN SAM rozmiar co
+   pokonani/zablokowani (nie to było problemem), ale hero card OBOK niego sprawiał wrażenie
+   dublowania tej samej informacji w dwóch miejscach. Cała treść hero cardu (portret
+   powiększony, taunt, HP+motyw, hint "kolejna energia za...", przycisk WALCZ) żyje teraz w
+   **popupie**, otwieranym tapnięciem węzła aktualnego bossa. `fmtEnergyCountdown`
+   przeniesione z `bosses.tsx` do `src/utils/bosses.ts` (eksportowane) — potrzebne teraz w
+   DWÓCH miejscach (ekran + popup mapy), jedna definicja zamiast duplikatu.
+3. **Pokonani — szaro + X** (user: "na szaro się pokazują albo przekreśleni czarnym X") —
+   zielona odznaka ✓ ZASTĄPIONA: portret przyciemniony (`opacity: 0.35`) + duże czarne `X`
+   (lucide) na wierzchu. Tap dalej działa, teraz jako popup (nazwa+loot) zamiast toastu —
+   patrz punkt 4.
+4. **Popupy zamiast toastu/modala** (user: "elementów niech będą popupy gdzieś przy
+   krawędziach żeby to było pełnoekranowe") — ANI RN `Modal` (portaluje poza przewijaną
+   treść, własny układ współrzędnych, zasłoniłby całą mapę) ANI toast (za mało miejsca na
+   przycisk WALCZ) — zamiast tego absolutnie pozycjonowana karta WEWNĄTRZ tej samej
+   przewijanej treści co węzły, w TEJ SAMEJ przestrzeni współrzędnych co `nodeX`/`nodeY`:
+   zakotwiczona przy tapniętym węźle (pod nim, albo NAD nim gdy węzeł jest blisko dołu
+   trasy), klamrowana w poziomie do szerokości mapy. Dzięki temu żadna interakcja nie
+   wymaga własnego, stałego miejsca na ekranie — mapa może zająć prawie cały ekran
+   (`mapH = max(480, wysokość_ekranu - 300)`, zamiast dawnych sztywnych 420px).
+
+**Testy**: brak nowych — czysto UI (przeniesienie `fmtEnergyCountdown` to refaktor bez zmiany
+zachowania). `tsc --noEmit` czyste, `jest --silent` 102/102 suite, 1342 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (duża przebudowa świeżo wdrożonego UI): (1) Bossy
+→ Kampania → tło-mapa widoczne, przyciemnione, kafelkuje się bez szwów przy przewijaniu w
+dół. (2) Tap na aktualnym węźle (TEN SAM rozmiar co inne) → popup z powiększonym portretem +
+taunt + HP + WALCZ, przycisk działa. (3) Tap na pokonanym (szary + czarne X) → popup z
+nazwą+lootem. (4) Zablokowani dalej bez interakcji, czarna sylwetka + mgła. (5) Popup NIE
+wychodzi poza krawędzie mapy niezależnie od tego który węzeł tapniesz (góra/dół/lewo/prawo
+wężowej ścieżki).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

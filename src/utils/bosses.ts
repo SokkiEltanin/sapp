@@ -422,6 +422,17 @@ export function dailyAttempts(energyMult: number): number {
 // ("dailyAttempts") — jedna prawda, nie osobny wzór.
 export const ENERGY_REGEN_HOURS = 3;
 
+// Odliczanie do kolejnego punktu energii kampanii — statyczne w chwili renderu (jak
+// fmtMissionDuration w pet.tsx), nie żywy tiker. Przeniesione tu z bosses.tsx (2026-10-13,
+// mapa kampanii) — `CampaignMap.tsx`'s popup aktualnego bossa potrzebuje TEJ SAMEJ funkcji co
+// dawny hero card w bosses.tsx, zamiast duplikować formułę w dwóch miejscach.
+export function fmtEnergyCountdown(regenAtIso: string): string {
+  const ms = Math.max(0, new Date(regenAtIso).getTime() - Date.now());
+  const totalMin = Math.ceil(ms / 60000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+
 // Czyste, testowalne jądro regeneracji — petStore.ts woła je z realnym `Date.now()`, testy
 // wołają z ustalonym `now`. `regenAt` = ISO czas kiedy dotrze NASTĘPNY punkt (null = bank
 // pełny, nic nie tyka). `max` = sufit banku, liczony przez wołającego z `dailyAttempts(energyMult)`

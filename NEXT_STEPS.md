@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Mapa kampanii — przebudowa: tło-mapa, popupy zamiast hero cardu, pokonani na szaro+X (2026-10-13)
+
+User przysłał zrzut świeżo wdrożonej mapy (§302) + własną grafikę topograficznej mapy i
+poprosił o dopracowanie. Pełny opis w ARCHITECTURE.md §305.
+
+- Tło mapy = przysłana grafika (`assets/lokalizacje/LOKALIZACJA_MAPA_KAMPANII.jpg`),
+  kafelkowana pionowo + przyciemniona.
+- Dawny hero card aktualnego bossa (nad mapą) USUNIĘTY — ta sama treść (portret/taunt/HP/
+  WALCZ) żyje teraz w popupie po tapnięciu węzła aktualnego bossa na mapie.
+- Pokonani: szary portret + czarne X zamiast zielonej odznaki ✓. Tap → popup z nazwą+lootem
+  (zamiast toastu).
+- Popupy zakotwiczone przy tapniętym węźle (nie pełnoekranowy Modal) — mapa dostała dużo
+  więcej wysokości (prawie pełnoekranowa zamiast sztywnych 420px).
+
+`tsc`/`jest` zielone (102/102 suite, 1342 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (świeża przebudowa UI): tło-mapa widoczne i
+przyciemnione, tap na aktualnym/pokonanym węźle → popup (nie wychodzi poza krawędzie mapy w
+żadnym miejscu trasy), WALCZ z popupu działa, pokonani wyraźnie szarzy z X.
+
 ## 🆕 Ujednolicenie nawigacji do "Woda" + schludny streak z rozwijanym kalendarzem (2026-10-13)
 
 User: "woda jak wchodzę na zdrowiu to jest inna zakładka niż woda jak wchodzę ze streaka".
