@@ -23,7 +23,7 @@ import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@
 import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp, gearAtkFlat, gearById, gearSellValue, isBetterThanEquipped } from '@/utils/gear';
-import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
+import { computePetState, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
@@ -586,7 +586,10 @@ export default function Pet() {
             )}
           </GearPanel>
         </View>
-        <Text style={s.tip}>{petStatusLine(pet)}</Text>
+        {/* Linijka statusu nastroju ("Trochę się nudzi…" itp., `petStatusLine`) USUNIĘTA
+            (2026-10-13, user: "SIŁA BOJOWA i trochę się nudzi bez sensu i rozciągają nam
+            wszystko") — `petStatusLine` w petState.ts ZOSTAJE nietknięta (czysta funkcja,
+            może się jeszcze przydać gdzie indziej), tylko przestała być renderowana tutaj. */}
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. UI misji
@@ -607,8 +610,9 @@ export default function Pet() {
           </PressableScale>
         )}
 
-        {/* ── Siła bojowa (scalone z pet-stats.tsx, 2026-08-19) ── */}
-        <Text style={s.section}>Siła bojowa</Text>
+        {/* ── Siła bojowa (scalone z pet-stats.tsx, 2026-08-19) — nagłówek "Siła bojowa"
+            USUNIĘTY (2026-10-13, user: "bez sensu i rozciąga nam wszystko") — siatka statów
+            niżej mówi sama za siebie, zaraz pod ekwipunkiem/kotkiem. ── */}
         <View style={s.statGrid}>
           {/* "+5"/"+20" na przyciskach ulepszeń dostają kolor stata, nie żółty (2026-08-27,
               user: "+5 na ataku niech będzie czerwone, +20 przy zdrowiu na zielono, resztę
@@ -886,7 +890,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
   moodChip: { marginTop: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
   status: { fontSize: 12, fontWeight: '800' },
-  tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },
   crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
   crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   dailyBoxIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: '#FBBF24', marginLeft: 6 },

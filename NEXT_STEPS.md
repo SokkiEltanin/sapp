@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
+
+User (po przebudowie mapy kampanii, §305): "potem musimy jak wgram nowe bosy i grafiki
+ogarnąć te bossy w końcu" — generuje nowych bossów "kilka dziennie", celuje w ~100+. GDY
+user wgra nowe pliki: dopisać `BOSS_<NAZWA>.png` do `BOSS_PNG` w `src/utils/bossIcons.ts`
+(zastępuje emoji-fallback/pożyczony art) i/lub dopisać nowe wpisy do `BOSSES` w
+`src/utils/bosses.ts` (id/name/emoji/hp/weakness/loot/taunt — patrz istniejące wpisy jako
+wzorzec). Mapa kampanii (`CampaignMap.tsx`) i `BossArt.tsx` NIE wymagają zmian kodu dla
+nowych bossów — podłączają się same przez `BOSSES`/`BOSS_PNG`, to czysto dane. Nie zaczynać
+bez wyraźnego sygnału że pliki są już wgrane.
+
+## 🆕 Usunięte zbędne napisy na ekranie Pupila: "Siła bojowa" + linijka nastroju (2026-10-13)
+
+User: "SIŁA BOJOWA i trochę się nudzi bez sensu i rozciągają nam wszystko". Pełny opis w
+ARCHITECTURE.md §306. Usunięte z `app/pet.tsx`: linijka statusu nastroju (`petStatusLine`,
+np. "Trochę się nudzi…") i nagłówek "Siła bojowa" nad siatką statów. Siatka statów i prompt
+"Wrócił z misji" (funkcjonalny, nie filler) zostają bez zmian.
+
+`tsc`/`jest` zielone (102/102 suite, 1342 testy, bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Pupil → krótszy ekran pod gear-panelem, bez dwóch
+linijek tekstu.
+
 ## 🆕 Mapa kampanii — przebudowa: tło-mapa, popupy zamiast hero cardu, pokonani na szaro+X (2026-10-13)
 
 User przysłał zrzut świeżo wdrożonej mapy (§302) + własną grafikę topograficznej mapy i
