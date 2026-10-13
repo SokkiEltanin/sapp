@@ -16785,6 +16785,33 @@ nazwą+lootem. (4) Zablokowani dalej bez interakcji, czarna sylwetka + mgła. (5
 wychodzi poza krawędzie mapy niezależnie od tego który węzeł tapniesz (góra/dół/lewo/prawo
 wężowej ścieżki).
 
+## 306. Usunięte zbędne napisy na ekranie Pupila: "Siła bojowa" + linijka nastroju (2026-10-13)
+
+User (zrzutem ekranu, pod gear-panelem/kotkiem, nad siatką statów): "możemy pod pupilem
+między statami wywalić te napisy? I ten 'SIŁA BOJOWA' i ten 'trochę się nudzi' bez sensu i
+rozciągają nam wszystko tylko". Dwa usunięte elementy w `app/pet.tsx`:
+
+1. **Linijka statusu nastroju** (`<Text style={s.tip}>{petStatusLine(pet)}</Text>`, np.
+   "Trochę się nudzi…", "Zadowolony i najedzony") — USUNIĘTA z renderu. `petStatusLine()` w
+   `src/utils/petState.ts` ZOSTAJE nietknięta (czysta funkcja, może się przydać gdzie indziej
+   — np. gdyby dashboard kiedyś dostał z powrotem kafel pupila), tylko przestała być
+   wywoływana tutaj. Martwy styl `s.tip` (jedyne użycie) usunięty.
+2. **Nagłówek "Siła bojowa"** nad siatką statów — sam tekst usunięty, siatka ZOSTAJE bez
+   zmian (ATK/HP/energia/misja/unik/kryt itd.) — kontekst (gear-panel bezpośrednio nad nią)
+   wystarcza, żeby wiedzieć co to za liczby, bez osobnego nagłówka. Styl `s.section` ZOSTAJE
+   (dalej używany przez "Umiejętności bossów" niżej w tym samym pliku).
+
+**Celowo NIE zrobione teraz**: "Wrócił z: {lokalizacja}" + "Naciśnij, aby zawalczyć i
+zakończyć misję" (ten sam blok, inny element) — to FUNKCJONALNY prompt (widoczny tylko gdy
+pupil wrócił z misji i czeka na walkę kończącą ją), nie dekoracyjny filler jak dwa usunięte
+wyżej — user nie go wymienił wśród "bez sensu", zostaje.
+
+**Testy**: brak nowych — czyste usunięcie renderowanego tekstu + martwego stylu, zero zmiany
+logiki/danych. `tsc --noEmit` czyste, `jest --silent` 102/102 suite, 1342 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — niski**: Pupil → ekran pod gear-panelem/kotkiem krótszy o
+dwie linijki tekstu, siatka statów ("Siła bojowa") zaczyna się od razu bez nagłówka.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
