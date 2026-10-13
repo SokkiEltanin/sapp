@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
-import { ChevronLeft, Droplets, Snowflake, Check } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, ChevronUp, Droplets, Snowflake, Check } from 'lucide-react-native';
 
 import { getWaterHabit, getCounts, setCounts, getCountsRange } from '@/utils/habits';
 import { getHealthGoals } from '@/utils/healthGoals';
@@ -46,6 +46,12 @@ export default function WaterCalendar() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'month' | 'year'>('month');
   const windowDays = view === 'month' ? 35 : WINDOW;
+  // Domyślnie ZWINIĘTE (2026-10-13, user: "żeby był schludny streak z rozwijanym
+  // kalendarzem, że pokazuje ostatnie 7 dni np a reszta do rozwinięcia, ogólnie żeby było
+  // jak zakładka PRACA") — pasek ostatnich 7 dni (patrz `last7` niżej) zawsze widoczny,
+  // pełna siatka miesiąc/rok chowa się za tym przełącznikiem, tak jak zwinięta lista
+  // pokonanych bossów w bosses.tsx/pokonanych nawyków gdzie indziej w appce.
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
 
   const [editDate, setEditDate] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -131,19 +137,17 @@ export default function WaterCalendar() {
   };
 
   const avgPerDay = windowDays > 0 ? stats.totalGlasses / windowDays : 0;
+  // Ostatnie 7 dni — zawsze widoczny pasek NIEZALEŻNY od `view` (miesiąc/rok to tylko
+  // zakres pełnej, zwijanej siatki niżej) — `cells` zawsze kończy się DZIŚ niezależnie od
+  // okna, więc `.slice(-7)` daje te same 7 dni dla obu widoków.
+  const last7 = cells.slice(-7);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title} numberOfLines={1}>Woda</Text>
-        <View style={s.viewToggle}>
-          {(['month', 'year'] as const).map(v => (
-            <TouchableOpacity key={v} onPress={() => setView(v)} style={[s.viewBtn, view === v && s.viewBtnOn]}>
-              <Text style={[s.viewBtnTxt, view === v && s.viewBtnTxtOn]}>{v === 'month' ? 'Miesiąc' : 'Rok'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -163,7 +167,48 @@ export default function WaterCalendar() {
           <View style={s.legendItem}><View style={[s.sw, { borderWidth: 1.4, borderColor: ICE, backgroundColor: c.fill.subtle }]} /><Text style={s.legendTxt}>zamrożone</Text></View>
         </View>
 
+        {/* Pasek "ostatnie 7 dni" (2026-10-13) — schludny domyślny widok, ten sam duży
+            dotykowy kafelek co siatka miesiąca niżej, tylko w jednym rzędzie bez scrolla. */}
         {!loading && (
+          <View style={s.weekRow}>
+            {last7.map(cell => {
+              const alpha = tierAlpha(cell.count, goal);
+              const fill = alpha ? ACCENT + alpha : c.fill.subtle;
+              return (
+                <TouchableOpacity key={cell.ds} onPress={() => openDay(cell.ds, cell.count)} style={s.weekCellTouch}>
+                  <Text style={s.weekCellDow}>{WD[cell.wd]}</Text>
+                  <View style={[
+                    s.weekCell, { backgroundColor: fill },
+                    cell.froz && { borderWidth: 2, borderColor: ICE },
+                    !cell.froz && cell.isToday && { borderWidth: 2, borderColor: c.text.primary },
+                  ]}>
+                    <Text style={[s.weekCellNum, { opacity: cell.count > 0 ? 1 : 0.5 }]}>{cell.dom}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Rozwiń/zwiń pełny kalendarz (user: "żeby był schludny streak z rozwijanym
+            kalendarzem... ogólnie żeby było jak zakładka PRACA") — ten sam zwijany wzorzec
+            co "Pokonani bossowie" w bosses.tsx. */}
+        <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setCalendarExpanded(v => !v); }} style={s.expandRow}>
+          <Text style={s.expandTxt}>{calendarExpanded ? 'Zwiń kalendarz' : 'Pokaż pełny kalendarz'}</Text>
+          {calendarExpanded ? <ChevronUp size={16} color={c.text.muted} /> : <ChevronDown size={16} color={c.text.muted} />}
+        </TouchableOpacity>
+
+        {calendarExpanded && (
+          <View style={s.viewToggle}>
+            {(['month', 'year'] as const).map(v => (
+              <TouchableOpacity key={v} onPress={() => setView(v)} style={[s.viewBtn, view === v && s.viewBtnOn]}>
+                <Text style={[s.viewBtnTxt, view === v && s.viewBtnTxtOn]}>{v === 'month' ? 'Miesiąc' : 'Rok'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {calendarExpanded && !loading && (
           <View style={s.gridCard}>
             {isMonth ? (
               <View style={{ width: '100%', aspectRatio: mW / mH }}>
@@ -271,7 +316,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
   title: { fontSize: 17, fontWeight: '800', color: c.text.primary, flex: 1 },
-  viewToggle: { flexDirection: 'row', backgroundColor: c.fill.subtle, borderRadius: radius.full, padding: 2, borderWidth: 1, borderColor: c.border.subtle },
+  viewToggle: { flexDirection: 'row', alignSelf: 'center', backgroundColor: c.fill.subtle, borderRadius: radius.full, padding: 2, borderWidth: 1, borderColor: c.border.subtle },
   viewBtn: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: radius.full },
   viewBtnOn: { backgroundColor: c.text.primary },
   viewBtnTxt: { fontSize: 11, fontWeight: '800', color: c.text.muted },
@@ -289,6 +334,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   sw: { width: 10, height: 10, borderRadius: 3 },
   legendTxt: { fontSize: 11, fontWeight: '600', color: c.text.muted },
+
+  // Pasek "ostatnie 7 dni" (2026-10-13) — ten sam język (zaokrąglony kwadrat + numer dnia +
+  // ramka na dziś/zamrożone) co komórki pełnej siatki niżej, żeby zwinięty/rozwinięty widok
+  // nie wyglądały jak dwa różne komponenty.
+  weekRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  weekCellTouch: { alignItems: 'center', gap: 4 },
+  weekCellDow: { fontSize: 9, fontWeight: '700', color: c.text.muted },
+  weekCell: { width: 40, height: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  weekCellNum: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  expandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: spacing[1] },
+  expandTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
 
   gridCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
 

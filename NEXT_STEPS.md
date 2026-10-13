@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ujednolicenie nawigacji do "Woda" + schludny streak z rozwijanym kalendarzem (2026-10-13)
+
+User: "woda jak wchodzę na zdrowiu to jest inna zakładka niż woda jak wchodzę ze streaka".
+Pełny opis w ARCHITECTURE.md §304. Nawyk "Woda" miał TRZY różne ekrany zależnie skąd się do
+niego wchodziło (`habits.tsx`/`StreakWallCard.tsx` → generyczny `/habit-year`, `health.tsx` →
+dedykowany `/water-calendar`) — teraz WSZĘDZIE `/water-calendar`. Ten ekran dostał też nowy,
+domyślnie widoczny pasek "ostatnie 7 dni" + rozwijaną pełną siatkę miesiąc/rok (user: "jak
+zakładka PRACA").
+
+`tsc`/`jest` zielone (102/102 suite, 1342 testy, bez zmiany — czysto UI/nawigacja).
+
+**Priorytet testu na urządzeniu — wysoki**: Nawyki → "Woda" → pasek 7 dni, Dashboard →
+"Twoje serie" → kafelek "Woda" — OBA powinny otwierać ten sam `/water-calendar` (nie
+generyczny kalendarz roku). Na `/water-calendar` samym: domyślnie widoczny pasek 7 dni bez
+pełnej siatki, "Pokaż pełny kalendarz" rozwija miesiąc/rok, edycja dnia (tap) działa w obu
+widokach.
+
 ## 🆕 Fix: statystyki skrzynek ignorowały wartość dropniętego ekwipunku (2026-10-12)
 
 User: "jak kupię za 35 a dropnę item wart 69 to jestem na plusie nie na minusie bo mam

@@ -607,7 +607,7 @@ export default function DashboardScreen() {
   // WŁASNY kafelek niżej (`counters-since`/`SinceCountersCard.tsx`, `dashSince`), mieszanie
   // auto-śledzonych streaków z ręcznie tapanymi licznikami w JEDNYM widgecie myliło.
   const streakWall = useMemo<StreakItem[]>(() => {
-    const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id) }));
+    const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id), kind: h.kind }));
     const fromCounters = counters
       .filter(cn => cn.kind === 'since' && cn.mode === 'auto' && cn.onDashboard !== false)
       .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
