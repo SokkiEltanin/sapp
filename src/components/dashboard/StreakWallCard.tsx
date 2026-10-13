@@ -13,7 +13,11 @@ import DisplayText from '@/components/ui/DisplayText';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
-export interface StreakItem { key: string; name: string; days: number }
+// `kind` (2026-10-13, user: "woda jak wchodzę ze streaka jest inna [zakładka] niż na
+// zdrowiu... ujednolicić") — jedyny powód tego pola: odróżnić nawyk "Woda" (ma WŁASNY,
+// bogatszy kalendarz, `/water-calendar`) od reszty (generyczny `/habit-year`), patrz `onTile`
+// niżej. Opcjonalne i nieużywane dla wpisów licznikowych (`c:`-prefiks).
+export interface StreakItem { key: string; name: string; days: number; kind?: string }
 
 const SEEN_KEY = 'streak_tiers_v1';
 
@@ -110,7 +114,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     const isZero = r.days < 1;
     const onTile = () => {
       haptic.tap();
-      if (r.key.startsWith('h:')) router.push(`/habit-year?id=${r.key.slice(2)}` as any);
+      if (r.key.startsWith('h:')) router.push((r.kind === 'water' ? `/water-calendar?id=${r.key.slice(2)}` : `/habit-year?id=${r.key.slice(2)}`) as any);
       else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
       else router.push('/counters' as any);
     };

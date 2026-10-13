@@ -165,8 +165,14 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
           </View>
         )}
 
-        {/* dotknij pasek 7 dni → pixel MIESIĄC (toggle na ROK) tego nawyku */}
-        <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); router.push(`/habit-year?id=${habit.id}` as any); }}
+        {/* dotknij pasek 7 dni → pixel MIESIĄC (toggle na ROK) tego nawyku — WYJĄTEK: "Woda"
+            (2026-10-13, user: "woda jak wchodzę na zdrowiu to jest inna zakładka niż woda
+            jak wchodzę ze streaka... ujednolicić") — `habit-year.tsx` to GENERYCZNY kalendarz
+            współny dla WSZYSTKICH nawyków, ale woda ma WŁASNY, bogatszy ekran
+            (`/water-calendar` — streak + edycja wsteczna ilości szklanek, nie tylko
+            zrobione/nie), do którego i tak prowadzi health.tsx. Bez tego wyjątku ten sam
+            nawyk "Woda" miał DWA różne kalendarze w zależności skąd się do niego wchodziło. */}
+        <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); router.push((habit.kind === 'water' ? `/water-calendar?id=${habit.id}` : `/habit-year?id=${habit.id}`) as any); }}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <HistoryDots days={last7} color={habit.color} />
           <View style={{ flex: 1 }} />

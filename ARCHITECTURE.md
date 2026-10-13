@@ -16685,6 +16685,57 @@ pełny panel (`/box-stats`) → otwórz kilka skrzynek z realnym ekwipunkiem w d
 bilans jest teraz dodatni (albo mniej ujemny) gdy dropnięty item jest wart więcej niż koszt, i
 że widać linijkę "+X potencjału z ekwipunku" pod sumą i pod kartą danej skrzynki.
 
+## 304. Ujednolicenie nawigacji do "Woda" + schludny streak z rozwijanym kalendarzem (2026-10-13)
+
+User: "woda jak wchodzę na zdrowiu to jest inna zakładka niż woda jak wchodzę ze streaka i
+inna niż z innych zakładek, możemy to ujednolicić... żeby był schludny streak z rozwijanym
+kalendarzem (że pokazuje ostatnie 7 dni np a reszta do rozwinięcia), ogólnie żeby było jak
+zakładka PRACA". Realny bug: woda to ZWYKŁY `Habit` (`kind: 'water'`, auto-tworzony przez
+`ensureWaterHabit()` w health.tsx) — żyje w TEJ SAMEJ liście co każdy inny nawyk, ale miał
+TRZY różne ekrany w zależności skąd się do niej wchodziło.
+
+1. **Trzy miejsca nawigacji, trzy różne cele** (przed fixem):
+   - `app/habits.tsx` (lista nawyków, pasek 7 dni pod każdym wierszem) → `/habit-year?id=...`
+     (generyczny kalendarz roku, WSPÓLNY dla wszystkich nawyków).
+   - `src/components/dashboard/StreakWallCard.tsx` ("Twoje serie" na dashboardzie) →
+     RÓWNIEŻ `/habit-year?id=...` (ten sam generyczny kalendarz).
+   - `app/(tabs)/health.tsx` (karta "NAWODNIENIE" → modal ustawień → przycisk "Kalendarz
+     wody") → `/water-calendar?id=...` — DEDYKOWANY ekran wody z edycją wsteczną ilości
+     szklanek (backfill), czego `/habit-year` NIE MA dla żadnego nawyku (patrz §"Kalendarz
+     wody" z 2026-10-03). Trzy różne UI dla tego samego nawyku zależnie od wejścia.
+   - Fix: `habits.tsx` i `StreakWallCard.tsx` dostały wyjątek — gdy `habit.kind === 'water'`,
+     router idzie do `/water-calendar?id=...` zamiast `/habit-year?id=...`. `StreakItem`
+     (StreakWallCard.tsx) dostał nowe opcjonalne pole `kind`, wypełniane w `index.tsx`'s
+     `streakWall` useMemo z `h.kind` (źródło prawdy — ten sam `Habit.kind` co reszta appki).
+     `health.tsx` już i tak celował poprawnie, bez zmian.
+2. **Schludny streak z rozwijanym kalendarzem** (user: "jak zakładka PRACA") —
+   `app/water-calendar.tsx` dostał nowy, zawsze widoczny pasek "ostatnie 7 dni" (`last7 =
+   cells.slice(-7)` — `cells` zawsze kończy się DZIŚ niezależnie od wybranego okna
+   miesiąc/rok, więc ten sam wycinek działa dla obu). Pełna siatka miesiąc/rok (już
+   istniejąca, z przełącznikiem widoku) schowana teraz za `calendarExpanded` (domyślnie
+   `false`) — "Pokaż pełny kalendarz" / "Zwiń kalendarz" z chevronem, TEN SAM zwijany wzorzec
+   co "Pokonani bossowie" w `bosses.tsx`. Hero (streak dni z rzędu), legenda kolorów i pasek
+   statystyk na dole ZOSTAJĄ bez zmian, zawsze widoczne — zmieniła się tylko domyślna
+   widoczność CIĘŻKIEJ, pełnej siatki.
+
+**Celowo NIE zrobione**: konsolidacja DUPLIKOWANEJ logiki liczenia wody (health.tsx ma
+WŁASNY, udokumentowany-w-komentarzach licznik z fixami wyścigów race-condition, osobny od
+`useWaterTracker.ts` używanego w food.tsx) — to inny problem niż nawigacja (user pytał
+konkretnie o "zakładki", nie o kod pod spodem), a health.tsx's implementacja ma realne,
+przetestowane na urządzeniu poprawki wyścigów (user #14, "wypiłem 8 szklanek a pokazuje
+mniej") które ryzykowałoby się zepsuć przy nieostrożnym scaleniu. Zostaje do osobnej, celowej
+zmiany jeśli user kiedyś tego zażąda wprost.
+
+**Testy**: brak nowych — czysto UI/nawigacja, zero zmiany logiki liczenia/zapisu wody.
+`tsc --noEmit` czyste, `jest --silent` 102/102 suite, 1342 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (nawigacja + nowy UI, łatwo przeoczyć regresję):
+(1) Nawyki → wiersz "Woda" → pasek 7 dni → powinno otworzyć `/water-calendar`, NIE generyczny
+kalendarz roku. (2) Dashboard → "Twoje serie" → kafelek "Woda" → to samo. (3) Zdrowie → karta
+NAWODNIENIE → "Kalendarz wody" w modalu → nadal działa jak dotąd. (4) `/water-calendar` →
+domyślnie widoczny pasek ostatnich 7 dni + hero streak, BEZ pełnej siatki → "Pokaż pełny
+kalendarz" rozwija miesiąc/rok jak dawniej, edycja dnia (tap) działa w OBU widokach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
