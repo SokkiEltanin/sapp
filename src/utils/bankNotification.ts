@@ -161,6 +161,13 @@ export function sameLocalDay(a: number, b: number): boolean {
   return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
 }
 
+// 'YYYY-MM-DD' local-day bucket — used as (part of) a dedup lock key, see asyncLock.ts.
+export function localDayKey(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export function findMatchingExpense(tx: ParsedBankTx, expenses: MatchExpense[], windowMin = 150): MatchExpense | null {
   const txTime = new Date(tx.dateISO).getTime();
   let best: { e: MatchExpense; score: number } | null = null;

@@ -14,6 +14,16 @@ wzorzec). Mapa kampanii (`CampaignMap.tsx`) i `BossArt.tsx` NIE wymagają zmian 
 nowych bossów — podłączają się same przez `BOSSES`/`BOSS_PNG`, to czysto dane. Nie zaczynać
 bez wyraźnego sygnału że pliki są już wgrane.
 
+## 🆕 Fix: wyścig paragon-vs-bank dawał zdublowany wydatek (2026-10-13)
+
+User: "czasami jak dodaje najpierw paragon a potem auto płatność czy na odwrót to mi nie
+lapie i sa dwa jakby duplikat". Root cause i fix (`asyncLock.ts`, wspólny zamek w
+`commitBankTx`+`expenses/scan.tsx`) w ARCHITECTURE.md §308 — to był znany, wcześniej
+nieudowodniony gap z §279. Priorytet testu na urządzeniu wysoki, ALE trudny do
+zweryfikowania bez realnego powiadomienia bankowego w locie (patrz zastrzeżenie w §308) —
+jeśli duplikat Lidl-owy (albo jakikolwiek inny, ta sama kwota+dzień) pojawi się PONOWNIE
+mimo tego fixu, to inny, jeszcze nieznaleziony root cause, nie regresja tego fixu.
+
 ## 🆕 Fix: mapa kampanii nie przewijała się dotykiem (2026-10-13)
 
 User: "nie mogę przesuwać mapy i nie centrujący aktualnego bossa". Przyczyna i fix

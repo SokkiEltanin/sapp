@@ -16839,6 +16839,58 @@ przechwytywania gestu).
 mapa da się przesuwać dotykiem w obu kierunkach niezależnie od zewnętrznego scrolla strony,
 i przy wejściu na ekran wciąż centruje się na aktualnym bossie.
 
+## 308. Fix: wyścig paragon-vs-powiadomienie-z-banku dawał zdublowany wydatek (`asyncLock.ts`) (2026-10-13)
+
+User (zrzutem listy wydatków, dwa wpisy "Lidl" po -23,97 zł tego samego dnia): "czasami jak
+dodaje najpierw paragon a potem auto płatność czy na odwrót to mi nie lapie i sa dwa jakby
+duplikat tego samego na te sama kwotę". To DOKŁADNIE scenariusz jawnie opisany jako znana,
+NIEnaprawiona luka w §279 ("dedup w commitBankTx wciąż NIE jest odporny na współbieżne
+wywołania z RÓŻNYCH miejsc kodu... nieporuszana tu bez realnego dowodu, że faktycznie się
+zdarza") — ten zrzut to ten dowód.
+
+**Root cause**: dwie NIEZALEŻNE ścieżki commitują tę samą płatność do `useExpensesStore` —
+powiadomienie z banku (`commitBankTx` w `bankCommit.ts`, przez `processAutoBankQueue`/
+`bank-review.tsx`) i ręcznie wklejony paragon (`saveSelected` w `expenses/scan.tsx`, gałąź
+reverse-merge). Obie mają WŁASNY dedup po kwocie+dniu(+sklepie) i w IZOLACJI działają
+poprawnie — ale żadna nie była odporna na to, że DRUGA strona commituje W TYM SAMYM
+momencie: obie czytały `st.expenses`/`useExpensesStore.getState().expenses` ZANIM którakolwiek
+zdążyła dopisać swój wpis (zwłaszcza `commitBankTx`, gdzie dedup-check leci PRZED `await
+expensesService.add(...)` — asynchronicznym zapisem do Firestore, realnym oknem czasowym w
+którym druga strona mogła zdążyć dopisać swój wpis BEZ ponownego sprawdzenia po stronie
+banku). Dokładnie ten sam KSZTAŁT błędu co §279 (6× zdublowany przelew z wielokrotnego
+klknięcia), tylko źródłem współbieżności są tu DWA RÓŻNE wejścia do kodu zamiast dwóch
+kliknięć tego samego przycisku.
+
+**Fix**: `src/utils/asyncLock.ts` — generyczny, w-pamięci async mutex (`withLock(key, fn)`,
+kolejka Promise'ów per klucz, `finally`-release odporny na throw). Obie strony teraz
+serializują się na TYM SAMYM kluczu `` `${kierunek}:${kwota.toFixed(2)}:${localDayKey(...)}` ``
+(`localDayKey`, nowy eksport w `bankNotification.ts`, 'YYYY-MM-DD' lokalnie):
+- `commitBankTx` — CAŁE ciało funkcji (obie gałęzie, `in`/`out`) owinięte w `withLock`,
+  `st = useExpensesStore.getState()` przeniesione DO ŚRODKA zamka (nie raz na starcie) —
+  commit, który czeka w kolejce, widzi PRZY SWOJEJ KOLEJCE już to, co poprzedni zdążył
+  dopisać, zamiast czytać nieaktualny snapshot sprzed oczekiwania.
+- `expenses/scan.tsx` — gałąź reverse-merge (`candidates`/`existingBank`/`addPending`) owinięta
+  w `withLock` z TYM SAMYM kluczem (kierunek zawsze `'out'` dla paragonów) — rendezvous z
+  `commitBankTx` dla tej samej płatności niezależnie od tego, która strona przyszła pierwsza.
+
+Efekt: który z dwóch commitów (bank/paragon) wygra wyścig o zamek, commituje NORMALNIE (bez
+zmiany zachowania — zero zmiany w samej logice dopasowania); druga strona, jeśli przyjdzie w
+trakcie, po prostu CZEKA aż pierwsza skończy (łącznie z jej `await` do Firestore), po czym
+dopiero wtedy odczytuje store i poprawnie trafia na już-zapisany wpis pierwszej — zamiast
+tworzyć duplikat. Zamek jest WYŁĄCZNIE w pamięci (nie trwały) — wystarczy, bo wyścig ma sens
+tylko wewnątrz JEDNEJ działającej sesji appki.
+
+**Testy**: nowy `__tests__/asyncLock.test.ts` (3 testy — serializacja tego samego klucza,
+brak blokowania między różnymi kluczami, zwolnienie zamka mimo rzuconego wyjątku w `finally`).
+`tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1345 testów (+3 nowe).
+
+**Priorytet testu na urządzeniu — wysoki** (duplikaty finansowe, cicho psują statystyki
+wydatków): odtwórz warunki wyścigu jeśli to możliwe (np. zapłać kartą w sklepie i OD RAZU,
+zanim powiadomienie z banku zdąży przyjść, wklej paragon z tej samej transakcji) — ma wyjść
+JEDEN wpis, nie dwa. Nie da się tego w pełni zweryfikować bez realnego powiadomienia z banku
+(Pekao) w locie, więc traktuj to jako redukcję ryzyka, nie gwarancję 100% — gdyby duplikat
+nadal się pojawił mimo tego fixu, to inny, jeszcze nieznaleziony root cause.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

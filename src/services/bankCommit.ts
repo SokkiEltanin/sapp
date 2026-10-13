@@ -1,6 +1,7 @@
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
-import { findMatchingExpense, findMatchingIncome, sameLocalDay } from '@/utils/bankNotification';
+import { findMatchingExpense, findMatchingIncome, sameLocalDay, localDayKey } from '@/utils/bankNotification';
+import { withLock } from '@/utils/asyncLock';
 import { recordMerchantAccept, MerchantInfo } from '@/utils/merchantMemory';
 import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
@@ -84,12 +85,22 @@ export async function commitBankTx(
   p: PendingBankTx,
   opts?: { corrected?: boolean; learn?: boolean; plnOverride?: number },
 ): Promise<CommitResult> {
-  const st = useExpensesStore.getState();
   const foreign = (p.currency || 'PLN') !== 'PLN';
   const useOverride = foreign && opts?.plnOverride != null && opts.plnOverride > 0;
   const finalAmount = useOverride ? opts!.plnOverride! : p.amount;
   const finalCurrency = useOverride ? 'PLN' : (p.currency || 'PLN');
   const originalFields = useOverride ? { originalAmount: p.amount, originalCurrency: p.currency } : {};
+
+  // Lock keyed by kierunek+kwota+dzień (2026-10-13, §308 — patrz asyncLock.ts) — bez tego
+  // dwa NIEZALEŻNE commity tej samej płatności (powiadomienie z banku + ręcznie dodany
+  // paragon dla TEJ SAMEJ kwoty/dnia, przychodzące w odstępie milisekund) oba czytały
+  // `st.expenses` ZANIM drugie zdążyło dopisać swój wpis — każdy z osobna poprawnie NIE
+  // widział duplikatu, bo go jeszcze nie było. `st` jest teraz POBIERANE WEWNĄTRZ zamka
+  // (nie raz na starcie funkcji), więc ten commit, który czeka na zamek, widzi już wpis
+  // zapisany przez poprzedni, gdy w końcu dostaje swoją kolej.
+  const lockKey = `${p.direction}:${p.amount.toFixed(2)}:${localDayKey(new Date(p.dateISO).getTime())}`;
+  return withLock(lockKey, async (): Promise<CommitResult> => {
+  const st = useExpensesStore.getState();
 
   // ── Incoming transfer → income ──────────────────────────────────────────────
   if (p.direction === 'in') {
@@ -205,4 +216,5 @@ export async function commitBankTx(
   } catch (e) {
     return { ok: false, matched: !!match, error: e instanceof Error ? e.message : undefined };
   }
+  }); // withLock
 }
