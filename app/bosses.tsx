@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Lock, Swords, Trophy } from 'lucide-react-native';
+import { ChevronLeft, Zap, Swords, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
@@ -171,6 +171,9 @@ export default function Bosses() {
   // inline `() => router.push(...)` tworzyłby nowe closure na KAŻDY render tego ekranu
   // (odliczanie energii re-renderuje go często), łamiąc porównanie propsów memo.
   const goFight = useCallback(() => router.push('/boss-fight' as any), []);
+  // Mapa MAD (2026-10-13) — ten sam wzorzec co `goFight`/CampaignMap wyżej, osobny stabilny
+  // callback żeby `CampaignMap`'s memo() łapało "nic się nie zmieniło" też w trybie MAD.
+  const goFightMad = useCallback(() => router.push('/boss-fight?kind=mad' as any), []);
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -178,6 +181,16 @@ export default function Bosses() {
   const madBase = madCandidate(defeatedBosses, defeatedMadBosses);
   const madBoss = madBase ? madBossFor(madBase) : null;
   const madUnlocked = level >= MAD_UNLOCK_LEVEL && !!madBase;
+  // Mapa MAD (2026-10-13, user: "mad bosy to tez pokonane i mapa zmienia kolor na lekko
+  // czerwony i te bosy pokonane sa do kliknięcia wtedy jako ich mad wersje") — reużywa
+  // CAMPAIGNMAP z `variant="mad"` zamiast osobnego komponentu: MAD dzieli DOKŁADNIE tę samą
+  // sekwencyjną "aktualny/pokonany/zablokowany po indeksie" logikę co kampania (patrz
+  // komentarz przy `variant` w CampaignMap.tsx), tylko tablica bossów to MAD-owe warianty
+  // (`madBossFor`, przeliczone hp/nagrody) zamiast gołych `BOSSES`. `useMemo` z pustymi
+  // deps — `madBossFor` jest czystą funkcją nad STAŁĄ `BOSSES`, wynik nigdy się nie zmienia
+  // między renderami tego ekranu, a CampaignMap jest `memo()`-owany więc stabilna referencja
+  // tej tablicy ma znaczenie (patrz komentarz na dole CampaignMap.tsx).
+  const madBosses = useMemo(() => BOSSES.map(b => madBossFor(b)), []);
 
   // ── raid tygodniowy ──
   const weekKey = weekKeyOf();
@@ -396,9 +409,10 @@ export default function Bosses() {
         />
         </>)}
 
-        {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 50+, tylko po pokonaniu normalnej
-            wersji danego bossa. Ten sam heroCard co kampania wyżej, art dostaje czerwoną
-            aurę (`powered`, patrz BossArt) żeby czytać się jako "wzmocniony wariant". ── */}
+        {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 15+ (MAD_UNLOCK_LEVEL), tylko po
+            pokonaniu normalnej wersji danego bossa. Mapa (2026-10-13) — ten sam CampaignMap
+            co kampania wyżej, `variant="mad"` dla czerwonego tła/ścieżki + czerwonej aury na
+            artach (`powered`, patrz BossArt/CampaignMap.tsx). ── */}
         {bossView === 'mad' && (<>
         {!madBoss ? (
           <View style={s.done}>
@@ -406,29 +420,12 @@ export default function Bosses() {
             <Text style={s.doneTxt}>Pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.</Text>
           </View>
         ) : (
-          <View style={s.heroCard}>
-            <View style={s.bossTop}>
-              <BossArt id={madBoss.id} emoji={madBoss.emoji} size={82} powered />
-            </View>
-            <Text style={s.madKicker}>OSZALAŁY WARIANT</Text>
-            <Text style={s.bossName}>{madBoss.name}</Text>
-            <Text style={s.bossTaunt}>„{madBoss.taunt}"</Text>
-            <Text style={s.hpTxt}>{madBoss.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{madBoss.weaknessLabel}</Text></Text>
-
-            {madUnlocked ? (
-              <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=mad' as any); }} style={{ width: '100%' }}>
-                <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
-                  <Swords size={18} color="#fff" />
-                  <Text style={s.attackTxt}>WALCZ!</Text>
-                </View>
-              </PressableScale>
-            ) : (
-              <View style={s.lockBox}>
-                <Lock size={16} color={c.text.muted} />
-                <Text style={s.lockTxt}>Odblokujesz na poziomie {MAD_UNLOCK_LEVEL} (masz {level}).</Text>
-              </View>
-            )}
-          </View>
+          <CampaignMap
+            bosses={madBosses} currentId={madBoss.id} onPressCurrent={goFightMad}
+            energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
+            variant="mad" locked={!madUnlocked}
+            lockMessage={`Odblokujesz na poziomie ${MAD_UNLOCK_LEVEL} (masz ${level}).`}
+          />
         )}
         </>)}
 
@@ -491,18 +488,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
-
-  heroCard: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[4] },
-  bossTop: { height: 92, justifyContent: 'center', alignItems: 'center' },
-  madKicker: { fontSize: 10.5, fontWeight: '900', color: '#DC2626', letterSpacing: 1.2, marginTop: 6 },
-  bossName: { fontSize: 20, fontWeight: '900', color: c.text.primary, marginTop: 4 },
-  bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: 2, marginBottom: spacing[2] },
-  hpTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
-
-  attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[3], width: '100%' },
-  attackTxt: { fontSize: 17, fontWeight: '900', color: '#fff' },
-  lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[3], paddingHorizontal: spacing[3] },
-  lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
 
   section: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[5], marginBottom: spacing[2] },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },

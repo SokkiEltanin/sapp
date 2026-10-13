@@ -11,7 +11,8 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
 import { foodSubcat, FOOD_ITEM_TAGS } from '@/utils/food';
-import { sameLocalDay } from '@/utils/bankNotification';
+import { sameLocalDay, localDayKey } from '@/utils/bankNotification';
+import { withLock } from '@/utils/asyncLock';
 import { toast } from '@/store/toastStore';
 import { localISO } from '@/utils/date';
 import { expensesService } from '@/services/expensesService';
@@ -595,6 +596,15 @@ export default function ScanReceiptModal() {
         if (recentDup) {
           toast.info('Ten paragon już dodałeś przed chwilą — pomijam duplikat');
         } else {
+          // Ten sam zamek co `commitBankTx` (2026-10-13, §308 — patrz asyncLock.ts) —
+          // user: "jak dodaje najpierw paragon a potem auto płatność czy na odwrót to mi
+          // nie lapie i sa dwa duplikat". Bez zamka: powiadomienie z banku dla TEGO SAMEGO
+          // zakupu, przetwarzane w `commitBankTx` W TYM SAMYM momencie, mogło odczytać
+          // store PRZED tym jak ten ekran dopisał paragon (albo odwrotnie) — każda strona
+          // z osobna poprawnie nie widziała drugiej, więc żadna nie miała co dopasować.
+          // Ten sam klucz (`kierunek:kwota:dzień`) co w `commitBankTx` — obie strony
+          // rendezvous'ują się na TYM SAMYM zamku dla tej samej płatności.
+          await withLock(`out:${roundedTotal.toFixed(2)}:${localDayKey(dTime)}`, async () => {
           // Reverse-merge: a bank notification for this purchase may already have created
           // a bare expense (bankMatched, no receiptItems). If one matches on amount + same
           // day + store, enrich THAT one with the receipt instead of adding a duplicate.
@@ -652,6 +662,7 @@ export default function ScanReceiptModal() {
             expensesService.remove(existingBank.id).catch(() => {});
             toast.success('Połączono z płatnością z banku — bez duplikatu');
           }
+          }); // withLock
         }
       }
       // Persist corrections to memory for future receipts

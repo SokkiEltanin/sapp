@@ -16812,6 +16812,141 @@ logiki/danych. `tsc --noEmit` czyste, `jest --silent` 102/102 suite, 1342 testy 
 **Priorytet testu na urządzeniu — niski**: Pupil → ekran pod gear-panelem/kotkiem krótszy o
 dwie linijki tekstu, siatka statów ("Siła bojowa") zaczyna się od razu bez nagłówka.
 
+## 307. Fix: mapa kampanii nie przewijała się dotykiem (`nestedScrollEnabled`) (2026-10-13)
+
+User (zrzutem ekranu mapy): "nie widzę innych bossów, nie mogę przesuwać mapy i nie
+centrujący aktualnego bossa". Przyczyna: `CampaignMap.tsx` ma WŁASNĄ, wewnętrzną
+`<ScrollView>` (pionowy pan po trasie bossów), zagnieżdżoną wewnątrz ZEWNĘTRZNEJ, też
+pionowej `<ScrollView>` całej strony (`app/bosses.tsx`). Na Androidzie dwie zagnieżdżone
+ScrollView o tej samej osi domyślnie przechwytują gest pan do TEJ ZEWNĘTRZNEJ — wewnętrzna
+mapa była więc efektywnie nieprzewijalna dotykiem (auto-scroll-przy-montowaniu do aktualnego
+bossa nadal działał programowo, ale dalej ręcznie przesunąć się nie dało, więc "nie
+centruje" i "nie widzę innych" to w praktyce TEN SAM symptom co "nie mogę przesuwać" —
+użytkownik zostawał tam, gdzie wylądował pierwszy auto-scroll).
+
+Fix: `nestedScrollEnabled` (prop RN, Android-only, no-op na iOS) na wewnętrznej ScrollView w
+`CampaignMap.tsx` — opt-in do natywnego protokołu zagnieżdżonego scrollowania Androida: gest
+najpierw próbuje przewinąć NAJBARDZIEJ wewnętrzną scrollowalną, a dopiero po dotarciu do jej
+granicy przechodzi do zewnętrznej. Jedna linia, bez zmian w logice auto-scrolla
+(`useEffect` z `scrollTo` przy montowaniu — patrz komentarz w kodzie — zostaje nietknięty,
+bo nie był przyczyną, tylko programowym `scrollTo` zawsze działającym niezależnie od
+przechwytywania gestu).
+
+**Testy**: brak nowych — jednoliniowy prop, zero zmiany logiki. `tsc --noEmit` czyste,
+`jest --silent` 102/102 suite, 1342 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (był całkowicie blokujący): Bossy → Kampania →
+mapa da się przesuwać dotykiem w obu kierunkach niezależnie od zewnętrznego scrolla strony,
+i przy wejściu na ekran wciąż centruje się na aktualnym bossie.
+
+## 308. Fix: wyścig paragon-vs-powiadomienie-z-banku dawał zdublowany wydatek (`asyncLock.ts`) (2026-10-13)
+
+User (zrzutem listy wydatków, dwa wpisy "Lidl" po -23,97 zł tego samego dnia): "czasami jak
+dodaje najpierw paragon a potem auto płatność czy na odwrót to mi nie lapie i sa dwa jakby
+duplikat tego samego na te sama kwotę". To DOKŁADNIE scenariusz jawnie opisany jako znana,
+NIEnaprawiona luka w §279 ("dedup w commitBankTx wciąż NIE jest odporny na współbieżne
+wywołania z RÓŻNYCH miejsc kodu... nieporuszana tu bez realnego dowodu, że faktycznie się
+zdarza") — ten zrzut to ten dowód.
+
+**Root cause**: dwie NIEZALEŻNE ścieżki commitują tę samą płatność do `useExpensesStore` —
+powiadomienie z banku (`commitBankTx` w `bankCommit.ts`, przez `processAutoBankQueue`/
+`bank-review.tsx`) i ręcznie wklejony paragon (`saveSelected` w `expenses/scan.tsx`, gałąź
+reverse-merge). Obie mają WŁASNY dedup po kwocie+dniu(+sklepie) i w IZOLACJI działają
+poprawnie — ale żadna nie była odporna na to, że DRUGA strona commituje W TYM SAMYM
+momencie: obie czytały `st.expenses`/`useExpensesStore.getState().expenses` ZANIM którakolwiek
+zdążyła dopisać swój wpis (zwłaszcza `commitBankTx`, gdzie dedup-check leci PRZED `await
+expensesService.add(...)` — asynchronicznym zapisem do Firestore, realnym oknem czasowym w
+którym druga strona mogła zdążyć dopisać swój wpis BEZ ponownego sprawdzenia po stronie
+banku). Dokładnie ten sam KSZTAŁT błędu co §279 (6× zdublowany przelew z wielokrotnego
+klknięcia), tylko źródłem współbieżności są tu DWA RÓŻNE wejścia do kodu zamiast dwóch
+kliknięć tego samego przycisku.
+
+**Fix**: `src/utils/asyncLock.ts` — generyczny, w-pamięci async mutex (`withLock(key, fn)`,
+kolejka Promise'ów per klucz, `finally`-release odporny na throw). Obie strony teraz
+serializują się na TYM SAMYM kluczu `` `${kierunek}:${kwota.toFixed(2)}:${localDayKey(...)}` ``
+(`localDayKey`, nowy eksport w `bankNotification.ts`, 'YYYY-MM-DD' lokalnie):
+- `commitBankTx` — CAŁE ciało funkcji (obie gałęzie, `in`/`out`) owinięte w `withLock`,
+  `st = useExpensesStore.getState()` przeniesione DO ŚRODKA zamka (nie raz na starcie) —
+  commit, który czeka w kolejce, widzi PRZY SWOJEJ KOLEJCE już to, co poprzedni zdążył
+  dopisać, zamiast czytać nieaktualny snapshot sprzed oczekiwania.
+- `expenses/scan.tsx` — gałąź reverse-merge (`candidates`/`existingBank`/`addPending`) owinięta
+  w `withLock` z TYM SAMYM kluczem (kierunek zawsze `'out'` dla paragonów) — rendezvous z
+  `commitBankTx` dla tej samej płatności niezależnie od tego, która strona przyszła pierwsza.
+
+Efekt: który z dwóch commitów (bank/paragon) wygra wyścig o zamek, commituje NORMALNIE (bez
+zmiany zachowania — zero zmiany w samej logice dopasowania); druga strona, jeśli przyjdzie w
+trakcie, po prostu CZEKA aż pierwsza skończy (łącznie z jej `await` do Firestore), po czym
+dopiero wtedy odczytuje store i poprawnie trafia na już-zapisany wpis pierwszej — zamiast
+tworzyć duplikat. Zamek jest WYŁĄCZNIE w pamięci (nie trwały) — wystarczy, bo wyścig ma sens
+tylko wewnątrz JEDNEJ działającej sesji appki.
+
+**Testy**: nowy `__tests__/asyncLock.test.ts` (3 testy — serializacja tego samego klucza,
+brak blokowania między różnymi kluczami, zwolnienie zamka mimo rzuconego wyjątku w `finally`).
+`tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1345 testów (+3 nowe).
+
+**Priorytet testu na urządzeniu — wysoki** (duplikaty finansowe, cicho psują statystyki
+wydatków): odtwórz warunki wyścigu jeśli to możliwe (np. zapłać kartą w sklepie i OD RAZU,
+zanim powiadomienie z banku zdąży przyjść, wklej paragon z tej samej transakcji) — ma wyjść
+JEDEN wpis, nie dwa. Nie da się tego w pełni zweryfikować bez realnego powiadomienia z banku
+(Pekao) w locie, więc traktuj to jako redukcję ryzyka, nie gwarancję 100% — gdyby duplikat
+nadal się pojawił mimo tego fixu, to inny, jeszcze nieznaleziony root cause.
+
+## 309. Mapa MAD bossów — `CampaignMap` z `variant="mad"` zamiast statycznej karty (2026-10-13)
+
+User (po naprawie przesuwania mapy kampanii, §307): "wtedy mad bosy to tez pokonane i mapa
+zmienia kolor na lekko czerwony i te bosy pokonane sa do kliknięcia wtedy jako ich mad
+wersje". Zakładka "MAD bossy" w `bosses.tsx` miała dotąd statyczną kartę (`heroCard`) z
+JEDYNIE aktualnym celem MAD — bez przeglądu całej sekwencji, w przeciwieństwie do mapy
+kampanii obok.
+
+**Kluczowy insight**: MAD dzieli DOKŁADNIE tę samą sekwencyjną strukturę co kampania —
+`madCandidate()` (madBosses.ts) zwraca "pierwszy pokonany-w-kampanii-ale-nie-w-MAD boss po
+kolejności `order`", identyczny wzorzec co kampanijne `current = BOSSES.find(b =>
+!defeatedBosses.includes(b.id))`. Skoro MAD-defeat też leci ściśle sekwencyjnie (nie da się
+pokonać MAD bossa 5 przed MAD bossem 3), "pokonany w MAD" ⟺ "indeks < indeks aktualnego MAD
+celu" w TEJ SAMEJ tablicy — DOKŁADNIE ta sama matematyka co `isDefeated`/`isCurrent`/
+`isLocked` w `CampaignMap.tsx`. Zamiast budować osobny komponent duplikujący całą logikę
+ścieżki/węzłów/popupów/auto-scrolla, `CampaignMap` dostał trzy nowe opcjonalne propsy:
+
+- `variant?: 'campaign' | 'mad'` — steruje kolorem scrim-gradientu NA mapie (neutralny ciemny
+  dla kampanii vs lekko czerwony `rgba(40,8,10,…)` dla MAD, user: "mapa zmienia kolor na
+  lekko czerwony") i kolorem "oświetlonej" ścieżki (`#38BDF8` niebieski vs `#EF4444`
+  czerwony). Węzły pokonane/aktualne (nie zablokowane) dostają `powered` na `BossArt` w
+  trybie MAD — ta sama czerwona aura co dawna statyczna karta MAD.
+- `locked?: boolean` + `lockMessage?: string` — popup aktualnego węzła w trybie MAD, gdy
+  poziom gracza < `MAD_UNLOCK_LEVEL`, pokazuje blok "Odblokujesz na poziomie X (masz Y)"
+  zamiast przycisku WALCZ (identyczny tekst/warunek co dawna karta) — węzeł i popup WCIĄŻ się
+  pokazują (widać CO odblokujesz), tylko bez możliwości ataku.
+- Popup pokonanego węzła w trybie MAD pokazuje `+{xp} XP` zamiast nazwy przedmiotu loot —
+  `madBossFor()` dziedziczy pole `loot` z bazowego bossa kampanii (nieużywane), ale walka z
+  MAD faktycznie przyznaje tylko coiny+XP (`boss-fight.tsx`, `victory.kind === 'mad'`),
+  pokazywanie loot.name tutaj byłoby mylące.
+
+`bosses.tsx`: `madBosses = useMemo(() => BOSSES.map(b => madBossFor(b)), [])` (stabilna
+referencja — `madBossFor` czyste nad stałą `BOSSES`, wymagane żeby `CampaignMap`'s `memo()`
+cokolwiek dawało w trybie MAD, ten sam warunek co `goFight`/`onPressCurrent` w trybie
+kampanii), nowy stabilny `goFightMad` (`useCallback`, nawiguje z `?kind=mad`), `currentId =
+madBoss.id` (mapa renderuje się TYLKO gdy `madBoss` istnieje — gałąź "pokonaj kolejnego bossa
+kampanii" zostaje bez zmian dla obu przypadków `null`: brak pokonanych bossów kampanii LUB
+wszystkie pokonane-w-kampanii mają już MAD ukończone). Martwy, usunięty kod: cała statyczna
+karta (`heroCard`/`bossTop`/`madKicker`/`bossName`/`bossTaunt`/`hpTxt`/`attackBtn`/
+`attackTxt`/`lockBox`/`lockTxt`, style + JSX) i nieużywany już import `Lock` z
+lucide-react-native w `bosses.tsx`.
+
+**Celowo NIE zrobione**: żadna zmiana w `madBosses.ts` (odblokowanie/nagrody/HP) — czysto
+prezentacyjna zmiana UI, zero zmiany w tym co i kiedy można pokonać.
+
+**Testy**: brak nowych — `CampaignMap` już był przetestowany pośrednio (brak bezpośrednich
+testów komponentu, tylko czysta logika w madBosses.ts/bosses.ts ma swoje testy, bez zmian
+tutaj). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1345 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (duża, świeża zmiana UI drugiej głównej
+zakładki): Bossy → MAD bossy → mapa się pokazuje (czerwonawe tło zamiast neutralnego),
+pokonane-w-MAD bossy szare+X, aktualny MAD cel klikalny z popupem (WALCZ albo blokada
+poziomu zależnie od `MAD_UNLOCK_LEVEL`), niepokonane-jeszcze-w-kampanii dalej jako czarne
+sylwetki z kłódką. Sprawdź też że przełączanie zakładek Kampania↔MAD nie gubi scrolla/
+pozycji żadnej z dwóch map.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
