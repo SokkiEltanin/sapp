@@ -10,7 +10,7 @@ import BossArt from '@/components/bosses/BossArt';
 import CampaignMap from '@/components/bosses/CampaignMap';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, fmtEnergyCountdown } from '@/utils/bosses';
 import { gearCombatBonuses, gearAtkFlat } from '@/utils/gear';
 import { raidForWeek, raidHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -30,17 +30,6 @@ import { haptic } from '@/utils/haptics';
 const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
-
-// Odliczanie do kolejnego punktu energii kampanii (2026-08-18, patrz
-// ENERGY_REGEN_HOURS w bosses.ts) — statyczne w chwili renderu (jak fmtMissionDuration w
-// pet.tsx), nie żywy tiker; wystarczy bo user i tak wraca na ten ekran co jakiś czas
-// (useFocusEffect już odświeża `reload()` przy każdym powrocie).
-function fmtEnergyCountdown(regenAtIso: string): string {
-  const ms = Math.max(0, new Date(regenAtIso).getTime() - Date.now());
-  const totalMin = Math.ceil(ms / 60000);
-  const h = Math.floor(totalMin / 60), m = totalMin % 60;
-  return h > 0 ? `${h}h ${m}min` : `${m}min`;
-}
 
 // Czerwona pula (event+raid) NIE regeneruje się w czasie rzeczywistym jak kampania — to
 // płaski, dzienny grant (`syncEventEnergy`, patrz petStore.ts), więc "kolejny punkt" realnie
@@ -381,45 +370,30 @@ export default function Bosses() {
           </PressableScale>
         </View>
 
-        {/* ── KAMPANIA: aktualny boss jako karta-bohater z jednym przyciskiem WALCZ,
-            który przenosi na osobny ekran walki (S&F). Reszta = zwykła lista. ── */}
+        {/* ── KAMPANIA: mapa (CampaignMap.tsx) — tap na aktualnym węźle otwiera popup z
+            portretem/tauntem/HP i przyciskiem WALCZ, który przenosi na osobny ekran walki
+            (S&F). Tap na pokonanym też popup (nazwa+loot); zablokowani bez interakcji. ── */}
         {bossView === 'campaign' && (<>
-        {!current ? (
+        {!current && (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
             <Text style={s.doneTxt}>Wszyscy bossowie pokonani! Kolejni wkrótce.</Text>
           </View>
-        ) : (
-          <View style={s.heroCard}>
-            <View style={s.bossTop}>
-              <BossArt id={current.id} emoji={current.emoji} size={82} />
-            </View>
-            <Text style={s.bossName}>{current.name}</Text>
-            <Text style={s.bossTaunt}>„{current.taunt}"</Text>
-            {/* Tylko HP + motyw — BEZ nagrody/mechanik przed walką (2026-08-10, user:
-                "zbyt dużo opisu bossa"). Reszta szczegółów żyje na ekranie walki. */}
-            <Text style={s.hpTxt}>{current.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
-            {/* Regeneracja w czasie (2026-08-18, patrz ENERGY_REGEN_HOURS w bosses.ts) —
-                gdy bank niepełny, pokazuje ZA ILE realnie dotrze kolejny punkt, nie tylko
-                "0 energii" bez kontekstu kiedy wróci. */}
-            {energy < campaignEnergyMax && energyRegenAt && (
-              <Text style={[s.hpTxt, { color: c.text.muted }]}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
-            )}
-
-            <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
-              <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
-                <Swords size={18} color="#fff" />
-                <Text style={s.attackTxt}>WALCZ!</Text>
-              </View>
-            </PressableScale>
-          </View>
         )}
 
-        {/* Mapa kampanii (2026-10-12) — zastąpiła dawną płaską listę "pokonani (zwinięci) +
-            reszta z kłódkami" (patrz CampaignMap.tsx dla pełnego uzasadnienia). Hero card
-            wyżej ZOSTAJE jedynym miejscem z taunt/energią — mapa to wizualny przegląd
-            postępu + skrót WALCZ na aktualnym węźle. */}
-        <CampaignMap bosses={BOSSES} currentId={current?.id ?? null} onPressCurrent={goFight} />
+        {/* Mapa kampanii (2026-10-12, przebudowa 2026-10-13 — user po zrzucie ekranu: "ta
+            ikonka aktualna niech sie pokazuje jak inne mała i po kliknieciu pokazuje sie
+            powiększony i przycisk walki popup") — dawny hero card (duży portret/taunt/WALCZ
+            aktualnego bossa, NAD mapą) USUNIĘTY; ta sama treść żyje teraz w popupie
+            CampaignMap, otwieranym tapnięciem węzła aktualnego bossa NA mapie (ten sam rozmiar
+            węzła co pokonani/zablokowani, żadnego osobnego dużego elementu). `energy`/
+            `campaignEnergyMax`/`energyRegenAt` przekazane, żeby popup mógł pokazać ten sam
+            hint "Kolejna energia za..." i wyszarzyć WALCZ przy energy<=0, tak jak dawny
+            hero card. */}
+        <CampaignMap
+          bosses={BOSSES} currentId={current?.id ?? null} onPressCurrent={goFight}
+          energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
+        />
         </>)}
 
         {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 50+, tylko po pokonaniu normalnej
