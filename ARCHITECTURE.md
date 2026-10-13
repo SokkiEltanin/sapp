@@ -16812,6 +16812,33 @@ logiki/danych. `tsc --noEmit` czyste, `jest --silent` 102/102 suite, 1342 testy 
 **Priorytet testu na urządzeniu — niski**: Pupil → ekran pod gear-panelem/kotkiem krótszy o
 dwie linijki tekstu, siatka statów ("Siła bojowa") zaczyna się od razu bez nagłówka.
 
+## 307. Fix: mapa kampanii nie przewijała się dotykiem (`nestedScrollEnabled`) (2026-10-13)
+
+User (zrzutem ekranu mapy): "nie widzę innych bossów, nie mogę przesuwać mapy i nie
+centrujący aktualnego bossa". Przyczyna: `CampaignMap.tsx` ma WŁASNĄ, wewnętrzną
+`<ScrollView>` (pionowy pan po trasie bossów), zagnieżdżoną wewnątrz ZEWNĘTRZNEJ, też
+pionowej `<ScrollView>` całej strony (`app/bosses.tsx`). Na Androidzie dwie zagnieżdżone
+ScrollView o tej samej osi domyślnie przechwytują gest pan do TEJ ZEWNĘTRZNEJ — wewnętrzna
+mapa była więc efektywnie nieprzewijalna dotykiem (auto-scroll-przy-montowaniu do aktualnego
+bossa nadal działał programowo, ale dalej ręcznie przesunąć się nie dało, więc "nie
+centruje" i "nie widzę innych" to w praktyce TEN SAM symptom co "nie mogę przesuwać" —
+użytkownik zostawał tam, gdzie wylądował pierwszy auto-scroll).
+
+Fix: `nestedScrollEnabled` (prop RN, Android-only, no-op na iOS) na wewnętrznej ScrollView w
+`CampaignMap.tsx` — opt-in do natywnego protokołu zagnieżdżonego scrollowania Androida: gest
+najpierw próbuje przewinąć NAJBARDZIEJ wewnętrzną scrollowalną, a dopiero po dotarciu do jej
+granicy przechodzi do zewnętrznej. Jedna linia, bez zmian w logice auto-scrolla
+(`useEffect` z `scrollTo` przy montowaniu — patrz komentarz w kodzie — zostaje nietknięty,
+bo nie był przyczyną, tylko programowym `scrollTo` zawsze działającym niezależnie od
+przechwytywania gestu).
+
+**Testy**: brak nowych — jednoliniowy prop, zero zmiany logiki. `tsc --noEmit` czyste,
+`jest --silent` 102/102 suite, 1342 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (był całkowicie blokujący): Bossy → Kampania →
+mapa da się przesuwać dotykiem w obu kierunkach niezależnie od zewnętrznego scrolla strony,
+i przy wejściu na ekran wciąż centruje się na aktualnym bossie.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

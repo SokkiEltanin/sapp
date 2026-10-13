@@ -14,6 +14,13 @@ wzorzec). Mapa kampanii (`CampaignMap.tsx`) i `BossArt.tsx` NIE wymagają zmian 
 nowych bossów — podłączają się same przez `BOSSES`/`BOSS_PNG`, to czysto dane. Nie zaczynać
 bez wyraźnego sygnału że pliki są już wgrane.
 
+## 🆕 Fix: mapa kampanii nie przewijała się dotykiem (2026-10-13)
+
+User: "nie mogę przesuwać mapy i nie centrujący aktualnego bossa". Przyczyna i fix
+(`nestedScrollEnabled` na wewnętrznej ScrollView mapy) w ARCHITECTURE.md §307. Priorytet
+testu na urządzeniu wysoki — sprawdź że mapa (Bossy → Kampania) da się teraz przesuwać
+dotykiem i wciąż centruje się na aktualnym bossie przy wejściu.
+
 ## 🆕 Usunięte zbędne napisy na ekranie Pupila: "Siła bojowa" + linijka nastroju (2026-10-13)
 
 User: "SIŁA BOJOWA i trochę się nudzi bez sensu i rozciągają nam wszystko". Pełny opis w

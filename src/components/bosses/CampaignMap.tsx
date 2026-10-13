@@ -112,9 +112,13 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   const nearBottom = popup ? popup.nodeY > contentH - estH - NODE - 20 : false;
   const popupTop = popup ? (nearBottom ? Math.max(8, popup.nodeY - estH - 10) : popup.nodeY + NODE + 10) : 0;
 
+  // `nestedScrollEnabled` (Android-only, no-op na iOS) — bez tego ta wewnętrzna ScrollView
+  // żyje wewnątrz zewnętrznej strony (bosses.tsx) o tej samej osi i Android przechwytuje
+  // CAŁY pan do zewnętrznej, czyniąc mapę nieprzewijalną dotykiem (user: "nie moge przesuwać
+  // mapy").
   return (
     <View style={[st.wrap, { height: mapH }]}>
-      <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
         <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: mapW, height: contentH }]} resizeMode="repeat" />
         <LinearGradient
           pointerEvents="none"
