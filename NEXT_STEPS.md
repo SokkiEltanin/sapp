@@ -14,6 +14,14 @@ wzorzec). Mapa kampanii (`CampaignMap.tsx`) i `BossArt.tsx` NIE wymagają zmian 
 nowych bossów — podłączają się same przez `BOSSES`/`BOSS_PNG`, to czysto dane. Nie zaczynać
 bez wyraźnego sygnału że pliki są już wgrane.
 
+## 🆕 Mapa MAD bossów (2026-10-13)
+
+User: "mad bosy to tez pokonane i mapa zmienia kolor na lekko czerwony i te bosy pokonane sa
+do kliknięcia wtedy jako ich mad wersje". Zakładka "MAD bossy" dostała tę samą mapę co
+kampania (`CampaignMap` z nowym `variant="mad"`) zamiast statycznej karty — pełen opis w
+ARCHITECTURE.md §309. Priorytet testu na urządzeniu wysoki — sprawdź obie zakładki (Kampania/
+MAD bossy), popupy, blokadę poziomu w MAD.
+
 ## 🆕 Fix: wyścig paragon-vs-bank dawał zdublowany wydatek (2026-10-13)
 
 User: "czasami jak dodaje najpierw paragon a potem auto płatność czy na odwrót to mi nie

@@ -16891,6 +16891,62 @@ JEDEN wpis, nie dwa. Nie da się tego w pełni zweryfikować bez realnego powiad
 (Pekao) w locie, więc traktuj to jako redukcję ryzyka, nie gwarancję 100% — gdyby duplikat
 nadal się pojawił mimo tego fixu, to inny, jeszcze nieznaleziony root cause.
 
+## 309. Mapa MAD bossów — `CampaignMap` z `variant="mad"` zamiast statycznej karty (2026-10-13)
+
+User (po naprawie przesuwania mapy kampanii, §307): "wtedy mad bosy to tez pokonane i mapa
+zmienia kolor na lekko czerwony i te bosy pokonane sa do kliknięcia wtedy jako ich mad
+wersje". Zakładka "MAD bossy" w `bosses.tsx` miała dotąd statyczną kartę (`heroCard`) z
+JEDYNIE aktualnym celem MAD — bez przeglądu całej sekwencji, w przeciwieństwie do mapy
+kampanii obok.
+
+**Kluczowy insight**: MAD dzieli DOKŁADNIE tę samą sekwencyjną strukturę co kampania —
+`madCandidate()` (madBosses.ts) zwraca "pierwszy pokonany-w-kampanii-ale-nie-w-MAD boss po
+kolejności `order`", identyczny wzorzec co kampanijne `current = BOSSES.find(b =>
+!defeatedBosses.includes(b.id))`. Skoro MAD-defeat też leci ściśle sekwencyjnie (nie da się
+pokonać MAD bossa 5 przed MAD bossem 3), "pokonany w MAD" ⟺ "indeks < indeks aktualnego MAD
+celu" w TEJ SAMEJ tablicy — DOKŁADNIE ta sama matematyka co `isDefeated`/`isCurrent`/
+`isLocked` w `CampaignMap.tsx`. Zamiast budować osobny komponent duplikujący całą logikę
+ścieżki/węzłów/popupów/auto-scrolla, `CampaignMap` dostał trzy nowe opcjonalne propsy:
+
+- `variant?: 'campaign' | 'mad'` — steruje kolorem scrim-gradientu NA mapie (neutralny ciemny
+  dla kampanii vs lekko czerwony `rgba(40,8,10,…)` dla MAD, user: "mapa zmienia kolor na
+  lekko czerwony") i kolorem "oświetlonej" ścieżki (`#38BDF8` niebieski vs `#EF4444`
+  czerwony). Węzły pokonane/aktualne (nie zablokowane) dostają `powered` na `BossArt` w
+  trybie MAD — ta sama czerwona aura co dawna statyczna karta MAD.
+- `locked?: boolean` + `lockMessage?: string` — popup aktualnego węzła w trybie MAD, gdy
+  poziom gracza < `MAD_UNLOCK_LEVEL`, pokazuje blok "Odblokujesz na poziomie X (masz Y)"
+  zamiast przycisku WALCZ (identyczny tekst/warunek co dawna karta) — węzeł i popup WCIĄŻ się
+  pokazują (widać CO odblokujesz), tylko bez możliwości ataku.
+- Popup pokonanego węzła w trybie MAD pokazuje `+{xp} XP` zamiast nazwy przedmiotu loot —
+  `madBossFor()` dziedziczy pole `loot` z bazowego bossa kampanii (nieużywane), ale walka z
+  MAD faktycznie przyznaje tylko coiny+XP (`boss-fight.tsx`, `victory.kind === 'mad'`),
+  pokazywanie loot.name tutaj byłoby mylące.
+
+`bosses.tsx`: `madBosses = useMemo(() => BOSSES.map(b => madBossFor(b)), [])` (stabilna
+referencja — `madBossFor` czyste nad stałą `BOSSES`, wymagane żeby `CampaignMap`'s `memo()`
+cokolwiek dawało w trybie MAD, ten sam warunek co `goFight`/`onPressCurrent` w trybie
+kampanii), nowy stabilny `goFightMad` (`useCallback`, nawiguje z `?kind=mad`), `currentId =
+madBoss.id` (mapa renderuje się TYLKO gdy `madBoss` istnieje — gałąź "pokonaj kolejnego bossa
+kampanii" zostaje bez zmian dla obu przypadków `null`: brak pokonanych bossów kampanii LUB
+wszystkie pokonane-w-kampanii mają już MAD ukończone). Martwy, usunięty kod: cała statyczna
+karta (`heroCard`/`bossTop`/`madKicker`/`bossName`/`bossTaunt`/`hpTxt`/`attackBtn`/
+`attackTxt`/`lockBox`/`lockTxt`, style + JSX) i nieużywany już import `Lock` z
+lucide-react-native w `bosses.tsx`.
+
+**Celowo NIE zrobione**: żadna zmiana w `madBosses.ts` (odblokowanie/nagrody/HP) — czysto
+prezentacyjna zmiana UI, zero zmiany w tym co i kiedy można pokonać.
+
+**Testy**: brak nowych — `CampaignMap` już był przetestowany pośrednio (brak bezpośrednich
+testów komponentu, tylko czysta logika w madBosses.ts/bosses.ts ma swoje testy, bez zmian
+tutaj). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1345 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (duża, świeża zmiana UI drugiej głównej
+zakładki): Bossy → MAD bossy → mapa się pokazuje (czerwonawe tło zamiast neutralnego),
+pokonane-w-MAD bossy szare+X, aktualny MAD cel klikalny z popupem (WALCZ albo blokada
+poziomu zależnie od `MAD_UNLOCK_LEVEL`), niepokonane-jeszcze-w-kampanii dalej jako czarne
+sylwetki z kłódką. Sprawdź też że przełączanie zakładek Kampania↔MAD nie gubi scrolla/
+pozycji żadnej z dwóch map.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

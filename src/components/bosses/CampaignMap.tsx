@@ -52,10 +52,23 @@ type Popup = { kind: 'current' | 'defeated'; boss: Boss; nodeX: number; nodeY: n
 // `defeatedList`), więc "pokonany" ⟺ "indeks < currentIdx" w TEJ SAMEJ tablicy `bosses`.
 // `energy`/`energyMax`/`energyRegenAt` opcjonalne — popup aktualnego bossa pokazuje hint
 // "kolejna energia za..." i wyszarza WALCZ tylko gdy podane (ten sam hint co dawny hero card).
-function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, energyRegenAt }: {
+//
+// `variant`/`locked`/`lockMessage` (2026-10-13, mapa MAD — user: "mad bosy to tez pokonane
+// [bossy kampanii] i mapa zmienia kolor na lekko czerwony i te bosy pokonane sa do kliknięcia
+// wtedy jako ich mad wersje") — MAD dzieli DOKŁADNIE tę samą sekwencyjną strukturę co
+// kampania (ten sam "aktualny cel po kolejności" wzorzec, patrz madCandidate w
+// madBosses.ts), więc zamiast osobnego komponentu bosses.tsx przekazuje tu MAD-owe warianty
+// bossów (`madBossFor`, id/name/hp/nagrody już przeliczone) + `variant="mad"` dla
+// czerwonego tła/ścieżki/aury artu. `locked` (poziom gracza < MAD_UNLOCK_LEVEL) pokazuje
+// zamiast przycisku WALCZ ten sam blok "Odblokujesz na poziomie X" co dawny hero card MAD —
+// węzeł/popup aktualnego celu i tak się pokazuje (żeby było widać CO odblokujesz), tylko bez
+// możliwości ataku.
+function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, energyRegenAt, variant = 'campaign', locked, lockMessage }: {
   bosses: Boss[]; currentId: string | null; onPressCurrent: () => void;
   energy?: number; energyMax?: number; energyRegenAt?: string | null;
+  variant?: 'campaign' | 'mad'; locked?: boolean; lockMessage?: string;
 }) {
+  const isMad = variant === 'mad';
   const c = useColors();
   const scrollRef = useRef<ScrollView>(null);
   const mapW = Dimensions.get('window').width - spacing[4] * 2;
@@ -82,6 +95,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     if (end < 1) return '';
     return Array.from({ length: end + 1 }, (_, i) => `${i === 0 ? 'M' : 'L'} ${centerX + nodeX(i)} ${nodeY(i) + NODE / 2}`).join(' ');
   }, [currentIdx, bosses.length, centerX]);
+  const litColor = isMad ? '#EF4444' : '#38BDF8';
 
   // Auto-scroll do aktualnego węzła RAZ przy montowaniu (nie na każdy render — ekran-rodzic
   // re-renderuje się często, np. co tyknięcie odliczania energii, nie chcemy szarpać scrolla).
@@ -120,15 +134,19 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     <View style={[st.wrap, { height: mapH }]}>
       <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
         <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: mapW, height: contentH }]} resizeMode="repeat" />
+        {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
+            na lekko czerwony") — ten sam 3-stopniowy gradient, tylko podbarwiony. */}
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(8,10,16,0.55)', 'rgba(8,10,16,0.68)', 'rgba(8,10,16,0.8)'] as [string, string, string]}
+          colors={(isMad
+            ? ['rgba(40,8,10,0.55)', 'rgba(40,8,10,0.68)', 'rgba(40,8,10,0.8)']
+            : ['rgba(8,10,16,0.55)', 'rgba(8,10,16,0.68)', 'rgba(8,10,16,0.8)']) as [string, string, string]}
           style={StyleSheet.absoluteFillObject}
         />
 
         <Svg width={mapW} height={contentH} style={StyleSheet.absoluteFillObject}>
           {!!fullPathD && <Path d={fullPathD} stroke={c.border.default} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />}
-          {!!litPathD && <Path d={litPathD} stroke="#38BDF8" strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
         </Svg>
 
         {bosses.map((b, i) => {
@@ -140,7 +158,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           const node = (
             <View style={[st.node, { left: x, top: y }]}>
               <View style={st.portrait}>
-                <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} />
+                <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
                 {isDefeated && (
                   <View style={st.defeatedOverlay} pointerEvents="none">
                     <X size={NODE * 0.62} color="rgba(0,0,0,0.82)" strokeWidth={3.5} />
@@ -190,25 +208,40 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
             <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setPopup(null)} />
             <View style={[st.popup, { left: popupLeft, top: popupTop, width: POPUP_W }]}>
               <View style={{ alignItems: 'center' }}>
-                <BossArt id={popup.boss.id} emoji={popup.boss.emoji} size={popup.kind === 'current' ? 84 : 56} mystery={false} />
+                <BossArt id={popup.boss.id} emoji={popup.boss.emoji} size={popup.kind === 'current' ? 84 : 56} mystery={false} powered={isMad} />
               </View>
+              {isMad && <Text style={st.popupMadKicker}>OSZALAŁY WARIANT</Text>}
               <Text style={st.popupName}>{popup.boss.name}</Text>
               {popup.kind === 'current' ? (
                 <>
                   <Text style={st.popupTaunt} numberOfLines={2}>„{popup.boss.taunt}"</Text>
                   <Text style={st.popupHp}>{popup.boss.hp} HP · <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{popup.boss.weaknessLabel}</Text></Text>
-                  {energy != null && energyMax != null && energy < energyMax && energyRegenAt && (
-                    <Text style={st.popupEnergyHint}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
-                  )}
-                  <PressableScale onPress={() => { haptic.tap(); setPopup(null); onPressCurrent(); }} style={{ width: '100%', marginTop: spacing[2] }}>
-                    <View style={[st.attackBtn, energy != null && energy <= 0 && { opacity: 0.5 }]}>
-                      <Swords size={15} color="#fff" />
-                      <Text style={st.attackTxt}>WALCZ!</Text>
+                  {locked ? (
+                    <View style={st.popupLockBox}>
+                      <Lock size={13} color="rgba(255,255,255,0.6)" />
+                      <Text style={st.popupLockTxt}>{lockMessage}</Text>
                     </View>
-                  </PressableScale>
+                  ) : (
+                    <>
+                      {energy != null && energyMax != null && energy < energyMax && energyRegenAt && (
+                        <Text style={st.popupEnergyHint}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
+                      )}
+                      <PressableScale onPress={() => { haptic.tap(); setPopup(null); onPressCurrent(); }} style={{ width: '100%', marginTop: spacing[2] }}>
+                        <View style={[st.attackBtn, energy != null && energy <= 0 && { opacity: 0.5 }]}>
+                          <Swords size={15} color="#fff" />
+                          <Text style={st.attackTxt}>WALCZ!</Text>
+                        </View>
+                      </PressableScale>
+                    </>
+                  )}
                 </>
               ) : (
-                <Text style={st.popupDoneTxt}>Pokonany ✓ · {popup.boss.loot.name}</Text>
+                // MAD pokonany daje coiny+XP (patrz boss-fight.tsx `victory.kind === 'mad'`),
+                // NIE przedmiot loot jak kampania — `madBossFor` dziedziczy pole `loot` z
+                // bazowego bossa, ale ono nie jest tym co realnie przyznaje walka z MAD.
+                <Text style={st.popupDoneTxt}>
+                  {isMad ? `Pokonany ✓ · +${popup.boss.xp} XP` : `Pokonany ✓ · ${popup.boss.loot.name}`}
+                </Text>
               )}
             </View>
           </>
@@ -236,11 +269,14 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)', padding: spacing[3], gap: 3,
     shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
+  popupMadKicker: { fontSize: 9.5, fontWeight: '900', color: '#DC2626', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
   popupName: { fontSize: 14, fontWeight: '900', color: '#fff', textAlign: 'center', marginTop: 4 },
   popupTaunt: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', textAlign: 'center' },
   popupHp: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 2 },
   popupEnergyHint: { fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 2 },
   popupDoneTxt: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  popupLockBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2] },
+  popupLockTxt: { flex: 1, fontSize: 10.5, color: 'rgba(255,255,255,0.6)', lineHeight: 14 },
   attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.md, paddingVertical: 11 },
   attackTxt: { fontSize: 13.5, fontWeight: '900', color: '#fff' },
 });
@@ -250,4 +286,6 @@ const st = StyleSheet.create({
 // kampanii lub pula energii się zmienia, nie co tyknięcie zegara, więc memo faktycznie coś
 // daje — POD WARUNKIEM że `onPressCurrent` jest stabilne (`useCallback` w bosses.tsx, patrz
 // `goFight` tam), inaczej nowe closure na każdy render i tak łamałoby porównanie propsów.
+// Ten sam warunek dotyczy `bosses` w trybie MAD — bosses.tsx musi przekazać stabilną
+// (`useMemo`) tablicę wariantów MAD, nie świeżo zmapowaną tablicę co render.
 export default memo(CampaignMap);
