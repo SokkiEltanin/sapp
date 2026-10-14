@@ -11,38 +11,43 @@ plany treningowe i zaznaczać ile czego się zrobiło ile czasu... że jeździł
 rowerze itp albo tyle pompek albo tyle rozciągania". Potwierdzone: elastyczny log (dowolna
 ilość/jednostka) od razu, monety/XP zostają.
 
-**Zrobione (§310)**: fundament loga — `ExerciseLogEntry`/`amountLoggedOn`/`exerciseStreakFrom`
-w `personalQuests.ts`, nowy `exercisesStore.ts`. Nic jeszcze go nie używa — zero zmiany
-zachowania na razie.
+**Zrobione**:
+- §310 — fundament loga: `ExerciseLogEntry`/`amountLoggedOn`/`exerciseStreakFrom` w
+  `personalQuests.ts`, nowy `exercisesStore.ts`.
+- §311 — nowy ekran `app/exercises.tsx` (6 ćwiczeń, cel z `targetsFor()`, pole do wpisania
+  dowolnej ilości + przycisk "Cel", streak w nagłówku) + kafelek wejściowy w
+  `app/(tabs)/health.tsx` (nad kartą "NAWODNIENIE"). Logowanie już DZIAŁA i zapisuje się
+  trwale — ale na razie NIE daje monet/XP (patrz niżej) i NIE ma go jeszcze na dashboardzie.
 
 **Do zrobienia (następna/kolejne zmiany)**:
 1. **Czeka na usera**: grafiki stick-man (user obiecał wysłać na czacie — "wklej je tutaj,
-   zapiszę do repo"). Do czasu ich dostarczenia — proste placeholder SVG stick-figures (ten
-   sam wzorzec co `TRAINING_ICON` tymczasowa ikona w pet-quests.tsx), podmienić jak przyjdą.
-2. Nowy ekran `app/exercises.tsx` (albo pod Zdrowiem) — plan/log: per ćwiczenie (6 z
-   `TRAINING_EXERCISES`) target z `targetsFor()`, pole/stepper do wpisania realnej ilości →
-   `useExercisesStore().addLog()`. Przy osiągnięciu targetu TEŻ wywołać stare
-   `markPushupsDone()`/itd. (petStore) — zachowuje istniejący silnik nagród (`b_pushups` itd.
-   w quests.ts) bez przepisywania go, nowy log dokłada tylko historię/elastyczność NA
-   WIERZCHU.
+   zapiszę do repo"). Na razie `app/exercises.tsx` używa tych samych ikon co stary
+   `TRAINING_ICON` w pet-quests.tsx (Dumbbell/Flame/Activity/Timer/Sparkles/Bike) —
+   podmienić na `Image` jak grafiki przyjdą, zero zmiany struktury.
+2. Podpięcie pod silnik nagród — w `app/exercises.tsx`'s `save`/`quickAdd`, przy osiągnięciu
+   celu TEŻ wywołać stare `markPushupsDone()`/itd. (petStore) — zachowuje istniejący silnik
+   nagród (`b_pushups` itd. w quests.ts) bez przepisywania go, nowy log dokłada tylko
+   historię/elastyczność NA WIERZCHU. Dopiero WTEDY bezpiecznie usunąć sekcję "Trening" z
+   pet-quests.tsx (krok 4 niżej) — przed tym self-report w Pupilu musi zostać, bo to JEDYNE
+   miejsce dające nagrody.
 3. Przepiąć `QuestCtx.trainingStreak` (usePetQuests.ts) z `trainingStreakFrom(trainingDays)`
    na nowe `exerciseStreakFrom(logs)` — streak reaguje na realne zalogowanie, nie na klik
    "Odbierz". `m_training` milestone (quests.ts) korzysta z tego samego pola, więc fix
-   automatyczny.
+   automatyczny. Zrób RAZEM z krokiem 2 (oba dotyczą tego samego miejsca w usePetQuests.ts).
 4. Kafelek dashboardu (`dashboardLayout.ts`: `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
    `SECTION_DESC`/`SECTION_GROUP`, playbook ARCHITECTURE §12) — nowa sekcja np.
    `exercise-streak`, pokazuje `exerciseStreakFrom`, tap nawiguje do `app/exercises.tsx`.
    Wizualnie w rodzinie "Zadania i nawyki" (jak `streak-wall`), flame-styling jak
    `StreakFlame.tsx`.
-5. Wejście z Zdrowia (`app/(tabs)/health.tsx`) — kafelek/link do `app/exercises.tsx`.
-6. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
-   użycie tam) — reszta ekranu (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko
-   SAMO logowanie ćwiczenia przenosi się do nowego ekranu.
-7. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS (PRZED/RAZEM z punktem 2 —
-   komentarz w exercisesStore.ts § 310 świadomie to odłożył, żeby nie backupować pustego
-   store'u zanim cokolwiek do niego pisze).
-8. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
-   nagród (krok 2 dalej je woła), NIE kasować.
+5. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
+   użycie tam) — DOPIERO po kroku 2 (parytet nagród udowodniony). Reszta ekranu
+   (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
+   przenosi się do nowego ekranu.
+6. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
+   (§311), dane realnie giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne,
+   zrobić wkrótce.
+7. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
+   nagród (krok 2 je woła), NIE kasować.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 

@@ -24,6 +24,8 @@ import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, formatWaterDiagnostic, probeSleep, sleepProbeVerdict } from '@/services/healthConnectService';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
+import { useExercisesStore } from '@/store/exercisesStore';
+import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { colors, spacing, radius, typography, fonts } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
@@ -148,6 +150,10 @@ export default function HealthScreen() {
   const pomodoroIsRunning = usePomodoroStore(s => s.isRunning);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const recentMood = entries.slice(0, 7).reverse();
+  // Kafelek "Ćwiczenia" (2026-10-14, patrz ARCHITECTURE.md §310) — tylko streak do pigułki,
+  // reszta (cele/logowanie) żyje na `app/exercises.tsx`, do którego ten kafelek nawiguje.
+  const exerciseLogs = useExercisesStore(st => st.logs);
+  const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, todayDate()), [exerciseLogs]);
 
   useFocusEffect(useCallback(() => {
     getTodaySessions().then(s => setTodayPomCount(s.length)).catch(() => {});
@@ -670,6 +676,24 @@ export default function HealthScreen() {
             zagnieżdżanie Touchable-w-Touchable w tym pliku już wymagało `stopPropagation`
             gdzie indziej (index.tsx, przycisk pomodoro w wierszu zadania), więc bezpieczniej
             trzymać je jako rodzeństwo niż ryzykować że "Dodaj" też otworzy config. */}
+        {/* Ćwiczenia — wejście do app/exercises.tsx (2026-10-14, user: "z pupila usunąć
+            ćwiczenia... dodać w zdrowiu zakładkę albo kafelek") — ten sam kompaktowy
+            cardRow-wzorzec co reszta kafelków tego ekranu, nawiguje zamiast rozwijać
+            szczegóły inline (logowanie/cele żyją na osobnym ekranie). */}
+        <GlassCard padding={spacing[3]} style={styles.tealCard}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); router.push('/exercises' as any); }}>
+            <View style={styles.cardRow}>
+              <Dumbbell size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>ĆWICZENIA</Text>
+              <View style={{ flex: 1 }} />
+              {exerciseStreak > 0 && (
+                <View style={styles.watchChip}><Flame size={9} color="#FB923C" /><Text style={styles.watchChipText}>{exerciseStreak} {exerciseStreak === 1 ? 'dzień' : 'dni'}</Text></View>
+              )}
+              <ChevronRight size={13} color={colors.text.muted} style={{ marginLeft: 4 }} />
+            </View>
+          </TouchableOpacity>
+        </GlassCard>
+
         <GlassCard padding={spacing[3]} style={styles.tealCard}>
           <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setWaterGoalInput(String(waterGoal)); setGlassMlInput(String(glassMl)); setWaterCfgOpen(true); }}>
             <View style={styles.cardRow}>
