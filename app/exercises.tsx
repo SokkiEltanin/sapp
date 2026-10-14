@@ -7,6 +7,7 @@ import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, S
 import { useShallow } from 'zustand/react/shallow';
 import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
+import ExerciseIcon from '@/components/health/ExerciseIcon';
 import { useProfileStore } from '@/store/profileStore';
 import { useExercisesStore } from '@/store/exercisesStore';
 import { usePetStore } from '@/store/petStore';
@@ -27,10 +28,8 @@ const todayISO = () => {
 // "chciałem żeby z PUPILA USUNĄĆ ćwiczenia i zamiast tego dodać w zdrowiu zakładkę albo
 // kafelek... zaznaczać ile czego się zrobiło ile czasu". Loguje do `exercisesStore`
 // (elastyczny log — dowolna ilość, SUMUJE się w ciągu dnia, nie nadpisuje jak stary
-// binarny self-report w petStore.ts). Ikony — TE SAME co `TRAINING_ICON` w
-// pet-quests.tsx (ciągłość wizualna ze starym miejscem) — czysto orientacyjny placeholder,
-// user obiecał wysłać prawdziwe grafiki stick-man na czacie, podmiana później bez zmiany
-// struktury (tylko `icon` → `Image`).
+// binarny self-report w petStore.ts). Ikony — `ExerciseIcon` (prawdziwe grafiki usera gdy
+// dostępne, patrz exerciseIcons.ts, inaczej lucide fallback podany tu w `EXERCISES`).
 //
 // Podpięte pod silnik nagród (2026-10-14, faza 3 — ARCHITECTURE.md §312): przekroczenie
 // celu TU woła to samo `markXDone()` (petStore) co stary self-report w pet-quests.tsx —
@@ -128,14 +127,13 @@ export default function ExercisesScreen() {
         )}
 
         {EXERCISES.map((ex) => {
-          const Icon = ex.icon;
           const target = targets ? ex.target(targets) : null;
           const todayAmt = amountLoggedOn(logs, ex.id, today);
           const done = target != null && todayAmt >= target;
           return (
             <View key={ex.id} style={[s.card, done && s.cardDone]}>
               <View style={s.cardHead}>
-                <View style={s.iconWrap}><Icon size={18} color="#FB923C" /></View>
+                <View style={s.iconWrap}><ExerciseIcon id={ex.id} fallback={ex.icon} size={18} color="#FB923C" /></View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.cardLabel}>{ex.label}</Text>
                   <Text style={s.cardSub}>

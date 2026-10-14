@@ -8,6 +8,8 @@ import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift, Dumbb
 import PressableScale from '@/components/ui/PressableScale';
 import TrainingSessionModal, { SelfReportExercise } from '@/components/pet/TrainingSessionModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
+import ExerciseIcon from '@/components/health/ExerciseIcon';
+import { TrainingExercise } from '@/utils/personalQuests';
 import { usePetStore } from '@/store/petStore';
 import { usePetQuests } from '@/hooks/usePetQuests';
 import { questFightCoins, questFightXp } from '@/utils/minibosses';
@@ -23,11 +25,17 @@ const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const todayISO = () => ymdOf(new Date());
 
 // Ikona na quest treningowy (2026-09-03, sekcja "Trening" — patrz komentarz przy JSX niżej).
-// Czysto dekoracyjne/orientacyjne, nie 1:1 anatomicznie trafne dla każdego ćwiczenia — user
-// obiecał docelową grafikę później ("moge potem wygenerować grafiki pod to"), to tymczasowy,
-// ale już czytelny placeholder zamiast gołego tekstu.
+// Lucide-icon FALLBACK dla `ExerciseIcon` (2026-10-14, user wgrał prawdziwe grafiki do
+// assets/cwiczeniaikony/, patrz exerciseIcons.ts) — ten sam zestaw co `EXERCISES` w
+// `app/exercises.tsx`, więc oba ekrany pokazują IDENTYCZNE ikony w okresie przejściowym
+// (self-report tu + nowy ekran logowania żyją równolegle, patrz NEXT_STEPS.md).
 const TRAINING_ICON: Record<string, typeof Dumbbell> = {
   b_pushups: Dumbbell, b_squats: Flame, b_situps: Activity, b_plank: Timer, b_stretch: Sparkles, b_bikeride: Bike,
+};
+// `b_bikeride` → `bike` jest jedynym rozjazdem między id questu a id ćwiczenia — reszta jest
+// 1:1 po zdjęciu prefiksu `b_`.
+const TRAINING_EXERCISE_ID: Record<string, TrainingExercise> = {
+  b_pushups: 'pushups', b_squats: 'squats', b_situps: 'situps', b_plank: 'plank', b_stretch: 'stretch', b_bikeride: 'bike',
 };
 
 // "wczoraj" / "N dni temu" dla listy zaległych questów (2026-08-27) — odkąd `missed` sięga
@@ -169,9 +177,12 @@ export default function PetQuests() {
                     {active.map((q, i) => {
                       const session = selfReport[q.id];
                       const Icon = TRAINING_ICON[q.id] ?? Dumbbell;
+                      const exId = TRAINING_EXERCISE_ID[q.id];
                       return (
                         <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                          <View style={s.trainingIconWrap}><Icon size={18} color="#FB923C" /></View>
+                          <View style={s.trainingIconWrap}>
+                            {exId ? <ExerciseIcon id={exId} fallback={Icon} size={18} color="#FB923C" /> : <Icon size={18} color="#FB923C" />}
+                          </View>
                           <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
                             {q.note && <Text style={s.qNote}>{q.note}</Text>}
