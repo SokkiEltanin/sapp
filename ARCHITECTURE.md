@@ -17053,6 +17053,50 @@ Zapisz → "Dziś: X" aktualizuje się, streak w nagłówku i na kafelku w Zdrow
 powrocie). Bez ustawionego poziomu treningowego (Ustawienia → Personalizacja) — baner +
 logowanie dalej działa, tylko bez widocznego celu.
 
+## 312. Ćwiczenia — faza 3: podpięcie pod silnik nagród + przepięcie streaka (2026-10-14)
+
+Trzecia zmiana w ramach przenoszenia ćwiczeń z Pupila do Zdrowia (plan §310/§311/NEXT_STEPS.md).
+
+**`app/exercises.tsx`**: nowy `logAmount(ex, amount)` (wołany przez `save`/`quickAdd`) liczy
+`before = amountLoggedOn(logs, ex.id, today)` PRZED dopisaniem wpisu — jeśli `before < target
+&& before + amount >= target` (próg celu PRZEKROCZONY DOPIERO TYM wpisem, nie przekroczony
+już wcześniej), woła to samo `markPushupsDone()`/itd. (petStore) co stary self-report w
+`TrainingSessionModal.tsx` — identyczny trigger dla questu `b_pushups`/itd. (quests.ts),
+tylko wołany z nowego miejsca. Warunek "dopiero TYM wpisem" (nie samo `>= target` za każdym
+razem) — `markXDone()` jest idempotentne więc powtórne wołanie nie szkodzi, ale pokazanie
+toastu "cel osiągnięty!" przy KAŻDYM kolejnym wpisie tego samego dnia (np. user loguje 3
+osobne krótkie sesje pompek, wszystkie już ponad cel) byłoby mylące — toast "cel osiągnięty"
+pokazuje się raz, przy przekroczeniu.
+
+**`usePetQuests.ts`**: `QuestCtx.trainingStreak` przepięty z `trainingStreakFrom(trainingDays)`
+(stary petStore rekord, zapisywany TYLKO przy odbiorze nagrody w pet-quests.tsx) na nowe
+`exerciseStreakFrom(exerciseLogs)` (nowy `exercisesStore.ts`, patrz §310) — streak reaguje na
+REALNY trening (zalogowanie), nie na to czy user pamiętał kliknąć "Odbierz". `m_training`
+milestone (quests.ts, ten sam `ctx.trainingStreak`) dostaje tę samą poprawkę bez osobnej
+zmiany. Stare `trainingDays`/`markTrainingDay()` w petStore.ts ZOSTAJĄ nietknięte (wciąż
+wołane z `onClaimQuest` w pet-quests.tsx przy odbiorze) — teraz po prostu nieużywane przez
+`trainingStreak` (nie kasować, patrz NEXT_STEPS.md — niewielkie ryzyko że coś jeszcze je
+czyta, bezpieczniej zostawić martwe niż zgadywać).
+
+**Efekt**: logowanie w NOWYM ekranie (Zdrowie → Ćwiczenia) i stary self-report w STARYM
+miejscu (Pupil → Zadania → sekcja "Trening") teraz zaliczają TEN SAM quest i karmią TEN SAM
+streak — oba miejsca są pełnoprawnymi wejściami do identycznej ekonomii, nie dwoma
+konkurującymi systemami. To otwiera bezpieczne usunięcie starej sekcji z pet-quests.tsx jako
+kolejny, już niskiego ryzyka krok (plan w NEXT_STEPS.md) — przed tą zmianą usunięcie starego
+UI zabrałoby JEDYNĄ ścieżkę do nagród, teraz jest to redundantna druga ścieżka do TEJ SAMEJ
+nagrody.
+
+**Testy**: brak nowych — `logAmount`'s próg-przekroczenia to proste porównanie liczb bez
+nowej czystej logiki wartej oddzielnego testu (sama matematyka progu już pokryta przez
+istniejące testy `amountLoggedOn`/`targetsFor`, §310). `tsc --noEmit` czyste, `jest --silent`
+103/103 suite, 1353 testy (bez zmiany).
+
+**Priorytet testu na urządzeniu — wysoki** (dotyka realnej ekonomii nagród — upewnij się że
+NIC się nie dubluje): Zdrowie → Ćwiczenia → zaloguj ilość ≥ cel dla dowolnego ćwiczenia →
+toast "cel osiągnięty" → Pupil → Zadania → sekcja "Trening" pokazuje TEN quest jako zrobiony,
+gotowy do "Odbierz" (JEDNA nagroda, nie podwójna). Potem sprawdź że streak w nagłówku
+Ćwiczeń/kafelku Zdrowia i `m_training` ("Cele" w Zadaniach) pokazują TĘ SAMĄ liczbę dni.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

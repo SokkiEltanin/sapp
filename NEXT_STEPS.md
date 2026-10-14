@@ -16,38 +16,34 @@ ilość/jednostka) od razu, monety/XP zostają.
   `personalQuests.ts`, nowy `exercisesStore.ts`.
 - §311 — nowy ekran `app/exercises.tsx` (6 ćwiczeń, cel z `targetsFor()`, pole do wpisania
   dowolnej ilości + przycisk "Cel", streak w nagłówku) + kafelek wejściowy w
-  `app/(tabs)/health.tsx` (nad kartą "NAWODNIENIE"). Logowanie już DZIAŁA i zapisuje się
-  trwale — ale na razie NIE daje monet/XP (patrz niżej) i NIE ma go jeszcze na dashboardzie.
+  `app/(tabs)/health.tsx` (nad kartą "NAWODNIENIE").
+- §312 — podpięte pod silnik nagród: przekroczenie celu w `app/exercises.tsx` woła
+  `markXDone()` (petStore) identycznie jak stary self-report, `QuestCtx.trainingStreak`
+  (usePetQuests.ts) przepięty na nowy log-based `exerciseStreakFrom` zamiast
+  `trainingStreakFrom(trainingDays)`. Oba miejsca (nowy ekran + stary self-report w Pupilu)
+  teraz zaliczają TEN SAM quest/streak — bezpieczne usunięcie starego UI jest już możliwe
+  (krok 2 niżej), bo nie jest już jedyną ścieżką do nagród.
 
 **Do zrobienia (następna/kolejne zmiany)**:
 1. **Czeka na usera**: grafiki stick-man (user obiecał wysłać na czacie — "wklej je tutaj,
    zapiszę do repo"). Na razie `app/exercises.tsx` używa tych samych ikon co stary
    `TRAINING_ICON` w pet-quests.tsx (Dumbbell/Flame/Activity/Timer/Sparkles/Bike) —
    podmienić na `Image` jak grafiki przyjdą, zero zmiany struktury.
-2. Podpięcie pod silnik nagród — w `app/exercises.tsx`'s `save`/`quickAdd`, przy osiągnięciu
-   celu TEŻ wywołać stare `markPushupsDone()`/itd. (petStore) — zachowuje istniejący silnik
-   nagród (`b_pushups` itd. w quests.ts) bez przepisywania go, nowy log dokłada tylko
-   historię/elastyczność NA WIERZCHU. Dopiero WTEDY bezpiecznie usunąć sekcję "Trening" z
-   pet-quests.tsx (krok 4 niżej) — przed tym self-report w Pupilu musi zostać, bo to JEDYNE
-   miejsce dające nagrody.
-3. Przepiąć `QuestCtx.trainingStreak` (usePetQuests.ts) z `trainingStreakFrom(trainingDays)`
-   na nowe `exerciseStreakFrom(logs)` — streak reaguje na realne zalogowanie, nie na klik
-   "Odbierz". `m_training` milestone (quests.ts) korzysta z tego samego pola, więc fix
-   automatyczny. Zrób RAZEM z krokiem 2 (oba dotyczą tego samego miejsca w usePetQuests.ts).
-4. Kafelek dashboardu (`dashboardLayout.ts`: `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
+2. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
+   użycie tam) — już bezpieczne po §312 (ten sam quest/streak zaliczany z nowego ekranu).
+   Reszta ekranu (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie
+   ćwiczenia przenosi się do nowego ekranu. Zrób to NA URZĄDZENIU dopiero po potwierdzeniu
+   że §312 faktycznie działa (priorytet testu wysoki w §312 — nie usuwać "na ślepo").
+3. Kafelek dashboardu (`dashboardLayout.ts`: `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
    `SECTION_DESC`/`SECTION_GROUP`, playbook ARCHITECTURE §12) — nowa sekcja np.
    `exercise-streak`, pokazuje `exerciseStreakFrom`, tap nawiguje do `app/exercises.tsx`.
    Wizualnie w rodzinie "Zadania i nawyki" (jak `streak-wall`), flame-styling jak
    `StreakFlame.tsx`.
-5. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
-   użycie tam) — DOPIERO po kroku 2 (parytet nagród udowodniony). Reszta ekranu
-   (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
-   przenosi się do nowego ekranu.
-6. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
+4. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
    (§311), dane realnie giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne,
    zrobić wkrótce.
-7. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
-   nagród (krok 2 je woła), NIE kasować.
+5. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
+   nagród (`markXDone()` dalej je woła z nowego ekranu), NIE kasować.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 
