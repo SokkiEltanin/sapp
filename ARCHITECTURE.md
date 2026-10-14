@@ -17130,6 +17130,66 @@ serii 0, neutralne szare tło zamiast gradientu), tap → otwiera `/exercises`. 
 ćwiczenia dziś — kafelek pokazuje aktualizowany streak (po powrocie na dashboard) w
 gradiencie koloru progu, tym samym co reszta serii w appce (bordo→czerwień→pomarańcz→...).
 
+## 314. Fix: mapa kampanii — auto-scroll rzeczywiście trafiał na szczyt, nie na bossa (2026-10-14)
+
+User (zrzutem ekranu Bossy → Kampania): "nie mam bosa kampania którym mogę kliknąć walcz, i
+dziwnie się pokazują niektóre jakby poza liniami i wgle zrob porządnie". Zrzut pokazywał TYLKO
+wczesne, już pokonane bossy (szary+X) i zablokowane sylwetki — żaden węzeł nie wyglądał jak
+"do walki", mimo że `current` na pewno istniał (brak komunikatu "Wszyscy bossowie pokonani").
+
+**Root cause #1 (główny, wyjaśnia "nie mam bosa którym mogę kliknąć walcz")**: auto-scroll
+do aktualnego węzła (dodany w §307 jako NIETKNIĘTY wtedy kawałek, tylko dociążony
+`nestedScrollEnabled` obok) wołał `scrollRef.current?.scrollTo(...)` wewnątrz
+`setTimeout(…, 0)` — gołe zgadywanie "ScrollView już ma zmierzoną treść po jednym ticku JS".
+Na Androidzie, zwłaszcza z `nestedScrollEnabled` (dłuższa ścieżka natywnego layoutu przy
+pierwszym mouncie zagnieżdżonej ScrollView), ten warunek bywał fałszywy — `scrollTo` leciało
+ZANIM treść faktycznie dostała wysokość, po cichu nic nie robiąc (nie rzuca błędu, po prostu
+nie przewija). User zostawał na y=0 (sam szczyt trasy = najwcześniejsze, dawno pokonane
+bossy), aktualny węzeł mógł być setki pikseli niżej, poza widokiem, i user musiał go znaleźć
+RĘCZNIE przewijając — co dawało wrażenie "nie ma bossa do walki" aż do przypadkowego
+natrafienia na niego.
+
+**Fix**: `onContentSizeChange` na `ScrollView` zamiast `setTimeout`+`useEffect` — ten callback
+z KONTRAKTU odpala się dopiero gdy natywna treść realnie ma już policzony rozmiar, więc
+`scrollTo` zawsze trafia we właściwą pozycję, bez zgadywania czasu. `didAutoScroll` ref (nie
+`useEffect`+pusta tablica zależności) pilnuje że scroll leci TYLKO RAZ — `onContentSizeChange`
+może odpalić się więcej niż jeden raz (np. gdyby `contentH` się przeliczyło), a kolejne
+odpalenie NIE MOŻE nadpisać ręcznego przewinięcia usera.
+
+**Root cause #2 (drugorzędny, ale wyjaśnia "dziwnie się pokazują... jakby poza liniami")**:
+zmatematyzowane — węzeł i ścieżka SVG są liczone z DOKŁADNIE tych samych `nodeX(i)`/`nodeY(i)`
+w tej samej pętli, więc desynchronizacja współrzędnych nie jest możliwa (sprawdzone:
+`order` w `bosses.ts` ściśle sekwencyjny 1-22, bez dziur/duplikatów, więc to też nie problem
+danych). Najbardziej prawdopodobne wyjaśnienie — "już przebyta" szara ścieżka rysowała się
+kolorem `c.border.default` (motywowy, w ciemnym motywie bardzo subtelny) przy opacity 0.6 na
+WIERZCHU zajętego, ciemnego, topograficznego tła mapy — praktycznie niewidoczna, więc
+węzły POŁĄCZONE niewidzialną linią czytały się jako "pływające osobno". Fix: stały, jasny
+`rgba(255,255,255,0.4)`, grubszy (5px zamiast 4px) — niezależny od motywu appki (mapa ma
+WŁASNE, zawsze-ciemne tło, nie powinna dziedziczyć koloru obramowań UI).
+
+**Dodatkowo (czytelność, nie bug)**: aktualny węzeł dostał kolorową obwódkę (`currentRing`,
+kolor = `litColor`, ten sam niebieski/czerwony co "oświetlona" ścieżka) — wcześniej
+wyglądał IDENTYCZNIE jak zwykły portret bez żadnego wyróżnika (żadnego X, żadnej sylwetki —
+po prostu "normalny"), łatwo przeoczalny nawet po poprawnym wylądowaniu scrolla na nim.
+
+**Niepewność, uczciwie**: root cause #1 jest wysoce pewny (mechanizm `setTimeout(0)` kontra
+natywny layout jest dobrze udokumentowanym źródłem właśnie tego objawu w RN). Root cause #2
+to NAJLEPSZE wyjaśnienie oparte na przeglądzie kodu + danych, ale nie zostało potwierdzone
+1:1 z pikseli zrzutu ekranu (nie da się tego zrobić bez narzędzi do pomiaru obrazu) — jeśli
+po tym fixie węzły WCIĄŻ wyglądają na "poza liniami" w inny sposób niż "ledwo widoczna
+ścieżka", to inny, jeszcze nieznaleziony problem, zgłoś ponownie z dokładniejszym opisem
+(najlepiej: który konkretnie boss i co dokładnie wygląda źle).
+
+**Testy**: brak nowych — czyste zmiany renderowania/timingu, zero nowej logiki biznesowej
+wartej testu jednostkowego. `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1353 testy
+(bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY** (mapa kampanii była efektywnie bezużyteczna —
+user nie mógł znaleźć bossa do walki): Bossy → Kampania → przy wejściu mapa od razu centruje
+się na aktualnym, kolorowo obwiedzionym węźle (nie na szczycie trasy), ścieżka między węzłami
+wyraźnie widoczna (jasna biała linia, nie prawie-niewidoczna). To samo sprawdź w MAD bossach
+(`variant="mad"`, ten sam komponent).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
