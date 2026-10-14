@@ -17490,6 +17490,105 @@ przesuwania. Dodatkowo: pokonanie bossa (walka) → powrót na mapę → kamera 
 aktualnego bossa automatycznie (nowe zachowanie z tego fixa, wcześniej camera stała w miejscu
 po pierwszym centrowaniu).
 
+## 320. Builder planów treningowych — biblioteka + "Dzisiejsza sesja" (2026-10-14)
+
+User: "zeby jak robię zeby treningi zautomatyzowane zeby zrobic builder i wtedy żebym mógł
+sobie go kopiować i edytowac i np zaznaczać jak w jedzeniu co zrobiłem". Zakres potwierdzony
+AskUserQuestion: (1) pozycje planu DOWOLNE, nie tylko 6 kanonicznych ćwiczeń z ekranu
+Ćwiczenia; (2) "zaznaczanie zrobione" = tap otwiera pole z ilością wypełnione celem, edytowalne
+przed zapisem (nie jeden-tap-gotowe); (3) odpalanie planu to osobny ekran "Dzisiejsza sesja",
+nie wbudowane w istniejący ekran Ćwiczenia.
+
+**Nowa warstwa nad istniejącym płaskim logiem** (`ExerciseLogEntry`/`exercisesStore`, §310-312)
+— plan to SZABLON (builder), sesja to jego odpalenie dnia bieżącego, oba piszą do TEGO SAMEGO
+loga co ręczne wpisywanie na ekranie Ćwiczenia, żadnego równoległego systemu logowania.
+
+**`ExerciseLogEntry.exercise` poszerzone z `TrainingExercise` (zamknięta unia 6 wartości) na
+`string`** (`personalQuests.ts`, `exercisesStore.ts: addLog`) — jedyna zmiana w ISTNIEJĄCYM
+kształcie danych, konieczna bo pozycje planu mogą mieć dowolną nazwę (user: "dowolne, własne
+nazwy też"). Bezpieczne: `exerciseStreakFrom` i tak liczy DOWOLNY zalogowany dzień bez
+patrzenia na wartość `exercise` (patrz test w personalQuests.test.ts), `amountLoggedOn`
+dalej dopasowuje po dokładnym stringu — oba działają identycznie dla starych (kanonicznych)
+i nowych (dowolnych) wartości, `tsc --noEmit` czyste na całym repo po zmianie (żadne miejsce
+nie zakładało zamkniętej unii na tym polu).
+
+**`TrainingPlanItem.linkedExercise?: TrainingExercise`** (`src/utils/trainingPlans.ts`) — to
+granica między "pełną" a "lekką" pozycją planu, CELOWA, nie przeoczenie:
+- **Z `linkedExercise`** (user wybrał jeden z 6 kanonicznych chipów w builderze) — loguje się
+  `addLog(linkedExercise, ...)` DOKŁADNIE jak ręczny wpis na ekranie Ćwiczenia → ten sam quest
+  (`b_pushups` itd.), ta sama nagroda pupila, ten sam spersonalizowany cel z `targetsFor()`
+  (używany do sprawdzenia odblokowania — NIE cel zapisany w samym planie, patrz niżej).
+- **Bez `linkedExercise`** (user wpisał własną nazwę, np. "Wykroki z hantlami") — loguje się
+  pod tą nazwą, liczy się do SERII (jak każdy wpis), ale NIE ma skonfigurowanego questu/
+  nagrody — nie ma dla niej spersonalizowanego celu w `targetsFor()` ani akcji `markXDone` w
+  petStore. Świadomy, udokumentowany wprost w kodzie wybór: builder nie udaje że dowolnie
+  wymyślone ćwiczenie odblokuje monety/XP.
+- **Cel pozycji planu (`targetAmount`, wpisany w builderze) jest NIEZALEŻNY od celu questu**
+  (`targetsFor()`) nawet dla pozycji z `linkedExercise` — "zrobione" w checkliście sesji
+  (`planItemDoneToday`) patrzy na cel PLANU (może być inny niż spersonalizowany cel questu,
+  np. plan rozgrzewkowy z mniejszą liczbą powtórzeń), a odblokowanie nagrody osobno patrzy na
+  cel questu. Oba czytają TEN SAM log, więc nie rozjeżdżają się w danych — tylko w progu.
+
+**Nowe pliki**:
+- `src/utils/exerciseMeta.ts` — `EXERCISE_META` (label/jednostka/funkcja celu dla 6
+  kanonicznych ćwiczeń), wyodrębnione z `app/exercises.tsx` żeby builder (chipsy wyboru) i
+  `useExerciseLogging.ts` czytały JEDNĄ definicję, nie dwie kopie które mogłyby się rozjechać.
+- `src/utils/trainingPlans.ts` — `TrainingPlanItem`/`TrainingPlan`, `genId()`,
+  `planItemLogKey()`, `planItemDoneToday()` (testowane, `__tests__/trainingPlans.test.ts`).
+- `src/store/trainingPlansStore.ts` — CRUD store (`persist`+AsyncStorage, klucz
+  `training-plans-v1`, ten sam wzorzec co `exercisesStore.ts`). Brak `duplicatePlan` — ten
+  sam wzorzec co `MealPreset` w `foodStore.ts` (grep potwierdził: foodStore TEŻ nie ma
+  `duplicatePreset`): kopiowanie dzieje się na poziomie ekranu buildera (`?dupId=`), `addPlan`
+  przy zapisie tworzy nowy byt — jedna konwencja kopiowania w całej apce.
+- `src/hooks/useExerciseLogging.ts` — wyodrębniony z `app/exercises.tsx` hook: `logs`,
+  `targets`, `streak`, `today`, `logAmount(opts)` (loguje + sprawdza `exerciseJustUnlocked` +
+  odpala `markXDone`/toast TYLKO gdy podane `linkedExercise`). Współdzielony przez ekran
+  Ćwiczenia (refaktoryzowany żeby go używać zamiast własnej kopii logiki) i nowy ekran sesji —
+  jedno miejsce liczące "czy ten wpis odblokowuje nagrodę", nie dwa potencjalnie rozjeżdżające
+  się.
+- `exerciseJustUnlocked(before, amount, target)` (`personalQuests.ts`, testowana) — czysty
+  warunek progu wyodrębniony z `app/exercises.tsx`.
+- `app/training-plans.tsx` — biblioteka: lista planów (tap = od razu "Dzisiejsza sesja", bo to
+  najczęstsza akcja), ikony Edytuj/Duplikuj/Usuń (usuwanie przez `ConfirmDialog`, ten sam
+  komponent co food/products.tsx). Pusty stan z zachętą do zbudowania pierwszego planu.
+- `app/training-plan-builder.tsx` — formularz obsługujący TRZY wejścia: nowy plan, `?editId=`
+  (edycja), `?dupId=` (duplikacja — wczytuje pozycje źródłowego planu do draftu BEZ `editId`,
+  nazwa z sufiksem "(kopia)", zapis tworzy nowy byt — ten sam wzorzec co
+  `app/food/add.tsx?dupPreset=`). Pozycja: rząd chipsów (6 kanonicznych + "Własne", tap
+  wypełnia nazwę/jednostkę/cel z `targetsFor()` i ustawia `linkedExercise`, "Własne" czyści
+  powiązanie, wszystkie pola zostają w pełni edytowalne) + pola nazwa/cel/jednostka.
+- `app/training-session.tsx` — "Dzisiejsza sesja": checklista pozycji planu, tap na pozycję
+  otwiera inline pole z ilością WYPEŁNIONE celem z planu (nie z `targetsFor()`), edytowalne,
+  "Zapisz" woła `useExerciseLogging().logAmount()`. "Zrobione" czytane WPROST z loga
+  (`planItemDoneToday`), nie osobny stan sesji — zgadza się nawet po zamknięciu i ponownym
+  otwarciu tego samego dnia, bez dodatkowego stanu do synchronizacji.
+
+**Wejście z ekranu Ćwiczenia**: nowy kafelek "Moje plany treningowe" nad listą 6 kanonicznych
+ćwiczeń w `app/exercises.tsx`, prowadzi do `/training-plans`. Ekran Ćwiczenia poza tym
+niezmieniony (dalej szybki, zawsze-dostępny log tych 6 — plany to DODATKOWA ścieżka, nie
+zamiennik).
+
+**Celowo NIE zrobione**: reorder pozycji planu (drag&drop) — kolejność to kolejność dodawania,
+wystarczające dla pierwszej wersji; przypominajka/powiadomienie o planie na dany dzień tygodnia
+(builder nie ma pojęcia "dni tygodnia", to czysto lista pozycji do odhaczenia, kiedy user sam
+otworzy sesję) — oba do rozważenia jako osobne zgłoszenia, nie część tego zakresu.
+
+**Testy**: `__tests__/trainingPlans.test.ts` (7 nowych: `planItemLogKey` ×2,
+`planItemDoneToday` ×5), `__tests__/personalQuests.test.ts` +5 (`exerciseJustUnlocked`).
+`tsc --noEmit` czyste, `jest --silent` 105/105 suite, 1371 testów (+12).
+
+**Priorytet testu na urządzeniu — średni-wysoki** (nowe ekrany, ale cała logika
+logowania/nagród to ten sam, już przetestowany na urządzeniu silnik z ekranu Ćwiczenia —
+ryzyko głównie w samym UI builderа, nie w fundamencie):
+1. Ćwiczenia → kafelek "Moje plany treningowe" → pusty stan → "Stwórz pierwszy plan".
+2. Builder: dodanie pozycji przez chip kanoniczny (wypełnia pola) i "Własne" (pola puste,
+   edytowalne) → Zapisz → widoczny na liście.
+3. Duplikuj/Edytuj z listy planów → poprawne wczytanie draftu, zapis nie nadpisuje złego bytu.
+4. Dzisiejsza sesja: tap pozycji → pole z celem jako domyślną wartością → Zapisz → "zrobione",
+   licznik u góry rośnie. Pozycja z chipa kanonicznego faktycznie odpala quest/nagrodę w
+   Pupil → Zadania identycznie jak ręczny wpis na ekranie Ćwiczenia.
+5. Usuwanie planu z potwierdzeniem — nie kasuje już zalogowanych wpisów, tylko sam szablon.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

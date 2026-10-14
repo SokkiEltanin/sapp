@@ -2,26 +2,24 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon } from 'lucide-react-native';
+import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon, ClipboardList, ChevronRight } from 'lucide-react-native';
 
-import { useShallow } from 'zustand/react/shallow';
 import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
 import { useProfileStore } from '@/store/profileStore';
-import { useExercisesStore } from '@/store/exercisesStore';
-import { usePetStore } from '@/store/petStore';
-import { ageFrom, targetsFor, TRAINING_EXERCISES, TrainingExercise, PersonalQuestTargets, amountLoggedOn, exerciseStreakFrom } from '@/utils/personalQuests';
+import { useExerciseLogging } from '@/hooks/useExerciseLogging';
+import { amountLoggedOn } from '@/utils/personalQuests';
+import { EXERCISE_META } from '@/utils/exerciseMeta';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
-import { toast } from '@/store/toastStore';
 
-const todayISO = () => {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+// Ikony per-ekran (lucide fallbacki, `EXERCISE_META` — exerciseMeta.ts — trzyma tylko label/
+// jednostkę/cel, współdzielone z builderem planów i hookiem nagród).
+const ICON_FOR: Record<string, typeof Dumbbell> = {
+  pushups: Dumbbell, squats: Flame, situps: Activity, plank: Timer, stretch: Sparkles, bike: Bike,
 };
 
 // Ekran "Ćwiczenia" w Zdrowiu (2026-10-14, faza 2 — patrz ARCHITECTURE.md §310) — user:
@@ -29,74 +27,30 @@ const todayISO = () => {
 // kafelek... zaznaczać ile czego się zrobiło ile czasu". Loguje do `exercisesStore`
 // (elastyczny log — dowolna ilość, SUMUJE się w ciągu dnia, nie nadpisuje jak stary
 // binarny self-report w petStore.ts). Ikony — `ExerciseIcon` (prawdziwe grafiki usera gdy
-// dostępne, patrz exerciseIcons.ts, inaczej lucide fallback podany tu w `EXERCISES`).
+// dostępne, patrz exerciseIcons.ts, inaczej lucide fallback z `ICON_FOR` wyżej).
 //
-// Podpięte pod silnik nagród (2026-10-14, faza 3 — ARCHITECTURE.md §312): przekroczenie
-// celu TU woła to samo `markXDone()` (petStore) co stary self-report w pet-quests.tsx —
-// quest `b_pushups`/itd. (quests.ts) zaliczy się identycznie, Odbiór monet/XP wciąż żyje w
+// Podpięte pod silnik nagród (2026-10-14, faza 3 — ARCHITECTURE.md §312, wyodrębnione do
+// `useExerciseLogging.ts` w §320 żeby współdzielić z nowym ekranem sesji planu): przekroczenie
+// celu woła to samo `markXDone()` (petStore) co stary self-report w pet-quests.tsx — quest
+// `b_pushups`/itd. (quests.ts) zaliczy się identycznie, Odbiór monet/XP wciąż żyje w
 // Pupil → Zadania (ten silnik NIE jest tu duplikowany, tylko wyzwalany z nowego miejsca).
 //
-// CELOWO NIE (jeszcze) w tej zmianie: dashboard-owy kafelek streaka i usunięcie starej
-// sekcji "Trening" z pet-quests.tsx (self-report tam dalej działa RÓWNOLEGLE — oba miejsca
-// teraz zaliczają TEN SAM quest, więc usunięcie starego jest już bezpieczne, ale to osobny,
-// kolejny krok — plan w NEXT_STEPS.md).
-interface ExerciseMeta { id: TrainingExercise; label: string; unit: string; icon: typeof Dumbbell; target: (t: PersonalQuestTargets) => number }
-const EXERCISES: ExerciseMeta[] = [
-  { id: 'pushups', label: 'Pompki',       unit: 'powt.', icon: Dumbbell,  target: t => t.pushups },
-  { id: 'squats',  label: 'Przysiady',    unit: 'powt.', icon: Flame,     target: t => t.squats },
-  { id: 'situps',  label: 'Brzuszki',     unit: 'powt.', icon: Activity,  target: t => t.situps },
-  { id: 'plank',   label: 'Deska',        unit: 's',     icon: Timer,     target: t => t.plankSeconds },
-  { id: 'stretch', label: 'Rozciąganie',  unit: 'min',   icon: Sparkles,  target: t => t.stretchMinutes },
-  { id: 'bike',    label: 'Rower',        unit: 'min',   icon: Bike,      target: t => t.bikeMinutes },
-];
-
+// §320 — builder planów treningowych (NEXT_STEPS.md): kafelek "Moje plany" niżej prowadzi do
+// `/training-plans`, gdzie user buduje własne sesje (dowolne pozycje, nie tylko tych 6) i
+// odpala je na osobnym ekranie "Dzisiejsza sesja" — ten ekran się NIE zmienia poza samym
+// kafelkiem-wejściem, dalej jest szybkim, zawsze-dostępnym logiem tych 6 kanonicznych ćwiczeń.
 export default function ExercisesScreen() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { birthdate, gender, trainingLevel } = useProfileStore();
-  const logs = useExercisesStore((st) => st.logs);
-  const addLog = useExercisesStore((st) => st.addLog);
-  const {
-    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markBikeDone,
-  } = usePetStore(useShallow((st) => ({
-    markPushupsDone: st.markPushupsDone, markSquatsDone: st.markSquatsDone, markSitupsDone: st.markSitupsDone,
-    markPlankDone: st.markPlankDone, markStretchDone: st.markStretchDone, markBikeDone: st.markBikeDone,
-  })));
+  const { trainingLevel } = useProfileStore();
+  const { logs, targets, streak, today, logAmount: logAmountRaw } = useExerciseLogging();
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
-  const today = todayISO();
-  const targets = useMemo(
-    () => (trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null),
-    [trainingLevel, birthdate, gender],
-  );
-  const streak = useMemo(() => exerciseStreakFrom(logs, today), [logs, today]);
-
-  // Ten sam quest `b_<exercise>` (quests.ts) co stary self-report — wyzwolony STĄD zamiast
-  // z pet-quests.tsx/TrainingSessionModal. `MARK_DONE` nie jest `useMemo`/module-scope bo
-  // musi złapać ŚWIEŻE referencje store'owych akcji (useShallow wyżej), nie stare domknięcie.
-  const MARK_DONE: Record<TrainingExercise, () => void> = {
-    pushups: markPushupsDone, squats: markSquatsDone, situps: markSitupsDone,
-    plank: markPlankDone, stretch: markStretchDone, bike: markBikeDone,
+  const logAmount = (ex: typeof EXERCISE_META[number], amount: number) => {
+    logAmountRaw({ exercise: ex.id, linkedExercise: ex.id, label: ex.label, unit: ex.unit, amount });
   };
 
-  // Jeśli TEN wpis przeprowadza dzisiejszą sumę przez próg celu (a wcześniej jeszcze go nie
-  // przekraczała — `markXDone()` jest idempotentne, ale drugi toast "odblokowano" po
-  // przekroczeniu celu DRUGI raz tego samego dnia byłby mylący) — zalicz quest + daj znać.
-  const logAmount = (ex: ExerciseMeta, amount: number) => {
-    const before = amountLoggedOn(logs, ex.id, today);
-    const target = targets ? ex.target(targets) : null;
-    addLog(ex.id, amount);
-    haptic.success();
-    const justUnlocked = target != null && before < target && before + amount >= target;
-    if (justUnlocked) {
-      MARK_DONE[ex.id]();
-      toast.success(`${ex.label}: cel osiągnięty! Nagroda czeka w Pupil → Zadania`);
-    } else {
-      toast.success(`Zapisano: ${ex.label} +${amount} ${ex.unit}`);
-    }
-  };
-
-  const save = (ex: ExerciseMeta) => {
+  const save = (ex: typeof EXERCISE_META[number]) => {
     const raw = inputs[ex.id];
     const amount = parseFloat((raw ?? '').replace(',', '.'));
     if (!raw || isNaN(amount) || amount <= 0) return;
@@ -104,7 +58,7 @@ export default function ExercisesScreen() {
     setInputs((prev) => ({ ...prev, [ex.id]: '' }));
   };
 
-  const quickAdd = (ex: ExerciseMeta, amount: number) => logAmount(ex, amount);
+  const quickAdd = (ex: typeof EXERCISE_META[number], amount: number) => logAmount(ex, amount);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -126,14 +80,23 @@ export default function ExercisesScreen() {
           </PressableScale>
         )}
 
-        {EXERCISES.map((ex) => {
+        <PressableScale onPress={() => { haptic.tap(); router.push('/training-plans' as any); }} style={s.plansBanner}>
+          <View style={s.plansBannerIcon}><ClipboardList size={18} color="#FB923C" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.plansBannerTitle}>Moje plany treningowe</Text>
+            <Text style={s.plansBannerSub}>Zbuduj własną sesję i odhaczaj pozycje</Text>
+          </View>
+          <ChevronRight size={18} color={c.text.muted} />
+        </PressableScale>
+
+        {EXERCISE_META.map((ex) => {
           const target = targets ? ex.target(targets) : null;
           const todayAmt = amountLoggedOn(logs, ex.id, today);
           const done = target != null && todayAmt >= target;
           return (
             <View key={ex.id} style={[s.card, done && s.cardDone]}>
               <View style={s.cardHead}>
-                <View style={s.iconWrap}><ExerciseIcon id={ex.id} fallback={ex.icon} size={18} color="#FB923C" /></View>
+                <View style={s.iconWrap}><ExerciseIcon id={ex.id} fallback={ICON_FOR[ex.id]} size={18} color="#FB923C" /></View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.cardLabel}>{ex.label}</Text>
                   <Text style={s.cardSub}>
@@ -185,6 +148,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   setupBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FB923C14', borderRadius: radius.lg, borderWidth: 1, borderColor: '#FB923C44', padding: spacing[3] },
   setupBannerTxt: { flex: 1, fontSize: 12, color: c.text.secondary, lineHeight: 17 },
+
+  plansBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
+  plansBannerIcon: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: '#FB923C1F', alignItems: 'center', justifyContent: 'center' },
+  plansBannerTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
+  plansBannerSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
 
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: spacing[2] },
   cardDone: { borderColor: '#2AC68F55', backgroundColor: '#2AC68F0D' },
