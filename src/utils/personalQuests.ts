@@ -106,7 +106,13 @@ export function trainingStreakFrom(trainingDays: Record<string, true>, today: st
 // usunięcie z Pupila to osobna, następna zmiana.
 export interface ExerciseLogEntry {
   id: string;
-  exercise: TrainingExercise;
+  // STRING, nie `TrainingExercise` (2026-10-14, poszerzone pod builder planów treningowych —
+  // patrz trainingPlans.ts) — jedna z 6 kanonicznych wartości `TrainingExercise` (ma cele/
+  // nagrody/ikony) ALBO dowolna nazwa własnego ćwiczenia z planu budowanego przez usera (user:
+  // "dowolne, własne nazwy też"). `amountLoggedOn`/`exerciseStreakFrom` traktują to jednolicie
+  // jako string-klucz — streak liczy DOWOLNY zalogowany dzień niezależnie od tej wartości, więc
+  // poszerzenie nie psuje istniejącej logiki (patrz `exerciseStreakFrom` niżej).
+  exercise: string;
   amount: number;   // powtórzenia / sekundy / minuty / km — zależnie od jednostki (patrz META w
                      // TrainingSessionModal.tsx dla reps/seconds/minutes; km tylko dla roweru,
                      // osobna jednostka od sekundowego/minutowego self-reportu dotychczasowego)
@@ -117,8 +123,17 @@ export interface ExerciseLogEntry {
 // Suma zalogowana danego dnia dla jednego ćwiczenia — można logować kilka razy dziennie
 // (np. dwie sesje pompek), wpisy się SUMUJĄ, nie nadpisują (w przeciwieństwie do starego
 // binarnego pushupsDay/itd. w petStore.ts, gdzie drugi tap tego samego dnia nic nie zmieniał).
-export function amountLoggedOn(logs: ExerciseLogEntry[], exercise: TrainingExercise, date: string): number {
+// `exercise: string` (nie `TrainingExercise`) z tego samego powodu co w `ExerciseLogEntry` wyżej.
+export function amountLoggedOn(logs: ExerciseLogEntry[], exercise: string, date: string): number {
   return logs.filter(l => l.exercise === exercise && l.date === date).reduce((sum, l) => sum + l.amount, 0);
+}
+
+// Czy TEN wpis przeprowadza dzisiejszą sumę przez próg celu (a wcześniej jeszcze go nie
+// przekraczała) — wyodrębnione z app/exercises.tsx (2026-10-14) żeby `useExerciseLogging.ts`
+// (nowy hook, współdzielony z builderem planów) i sam ekran Ćwiczenia liczyły to identycznie,
+// nie dwie kopie tego samego warunku które mogłyby się rozjechać.
+export function exerciseJustUnlocked(before: number, amount: number, target: number | null): boolean {
+  return target != null && before < target && before + amount >= target;
 }
 
 // Streak dni z DOWOLNYM zalogowanym ćwiczeniem — ten sam chodzenie-wstecz wzorzec co

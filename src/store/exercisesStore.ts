@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
-import { TrainingExercise, ExerciseLogEntry } from '@/utils/personalQuests';
+import { ExerciseLogEntry } from '@/utils/personalQuests';
 
 // Log ćwiczeń (2026-10-14) — fundament pod nowy ekran "Ćwiczenia" w Zdrowiu, patrz obszerny
 // komentarz w personalQuests.ts przy `ExerciseLogEntry`. Osobny, lekki store (nie dokładane do
@@ -17,7 +17,9 @@ const todayISO = () => {
 interface ExercisesState {
   logs: ExerciseLogEntry[];
   _hydrated: boolean;
-  addLog: (exercise: TrainingExercise, amount: number, date?: string) => void;
+  // `exercise: string` (nie `TrainingExercise`) — patrz komentarz przy `ExerciseLogEntry` w
+  // personalQuests.ts (2026-10-14, poszerzone pod dowolne nazwy ćwiczeń z buildera planów).
+  addLog: (exercise: string, amount: number, date?: string) => void;
   removeLog: (id: string) => void;
 }
 

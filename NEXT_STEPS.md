@@ -51,6 +51,13 @@ ilość/jednostka) od razu, monety/XP zostają.
 - §316 — prawdziwe grafiki ćwiczeń (user wgrał do `assets/cwiczeniaikony/` przez GitHub web
   upload na `master`) podpięte w OBU miejscach (`app/exercises.tsx` + `app/pet-quests.tsx`,
   nowy `ExerciseIcon.tsx`/`exerciseIcons.ts`). Bez grafiki na razie: rower.
+- §320 — builder planów treningowych (user: "zrobic builder i wtedy żebym mógł sobie go
+  kopiować i edytowac i np zaznaczać jak w jedzeniu co zrobiłem"): biblioteka planów
+  (`app/training-plans.tsx`), builder z edycją/duplikacją (`app/training-plan-builder.tsx`),
+  "Dzisiejsza sesja" (`app/training-session.tsx`), nowy store `trainingPlansStore.ts`, logika
+  w `trainingPlans.ts`/`exerciseMeta.ts`, wspólny `useExerciseLogging.ts` (refaktor —
+  `app/exercises.tsx` używa go teraz też, zamiast własnej kopii logiki nagród). Wejście:
+  kafelek "Moje plany treningowe" na ekranie Ćwiczenia.
 
 **Do zrobienia (następna/kolejne zmiany)**:
 1. **Czeka na usera (test na urządzeniu)**: USUŃ sekcję "Trening" z `app/pet-quests.tsx`
@@ -60,11 +67,16 @@ ilość/jednostka) od razu, monety/XP zostają.
    nagrodę i że streaki się zgadzają (priorytet testu wysoki w §312). Reszta ekranu
    (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
    przenosi się do nowego ekranu.
-2. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
-   (§311), dane realnie giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne,
-   zrobić wkrótce.
+2. Dopisz `exercises-v1` ORAZ `training-plans-v1` do `backupService.ts` CLOUD_COLS — oba
+   ekrany już z nich korzystają (§311, §320), dane realnie giną przy reinstalu/zmianie
+   telefonu bez tego. Małe, niezależne, zrobić wkrótce — builder planów to też ręcznie
+   wpisana praca usera (szablony sesji), nie tylko log, więc utrata boli podwójnie.
 3. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
    nagród (`markXDone()` dalej je woła z nowego ekranu), NIE kasować.
+4. **Priorytet testu na urządzeniu — średni-wysoki, nowe ekrany** (§320, builder planów):
+   checklist pełna w ARCHITECTURE.md §320 — budowa/edycja/duplikacja/usuwanie planu,
+   odpalenie sesji i faktyczne odblokowanie questu/nagrody dla pozycji podpiętych pod jedno
+   z 6 kanonicznych ćwiczeń.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 

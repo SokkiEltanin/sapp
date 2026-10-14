@@ -1,4 +1,4 @@
-import { ageFrom, targetsFor, dailyExercisePool, TRAINING_EXERCISES, DAILY_EXERCISE_COUNT, trainingStreakFrom, amountLoggedOn, exerciseStreakFrom, ExerciseLogEntry } from '@/utils/personalQuests';
+import { ageFrom, targetsFor, dailyExercisePool, TRAINING_EXERCISES, DAILY_EXERCISE_COUNT, trainingStreakFrom, amountLoggedOn, exerciseStreakFrom, exerciseJustUnlocked, ExerciseLogEntry } from '@/utils/personalQuests';
 
 describe('personalQuests — ageFrom', () => {
   test('brak daty urodzenia → null', () => {
@@ -156,5 +156,27 @@ describe('personalQuests — exerciseStreakFrom (log-based, zastępuje trainingD
   test('dziura w środku → seria tylko od najnowszej ciągłej reszty', () => {
     const logs = [log('pushups', '2026-08-11'), log('squats', '2026-08-10'), log('bike', '2026-08-08')];
     expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(2);
+  });
+});
+
+describe('personalQuests — exerciseJustUnlocked (wyodrębnione z ekranu Ćwiczenia pod builder planów, §320)', () => {
+  test('brak celu (null) → nigdy nie odblokowuje', () => {
+    expect(exerciseJustUnlocked(0, 10, null)).toBe(false);
+  });
+
+  test('przed wpisem już >= cel → nie "just" unlocked (był odblokowany wcześniej)', () => {
+    expect(exerciseJustUnlocked(10, 5, 10)).toBe(false);
+  });
+
+  test('wpis przeprowadza przez próg → true', () => {
+    expect(exerciseJustUnlocked(5, 10, 10)).toBe(true);
+  });
+
+  test('wpis dokładnie trafia w próg → true (>=, nie >)', () => {
+    expect(exerciseJustUnlocked(0, 10, 10)).toBe(true);
+  });
+
+  test('wpis wciąż poniżej progu → false', () => {
+    expect(exerciseJustUnlocked(0, 5, 10)).toBe(false);
   });
 });
