@@ -17003,6 +17003,56 @@ serię). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1353 testy (+8).
 **Priorytet testu na urządzeniu — brak** (zero zmiany zachowania — nowy kod nieużywany przez
 żaden ekran jeszcze).
 
+## 311. Ćwiczenia — faza 2: ekran `app/exercises.tsx` + kafelek w Zdrowiu (2026-10-14)
+
+Druga zmiana w ramach przenoszenia ćwiczeń z Pupila do Zdrowia (plan w §310/NEXT_STEPS.md).
+
+**Nowy ekran `app/exercises.tsx`**: 6 ćwiczeń z `TRAINING_EXERCISES` (personalQuests.ts),
+każde jako karta z: ikoną (TE SAME ikony co `TRAINING_ICON` w pet-quests.tsx —
+Dumbbell/Flame/Activity/Timer/Sparkles/Bike, czysto orientacyjny placeholder — user obiecał
+wysłać prawdziwe grafiki stick-man na czacie, podmiana później bez zmiany struktury, tylko
+`icon` → `Image`), dzisiejszą sumą (`amountLoggedOn`) vs cel (`targetsFor`, gdy
+`trainingLevel` ustawiony w profileStore — inaczej baner z linkiem do Ustawienia →
+Personalizacja, logowanie działa i tak, bez celu), polem liczbowym + "Zapisz" (dowolna
+ilość, SUMUJE się z poprzednimi wpisami tego dnia — `useExercisesStore().addLog()`) i
+przyciskiem "Cel" (jeden tap = zaloguj dokładnie tyle ile cel, wygoda dla najczęstszego
+przypadku). Nagłówek pokazuje `StreakFlame` z `exerciseStreakFrom(logs, today)`.
+
+**Kafelek w Zdrowiu** (`app/(tabs)/health.tsx`, nad kartą "NAWODNIENIE") — ten sam
+kompaktowy `cardRow`-wzorzec co reszta kafelków tego ekranu (ikona+etykieta+chevron,
+`TouchableOpacity` nawigujący, NIE rozwijający inline), z pigułką streaka
+(`{exerciseStreak} dni`, pomarańczowy `Flame`) gdy streak > 0. Czysto wejściowy — cała
+logika/UI logowania żyje na `app/exercises.tsx`.
+
+**Celowo NIE zrobione w tej zmianie** (plan w NEXT_STEPS.md, osobne kolejne kroki):
+1. Podpięcie pod silnik nagród — `markPushupsDone()` itd. (petStore.ts) NIE wołane stąd,
+   więc logowanie w nowym ekranie na razie NIE daje monet/XP. Stary self-report w
+   pet-quests.tsx (sekcja "Trening") dalej żyje RÓWNOLEGLE i dalej daje nagrody — dwa
+   niepołączone źródła chwilowo, identyczny powód co w §310 (nie psuć działającej ścieżki
+   przed gotowym zamiennikiem, tu: przed udowodnieniem nowego ekranu na urządzeniu).
+2. `QuestCtx.trainingStreak` (usePetQuests.ts) dalej czyta stare `trainingStreakFrom
+   (trainingDays)`, NIE nowe `exerciseStreakFrom(logs)` — `m_training` milestone i kafelek w
+   Zdrowiu mogą więc chwilowo pokazywać RÓŻNE liczby streaka (stary = dni z ODEBRANĄ
+   nagrodą treningową, nowy = dni z DOWOLNYM zalogowanym ćwiczeniem). Scalenie dopiero przy
+   podpięciu nagród (krok 1 wyżej).
+3. Dashboard (`dashboardLayout.ts`) NIE dostał jeszcze sekcji `exercise-streak` — user chciał
+   "kafelek na dashbordzie przypięty w streaku", to osobny krok (playbook ARCHITECTURE §12).
+4. Usunięcie sekcji "Trening" z pet-quests.tsx — dopiero gdy krok 1 udowodni parytet nagród.
+5. `exercises-v1` dalej NIE w `backupService.ts` CLOUD_COLS (patrz zastrzeżenie w §310) —
+   teraz ekran już z niego korzysta, więc to następny, niezależny mały fix do zrobienia
+   wkrótce (dane realnie giną przy reinstalu/zmianie telefonu bez tego).
+
+**Testy**: brak nowych — czysty ekran/UI nad już przetestowaną logiką (`amountLoggedOn`/
+`exerciseStreakFrom`, §310). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1353 testy
+(bez zmiany).
+
+**Priorytet testu na urządzeniu — średni** (nowy ekran, ale BEZ wpływu na istniejącą
+ekonomię/nagrody — nic nie może się zepsuć poza samym nowym ekranem): Zdrowie → kafelek
+"ĆWICZENIA" → otwiera `app/exercises.tsx` → wpisz dowolną liczbę dla dowolnego ćwiczenia →
+Zapisz → "Dziś: X" aktualizuje się, streak w nagłówku i na kafelku w Zdrowiu też (po
+powrocie). Bez ustawionego poziomu treningowego (Ustawienia → Personalizacja) — baner +
+logowanie dalej działa, tylko bez widocznego celu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
