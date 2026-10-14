@@ -17290,6 +17290,54 @@ przebudowana, nowy silnik gestów, nic z tego nie przeszło testu na prawdziwym 
    właściwym aktualnym bosie danego trybu.
 7. Brak "Medale" sekcji — licznik medali nadal widoczny jako odznaka na kaflach.
 
+## 316. Ćwiczenia — prawdziwe grafiki zamiast lucide-ikon (2026-10-14)
+
+User wgrał grafiki do `assets/cwiczeniaikony/` przez GitHub web upload na `master` (nie na
+roboczą gałąź tej sesji — ta resetuje się po każdym mergu): "dodałem wszystkie jakie miałem
+na ten moment jak jakiś nie ma to bez ikony na razie". 7 plików, generyczne nazwy ze
+stockowej paczki ikon (nie opisowe jak `pompki.png`) — dopasowane RĘCZNIE po obejrzeniu
+każdej grafiki (`Read` jako obraz), nie po nazwie pliku:
+
+| Plik | Ćwiczenie | Dlaczego |
+|---|---|---|
+| `pushups-man.png` | pompki | prosta linia ciała + wsparcie na ramieniu, nazwa się zgadza |
+| `abdominal-exercise.png` | brzuszki | sylwetka w leżeniu unosząca tułów — "abdominal" = brzuch |
+| `man-exercising-on-the-floor.png` | deska | klasyczna pozioma sylwetka na przedramionach |
+| `man-exercising-legs.png` | przysiady | stojąca sylwetka, wykrok/przysiad |
+| `man-exercising-hips.png` | rozciąganie | pochylenie w biodrach, pozycja rozciągająca |
+
+**Bez grafiki na razie**: rower (nic pasującego wśród wgranych — zostaje lucide `Bike`
+fallback). **Nadmiarowe, nieużyte**: `sitting-man.png`,
+`man-exercising-leg-on-the-flor.png` — bez jednoznacznego dopasowania do żadnego z 6
+ćwiczeń, zostają w folderze na wszelki wypadek (user może dopowiedzieć do czego miały być).
+
+**Nowe pliki**:
+- `src/utils/exerciseIcons.ts` — `exercisePng(id): number | null`, czysta mapa
+  `TrainingExercise → require(png)`, `null` gdy brak grafiki (rower).
+- `src/components/health/ExerciseIcon.tsx` — współdzielony komponent: realna grafika
+  (`Image` + `tintColor` — PNG to czarne monochromatyczne piktogramy na przezroczystym tle,
+  `tintColor` przefarbowuje je na `#FB923C` pomarańczowy, SPÓJNY z resztą akcentu "Trening"
+  bez potrzeby edycji samych plików) gdy dostępna, inaczej przekazany lucide-icon fallback.
+
+**Podpięte w DWÓCH miejscach** (oba ekrany dostają IDENTYCZNE grafiki w okresie
+przejściowym — stary self-report w pet-quests.tsx i nowy log w exercises.tsx wciąż żyją
+równolegle, patrz NEXT_STEPS.md):
+- `app/exercises.tsx` — `EXERCISES[].icon` (lucide) teraz tylko FALLBACK, renderowane przez
+  `<ExerciseIcon id={ex.id} fallback={ex.icon} .../>`.
+- `app/pet-quests.tsx` — nowa mapa `TRAINING_EXERCISE_ID` (quest id `b_pushups` → ćwiczenie
+  `pushups` — jedyny rozjazd to `b_bikeride` → `bike`), ten sam `ExerciseIcon` w sekcji
+  "Trening".
+
+**Testy**: brak nowych — czysta mapa danych + prezentacyjny komponent, nic warte
+jednostkowego testu (sama logika to `require()` + warunek). `tsc --noEmit` czyste, `jest
+--silent` 104/104 suite, 1359 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — niski-średni** (czysto wizualne, zero zmiany logiki): Zdrowie
+→ Ćwiczenia i Pupil → Zadania → sekcja "Trening" — pompki/brzuszki/deska/przysiady/
+rozciąganie pokazują prawdziwe grafiki (pomarańczowe sylwetki), rower dalej jako ikona
+lucide. Jeśli któreś dopasowanie wygląda źle (np. zamienione miejscami) — łatwe do
+poprawienia, to tylko mapa w `exerciseIcons.ts`.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

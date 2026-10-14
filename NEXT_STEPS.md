@@ -41,23 +41,22 @@ ilość/jednostka) od razu, monety/XP zostają.
 - §313 — kafelek "ĆWICZENIA" na dashboardzie (`ExerciseStreakCard.tsx`, nowe id
   `exercise-streak` w `dashboardLayout.ts`, wpięte w `index.tsx`'s `nodes`) — ZAWSZE
   widoczny (nawet przy serii 0), tap → `/exercises`.
+- §316 — prawdziwe grafiki ćwiczeń (user wgrał do `assets/cwiczeniaikony/` przez GitHub web
+  upload na `master`) podpięte w OBU miejscach (`app/exercises.tsx` + `app/pet-quests.tsx`,
+  nowy `ExerciseIcon.tsx`/`exerciseIcons.ts`). Bez grafiki na razie: rower.
 
 **Do zrobienia (następna/kolejne zmiany)**:
-1. **Czeka na usera**: grafiki stick-man (user obiecał wysłać na czacie — "wklej je tutaj,
-   zapiszę do repo"). Na razie `app/exercises.tsx` używa tych samych ikon co stary
-   `TRAINING_ICON` w pet-quests.tsx (Dumbbell/Flame/Activity/Timer/Sparkles/Bike) —
-   podmienić na `Image` jak grafiki przyjdą, zero zmiany struktury.
-2. **Czeka na usera (test na urządzeniu)**: USUŃ sekcję "Trening" z `app/pet-quests.tsx`
+1. **Czeka na usera (test na urządzeniu)**: USUŃ sekcję "Trening" z `app/pet-quests.tsx`
    (self-report UI + `TrainingSessionModal` użycie tam) — już bezpieczne po §312 (ten sam
    quest/streak zaliczany z nowego ekranu), ale NIE usuwać zanim user potwierdzi na
    urządzeniu że logowanie w `app/exercises.tsx` faktycznie daje JEDNĄ (nie podwójną)
    nagrodę i że streaki się zgadzają (priorytet testu wysoki w §312). Reszta ekranu
    (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
    przenosi się do nowego ekranu.
-3. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
+2. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
    (§311), dane realnie giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne,
    zrobić wkrótce.
-4. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
+3. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
    nagród (`markXDone()` dalej je woła z nowego ekranu), NIE kasować.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
