@@ -17097,6 +17097,39 @@ toast "cel osiągnięty" → Pupil → Zadania → sekcja "Trening" pokazuje TEN
 gotowy do "Odbierz" (JEDNA nagroda, nie podwójna). Potem sprawdź że streak w nagłówku
 Ćwiczeń/kafelku Zdrowia i `m_training` ("Cele" w Zadaniach) pokazują TĘ SAMĄ liczbę dni.
 
+## 313. Ćwiczenia — faza 4: kafelek streaka na dashboardzie (2026-10-14)
+
+Czwarta zmiana w serii przenoszenia ćwiczeń do Zdrowia (plan §310-312/NEXT_STEPS.md) — user:
+"damy kafelek na dashbordzie przypięty w streaku nowy serial cwiczen".
+
+**Nowy komponent `src/components/dashboard/ExerciseStreakCard.tsx`**: ten sam wizualny
+przepis co pojedynczy kafelek w `StreakWallCard.tsx` (gradient koloru progu wg
+`streakColor()`, `StreakFlameGlow` w rogu, duża liczba) — ale WŁASNA, PEŁNA szerokość sekcji
+(nie kwadrat w siatce "Twoje serie"), bo user chciał osobny, widoczny kafelek, nie kolejny
+wpis wmieszany między nawyki/liczniki. Tap → `/exercises`. **BEZ guard-a `> 0`** (w
+przeciwieństwie do `streak-wall`) — kafelek jest ZAWSZE widoczny nawet przy serii 0, bo ma
+być stałym punktem wejścia do logowania, nie czymś co pojawia się dopiero gdy już masz serię
+(ten sam Duolingo-styl zachęty co zera w `StreakWallCard`, ale tu też sterujący WIDOCZNOŚCIĄ
+całej sekcji, nie tylko kolorem pojedynczego kafla).
+
+**Wpięcie wg playbooku ARCHITECTURE §12**: nowe id `exercise-streak` w
+`dashboardLayout.ts`'s `DEFAULT_DASHBOARD_SECTIONS` (zaraz po `streak-wall` — ta sama rodzina
+"Zadania i nawyki" w `SECTION_GROUP`) + `SECTION_TITLES`/`SECTION_DESC`. `app/(tabs)/index.tsx`:
+nowy `exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), …)` (ten sam
+`dayKey` co reszta dashboardu — `useDayKey()`, rolluje się o północy bez potrzeby re-focusu
+ekranu) + `nodes['exercise-streak'] = <ExerciseStreakCard streak={exerciseStreak}
+cardBg={cardBgDark} />`.
+
+**Testy**: brak nowych — czysty prezentacyjny komponent nad już przetestowaną
+`exerciseStreakFrom` (§310). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1353 testy
+(bez zmiany).
+
+**Priorytet testu na urządzeniu — niski** (czysto dodatkowy, nawigacyjny kafelek — nic
+istniejącego nie może się zepsuć): Dashboard → kafelek "ĆWICZENIA" widoczny (nawet przy
+serii 0, neutralne szare tło zamiast gradientu), tap → otwiera `/exercises`. Po zalogowaniu
+ćwiczenia dziś — kafelek pokazuje aktualizowany streak (po powrocie na dashboard) w
+gradiencie koloru progu, tym samym co reszta serii w appce (bordo→czerwień→pomarańcz→...).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

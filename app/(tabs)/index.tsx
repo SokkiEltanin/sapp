@@ -83,6 +83,7 @@ import MoodMiniCal from '@/components/dashboard/MoodMiniCal';
 import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
+import ExerciseStreakCard from '@/components/dashboard/ExerciseStreakCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
@@ -108,6 +109,8 @@ import { activeSeasonalEvent, eventPeriodKey, eventDaysLeft } from '@/utils/seas
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
 import { usePetStore, levelFromXp, loginBonusCoins } from '@/store/petStore';
+import { useExercisesStore } from '@/store/exercisesStore';
+import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildQuests, sweetlessDaysFrom } from '@/utils/quests';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
@@ -613,6 +616,10 @@ export default function DashboardScreen() {
       .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
     return [...fromHabits, ...fromCounters];
   }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey]);
+  // Kafelek "Ćwiczenia" (2026-10-14, patrz ARCHITECTURE.md §313) — osobny z `streak-wall`
+  // wyżej (ten pokazuje dni z DOWOLNYM zalogowanym ćwiczeniem, nie nawyki/liczniki).
+  const exerciseLogs = useExercisesStore(st => st.logs);
+  const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -3071,6 +3078,13 @@ export default function DashboardScreen() {
             // chował całą kartę, gdy WSZYSTKIE serie akurat spadły na 0 (np. dzień po zjedzeniu
             // słodycza z jedynym licznikiem na koncie) — dokładnie odwrotność intencji karty.
             nodes['streak-wall'] = streakWall.length > 0 && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
+            // "Ćwiczenia" (2026-10-14, patrz ARCHITECTURE.md §313) — user: "damy kafelek na
+            // dashbordzie przypięty w streaku nowy serial cwiczen". Bez `> 0` guard-a
+            // (odwrotnie niż `streak-wall` wyżej) — kafelek ma być ZAWSZE widoczny, nawet przy
+            // 0 (ten sam Duolingo-styl zachęty co `StreakWallCard`'s zera, nie znikanie przy
+            // złamanej/jeszcze-nie-zaczętej serii — user chce, żeby to był STAŁY punkt wejścia
+            // do logowania, nie coś co pojawia się dopiero gdy już masz serię).
+            nodes['exercise-streak'] = <ExerciseStreakCard streak={exerciseStreak} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
