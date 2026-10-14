@@ -22,17 +22,46 @@ describe('bossMapLayout — layoutBossMap', () => {
     expect(a.height).toBe(b.height);
   });
 
-  test('kolejne węzły są dokładnie STEP (170) od siebie — pojedynczy, ciągły szlak', () => {
-    const { nodes } = layoutBossMap(22);
+  // Gwarancja braku samoprzecięć trasy (2026-10-14, przebudowa #2 — user: "boss niektóre sa
+  // porozrzucane zle", "od zera") — Y MUSI ściśle rosnąć z indeksem, więc połączenie
+  // kolejnych punktów nigdy nie może się cofnąć/zapętlić na siebie, niezależnie od tego co
+  // robi X. To jedyna własność konieczna do matematycznego wykluczenia samoprzecięć.
+  test('Y ściśle rośnie z indeksem — trasa nigdy nie zawraca w górę (brak samoprzecięć)', () => {
+    const { nodes } = layoutBossMap(100);
     for (let i = 1; i < nodes.length; i++) {
-      const dx = nodes[i].x - nodes[i - 1].x;
-      const dy = nodes[i].y - nodes[i - 1].y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      expect(dist).toBeCloseTo(170, 5);
+      expect(nodes[i].y).toBeGreaterThan(nodes[i - 1].y);
     }
   });
 
-  test('wszystkie węzły mieszczą się w zwróconym width/height (z marginesem)', () => {
+  test('X zawsze w wąskim, stałym paśmie torów (bez swobodnego pan — mapa przewija się tylko pionowo)', () => {
+    const { nodes, width } = layoutBossMap(100);
+    for (const n of nodes) {
+      expect(n.x).toBeGreaterThanOrEqual(0);
+      expect(n.x).toBeLessThanOrEqual(width);
+    }
+  });
+
+  test('kolejne węzły nigdy nie zmieniają toru o więcej niż jeden — brak gwałtownych skoków w poziomie', () => {
+    const areaWidth = 340;
+    const { nodes } = layoutBossMap(100, areaWidth);
+    const laneWidth = areaWidth / 5; // LANES w bossMapLayout.ts
+    for (let i = 1; i < nodes.length; i++) {
+      const dx = Math.abs(nodes[i].x - nodes[i - 1].x);
+      // odległość między środkami sąsiednich torów — krok w poziomie nie może przekroczyć TEJ wartości
+      expect(dx).toBeLessThanOrEqual(laneWidth + 0.001);
+    }
+  });
+
+  test('płótno mieści się dokładnie w podanej szerokości viewportu (bez poziomego przycinania)', () => {
+    const { nodes, width } = layoutBossMap(30, 400);
+    expect(width).toBe(400);
+    for (const n of nodes) {
+      expect(n.x).toBeGreaterThanOrEqual(0);
+      expect(n.x).toBeLessThanOrEqual(400);
+    }
+  });
+
+  test('wszystkie węzły mieszczą się w zwróconym width/height', () => {
     const { nodes, width, height } = layoutBossMap(44);
     for (const n of nodes) {
       expect(n.x).toBeGreaterThanOrEqual(0);
