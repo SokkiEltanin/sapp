@@ -127,6 +127,11 @@ export const MAD_HP_MULT = 10;      // MAD hp = boss.hp (kampania) × 10, STAŁE
 export const MAD_COUNTER_MULT = 3;  // dodatkowy mnożnik kontrataku PONAD naturalny wzrost z 10× hp
 
 export function madBossId(baseId: string): string { return `mad_${baseId}`; }
+// Odwrotność `madBossId` (2026-10-14, edytor mapy bossów — ARCHITECTURE.md §322) — pozwala
+// CampaignMap.tsx dopasować pozycję z ręcznie ułożonego layoutu (kluczowanego BAZOWYM id, ten
+// sam fizyczny układ dla kampanii i MAD) niezależnie od tego czy renderuje `BOSSES` czy
+// `madBosses` (id z prefixem `mad_`).
+export function baseBossId(id: string): string { return id.startsWith('mad_') ? id.slice(4) : id; }
 
 // Pierwszy pokonany-normalnie-ale-nie-MAD boss, po kolejności kampanii — null gdy jeszcze
 // żaden boss nie padł, albo gdy wszystkie dotąd pokonane mają już MAD ukończone.
