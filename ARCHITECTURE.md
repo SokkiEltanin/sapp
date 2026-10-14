@@ -17680,6 +17680,66 @@ gestów — mniejsza powierzchnia na nowe bugi tego samego rodzaju):
 5. Przełącznik Kampania/MAD przełącza i na nowo przewija do właściwego aktualnego bossa
    danego trybu.
 
+## 322. Edytor mapy bossów — ręczne rozstawienie + wygładzona ścieżka (2026-10-14)
+
+User po §321 (przebudowa od zera #2), zanim zdążył przetestować na urządzeniu: "Moze zrobisz
+edytor ja sam ustawie wszystko mapę ścieżkę i wgle (w sensie porozmieszczam punkty a ścieżkę
+polaczy soe sama z jakas tam modyfikacja smooth". Pierwsza wersja zrobiona jako Artifact (web,
+poza appką, z eksportem JSON do wklejenia) — user: "Ale to w apce xddd" — poprawione, ten sam
+koncept, ale jako prawdziwy ekran w Sapp.
+
+**Dlaczego to bezpieczne, mimo że §315-§321 to pięć rund bugów właśnie na gestach/mapie**:
+przeciąganie POJEDYNCZEGO, małego węzła to fundamentalnie inna, dużo prostsza klasa gestu niż
+swobodny pan+zoom CAŁEGO płótna — bez kamery, bez transformu całej warstwy, bez klamrowania
+granic widoku do pomylenia. Użyty `PanResponder` (natywny RN, nie `Gesture.Pan`) z pozycją
+TYLKO w lokalnym state podczas przeciągania (zapis do store'u dopiero na puszczenie palca —
+inaczej KAŻDY inny węzeł re-renderowałby się na każdy piksel ruchu).
+
+**Nowe/zmienione pliki**:
+- `src/store/bossMapLayoutStore.ts` — `positions: Record<string, {x,y}>` (persist,
+  AsyncStorage, klucz `boss-map-layout-v1`), klucz = BAZOWE id bossa (bez `mad_` prefixu —
+  `baseBossId`, nowy eksport w `madBosses.ts`) — JEDEN fizyczny układ obsługuje kampanię I
+  MAD, nie trzeba układać dwa razy. Brak wpisu dla danego id = ten boss zostaje na swojej
+  proceduralnej pozycji z §321 (więc nowo dodani bossowie — user dopisuje "kilka dziennie" —
+  mają sensowną pozycję zanim zdąży ich ręcznie poustawiać).
+- `src/utils/bossMapLayout.ts` — `applyLayoutOverrides(base, ids, overrides, areaWidth)`
+  (testowana) nakłada ręczne pozycje NA WIERZCH proceduralnego układu z §321 (ten zostaje
+  nietknięty, dalej jest fallbackiem); `catmullRomPath(points)` (testowana) — standardowa
+  konwersja Catmull-Rom→Bezier, wygładzona krzywa zamiast łamanych `M/L` odcinków prosto-w-
+  prosto (user: "ścieżka połączy się sama z jakąś tam modyfikacją smooth"). WSPÓŁDZIELONA
+  przez `CampaignMap.tsx` (prawdziwa mapa) i edytor — jedna definicja "jak wygląda ścieżka".
+- `src/components/bosses/CampaignMap.tsx` — czyta `useBossMapLayoutStore`, nakłada nadpisania
+  przez `applyLayoutOverrides`, rysuje `fullPathD`/`litPathD` przez `catmullRomPath` zamiast
+  prostych odcinków. Reszta (ScrollView/centrowanie z §321) bez zmian.
+- `app/boss-map-editor.tsx` (nowy ekran) — wszyscy bossowie (zawsze `BOSSES`, nie wariant MAD)
+  jako przeciągalne węzły na tym samym pionowym płótnie (szerokość = zmierzony viewport, jak
+  w prawdziwej mapie), ścieżka wygładzona na żywo podczas przeciągania. "Resetuj" (z
+  `ConfirmDialog`) czyści WSZYSTKIE nadpisania naraz (`resetAll`), wraca do proceduralnego
+  układu.
+- `app/bosses.tsx` — mały pływający przycisk-ołówek w lewym dolnym rogu mapy (symetrycznie do
+  kafli raid/event po prawej), prowadzi do `/boss-map-editor`.
+
+**Celowo NIE zrobione**: reset pojedynczego bossa (tylko "resetuj wszystko") — builder ma już
+przycisk reset ogólny, osobny per-węzeł byłby na razie nadmiarowy UI dla pierwszej wersji;
+jeśli user będzie chciał cofnąć TYLKO jednego bossa, `resetPosition(id)` już istnieje w
+storze, brakuje tylko przycisku w UI — trywialne do dodania jako kolejny krok.
+
+**Testy**: `applyLayoutOverrides` — 4 nowe (brak nadpisań = bez zmian, nadpisanie zmienia
+TYLKO swój węzeł, przycinanie x do granic płótna, wysokość rośnie pod przeciągnięty niżej
+węzeł). `catmullRomPath` — 5 nowych (puste/1-punktowe wejście, 2 punkty = prosta linia,
+zaczyna się w pierwszym punkcie, kończy w ostatnim, deterministyczna). `tsc --noEmit` czyste,
+`jest --silent` 105/105 suite, 1383 testów (+9).
+
+**Nowy dług wpisany do NEXT_STEPS.md**: `boss-map-layout-v1` (jak `exercises-v1`/
+`training-plans-v1` z tej samej sesji) nie jest jeszcze w `backupService.ts` CLOUD_COLS —
+ręcznie ułożony layout to realna praca usera, ginie przy reinstalu bez backupu.
+
+**Priorytet testu na urządzeniu — WYSOKI, ale inny rodzaj ryzyka niż §315-§321** (to NOWA
+funkcja, nie kolejna próba naprawy tej samej mapy): otwórz edytor, przeciągnij kilku bossów,
+wróć na mapę kampanii/MAD — nadpisane pozycje i wygładzona ścieżka powinny być widoczne od
+razu (ten sam `catmullRomPath`/store co edytor). Reset czyści wszystko i wraca do zygzaka
+z §321.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

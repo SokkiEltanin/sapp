@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, Pressable, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Swords, Trophy } from 'lucide-react-native';
+import { ChevronLeft, Zap, Swords, Trophy, Pencil } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
@@ -322,6 +322,13 @@ export default function Bosses() {
           </PressableScale>
         </View>
 
+        {/* Wejście do edytora mapy (2026-10-14, ARCHITECTURE.md §322 — user: "zrobisz edytor
+            ja sam ustawie wszystko mapę ścieżkę") — pływa w lewym dolnym rogu, symetrycznie
+            do kafli raid/event po prawej. */}
+        <PressableScale onPress={() => { haptic.tap(); router.push('/boss-map-editor' as any); }} style={s.editMapBtn}>
+          <Pencil size={18} color={c.text.secondary} />
+        </PressableScale>
+
         {/* Raid + wydarzenie — kompaktowe kafle-ikony (user: "te bosy evetowe muszą byc w
             kafelkach mniejsze jak w grach zeby po kliknięciu sie pokazywalo zeby nie
             zasłaniały mapy"). Odznaka liczby medali w rogu, kropka "gotowe do walki" gdy
@@ -470,6 +477,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   doneCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3], paddingHorizontal: spacing[6] },
   doneCenterTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
 
+  editMapBtn: {
+    position: 'absolute', left: spacing[3], bottom: spacing[3], width: 44, height: 44,
+    borderRadius: radius.lg, backgroundColor: 'rgba(15,17,20,0.92)', borderWidth: 1,
+    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
+  },
   tileRow: { position: 'absolute', right: spacing[3], bottom: spacing[3], gap: spacing[2] },
   tile: {
     width: 52, height: 52, borderRadius: radius.lg, backgroundColor: 'rgba(15,17,20,0.92)',

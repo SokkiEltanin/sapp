@@ -1,4 +1,4 @@
-import { layoutBossMap } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLayoutOverrides, catmullRomPath } from '@/utils/bossMapLayout';
 
 describe('bossMapLayout — layoutBossMap', () => {
   test('count 0 → brak węzłów', () => {
@@ -75,5 +75,64 @@ describe('bossMapLayout — layoutBossMap', () => {
     for (const n of [1, 2, 5, 22, 44, 100]) {
       expect(layoutBossMap(n).nodes).toHaveLength(n);
     }
+  });
+});
+
+describe('bossMapLayout — applyLayoutOverrides (edytor mapy, §322)', () => {
+  test('brak nadpisań → węzły bez zmian (procedural zostaje)', () => {
+    const base = layoutBossMap(5, 300);
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    const out = applyLayoutOverrides(base.nodes, ids, {}, 300);
+    expect(out.nodes).toEqual(base.nodes);
+  });
+
+  test('nadpisanie konkretnego id zmienia TYLKO ten węzeł', () => {
+    const base = layoutBossMap(3, 300);
+    const ids = ['a', 'b', 'c'];
+    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 123, y: 456 } }, 300);
+    expect(out.nodes[0]).toEqual(base.nodes[0]);
+    expect(out.nodes[1]).toEqual({ x: 123, y: 456 });
+    expect(out.nodes[2]).toEqual(base.nodes[2]);
+  });
+
+  test('nadpisane x przycinane do [0, areaWidth] — pozycja z innego rozmiaru ekranu nie wyjeżdża poza płótno', () => {
+    const base = layoutBossMap(2, 300);
+    const out = applyLayoutOverrides(base.nodes, ['a', 'b'], { a: { x: 999, y: 10 }, b: { x: -50, y: 10 } }, 300);
+    expect(out.nodes[0].x).toBe(300);
+    expect(out.nodes[1].x).toBe(0);
+  });
+
+  test('wysokość płótna rośnie, żeby pomieścić węzeł przeciągnięty niżej niż domyślny układ', () => {
+    const base = layoutBossMap(3, 300);
+    const out = applyLayoutOverrides(base.nodes, ['a', 'b', 'c'], { c: { x: 10, y: 99999 } }, 300);
+    expect(out.height).toBeGreaterThan(99999);
+  });
+});
+
+describe('bossMapLayout — catmullRomPath (wygładzona ścieżka, §322)', () => {
+  test('mniej niż 2 punkty → pusty string', () => {
+    expect(catmullRomPath([])).toBe('');
+    expect(catmullRomPath([{ x: 0, y: 0 }])).toBe('');
+  });
+
+  test('dokładnie 2 punkty → prosta linia (nie ma czego wygładzać)', () => {
+    expect(catmullRomPath([{ x: 0, y: 0 }, { x: 10, y: 20 }])).toBe('M 0 0 L 10 20');
+  });
+
+  test('zaczyna się dokładnie w pierwszym punkcie', () => {
+    const d = catmullRomPath([{ x: 5, y: 5 }, { x: 50, y: 10 }, { x: 100, y: 5 }]);
+    expect(d.startsWith('M 5 5')).toBe(true);
+  });
+
+  test('krzywa kończy się dokładnie w ostatnim punkcie (ostatnia krzywa Beziera trafia w niego)', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 40, y: 10 }, { x: 80, y: -10 }, { x: 120, y: 0 }];
+    const d = catmullRomPath(pts);
+    const last = pts[pts.length - 1];
+    expect(d.trim().endsWith(`${last.x} ${last.y}`)).toBe(true);
+  });
+
+  test('deterministyczna — te same punkty zawsze dają tę samą ścieżkę', () => {
+    const pts = [{ x: 1, y: 2 }, { x: 3, y: 9 }, { x: 7, y: 4 }];
+    expect(catmullRomPath(pts)).toBe(catmullRomPath(pts));
   });
 });

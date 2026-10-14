@@ -6,7 +6,9 @@ import { X, Lock, Swords } from 'lucide-react-native';
 import BossArt from './BossArt';
 import PressableScale from '@/components/ui/PressableScale';
 import { Boss, mysteryBossName, fmtEnergyCountdown } from '@/utils/bosses';
-import { layoutBossMap } from '@/utils/bossMapLayout';
+import { baseBossId } from '@/utils/madBosses';
+import { layoutBossMap, applyLayoutOverrides, catmullRomPath } from '@/utils/bossMapLayout';
+import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -62,14 +64,20 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   const scrollRef = useRef<ScrollView>(null);
 
   const currentIdx = currentId ? bosses.findIndex(b => b.id === currentId) : bosses.length;
+  // Edytor mapy (2026-10-14, ARCHITECTURE.md §322 — user: "zrobisz edytor ja sam ustawie
+  // wszystko mapę ścieżkę") — ręcznie przeciągnięta pozycja NADPISUJE proceduralny zygzak dla
+  // danego bossa. Kluczowane BAZOWYM id (`baseBossId`) — TEN SAM fizyczny układ obowiązuje
+  // kampanię i MAD (mapy się nie dubluje per wariant).
+  const layoutOverrides = useBossMapLayoutStore(st => st.positions);
   // Szerokość płótna = ZMIERZONA szerokość viewportu (nie stała) — gwarantuje że zygzak
   // zawsze dokładnie mieści się na ekranie, na KAŻDYM rozmiarze telefonu, bez poziomego
   // przycinania/scrolla. Dopóki viewport nie jest jeszcze zmierzony, 340 to bezpieczny
   // placeholder (pierwszy render i tak zaraz dostanie realny onLayout).
-  const { nodes, width: canvasW, height: canvasH } = useMemo(
-    () => layoutBossMap(bosses.length, viewport.w || 340),
-    [bosses.length, viewport.w],
-  );
+  const { nodes, width: canvasW, height: canvasH } = useMemo(() => {
+    const base = layoutBossMap(bosses.length, viewport.w || 340);
+    const ids = bosses.map(b => baseBossId(b.id));
+    return applyLayoutOverrides(base.nodes, ids, layoutOverrides, base.width);
+  }, [bosses, viewport.w, layoutOverrides]);
   const litColor = isMad ? '#EF4444' : '#38BDF8';
 
   const onLayoutViewport = (e: LayoutChangeEvent) => {
@@ -95,14 +103,13 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 
   // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:
   // "te Ścieżki dalej mają byc czarno mgła zasłonięte"), + osobny, krótszy odcinek TYLKO do
-  // aktualnego węzła w jaskrawym kolorze akcentu NA WIERZCHU ("odkryta" część trasy.
-  const fullPathD = useMemo(() => (
-    nodes.length < 2 ? '' : nodes.map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ')
-  ), [nodes]);
+  // aktualnego węzła w jaskrawym kolorze akcentu NA WIERZCHU ("odkryta" część trasy). Krzywa
+  // Catmull-Rom (`catmullRomPath`, §322) zamiast łamanych odcinków prosto-w-prosto — user:
+  // "ścieżka połączy się sama z jakąś tam modyfikacją smooth" — ta sama funkcja co w edytorze
+  // mapy, więc podgląd w edytorze i realny render się zgadzają.
+  const fullPathD = useMemo(() => catmullRomPath(nodes), [nodes]);
   const litEnd = Math.min(currentIdx, nodes.length - 1);
-  const litPathD = useMemo(() => (
-    litEnd < 1 ? '' : nodes.slice(0, litEnd + 1).map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ')
-  ), [nodes, litEnd]);
+  const litPathD = useMemo(() => (litEnd < 1 ? '' : catmullRomPath(nodes.slice(0, litEnd + 1))), [nodes, litEnd]);
 
   if (bosses.length === 0) return null;
 

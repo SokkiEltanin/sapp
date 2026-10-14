@@ -41,6 +41,28 @@ boss widoczny od razu bez przewijania; pionowy scroll płynny (zwykły natywny);
 popup z WALCZ; przełącznik Kampania/MAD przewija do właściwego aktualnego bossa. ŚWIADOMIE
 BRAK poziomego przesuwania/zoomu — mapa węższa niż poprzednio, to nie błąd.
 
+**WAŻNE, znalezione PO §321**: user ciągle widział starą mapę mimo kolejnych scaleń PR-ów —
+appka NIE aktualizuje się sama przy starcie (user wcześniej explicite tego chciał: "mogę
+zrobić wtedy w ustawieniach aktualizację... żeby nie ładowało tak w kółko"). Trzeba RĘCZNIE:
+Ustawienia → Aplikacja → "Sprawdź aktualizację (OTA)" → Restart, PRZED każdym testem mapy na
+urządzeniu, inaczej test i tak trafia w starą, zbuforowaną paczkę JS. Warto to user'owi
+przypominać przy każdym kolejnym teście tej funkcji, dopóki się nie utrwali w nawyku.
+
+## 🆕 Edytor mapy bossów — ręczne rozstawienie (2026-10-14, §322)
+
+Po §321 user, zanim zdążył przetestować przebudowę #2: "zrobisz edytor ja sam ustawie wszystko
+mapę ścieżkę... ścieżka polaczy sie sama z jakas tam modyfikacja smooth". Zbudowane: nowy ekran
+`app/boss-map-editor.tsx` (wejście: ołówek w lewym dolnym rogu mapy bossów) — przeciągasz
+każdego z 22 bossów palcem, ścieżka łączy ich na żywo wygładzoną krzywą (Catmull-Rom,
+`catmullRomPath` w bossMapLayout.ts, współdzielona z prawdziwą mapą). Pozycje zapisują się do
+`bossMapLayoutStore` (persist) i NADPISUJĄ proceduralny zygzak z §321 w `CampaignMap.tsx` —
+jeden fizyczny układ dla kampanii i MAD naraz. "Resetuj" czyści wszystko naraz, wraca do
+automatycznego układu.
+
+**Priorytet testu na urządzeniu — WYSOKI**: otwórz edytor (ołówek na mapie), przeciągnij kilku
+bossów, sprawdź czy się zapisuje (wróć na mapę, powinny być w nowych miejscach + wygładzona
+ścieżka), zamknij i otwórz appkę ponownie (powinno przetrwać). Reset wszystkiego działa.
+
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 
 User: "chciałem żeby z PUPILA USUNĄĆ ćwiczenia i zamiast tego dodać w zdrowiu zakładkę albo
@@ -83,10 +105,11 @@ ilość/jednostka) od razu, monety/XP zostają.
    nagrodę i że streaki się zgadzają (priorytet testu wysoki w §312). Reszta ekranu
    (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
    przenosi się do nowego ekranu.
-2. Dopisz `exercises-v1` ORAZ `training-plans-v1` do `backupService.ts` CLOUD_COLS — oba
-   ekrany już z nich korzystają (§311, §320), dane realnie giną przy reinstalu/zmianie
-   telefonu bez tego. Małe, niezależne, zrobić wkrótce — builder planów to też ręcznie
-   wpisana praca usera (szablony sesji), nie tylko log, więc utrata boli podwójnie.
+2. Dopisz `exercises-v1`, `training-plans-v1` ORAZ `boss-map-layout-v1` do `backupService.ts`
+   CLOUD_COLS — wszystkie trzy ekrany już z nich korzystają (§311, §320, §322), dane realnie
+   giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne, zrobić wkrótce — builder
+   planów i ręcznie ułożona mapa bossów to też ręcznie wpisana praca usera, nie tylko log,
+   więc utrata boli podwójnie.
 3. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
    nagród (`markXDone()` dalej je woła z nowego ekranu), NIE kasować.
 4. **Priorytet testu na urządzeniu — średni-wysoki, nowe ekrany** (§320, builder planów):
