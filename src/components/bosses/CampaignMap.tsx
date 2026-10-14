@@ -1,68 +1,53 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Image, Pressable } from 'react-native';
+import { memo, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Image, Pressable, LayoutChangeEvent } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Lock, Swords } from 'lucide-react-native';
 import BossArt from './BossArt';
 import PressableScale from '@/components/ui/PressableScale';
 import { Boss, mysteryBossName, fmtEnergyCountdown } from '@/utils/bosses';
+import { layoutBossMap } from '@/utils/bossMapLayout';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-// Mapa kampanii (2026-10-12, przebudowa 2026-10-13 po zrzucie ekranu — user: "wrzuć tę mapę
-// w tło zmniejsz jasność... żeby to wyglądało jak podróż... ta ikonka aktualna niech się
-// pokazuje jak inne mała i po kliknięciu pokazuje się powiększony i przycisk walki popup...
-// pokonani niech na szaro się pokazują albo przekreśleni czarnym X... i elementów niech będą
-// popupy gdzieś przy krawędziach żeby to było pełnoekranowe"). Cztery zmiany względem
-// pierwszej wersji:
-// 1. Tło — prawdziwa, dostarczona grafika mapy (topograficzny pergamin, assets/lokalizacje/
-//    LOKACJA_MAPA_KAMPANII.jpg), kafelkowana (`resizeMode="repeat"`, zwykły RN `Image`, NIE
-//    expo-image — ten jedyny tu potrzebuje natywnego tile'owania, którego expo-image nie ma)
-//    bo trasa bywa dużo wyższa niż pojedyncza grafika (kampania już ~44 bossów, celuje w
-//    ~100+). Ciemny scrim NA WIERZCHU (user: "zmniejsz jasność") — ten sam 3-stopniowy
-//    gradient-w-dół co tło lokacji w boss-fight.tsx, dla spójności.
-// 2. Dawny hero card aktualnego bossa (duży portret/taunt/WALCZ, NAD mapą w bosses.tsx)
-//    USUNIĘTY CAŁKOWICIE — ta sama treść żyje teraz w POPUPIE otwieranym tapnięciem węzła
-//    aktualnego bossa, który na samej mapie ma TEN SAM rozmiar co pokonani/zablokowani (był
-//    już taki od pierwszej wersji — to hero card obok mapy sprawiał wrażenie dublowania, nie
-//    sam węzeł).
-// 3. Pokonani — zamiast zielonej odznaki ✓, portret przyciemniony (opacity 0.35) + duże
-//    czarne X na wierzchu. Tap dalej działa, teraz jako popup (nie toast) z nazwą+lootem.
-// 4. Popupy (aktualny i pokonany) to NIE pełnoekranowy `Modal` — absolutnie pozycjonowane
-//    karty WEWNĄTRZ tej samej przewijanej treści co węzły (ta sama przestrzeń współrzędnych
-//    co `nodeX`/`nodeY`), zakotwiczone PRZY tapniętym węźle i przesunięte żeby nie wyjść
-//    poza krawędzie mapy — mapa może być prawie pełnoekranowa, bo żadna interakcja nie
-//    wymaga własnego, osobnego miejsca na ekranie.
-const NODE = 56;
-const ROW_GAP = 92;
-const AMP = 70;          // maks. poziome wychylenie węzła od środka (wężowa ścieżka)
-const TOP_PAD = 36;
-const BOTTOM_PAD = 48;
-const POPUP_W = 224;
+// Mapa bossów — PRZEBUDOWA OD ZERA (2026-10-14, user po zrzucie: "zrob caloekranowa te
+// mapę... rozmieścić bosy na koordynatach potem polacz sciezkami po kolei jak w dragon mania
+// legends... teraz duplikujesz mapę wielokrotnie i ma scrolla dziwnie... chodziło o
+// przebudowę całej zakładki bossów od zera"). Poprzednia wersja (jeden pionowy ScrollView,
+// węzły kołysane sinusoidą TYLKO w poziomie, Y rosnące liniowo z indeksem) dawała okresowo
+// powtarzający się kształt — stąd wrażenie "duplikowania się" mapy. Ta wersja:
+// 1. PRAWDZIWA mapa 2D — węzły rozmieszczone proceduralnym spacerem (`layoutBossMap`,
+//    bossMapLayout.ts) łamiącym kierunek w KAŻDĄ stronę (nie tylko X), więc trasa realnie
+//    wije się po płaszczyźnie, nie powtarza okresowego wzoru.
+// 2. Swobodne przesuwanie + pinch-zoom (`Gesture.Pan`+`Gesture.Pinch`, react-native-gesture-
+//    handler — już w projekcie, ten sam "nowy" `Gesture`/`GestureDetector` styl co
+//    `(tabs)/_layout.tsx`/`DashEditRow.tsx`/`MoodEnergyGrid.tsx`, nie legacy
+//    Pan/PinchGestureHandler) zamiast samego pionowego scrolla.
+// 3. Kamera "wskakuje" (jump, NIE animowany scroll) na aktualnego bossa przy pierwszym
+//    zmierzeniu viewportu (`onLayout`) — eliminuje CAŁĄ klasę wyścigów czasowych, które
+//    psuły starą wersję (setTimeout(0) kontra natywny layout ScrollView).
+// 4. "Mgła" przeprojektowana pod 2D — stary gradient działał tylko bo trasa była ściśle
+//    pionowa (można było "zasłonić wszystko poniżej Y"). W prawdziwym 2D nie ma jednego
+//    "poniżej" — fog realizowany teraz PER-SEGMENT ścieżki (nieodkryty odcinek rysowany
+//    prawie czarnym, ledwo widocznym kolorem zamiast jasnego akcentu) + per-węzeł (locked =
+//    czarna sylwetka + kłódka, już istniało, zostaje).
+const NODE = 60;
+const POPUP_W = 248;
+const MIN_SCALE = 0.35;
+const MAX_SCALE = 1.8;
 const MAP_BG = require('../../../assets/lokalizacje/LOKALIZACJA_MAPA_KAMPANII.jpg');
 
-function nodeX(i: number) { return Math.sin(i * 0.85) * AMP; }
-function nodeY(i: number) { return TOP_PAD + i * ROW_GAP; }
-
-type Popup = { kind: 'current' | 'defeated'; boss: Boss; nodeX: number; nodeY: number };
+type Popup = { kind: 'current' | 'defeated'; boss: Boss };
 
 // `defeatedIds` nie jest tu potrzebne osobno — kampania leci ŚCIŚLE sekwencyjnie (patrz
-// `current = BOSSES.find(b => !defeatedBosses.includes(b.id))` w bosses.tsx, komentarz przy
-// `defeatedList`), więc "pokonany" ⟺ "indeks < currentIdx" w TEJ SAMEJ tablicy `bosses`.
-// `energy`/`energyMax`/`energyRegenAt` opcjonalne — popup aktualnego bossa pokazuje hint
-// "kolejna energia za..." i wyszarza WALCZ tylko gdy podane (ten sam hint co dawny hero card).
-//
-// `variant`/`locked`/`lockMessage` (2026-10-13, mapa MAD — user: "mad bosy to tez pokonane
-// [bossy kampanii] i mapa zmienia kolor na lekko czerwony i te bosy pokonane sa do kliknięcia
-// wtedy jako ich mad wersje") — MAD dzieli DOKŁADNIE tę samą sekwencyjną strukturę co
-// kampania (ten sam "aktualny cel po kolejności" wzorzec, patrz madCandidate w
-// madBosses.ts), więc zamiast osobnego komponentu bosses.tsx przekazuje tu MAD-owe warianty
-// bossów (`madBossFor`, id/name/hp/nagrody już przeliczone) + `variant="mad"` dla
-// czerwonego tła/ścieżki/aury artu. `locked` (poziom gracza < MAD_UNLOCK_LEVEL) pokazuje
-// zamiast przycisku WALCZ ten sam blok "Odblokujesz na poziomie X" co dawny hero card MAD —
-// węzeł/popup aktualnego celu i tak się pokazuje (żeby było widać CO odblokujesz), tylko bez
-// możliwości ataku.
+// `current = BOSSES.find(b => !defeatedBosses.includes(b.id))` w bosses.tsx), więc "pokonany"
+// ⟺ "indeks < currentIdx" w TEJ SAMEJ tablicy `bosses`. `variant`/`locked`/`lockMessage` —
+// patrz komentarz w bosses.tsx przy wywołaniu z `variant="mad"`: ten sam komponent obsługuje
+// kampanię i MAD (identyczna sekwencyjna logika), tylko inny kolor ścieżki/aury i ew. blokada
+// poziomu w popupie aktualnego celu.
 function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, energyRegenAt, variant = 'campaign', locked, lockMessage }: {
   bosses: Boss[]; currentId: string | null; onPressCurrent: () => void;
   energy?: number; energyMax?: number; energyRegenAt?: string | null;
@@ -70,219 +55,210 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 }) {
   const isMad = variant === 'mad';
   const c = useColors();
-  const scrollRef = useRef<ScrollView>(null);
-  const mapW = Dimensions.get('window').width - spacing[4] * 2;
-  const mapH = Math.max(480, Dimensions.get('window').height - 300);
-  const centerX = mapW / 2;
   const [popup, setPopup] = useState<Popup | null>(null);
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
 
   const currentIdx = currentId ? bosses.findIndex(b => b.id === currentId) : bosses.length;
-  const contentH = TOP_PAD + Math.max(bosses.length - 1, 0) * ROW_GAP + NODE + BOTTOM_PAD;
-
-  // Popup zamyka się sam gdy postęp kampanii faktycznie się zmienia (np. wygrana walka
-  // przesuwa `currentId`) — stary popup pokazywałby wtedy nieaktualny stan/przycisk.
-  useEffect(() => { setPopup(null); }, [currentId]);
-
-  // Pełna trasa w jednym kolorze (przebyta już droga), + osobny, krótszy `Path` TYLKO do
-  // aktualnego węzła w kolorze akcentu NA WIERZCHU — czyta się jako "oświetlony odcinek
-  // ścieżki", reszta (pod mgłą niżej) zostaje matowa bez komplikowania się z maskami/clipami.
-  const fullPathD = useMemo(() => {
-    if (bosses.length < 2) return '';
-    return bosses.map((_, i) => `${i === 0 ? 'M' : 'L'} ${centerX + nodeX(i)} ${nodeY(i) + NODE / 2}`).join(' ');
-  }, [bosses.length, centerX]);
-  const litPathD = useMemo(() => {
-    const end = Math.min(currentIdx, bosses.length - 1);
-    if (end < 1) return '';
-    return Array.from({ length: end + 1 }, (_, i) => `${i === 0 ? 'M' : 'L'} ${centerX + nodeX(i)} ${nodeY(i) + NODE / 2}`).join(' ');
-  }, [currentIdx, bosses.length, centerX]);
+  const { nodes, width: canvasW, height: canvasH } = useMemo(() => layoutBossMap(bosses.length), [bosses.length]);
   const litColor = isMad ? '#EF4444' : '#38BDF8';
 
-  // Auto-scroll do aktualnego węzła RAZ przy montowaniu (nie na każdy render — ekran-rodzic
-  // re-renderuje się często, np. co tyknięcie odliczania energii, nie chcemy szarpać scrolla).
-  // FIX (2026-10-14, user: "nie mam bosa kampania którym mogę kliknąć walcz" — po scrollu
-  // który w tej samej mapie wylądował na SAMEJ GÓRZE, nie przy aktualnym bossie) —
-  // `setTimeout(…, 0)` wyścigowo zgadywał "ScrollView już zmierzona", co na Androidzie
-  // bywa fałszywe (zwłaszcza z `nestedScrollEnabled`, patrz niżej — dłuższa ścieżka
-  // natywnego layoutu przy pierwszym mouncie): `scrollTo` wołane ZANIM treść faktycznie
-  // dostała swoją wysokość po cichu nic nie robi. `onContentSizeChange` na ScrollView
-  // zamiast tego — odpala się DOPIERO gdy natywna treść realnie ma już znany, policzony
-  // rozmiar (gwarancja z samego kontraktu tego callbacku), więc `scrollTo` zawsze trafia we
-  // właściwą pozycję. `didAutoScroll` ref (nie `useEffect`+`[]`) pilnuje że to leci TYLKO
-  // RAZ — `onContentSizeChange` może odpalić się więcej niż raz (np. gdyby `contentH` się
-  // zmieniło), a ręczne przewinięcie usera nie może zostać nadpisane kolejnym auto-scrollem.
-  const didAutoScroll = useRef(false);
-  const onContentSizeChange = () => {
-    if (didAutoScroll.current) return;
-    didAutoScroll.current = true;
-    const idx = currentIdx >= 0 ? currentIdx : Math.max(bosses.length - 1, 0);
-    const targetY = Math.max(0, nodeY(idx) - 260);
-    scrollRef.current?.scrollTo({ y: targetY, animated: false });
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const startScale = useSharedValue(1);
+
+  // Kamera wskakuje na aktualnego bossa RAZ, gdy poznajemy rozmiar viewportu — user: "domyślnie
+  // popakuje sie pozycja bosa aktualnego do pokonania". `onLayout` (nie efekt+Dimensions) bo
+  // musi znać REALNY, zmierzony rozmiar TEGO konkretnego kontenera (zależny od layoutu ekranu-
+  // rodzica, nie całego okna) — bez wyścigu, `onLayout` z kontraktu odpala się z gotowym
+  // rozmiarem, ten sam powód co `onContentSizeChange` w poprzedniej wersji tego pliku.
+  const centered = useRef(false);
+  const onLayoutViewport = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setViewport({ w: width, h: height });
+    if (centered.current || nodes.length === 0) return;
+    centered.current = true;
+    const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
+    const node = nodes[idx];
+    const tx = width / 2 - node.x;
+    const ty = height / 2 - node.y;
+    translateX.value = tx;
+    translateY.value = ty;
+    startX.value = tx;
+    startY.value = ty;
   };
+
+  const pan = Gesture.Pan()
+    .minDistance(4)
+    .onUpdate((e) => {
+      'worklet';
+      const s = scale.value;
+      const minTX = Math.min(0, viewport.w - canvasW * s);
+      const maxTX = Math.max(0, viewport.w - canvasW * s);
+      const minTY = Math.min(0, viewport.h - canvasH * s);
+      const maxTY = Math.max(0, viewport.h - canvasH * s);
+      let nx = startX.value + e.translationX;
+      let ny = startY.value + e.translationY;
+      if (nx < minTX) nx = minTX; else if (nx > maxTX) nx = maxTX;
+      if (ny < minTY) ny = minTY; else if (ny > maxTY) ny = maxTY;
+      translateX.value = nx;
+      translateY.value = ny;
+    })
+    .onEnd(() => {
+      'worklet';
+      startX.value = translateX.value;
+      startY.value = translateY.value;
+    });
+
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      'worklet';
+      let s = startScale.value * e.scale;
+      if (s < MIN_SCALE) s = MIN_SCALE; else if (s > MAX_SCALE) s = MAX_SCALE;
+      scale.value = s;
+    })
+    .onEnd(() => {
+      'worklet';
+      startScale.value = scale.value;
+    });
+
+  const composed = Gesture.Simultaneous(pan, pinch);
+
+  const canvasStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:
+  // "te Ścieżki dalej mają byc czarno mgła zasłonięte"), + osobny, krótszy odcinek TYLKO do
+  // aktualnego węzła w jaskrawym kolorze akcentu NA WIERZCHU ("odkryta" część trasy.
+  const fullPathD = useMemo(() => (
+    nodes.length < 2 ? '' : nodes.map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ')
+  ), [nodes]);
+  const litEnd = Math.min(currentIdx, nodes.length - 1);
+  const litPathD = useMemo(() => (
+    litEnd < 1 ? '' : nodes.slice(0, litEnd + 1).map((n, i) => `${i === 0 ? 'M' : 'L'} ${n.x} ${n.y}`).join(' ')
+  ), [nodes, litEnd]);
 
   if (bosses.length === 0) return null;
 
-  // Mgła naciągnięta na segment ZA aktualnym węzłem (user: "reszta mapy zasłonięta jest
-  // mgłą") — zaczyna się TUŻ nad aktualnym węzłem (lekki overlap, żeby nie było twardej
-  // krawędzi na jego wysokości) i sięga do samego dołu trasy. Kampania w 100% ukończona
-  // (`currentIdx >= bosses.length`, nic już zablokowane) → brak mgły w ogóle, nie
-  // "przyklejona" do ostatniego (w tym wypadku POKONANEGO) węzła.
-  const hasLocked = currentIdx < bosses.length;
-  const fogStartY = hasLocked ? Math.max(0, nodeY(currentIdx) - NODE * 0.6) : contentH;
-  const fogH = contentH - fogStartY;
+  const popupLeft = viewport.w ? (viewport.w - POPUP_W) / 2 : 0;
+  const popupTop = viewport.h ? viewport.h / 2 - 140 : 0;
 
-  // Popup zakotwiczony PRZY tapniętym węźle (nie wyśrodkowany modal) — klamrowany w
-  // poziomie do szerokości mapy, w pionie pokazywany pod węzłem albo nad nim gdy węzeł jest
-  // blisko dołu trasy (żeby nie wystawał poza przewijaną treść).
-  const popupLeft = popup ? Math.min(Math.max(popup.nodeX + NODE / 2 - POPUP_W / 2, 8), mapW - POPUP_W - 8) : 0;
-  const estH = popup?.kind === 'current' ? 236 : 110;
-  const nearBottom = popup ? popup.nodeY > contentH - estH - NODE - 20 : false;
-  const popupTop = popup ? (nearBottom ? Math.max(8, popup.nodeY - estH - 10) : popup.nodeY + NODE + 10) : 0;
-
-  // `nestedScrollEnabled` (Android-only, no-op na iOS) — bez tego ta wewnętrzna ScrollView
-  // żyje wewnątrz zewnętrznej strony (bosses.tsx) o tej samej osi i Android przechwytuje
-  // CAŁY pan do zewnętrznej, czyniąc mapę nieprzewijalną dotykiem (user: "nie moge przesuwać
-  // mapy").
   return (
-    <View style={[st.wrap, { height: mapH }]}>
-      <ScrollView
-        ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }}
-        showsVerticalScrollIndicator={false} nestedScrollEnabled
-        onContentSizeChange={onContentSizeChange}
-      >
-        <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: mapW, height: contentH }]} resizeMode="repeat" />
-        {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
-            na lekko czerwony") — ten sam 3-stopniowy gradient, tylko podbarwiony. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={(isMad
-            ? ['rgba(40,8,10,0.55)', 'rgba(40,8,10,0.68)', 'rgba(40,8,10,0.8)']
-            : ['rgba(8,10,16,0.55)', 'rgba(8,10,16,0.68)', 'rgba(8,10,16,0.8)']) as [string, string, string]}
-          style={StyleSheet.absoluteFillObject}
-        />
+    <View style={st.wrap} onLayout={onLayoutViewport}>
+      <GestureDetector gesture={composed}>
+        <Reanimated.View style={[{ width: canvasW, height: canvasH }, canvasStyle]}>
+          <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: canvasW, height: canvasH }]} resizeMode="repeat" />
+          {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
+              na lekko czerwony"). */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={(isMad
+              ? ['rgba(40,8,10,0.55)', 'rgba(40,8,10,0.68)', 'rgba(40,8,10,0.82)']
+              : ['rgba(8,10,16,0.55)', 'rgba(8,10,16,0.68)', 'rgba(8,10,16,0.82)']) as [string, string, string]}
+            style={StyleSheet.absoluteFillObject}
+          />
 
-        {/* Ścieżka "już przebyta" — STAŁY, jasny biały (NIE `c.border.default`, który w
-            ciemnym motywie bywa prawie niewidoczny na ciemnym tle mapy — user: "dziwnie się
-            pokazują niektóre jakby poza liniami", bo nie dało się prześledzić wzrokiem którędy
-            faktycznie biegnie trasa między węzłami) — mapa ma WŁASNE, stałe ciemne tło
-            niezależne od motywu appki, więc linia nie powinna go dziedziczyć. Grubsza
-            (5 zamiast 4) i wyraźniejsza (0.4 zamiast 0.6×border-koloru) dla czytelności. */}
-        <Svg width={mapW} height={contentH} style={StyleSheet.absoluteFillObject}>
-          {!!fullPathD && <Path d={fullPathD} stroke="rgba(255,255,255,0.4)" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-        </Svg>
+          <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
+            {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+            {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          </Svg>
 
-        {bosses.map((b, i) => {
-          const isDefeated = i < currentIdx;
-          const isCurrent = i === currentIdx;
-          const isLocked = i > currentIdx;
-          const x = centerX + nodeX(i) - NODE / 2;
-          const y = nodeY(i);
-          const node = (
-            <View style={[st.node, { left: x, top: y }]}>
-              <View style={st.portrait}>
-                {/* Pierścień wokół AKTUALNEGO węzła (2026-10-14, user: "nie mam bosa kampania
-                    którym mogę kliknąć walcz" — nawet po naprawie auto-scrolla, aktualny
-                    węzeł wyglądał identycznie jak każdy pokonany/zablokowany portret, łatwo
-                    było go przeoczyć przy przewijaniu) — kolorowa obwódka w kolorze
-                    "oświetlonej" ścieżki (ten sam `litColor`, niebieski/czerwony wg wariantu),
-                    żeby jedyny klikalny-do-walki węzeł faktycznie rzucał się w oczy. */}
-                {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
-                <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
-                {isDefeated && (
-                  <View style={st.defeatedOverlay} pointerEvents="none">
-                    <X size={NODE * 0.62} color="rgba(0,0,0,0.82)" strokeWidth={3.5} />
-                  </View>
-                )}
-              </View>
-              {isLocked && <View style={st.badgeLock}><Lock size={10} color="rgba(255,255,255,0.75)" /></View>}
-              <Text style={[st.nodeLabel, { color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
-                {isLocked ? mysteryBossName(b.id) : b.name}
-              </Text>
-            </View>
-          );
-          if (isCurrent) {
-            return (
-              <PressableScale
-                key={b.id}
-                onPress={() => { haptic.tap(); setPopup({ kind: 'current', boss: b, nodeX: x, nodeY: y }); }}
-                style={[st.nodeTouch, { left: x, top: y }]}
-              >
-                {node}
-              </PressableScale>
-            );
-          }
-          if (isDefeated) {
-            return (
-              <PressableScale
-                key={b.id}
-                onPress={() => { haptic.tap(); setPopup({ kind: 'defeated', boss: b, nodeX: x, nodeY: y }); }}
-                style={[st.nodeTouch, { left: x, top: y }]}
-              >
-                {node}
-              </PressableScale>
-            );
-          }
-          return <View key={b.id}>{node}</View>;
-        })}
-
-        <LinearGradient
-          pointerEvents="none"
-          colors={['rgba(8,10,16,0)', 'rgba(8,10,16,0.85)', 'rgba(8,10,16,0.96)'] as [string, string, string]}
-          locations={[0, 0.3, 1]}
-          style={{ position: 'absolute', left: 0, right: 0, top: fogStartY, height: Math.max(fogH, 0) }}
-        />
-
-        {popup && (
-          <>
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setPopup(null)} />
-            <View style={[st.popup, { left: popupLeft, top: popupTop, width: POPUP_W }]}>
-              <View style={{ alignItems: 'center' }}>
-                <BossArt id={popup.boss.id} emoji={popup.boss.emoji} size={popup.kind === 'current' ? 84 : 56} mystery={false} powered={isMad} />
-              </View>
-              {isMad && <Text style={st.popupMadKicker}>OSZALAŁY WARIANT</Text>}
-              <Text style={st.popupName}>{popup.boss.name}</Text>
-              {popup.kind === 'current' ? (
-                <>
-                  <Text style={st.popupTaunt} numberOfLines={2}>„{popup.boss.taunt}"</Text>
-                  <Text style={st.popupHp}>{popup.boss.hp} HP · <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{popup.boss.weaknessLabel}</Text></Text>
-                  {locked ? (
-                    <View style={st.popupLockBox}>
-                      <Lock size={13} color="rgba(255,255,255,0.6)" />
-                      <Text style={st.popupLockTxt}>{lockMessage}</Text>
+          {bosses.map((b, i) => {
+            const isDefeated = i < currentIdx;
+            const isCurrent = i === currentIdx;
+            const isLocked = i > currentIdx;
+            const n = nodes[i];
+            const x = n.x - NODE / 2;
+            const y = n.y - NODE / 2;
+            const node = (
+              <View style={[st.node, { left: x, top: y }]}>
+                <View style={st.portrait}>
+                  {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
+                  <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
+                  {isDefeated && (
+                    <View style={st.defeatedOverlay} pointerEvents="none">
+                      <X size={NODE * 0.62} color="rgba(0,0,0,0.82)" strokeWidth={3.5} />
                     </View>
-                  ) : (
-                    <>
-                      {energy != null && energyMax != null && energy < energyMax && energyRegenAt && (
-                        <Text style={st.popupEnergyHint}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
-                      )}
-                      <PressableScale onPress={() => { haptic.tap(); setPopup(null); onPressCurrent(); }} style={{ width: '100%', marginTop: spacing[2] }}>
-                        <View style={[st.attackBtn, energy != null && energy <= 0 && { opacity: 0.5 }]}>
-                          <Swords size={15} color="#fff" />
-                          <Text style={st.attackTxt}>WALCZ!</Text>
-                        </View>
-                      </PressableScale>
-                    </>
                   )}
-                </>
-              ) : (
-                // MAD pokonany daje coiny+XP (patrz boss-fight.tsx `victory.kind === 'mad'`),
-                // NIE przedmiot loot jak kampania — `madBossFor` dziedziczy pole `loot` z
-                // bazowego bossa, ale ono nie jest tym co realnie przyznaje walka z MAD.
-                <Text style={st.popupDoneTxt}>
-                  {isMad ? `Pokonany ✓ · +${popup.boss.xp} XP` : `Pokonany ✓ · ${popup.boss.loot.name}`}
+                </View>
+                {isLocked && <View style={st.badgeLock}><Lock size={10} color="rgba(255,255,255,0.75)" /></View>}
+                <Text style={[st.nodeLabel, { color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
+                  {isLocked ? mysteryBossName(b.id) : b.name}
                 </Text>
-              )}
+              </View>
+            );
+            if (isCurrent || isDefeated) {
+              return (
+                <PressableScale
+                  key={b.id}
+                  onPress={() => { haptic.tap(); setPopup({ kind: isCurrent ? 'current' : 'defeated', boss: b }); }}
+                  style={[st.nodeTouch, { left: x, top: y }]}
+                >
+                  {node}
+                </PressableScale>
+              );
+            }
+            return <View key={b.id}>{node}</View>;
+          })}
+        </Reanimated.View>
+      </GestureDetector>
+
+      {popup && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <Pressable style={st.popupBackdrop} onPress={() => setPopup(null)} />
+          <View style={[st.popup, { left: popupLeft, top: popupTop, width: POPUP_W }]}>
+            <View style={{ alignItems: 'center' }}>
+              <BossArt id={popup.boss.id} emoji={popup.boss.emoji} size={popup.kind === 'current' ? 88 : 60} mystery={false} powered={isMad} />
             </View>
-          </>
-        )}
-      </ScrollView>
+            {isMad && <Text style={st.popupMadKicker}>OSZALAŁY WARIANT</Text>}
+            <Text style={st.popupName}>{popup.boss.name}</Text>
+            {popup.kind === 'current' ? (
+              <>
+                <Text style={st.popupTaunt} numberOfLines={2}>„{popup.boss.taunt}"</Text>
+                <Text style={st.popupHp}>{popup.boss.hp} HP · <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{popup.boss.weaknessLabel}</Text></Text>
+                {locked ? (
+                  <View style={st.popupLockBox}>
+                    <Lock size={13} color="rgba(255,255,255,0.6)" />
+                    <Text style={st.popupLockTxt}>{lockMessage}</Text>
+                  </View>
+                ) : (
+                  <>
+                    {energy != null && energyMax != null && energy < energyMax && energyRegenAt && (
+                      <Text style={st.popupEnergyHint}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
+                    )}
+                    <PressableScale onPress={() => { haptic.tap(); setPopup(null); onPressCurrent(); }} style={{ width: '100%', marginTop: spacing[2] }}>
+                      <View style={[st.attackBtn, energy != null && energy <= 0 && { opacity: 0.5 }]}>
+                        <Swords size={15} color="#fff" />
+                        <Text style={st.attackTxt}>WALCZ!</Text>
+                      </View>
+                    </PressableScale>
+                  </>
+                )}
+              </>
+            ) : (
+              // MAD pokonany daje coiny+XP (patrz boss-fight.tsx `victory.kind === 'mad'`), NIE
+              // przedmiot loot jak kampania — `madBossFor` dziedziczy pole `loot` z bazowego
+              // bossa, ale ono nie jest tym co realnie przyznaje walka z MAD.
+              <Text style={st.popupDoneTxt}>
+                {isMad ? `Pokonany ✓ · +${popup.boss.xp} XP` : `Pokonany ✓ · ${popup.boss.loot.name}`}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  wrap: { borderRadius: radius.xl, overflow: 'hidden', marginTop: spacing[3] },
-  scroll: { flex: 1 },
+  wrap: { flex: 1, overflow: 'hidden', backgroundColor: '#05060A' },
   nodeTouch: { position: 'absolute', width: NODE, alignItems: 'center' },
   node: { position: 'absolute', width: NODE, alignItems: 'center' },
   portrait: { width: NODE, height: NODE, alignItems: 'center', justifyContent: 'center' },
@@ -295,30 +271,30 @@ const st = StyleSheet.create({
     position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: 9,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
   },
-  nodeLabel: { fontSize: 9.5, fontWeight: '800', textAlign: 'center', marginTop: 4, width: NODE + 28, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  nodeLabel: { fontSize: 10, fontWeight: '800', textAlign: 'center', marginTop: 4, width: NODE + 32, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
+  popupBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   popup: {
     position: 'absolute', backgroundColor: '#161A1A', borderRadius: radius.lg, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)', padding: spacing[3], gap: 3,
-    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 10,
+    borderColor: 'rgba(255,255,255,0.14)', padding: spacing[4], gap: 3,
+    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
   popupMadKicker: { fontSize: 9.5, fontWeight: '900', color: '#DC2626', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
-  popupName: { fontSize: 14, fontWeight: '900', color: '#fff', textAlign: 'center', marginTop: 4 },
-  popupTaunt: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', textAlign: 'center' },
-  popupHp: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 2 },
-  popupEnergyHint: { fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 2 },
-  popupDoneTxt: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  popupName: { fontSize: 15, fontWeight: '900', color: '#fff', textAlign: 'center', marginTop: 4 },
+  popupTaunt: { fontSize: 11.5, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', textAlign: 'center' },
+  popupHp: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 2 },
+  popupEnergyHint: { fontSize: 10.5, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 2 },
+  popupDoneTxt: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
   popupLockBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2] },
-  popupLockTxt: { flex: 1, fontSize: 10.5, color: 'rgba(255,255,255,0.6)', lineHeight: 14 },
-  attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.md, paddingVertical: 11 },
-  attackTxt: { fontSize: 13.5, fontWeight: '900', color: '#fff' },
+  popupLockTxt: { flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 15 },
+  attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.md, paddingVertical: 12 },
+  attackTxt: { fontSize: 14, fontWeight: '900', color: '#fff' },
 });
 
 // memo: ekran-rodzic (bosses.tsx) re-renderuje się często (odliczanie energii) — props tego
 // komponentu (bosses/currentId/onPressCurrent/energy*) zmieniają się tylko gdy REALNY postęp
 // kampanii lub pula energii się zmienia, nie co tyknięcie zegara, więc memo faktycznie coś
-// daje — POD WARUNKIEM że `onPressCurrent` jest stabilne (`useCallback` w bosses.tsx, patrz
-// `goFight` tam), inaczej nowe closure na każdy render i tak łamałoby porównanie propsów.
-// Ten sam warunek dotyczy `bosses` w trybie MAD — bosses.tsx musi przekazać stabilną
-// (`useMemo`) tablicę wariantów MAD, nie świeżo zmapowaną tablicę co render.
+// daje — POD WARUNKIEM że `onPressCurrent` jest stabilne (`useCallback` w bosses.tsx) i
+// `bosses` ma stabilną referencję w trybie MAD (`useMemo` tam) — inaczej nowe closure/tablica
+// na każdy render i tak łamałoby porównanie propsów.
 export default memo(CampaignMap);

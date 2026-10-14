@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
+import { View, Text, StyleSheet, Pressable, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Zap, Swords, Trophy } from 'lucide-react-native';
@@ -14,8 +14,7 @@ import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, fmtEnergyCountd
 import { gearCombatBonuses, gearAtkFlat } from '@/utils/gear';
 import { raidForWeek, raidHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
-import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
-import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -41,13 +40,22 @@ function nextLocalMidnightIso(): string {
   return d.toISOString();
 }
 
-// Ekran-LISTA (S&F-style): kampania + raid + wydarzenie, WYŁĄCZNIE przegląd. Klik "WALCZ"
-// na KAŻDYM z trzech nawiguje do app/boss-fight.tsx (kampania bez parametru, raid/wydarzenie
-// przez ?kind=raid|event) — 2026-08-10, user: "przyjrzyj się teraz eventowym bossom żeby
-// były tak samo jak te nasze, też wchodzę z nimi do walki". Wcześniej raid/wydarzenie były
-// jednorazowym klikiem TU NA MIEJSCU (bez nawigacji, bez rundowej animacji) — ten podział
-// zniknął, cała trójka dzieli teraz jedną arenę. Mini-karty tutaj zostają jako KOMPAKTOWY
-// PODGLĄD (nazwa/HP/portret), nie miejsce walki.
+// Zakładka Bossy — PRZEBUDOWA OD ZERA (2026-10-14, patrz obszerny komentarz w
+// CampaignMap.tsx) — user: "zrob caloekranowa te mapę cała zakładka bossow niech bedzie
+// miała mapę... te bosy evetowe muszą byc w kafelkach mniejsze jak w grach zeby po
+// kliknięciu sie pokazywalo zeby nie zasłaniały mapy... wywalmy odznaki z tej zakładki".
+// Trzy zmiany względem poprzedniej wersji:
+// 1. Mapa (CampaignMap) jest teraz PEŁNOEKRANOWA — `{flex:1}` zamiast kafla w przewijanej
+//    stronie, przełącznik Kampania/MAD i kompaktowe kafle raid/event PŁYWAJĄ nad nią
+//    (`position:absolute`), nie zajmują własnego miejsca w layoucie.
+// 2. Raid/wydarzenie — dawne zawsze-widoczne "mini-karty" (portret+pasek+WALCZ, blokujące
+//    górę mapy) zastąpione MAŁYMI kafelkami-ikonami (sam portret + odznaka liczby medali +
+//    kropka "gotowe"); tap otwiera wyśrodkowany popup z pełną treścią (dokładnie ta sama
+//    informacja co dawna mini-karta, tylko na żądanie, nie zasłaniając mapy na stałe).
+// 3. Sekcje "Medale raidów"/"Medale wydarzeń" (ściana ikon pod mapą) USUNIĘTE CAŁKOWICIE —
+//    user: "sa bez sensu i zle wyglądają" — licznik medali ZOSTAJE jako mała odznaka na
+//    kompaktowym kaflu (powyżej), reszta (sama ściana ikon) skasowana wraz z martwym
+//    importem `raidIcon`/`eventIcon`/`eventBossFromKey` (używanymi WYŁĄCZNIE tam).
 export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -103,20 +111,14 @@ export default function Bosses() {
   // pupila, nie inwestycja w łup.
   const eventEnergyMax = eventDailyAttempts(level);
 
-  // Przełącznik Kampania/MAD (2026-08-21, user: "dodaj zeby byl przełącznik pomiędzy mad
-  // bosami a kampanijnymi") — obie sekcje dawniej stały jedna pod drugą, więc dotarcie do MAD
-  // wymagało przewinięcia całej (do 22-pozycyjnej) listy kampanii. Teraz jeden segmented
-  // control pokazuje TYLKO wybraną sekcję na raz; raid/wydarzenie (osobne tory) i ściany
-  // medali zostają poza przełącznikiem, zawsze widoczne.
-  // Domyślna zakładka zależy od postępu (2026-09-19, user: "jak pokonałem wszystkie bossy
-  // kampanii to główna zakładka musi być wtedy madbossy") — z kampanią w 100% skończoną
-  // (`current` niżej == null) domyślny widok "Kampania" pokazywał tylko martwy ekran
-  // "Wszyscy bossowie pokonani!" (linia `s.done` niżej), a jedyny realny cel (MAD) wymagał
-  // ręcznego przełączenia przy każdym wejściu na ekran. `null` = brak ręcznego wyboru w tej
-  // sesji ekranu → domyślna zakładka liczona z postępu; po ręcznym kliknięciu przełącznika
-  // override trzyma wybór usera (nie wraca siłą do MAD np. gdy user ogląda ściany medali w
-  // zakładce Kampania mimo skończonej kampanii).
+  // Przełącznik Kampania/MAD (2026-08-21) — pływa nad mapą (patrz JSX), nie stoi w osobnym
+  // wierszu layoutu. Domyślna zakładka zależy od postępu (2026-09-19, user: "jak pokonałem
+  // wszystkie bossy kampanii to główna zakładka musi być wtedy madbossy") — z kampanią w
+  // 100% skończoną (`current` niżej == null) domyślny widok to MAD. `null` = brak ręcznego
+  // wyboru w tej sesji ekranu → domyślna zakładka liczona z postępu; po ręcznym kliknięciu
+  // przełącznika override trzyma wybór usera.
   const [bossViewOverride, setBossViewOverride] = useState<'campaign' | 'mad' | null>(null);
+  const [detail, setDetail] = useState<'raid' | 'event' | null>(null);
 
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
   // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
@@ -231,6 +233,9 @@ export default function Bosses() {
   // FLAT próbę dzienną/termin. Nemesis (2026-08-18) nie ma już końca ani limitu prób.
   const eventDaysLeftN = eventBoss && !isMenace ? eventDaysLeft(eventBoss, now) : 0;
 
+  const raidReady = !raidDone && raidUnlocked;
+  const eventReady = !!eventBoss && !eventDone && eventUnlocked;
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -238,27 +243,10 @@ export default function Bosses() {
         <Text style={s.headerTitle}>Bossy</Text>
         {/* Dwie NIEZALEŻNE pule energii w prawym górnym rogu, W KOLUMNIE (2026-08-19, user:
             "energia eventowych ma być czerwona i wspólna dla obu w prawym górnym, i pod nią
-            energia zwykła niebieska pod kampanię") — czerwona (wydarzenia, `eventEnergy`,
-            wspólna dla wszystkich sezonowych) NA GÓRZE, niebieska (kampania/MAD, `energy`)
-            POD NIĄ. Czerwona pokazywana dopiero od odblokowania eventów (level>=2, ten sam
-            próg co `eventUnlocked` niżej) — przed tym nie ma czego pokazywać. Nemesis jej nie
-            zużywa (nielimitowane próby). Raid (2026-08-22, user: "ogarnąłeś zeby raid ten
-            korzystał z czerwonej energii?") DOŁĄCZYŁ do tej samej czerwonej puli — patrz
-            mini-karta raidu niżej, teraz też `eventEnergy` zamiast dawnej własnej `raidEnergy`.
-            PIGUŁKI "X/max" + odliczanie (2026-08-21, user: "widać w prawym górnym licznik do
-            następnej energii oraz ile na ile mam np 0/5") — dawniej pigułki pokazywały TYLKO
-            surową liczbę bez sufitu, a odliczanie do kolejnego punktu żyło jedynie w karcie
-            bohatera kampanii niżej (trzeba było przewinąć, żeby je zobaczyć). Sufit dokłada
-            się z TYCH SAMYCH formuł co reszta ekranu (`campaignEnergyMax`/`eventEnergyMax`
-            wyżej) — jedna prawda, nie druga zgadywana liczba.
-            Odliczanie PO LEWEJ od pigułki, nie pod obiema (2026-08-22, user: "to odliczanie
-            do następnej energii... możesz dodać po lewej od energii i dodać dla czerwonej
-            też taki licznik?") — każda pigułka dostaje WŁASNY wiersz (`s.energyRow`) z
-            odliczaniem jako lewy sąsiad, zamiast jednego wspólnego tekstu zbitego pod spodem
-            całej kolumny (dawniej dotyczył tylko niebieskiej). Czerwona liczy do najbliższej
-            lokalnej północy (`nextLocalMidnightIso`) — to płaski dzienny grant, nie
-            regenerujący się w czasie bank jak kampania, więc "kolejny punkt" realnie
-            przychodzi o północy. */}
+            energia zwykła niebieska pod kampanię"). Sufit dokłada się z TYCH SAMYCH formuł co
+            reszta ekranu (`campaignEnergyMax`/`eventEnergyMax` wyżej) — jedna prawda, nie
+            druga zgadywana liczba. Czerwona liczy do najbliższej lokalnej północy — to płaski
+            dzienny grant, nie regenerujący się w czasie bank jak kampania. */}
         <View style={s.energyPillCol}>
           {level >= 2 && (
             <View style={s.energyRow}>
@@ -279,97 +267,48 @@ export default function Bosses() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── RAID + WYDARZENIE: kompaktowy podgląd, WALCZ nawiguje do boss-fight ── */}
-        <View style={s.miniRow}>
-          <View style={s.miniCard}>
-            <View style={s.miniHead}>
-              <View style={s.miniKickerRow}>
-                <Text style={s.miniKicker}>RAID</Text>
-                <Trophy size={9} color={c.text.muted} />
-                <Text style={s.miniKicker}>{raidWon.length}</Text>
+      {/* ── Mapa, pełnoekranowa (`{flex:1}`) — przełącznik Kampania/MAD i kompaktowe kafle
+          raid/wydarzenie pływają NAD nią jako position:absolute, nie zajmują osobnego
+          miejsca w layoucie (user: "zrob caloekranowa te mapę... zeby nie zasłaniały
+          mapy"). ── */}
+      <View style={{ flex: 1 }}>
+        {bossView === 'campaign' && (
+          current ? (
+            <CampaignMap
+              bosses={BOSSES} currentId={current.id} onPressCurrent={goFight}
+              energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
+            />
+          ) : (
+            <>
+              <CampaignMap
+                bosses={BOSSES} currentId={null} onPressCurrent={goFight}
+                energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
+              />
+              <View style={s.doneBanner} pointerEvents="none">
+                <Swords size={14} color="#fff" />
+                <Text style={s.doneBannerTxt}>Wszyscy bossowie pokonani! Kolejni wkrótce.</Text>
               </View>
-              <View style={s.miniEnergyRow}>
-                <Zap size={10} color="#F87171" />
-                <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
-              </View>
-            </View>
-            <View style={s.miniBody}>
-              <BossArt id={raid.id} emoji={raid.emoji} size={40} powered />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.miniName} numberOfLines={1}>{raid.name}</Text>
-                <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((raidDone ? 0 : raidRemaining) / raidMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[raid.weakness] ?? '#888' }]} /></View>
-              </View>
-            </View>
-            {raidDone ? (
-              <Text style={s.miniDoneTxt}>Pokonany ✓ · nowy w pon.</Text>
-            ) : raidUnlocked ? (
-              <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=raid' as any); }}>
-                {/* eventEnergy < RAID_ENERGY_COST (nie <= 0) — raid kosztuje 2, nie 1
-                    (2026-08-25) — przycisk musi wyglądać na wyszarzony już przy 1 energii,
-                    nie dopiero przy 0, inaczej wyglądałby na aktywny mimo że próba i tak
-                    odbije się o "Brak prób ataku" w boss-fight.tsx. */}
-                <View style={[s.miniBtn, eventEnergy < RAID_ENERGY_COST && { opacity: 0.5 }]}>
-                  <Text style={s.miniBtnTxt}>WALCZ</Text>
-                </View>
-              </PressableScale>
-            ) : (
-              <Text style={s.miniLockTxt}>Odblokuj: lvl 3</Text>
-            )}
-          </View>
+            </>
+          )
+        )}
 
-          {eventBoss && eventKey && (
-            <View style={s.miniCard}>
-              <View style={s.miniHead}>
-                <View style={s.miniKickerRow}>
-                  <Text style={s.miniKicker} numberOfLines={1}>{isMenace ? 'NEMESIS' : 'WYDARZENIE'}</Text>
-                  <Trophy size={9} color={c.text.muted} />
-                  <Text style={s.miniKicker}>{eventWon.length}</Text>
-                </View>
-                {/* Nemesis (2026-09-24, user: "ma zużywać energię jak walczę") dzieli TERAZ
-                    prawdziwą `eventEnergy` z sezonowymi — pigułka pokazywana zawsze, bez
-                    wyjątku dla menace (dawny "nielimitowane próby" wyjątek zdjęty). */}
-                <View style={s.miniEnergyRow}>
-                  <Zap size={10} color="#F87171" />
-                  <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
-                </View>
-              </View>
-              <View style={s.miniBody}>
-                <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={40} powered={isMenace} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
-                  {isMenace ? (
-                    // Trwały bank → pasek postępu (jak raid), nie statyczne "X HP" — user:
-                    // "pasek zdrowia większy... żeby go długo klepać".
-                    <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((eventDone ? 0 : menaceRemaining) / menaceMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[eventBoss.weakness] ?? '#888' }]} /></View>
-                  ) : (
-                    <>
-                      <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
-                      {!eventDone && (
-                        <Text style={[s.miniCountdown, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted }]} numberOfLines={1}>
-                          {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
-                        </Text>
-                      )}
-                    </>
-                  )}
-                </View>
-              </View>
-              {eventDone ? (
-                <Text style={s.miniDoneTxt}>Pokonany ✓</Text>
-              ) : eventUnlocked ? (
-                <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=event' as any); }}>
-                  <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
-                    <Text style={s.miniBtnTxt}>WALCZ</Text>
-                  </View>
-                </PressableScale>
-              ) : (
-                <Text style={s.miniLockTxt}>Odblokuj: lvl 2</Text>
-              )}
+        {bossView === 'mad' && (
+          madBoss ? (
+            <CampaignMap
+              bosses={madBosses} currentId={madBoss.id} onPressCurrent={goFightMad}
+              energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
+              variant="mad" locked={!madUnlocked}
+              lockMessage={`Odblokujesz na poziomie ${MAD_UNLOCK_LEVEL} (masz ${level}).`}
+            />
+          ) : (
+            <View style={s.doneCenter}>
+              <Swords size={30} color={c.text.muted} />
+              <Text style={s.doneCenterTxt}>Pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.</Text>
             </View>
-          )}
-        </View>
+          )
+        )}
 
-        {/* Przełącznik Kampania/MAD — patrz komentarz przy `bossView` wyżej. */}
+        {/* Przełącznik Kampania/MAD — pływa nad mapą. */}
         <View style={s.modeToggle}>
           <PressableScale onPress={() => { haptic.tap(); setBossViewOverride('campaign'); }} style={{ flex: 1 }}>
             <View style={[s.modeBtn, bossView === 'campaign' && s.modeBtnActive]}>
@@ -383,85 +322,117 @@ export default function Bosses() {
           </PressableScale>
         </View>
 
-        {/* ── KAMPANIA: mapa (CampaignMap.tsx) — tap na aktualnym węźle otwiera popup z
-            portretem/tauntem/HP i przyciskiem WALCZ, który przenosi na osobny ekran walki
-            (S&F). Tap na pokonanym też popup (nazwa+loot); zablokowani bez interakcji. ── */}
-        {bossView === 'campaign' && (<>
-        {!current && (
-          <View style={s.done}>
-            <Swords size={30} color={c.text.muted} />
-            <Text style={s.doneTxt}>Wszyscy bossowie pokonani! Kolejni wkrótce.</Text>
-          </View>
-        )}
+        {/* Raid + wydarzenie — kompaktowe kafle-ikony (user: "te bosy evetowe muszą byc w
+            kafelkach mniejsze jak w grach zeby po kliknięciu sie pokazywalo zeby nie
+            zasłaniały mapy"). Odznaka liczby medali w rogu, kropka "gotowe do walki" gdy
+            odblokowane+nieukończone+jest energia. Tap → wyśrodkowany popup (`detail`) z
+            pełną treścią, dokładnie tą samą co dawna zawsze-widoczna mini-karta. */}
+        <View style={s.tileRow}>
+          <PressableScale onPress={() => { haptic.tap(); setDetail('raid'); }} style={s.tile}>
+            <BossArt id={raid.id} emoji={raid.emoji} size={34} powered />
+            {raidWon.length > 0 && <View style={s.tileBadge}><Text style={s.tileBadgeTxt}>{raidWon.length}</Text></View>}
+            {raidReady && eventEnergy >= RAID_ENERGY_COST && <View style={[s.tileReadyDot, { backgroundColor: '#F87171' }]} />}
+          </PressableScale>
+          {eventBoss && eventKey && (
+            <PressableScale onPress={() => { haptic.tap(); setDetail('event'); }} style={s.tile}>
+              <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={34} powered={isMenace} />
+              {eventWon.length > 0 && <View style={s.tileBadge}><Text style={s.tileBadgeTxt}>{eventWon.length}</Text></View>}
+              {eventReady && eventEnergy > 0 && <View style={[s.tileReadyDot, { backgroundColor: '#F87171' }]} />}
+            </PressableScale>
+          )}
+        </View>
+      </View>
 
-        {/* Mapa kampanii (2026-10-12, przebudowa 2026-10-13 — user po zrzucie ekranu: "ta
-            ikonka aktualna niech sie pokazuje jak inne mała i po kliknieciu pokazuje sie
-            powiększony i przycisk walki popup") — dawny hero card (duży portret/taunt/WALCZ
-            aktualnego bossa, NAD mapą) USUNIĘTY; ta sama treść żyje teraz w popupie
-            CampaignMap, otwieranym tapnięciem węzła aktualnego bossa NA mapie (ten sam rozmiar
-            węzła co pokonani/zablokowani, żadnego osobnego dużego elementu). `energy`/
-            `campaignEnergyMax`/`energyRegenAt` przekazane, żeby popup mógł pokazać ten sam
-            hint "Kolejna energia za..." i wyszarzyć WALCZ przy energy<=0, tak jak dawny
-            hero card. */}
-        <CampaignMap
-          bosses={BOSSES} currentId={current?.id ?? null} onPressCurrent={goFight}
-          energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
-        />
-        </>)}
-
-        {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 15+ (MAD_UNLOCK_LEVEL), tylko po
-            pokonaniu normalnej wersji danego bossa. Mapa (2026-10-13) — ten sam CampaignMap
-            co kampania wyżej, `variant="mad"` dla czerwonego tła/ścieżki + czerwonej aury na
-            artach (`powered`, patrz BossArt/CampaignMap.tsx). ── */}
-        {bossView === 'mad' && (<>
-        {!madBoss ? (
-          <View style={s.done}>
-            <Swords size={30} color={c.text.muted} />
-            <Text style={s.doneTxt}>Pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.</Text>
-          </View>
-        ) : (
-          <CampaignMap
-            bosses={madBosses} currentId={madBoss.id} onPressCurrent={goFightMad}
-            energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
-            variant="mad" locked={!madUnlocked}
-            lockMessage={`Odblokujesz na poziomie ${MAD_UNLOCK_LEVEL} (masz ${level}).`}
-          />
-        )}
-        </>)}
-
-        {raidWon.length > 0 && (
-          <>
-            <Text style={s.section}>Medale raidów ({raidWon.length})</Text>
-            <View style={s.medalWall}>
-              {raidWon.slice().reverse().map(wk => {
-                const MedalIcon = raidIcon(raidForWeek(wk).id);
-                return (
-                  <View key={wk} style={s.medal}>
-                    <MedalIcon size={22} color="#FBBF24" />
-                    <Text style={s.medalWk} numberOfLines={1}>{wk}</Text>
+      {/* Popup raid/wydarzenie — treść 1:1 ze starej zawsze-widocznej mini-karty, teraz na
+          żądanie. */}
+      {detail && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <Pressable style={s.detailBackdrop} onPress={() => setDetail(null)} />
+          {detail === 'raid' ? (
+            <View style={s.detailCard}>
+              <View style={s.miniHead}>
+                <View style={s.miniKickerRow}>
+                  <Text style={s.miniKicker}>RAID</Text>
+                  <Trophy size={9} color={c.text.muted} />
+                  <Text style={s.miniKicker}>{raidWon.length}</Text>
+                </View>
+                <View style={s.miniEnergyRow}>
+                  <Zap size={10} color="#F87171" />
+                  <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
+                </View>
+              </View>
+              <View style={s.miniBody}>
+                <BossArt id={raid.id} emoji={raid.emoji} size={48} powered />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.miniName} numberOfLines={1}>{raid.name}</Text>
+                  <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((raidDone ? 0 : raidRemaining) / raidMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[raid.weakness] ?? '#888' }]} /></View>
+                </View>
+              </View>
+              {raidDone ? (
+                <Text style={s.miniDoneTxt}>Pokonany ✓ · nowy w pon.</Text>
+              ) : raidUnlocked ? (
+                <PressableScale onPress={() => { haptic.tap(); setDetail(null); router.push('/boss-fight?kind=raid' as any); }}>
+                  {/* eventEnergy < RAID_ENERGY_COST (nie <= 0) — raid kosztuje 2, nie 1
+                      (2026-08-25) — przycisk musi wyglądać na wyszarzony już przy 1 energii. */}
+                  <View style={[s.miniBtn, eventEnergy < RAID_ENERGY_COST && { opacity: 0.5 }]}>
+                    <Text style={s.miniBtnTxt}>WALCZ</Text>
                   </View>
-                );
-              })}
+                </PressableScale>
+              ) : (
+                <Text style={s.miniLockTxt}>Odblokuj: lvl 3</Text>
+              )}
             </View>
-          </>
-        )}
-        {eventWon.length > 0 && (
-          <>
-            <Text style={s.section}>Medale wydarzeń ({eventWon.length})</Text>
-            <View style={s.medalWall}>
-              {eventWon.slice().reverse().map(key => {
-                const MedalIcon = eventIcon(eventBossFromKey(key)?.id ?? '');
-                return (
-                  <View key={key} style={s.medal}>
-                    <MedalIcon size={22} color="#FBBF24" />
-                    <Text style={s.medalWk} numberOfLines={1}>{key}</Text>
+          ) : (
+            eventBoss && eventKey && (
+              <View style={s.detailCard}>
+                <View style={s.miniHead}>
+                  <View style={s.miniKickerRow}>
+                    <Text style={s.miniKicker} numberOfLines={1}>{isMenace ? 'NEMESIS' : 'WYDARZENIE'}</Text>
+                    <Trophy size={9} color={c.text.muted} />
+                    <Text style={s.miniKicker}>{eventWon.length}</Text>
                   </View>
-                );
-              })}
-            </View>
-          </>
-        )}
-      </ScrollView>
+                  {/* Nemesis dzieli prawdziwą `eventEnergy` z sezonowymi — pigułka pokazywana
+                      zawsze, bez wyjątku dla menace. */}
+                  <View style={s.miniEnergyRow}>
+                    <Zap size={10} color="#F87171" />
+                    <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
+                  </View>
+                </View>
+                <View style={s.miniBody}>
+                  <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={48} powered={isMenace} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
+                    {isMenace ? (
+                      // Trwały bank → pasek postępu (jak raid), nie statyczne "X HP".
+                      <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((eventDone ? 0 : menaceRemaining) / menaceMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[eventBoss.weakness] ?? '#888' }]} /></View>
+                    ) : (
+                      <>
+                        <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
+                        {!eventDone && (
+                          <Text style={[s.miniCountdown, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted }]} numberOfLines={1}>
+                            {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </View>
+                </View>
+                {eventDone ? (
+                  <Text style={s.miniDoneTxt}>Pokonany ✓</Text>
+                ) : eventUnlocked ? (
+                  <PressableScale onPress={() => { haptic.tap(); setDetail(null); router.push('/boss-fight?kind=event' as any); }}>
+                    <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
+                      <Text style={s.miniBtnTxt}>WALCZ</Text>
+                    </View>
+                  </PressableScale>
+                ) : (
+                  <Text style={s.miniLockTxt}>Odblokuj: lvl 2</Text>
+                )}
+              </View>
+            )
+          )}
+        </View>
+      )}
 
       <PupilNavbar current="bosses" />
     </SafeAreaView>
@@ -478,43 +449,59 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
   energyCountdown: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110 },
 
-  modeToggle: { flexDirection: 'row', gap: spacing[1], backgroundColor: c.bg.card, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, padding: 4, marginBottom: spacing[3] },
+  // Pływające kontrolki NAD mapą (2026-10-14) — absolute w obrębie `{flex:1}` wrapperu mapy.
+  modeToggle: {
+    position: 'absolute', top: spacing[3], left: spacing[3], right: spacing[3],
+    flexDirection: 'row', gap: spacing[1], backgroundColor: 'rgba(15,17,20,0.92)', borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default, padding: 4,
+  },
   modeBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: 'transparent' },
   modeBtnActive: { backgroundColor: '#38BDF81F', borderColor: '#38BDF855' },
   modeBtnTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
   modeBtnTxtActive: { color: '#38BDF8' },
 
-  done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
-  doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
+  doneBanner: {
+    position: 'absolute', top: spacing[3] + 52, left: spacing[3], right: spacing[3],
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(42,198,143,0.92)', borderRadius: radius.lg, paddingVertical: 10, paddingHorizontal: spacing[3],
+  },
+  doneBannerTxt: { fontSize: 12.5, fontWeight: '800', color: '#07160F', textAlign: 'center' },
+  doneCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3], paddingHorizontal: spacing[6] },
+  doneCenterTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
 
-  section: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[5], marginBottom: spacing[2] },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
-  rowName: { fontSize: 14, fontWeight: '800', color: c.text.primary },
-  rowSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  rowBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2AC68F1A', alignItems: 'center', justifyContent: 'center' },
-  collapseRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: '#2AC68F44', padding: spacing[3] },
-  collapseTxt: { flex: 1, fontSize: 13, fontWeight: '800', color: c.text.primary },
+  tileRow: { position: 'absolute', right: spacing[3], bottom: spacing[3], gap: spacing[2] },
+  tile: {
+    width: 52, height: 52, borderRadius: radius.lg, backgroundColor: 'rgba(15,17,20,0.92)',
+    borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
+  },
+  tileBadge: {
+    position: 'absolute', top: -5, left: -5, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 3,
+    backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center',
+  },
+  tileBadgeTxt: { fontSize: 9.5, fontWeight: '900', color: '#0B0E1A' },
+  tileReadyDot: { position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#0B0E1A' },
 
-  miniRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },
-  miniCard: { flex: 1, minWidth: 0, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },
+  detailBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  detailCard: {
+    position: 'absolute', left: spacing[4], right: spacing[4], top: '38%',
+    backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
+    padding: spacing[4], gap: 6,
+    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+  },
   miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   miniKickerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, minWidth: 0 },
-  miniKicker: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, color: c.text.muted },
+  miniKicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, color: c.text.muted },
   miniEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  miniEnergy: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
-  miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  miniName: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
-  miniSub: { fontSize: 10, color: c.text.muted, marginTop: 2 },
-  miniCountdown: { fontSize: 10, fontWeight: '800', marginTop: 2 },
-  miniHpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4 },
-  miniHpFill: { height: '100%', borderRadius: 3 },
-  miniBtn: { alignItems: 'center', borderRadius: radius.md, paddingVertical: 8, backgroundColor: '#EF4444' },
-  miniBtnTxt: { fontSize: 11.5, fontWeight: '800', color: '#fff' },
-  miniDoneTxt: { fontSize: 10.5, fontWeight: '700', color: '#2AC68F', textAlign: 'center' },
-  miniLockTxt: { fontSize: 10.5, color: c.text.muted, textAlign: 'center' },
-  medalWall: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  medal: { width: 64, alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingVertical: spacing[2] },
-  medalWk: { fontSize: 9, color: c.text.muted, marginTop: 2 },
+  miniEnergy: { fontSize: 11.5, fontWeight: '800', color: '#38BDF8' },
+  miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: 4 },
+  miniName: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  miniSub: { fontSize: 11.5, color: c.text.muted, marginTop: 2 },
+  miniCountdown: { fontSize: 11, fontWeight: '800', marginTop: 2 },
+  miniHpTrack: { width: '100%', height: 7, borderRadius: 4, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 5 },
+  miniHpFill: { height: '100%', borderRadius: 4 },
+  miniBtn: { alignItems: 'center', borderRadius: radius.md, paddingVertical: 12, backgroundColor: '#EF4444', marginTop: 4 },
+  miniBtnTxt: { fontSize: 13.5, fontWeight: '800', color: '#fff' },
+  miniDoneTxt: { fontSize: 12, fontWeight: '700', color: '#2AC68F', textAlign: 'center', marginTop: 4 },
+  miniLockTxt: { fontSize: 12, color: c.text.muted, textAlign: 'center', marginTop: 4 },
 }));

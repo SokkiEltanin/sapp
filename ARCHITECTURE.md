@@ -17190,6 +17190,106 @@ się na aktualnym, kolorowo obwiedzionym węźle (nie na szczycie trasy), ście�
 wyraźnie widoczna (jasna biała linia, nie prawie-niewidoczna). To samo sprawdź w MAD bossach
 (`variant="mad"`, ten sam komponent).
 
+## 315. Mapa bossów — PRZEBUDOWA OD ZERA: pełnoekranowa, pannable+zoomable 2D (2026-10-14)
+
+User (po §314, zrzutem): "Nie o to chodzi, zrob caloekranowa te mapę cała zakładka bossow
+niech bedzie miała mapę powieksz ja, rozmieścić bosy na koordynator potem polacz ścieżkami po
+kolei jak w dragom mania legends, te Ścieżki dalej mają byc czarno mgła zasłonięte a
+domyślnie popakuje sie pozycja bosa aktualnego do pokonania a starsze pokonane odsłonięte
+mgła na szaro z przekreślone (teraz duplikujesz mapę wielokrotnie i ma scrolla dziwnie to
+wyglada mi chodziło o przebudowę całej zakładki bossów od zera) dodatkowo te bosy evetowe
+muszą byc w kafelkach mniejsze jak w grach zeby po kliknięciu sie pokazywalo zeby nie
+zasłaniały mapy. Tak samo wywalmy odznaki z tej zakładki sa bez sensu i zle wyglądają". Zakres
+potwierdzony (AskUserQuestion): prawdziwa mapa 2D z pan+zoom w obie strony, NIE powiększona
+wersja starego pionowego szlaku.
+
+**Diagnoza "duplikuje się"**: stara mapa (§307-314) miała `nodeX(i) = sin(i*0.85)*70` — OKRESOWĄ
+sinusoidę (okres ~7.4 indeksu) ze ściśle liniowo rosnącym Y. Co ~7-8 bossów trasa powtarzała
+DOKŁADNIE ten sam kształt (ten sam wygięty esik w lewo-prawo) — stąd wrażenie "duplikowania
+mapy", mimo że to był jeden ciągły szlak, nie faktyczna duplikacja treści.
+
+**Nowa architektura — trzy nowe/przebudowane pliki**:
+
+1. **`src/utils/bossMapLayout.ts`** (nowy, czysta logika, testowana) — `layoutBossMap(count)`
+   generuje PRAWDZIWY układ 2D: deterministyczny spacer (STEP=170px/krok), kierunek łamany o
+   losowy (ale seedowany indeksem, nie `Math.random()` — ten sam układ za każdym razem) kąt
+   do ±49° na krok. Celowo NIE unikane: samoprzecięcia trasy przy bardzo dużym rosterze
+   (akceptowalne dla dekoracyjnej wizualizacji postępu, nie prawdziwego pathfindingu) —
+   zaznaczone wprost w komentarzu w kodzie jako świadomy scope cut, nie przeoczenie.
+2. **`src/components/bosses/CampaignMap.tsx`** (przebudowany od zera, ten sam plik/nazwa
+   eksportu dla ciągłości — jedyny użytkownik to `bosses.tsx`) — zamiast `ScrollView`:
+   `Gesture.Pan()` + `Gesture.Pinch()` + `GestureDetector` (react-native-gesture-handler,
+   JUŻ w projekcie — ten sam "nowy" styl API co `(tabs)/_layout.tsx`/`DashEditRow.tsx`/
+   `MoodEnergyGrid.tsx`, nie legacy `PanGestureHandler`) napędzane `useSharedValue`/
+   `useAnimatedStyle` z `react-native-reanimated` (też już w projekcie — ZERO nowych
+   zależności, więc ZERO potrzeby nowego buildu APK dla samej biblioteki). Kamera "wskakuje"
+   (jump, nie animowany scroll) na aktualnego bossa w `onLayout` — eliminuje CAŁĄ klasę
+   wyścigów czasowych z poprzednich wersji (`setTimeout`/`onContentSizeChange` kontra natywny
+   layout) — `onLayout`/ustawienie `.value` na shared value z JS threada jest zawsze
+   bezpieczne, bez zgadywania "czy już gotowe".
+3. **`app/bosses.tsx`** (przebudowany) — mapa `{flex:1}` zamiast kafla w przewijanej stronie
+   (cała strona-ScrollView USUNIĘTA, nic już nie scrolluje pionowo — mapa sama jest
+   pannable). Przełącznik Kampania/MAD i kompaktowe kafle raid/wydarzenie teraz PŁYWAJĄ
+   (`position:absolute`) NAD mapą, nie zajmują miejsca w layoucie.
+
+**Fog/mgła przeprojektowana pod 2D**: stary gradient działał TYLKO bo trasa była ściśle
+pionowa (dało się "zasłonić wszystko poniżej Y"). W prawdziwym 2D nie ma jednego kierunku
+"dalej" — fog realizowany teraz: (a) PER-SEGMENT ścieżki — nieodkryty odcinek rysowany prawie
+czarnym (`rgba(4,5,8,0.9)`), ledwo widocznym kolorem, odkryty (do aktualnego bossa) jaskrawym
+akcentem na wierzchu; (b) PER-WĘZEŁ — locked = czarna sylwetka (`BossArt mystery`) + kłódka,
+BEZ ZMIAN względem poprzednich wersji. Defeated = szary + czarne X, też bez zmian.
+
+**Raid/wydarzenie → kompaktowe kafle** (`app/bosses.tsx`, user: "muszą byc w kafelkach
+mniejsze jak w grach zeby po kliknięciu sie pokazywalo zeby nie zasłaniały mapy") — dawne,
+zawsze-widoczne "mini-karty" (portret+pasek HP+WALCZ, blokujące górę mapy w starym layoucie)
+zastąpione małymi (52×52) kaflami-ikonami w prawym dolnym rogu (tylko portret + odznaka
+liczby medali + kropka "gotowe do walki" gdy odblokowane+nieukończone+jest energia). Tap →
+wyśrodkowany popup (`detail` state) z PEŁNĄ, dawną treścią (nazwa/pasek/odliczanie/WALCZ) —
+1:1 ta sama logika/dane, tylko na żądanie zamiast zajmując stałe miejsce.
+
+**Usunięte: "Medale raidów"/"Medale wydarzeń"** (user: "sa bez sensu i zle wyglądają") — cała
+ściana ikon pod mapą skasowana razem z martwymi importami `raidIcon`/`eventIcon` (z
+`bossUiIcons.ts`) i `eventBossFromKey` (z `seasonalEvents.ts`), używanymi WYŁĄCZNIE tam.
+Licznik medali ZOSTAJE jako mała odznaka liczby na kompaktowym kaflu (wyżej) — user nie
+mówił że chce stracić SAM licznik, tylko ścianę ikon.
+
+**Celowo NIE zrobione / znane uproszczenia** (uczciwie spisane, nie przeoczenia):
+- Pinch-zoom zawsze pivotuje wokół ŚRODKA CAŁEGO płótna (`transform-origin` domyślny RN —
+  środek widoku), NIE wokół punktu dotyku/środka viewportu — prostsze i bezpieczniejsze do
+  zaimplementowania bez urządzenia do testów, kosztem nieco mniej "naturalnego" czucia zoomu
+  niż w prawdziwych mapach (Google Maps itd., gdzie zoom pivotuje pod palcami).
+- Brak unikania samoprzecięć trasy przy dużym rosterze (patrz `bossMapLayout.ts` wyżej).
+- Pan ma PROSTE ograniczenie granic (canvas nie odjeżdża całkowicie poza viewport), bez
+  "elastycznego" odbicia/sprężyny przy granicy (`withSpring` na overshoot) — twardy klamp.
+- `BossArt`/portrety bossów dalej lucide-icon placeholdery TRAINING_ICON-stylu dla
+  event/raid kafli (BEZ ZMIANY — to osobna sprawa, nieruszona tu).
+
+**Ryzyko/niepewność, uczciwie**: to NAJWIĘKSZA pojedyncza zmiana UI w tej sesji — nowy silnik
+gestów (pan+pinch) na realnym urządzeniu, którego NIE da się przetestować z tego środowiska
+(brak fizycznego telefonu/symulatora z dotykiem). Node'y (`PressableScale`) żyją WEWNĄTRZ
+transformowanego/pannable widoku — `Gesture.Pan().minDistance(4)` to standardowa, sprawdzona
+technika żeby krótkie tapnięcia przechodziły do dzieci zamiast być łapane jako pan, ale to
+WYMAGA potwierdzenia na urządzeniu, nie jest czystą matematyką jak reszta tej sesji.
+
+**Testy**: `__tests__/bossMapLayout.test.ts` — 6 nowych (count=0/1, deterministyczność,
+odległość STEP między kolejnymi węzłami, wszystkie węzły w obrębie width/height, liczba
+węzłów = count). `tsc --noEmit` czyste, `jest --silent` 104/104 suite, 1359 testów (+6).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, NAJWYŻSZY W TEJ SESJI** (cała zakładka
+przebudowana, nowy silnik gestów, nic z tego nie przeszło testu na prawdziwym dotyku):
+1. Bossy → mapa wypełnia cały ekran, od razu wyśrodkowana na aktualnym bossie (kolorowa
+   obwódka).
+2. Przesuwanie palcem w KAŻDĄ stronę (nie tylko pionowo) faktycznie przesuwa mapę.
+3. Uszczypnięcie (pinch) faktycznie zooomuje, w obu kierunkach (bliżej/dalej), w granicach
+   (nie da się "zgubić" mapy całkowicie).
+4. Tapnięcie aktualnego/pokonanego bossa OTWIERA popup (nie jest łapane jako pan/przypadkowo
+   ignorowane) — to NAJWAŻNIEJSZY punkt, bez tego mapa jest bezużyteczna identycznie jak
+   poprzedni bug.
+5. Kafle raid/wydarzenie (prawy dolny róg) → tap otwiera popup z pełną treścią, WALCZ działa.
+6. Przełącznik Kampania/MAD (pływający, góra ekranu) przełącza i na nowo centruje kamerę na
+   właściwym aktualnym bosie danego trybu.
+7. Brak "Medale" sekcji — licznik medali nadal widoczny jako odznaka na kaflach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

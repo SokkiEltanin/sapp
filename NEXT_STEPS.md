@@ -3,16 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Fix: mapa kampanii — auto-scroll lądował na szczycie, nie na bossie (2026-10-14)
+## 🆕 Mapa bossów przebudowana od zera — pełnoekranowa, pan+zoom 2D (2026-10-14)
 
-User: "nie mam bosa kampania którym mogę kliknąć walcz, i dziwnie się pokazują niektóre jakby
-poza liniami". Root cause (wyścig `setTimeout(0)` vs natywny layout ScrollView, fix:
-`onContentSizeChange`) + drugi fix (niewidoczna "już przebyta" ścieżka, kolorowa obwódka
-aktualnego węzła) w ARCHITECTURE.md §314. Priorytet testu na urządzeniu KRYTYCZNY — mapa
-kampanii była efektywnie bezużyteczna bez tego fixu. Część diagnozy (ścieżka) NIE jest
-100% potwierdzona z pikseli zrzutu (uczciwie przyznane w §314) — jeśli user zgłosi że
-"poza liniami" dalej występuje mimo jaśniejszej ścieżki, to inny, nieznaleziony jeszcze
-problem, wymaga dokładniejszego opisu/zrzutu.
+§314 (auto-scroll fix) okazał się NIEWYSTARCZAJĄCY — user po zrzucie: "Nie o to chodzi...
+chodziło o przebudowę całej zakładki bossów od zera". Pełny opis nowej architektury
+(`bossMapLayout.ts`, `Gesture.Pan`+`Gesture.Pinch`, kompaktowe kafle raid/event, usunięte
+"Medale") w ARCHITECTURE.md §315.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, najwyższy w tej sesji** — nowy silnik gestów
+(pan+pinch+tap-przez-pan) NIE przeszedł testu na realnym dotyku (brak takiego środowiska tu).
+Konkretna checklist w §315 — NAJWAŻNIEJSZE: czy tapnięcie bossa na mapie otwiera popup, czy
+pan/pinch działają płynnie w obu kierunkach. Jeśli tapnięcie węzłów nie działa (gest pan
+"zjada" tapnięcia) — zgłoś, to pierwsza rzecz do zdebugowania (kandydat: zwiększyć
+`.minDistance()` na `Gesture.Pan()` w CampaignMap.tsx, albo dodać `Gesture.Tap()` osobno
+skomponowany przez `Gesture.Race` zamiast polegać na zwykłym `Pressable` pod spodem).
 
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 
