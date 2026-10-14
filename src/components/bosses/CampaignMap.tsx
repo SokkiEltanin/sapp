@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -69,24 +69,31 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   const startY = useSharedValue(0);
   const startScale = useSharedValue(1);
 
-  // Kamera wskakuje na aktualnego bossa RAZ, gdy poznajemy rozmiar viewportu — user: "domyślnie
-  // popakuje sie pozycja bosa aktualnego do pokonania". `onLayout` (nie efekt+Dimensions) bo
-  // musi znać REALNY, zmierzony rozmiar TEGO konkretnego kontenera (zależny od layoutu ekranu-
-  // rodzica, nie całego okna) — bez wyścigu, `onLayout` z kontraktu odpala się z gotowym
-  // rozmiarem, ten sam powód co `onContentSizeChange` w poprzedniej wersji tego pliku.
-  // BUG (user, 2026-10-14, po PR #422: "zjebales nadal... skrajne przesunięcia... ani nie
-  // widać bosa ani innych bossów"): to centrowanie NIE przycinało wyniku do granic płótna, w
-  // przeciwieństwie do `pan.onUpdate` poniżej, które przycina identyczną formułą. Gdy aktualny
-  // boss leży blisko początku trasy (małe x/y) a viewport jest duży (pełny ekran), wycentrowanie
-  // go na środku wymagało przesunięcia płótna POZA jego własną krawędź — stąd czarne pasy z
-  // zrzutów (widać "poza" płótnem, tam gdzie nic nie jest narysowane). Przycinamy teraz TĄ SAMĄ
-  // formułą co pan, żeby kamera nigdy nie odsłoniła obszaru poza `canvasW`×`canvasH`.
-  const centered = useRef(false);
-  const onLayoutViewport = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setViewport({ w: width, h: height });
-    if (centered.current || nodes.length === 0) return;
-    centered.current = true;
+  // Kamera wskakuje na aktualnego bossa — user: "domyślnie popakuje sie pozycja bosa
+  // aktualnego do pokonania". `onLayout` (nie efekt+Dimensions) bo musi znać REALNY, zmierzony
+  // rozmiar TEGO konkretnego kontenera (zależny od layoutu ekranu-rodzica, nie całego okna).
+  //
+  // BUG #2 (user, 2026-10-14, po PR #424, zrzut: "boss nie sa w dobrym miejscu linią jest
+  // zła... aktualny boss wgle jest nie widoczny i nie mogę z nim zawalczyć") — TO NIE był ten
+  // sam bug co w PR #424 (tamten — brak przycinania do granic płótna — jest naprawiony,
+  // przycinanie niżej zostaje bez zmian). Prawdziwa przyczyna: centrowanie było jednorazowe
+  // (`centered.current` ustawiane raz na zawsze), odpalane przy PIERWSZYM `onLayout`. Ale
+  // `defeatedBosses` (petStore, `persist`+AsyncStorage, patrz `_hydrated` w petStore.ts) ładuje
+  // się ASYNCHRONICZNIE — pierwszy `onLayout` tego ekranu często odpala się ZANIM store się
+  // zrehydrował, czyli z DOMYŚLNYM `defeatedBosses=[]` → `current`/`currentId` w bosses.tsx w
+  // tym momencie to BOSSES[0], nie prawdziwy aktualny boss gracza. Kamera centrowała się raz
+  // na boss #0 i WIĘCEJ SIĘ NIE PRZESUWAŁA, nawet gdy chwilę później store się zrehydrował i
+  // `currentId` zmienił się na prawdziwego bossa — stąd "losowy", niepowiązany z realnym
+  // postępem fragment mapy, prawdziwy aktualny boss poza ekranem, a "chaos" to po prostu
+  // pomieszane pokonane/zablokowane węzły widziane w oderwaniu od kontekstu trasy.
+  //
+  // Naprawa: zamiast jednorazowego flaga, pamiętamy NA KTÓRE `currentId` kamera jest aktualnie
+  // wyśrodkowana (`centeredOn`) i re-centrujemy za każdym razem gdy `currentId` się ZMIENI
+  // (efekt niżej) — czy to po hydratacji store'u, czy po pokonaniu bossa i powrocie na mapę.
+  // Ręczne przesunięcie/zoom gracza NIE jest nadpisywane, dopóki `currentId` się nie zmieni.
+  const centeredOn = useRef<string | null | undefined>(undefined);
+  const recenter = useCallback((width: number, height: number) => {
+    if (!width || !height || nodes.length === 0) return;
     const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
     const node = nodes[idx];
     const s = scale.value;
@@ -102,7 +109,19 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     translateY.value = ty;
     startX.value = tx;
     startY.value = ty;
+  }, [nodes, currentIdx, canvasW, canvasH, scale, translateX, translateY, startX, startY]);
+
+  const onLayoutViewport = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setViewport({ w: width, h: height });
   };
+
+  useEffect(() => {
+    if (centeredOn.current === currentId) return;
+    if (!viewport.w || !viewport.h) return;
+    centeredOn.current = currentId;
+    recenter(viewport.w, viewport.h);
+  }, [currentId, viewport.w, viewport.h, recenter]);
 
   const pan = Gesture.Pan()
     .minDistance(4)
