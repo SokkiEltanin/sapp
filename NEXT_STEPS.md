@@ -23,26 +23,26 @@ ilość/jednostka) od razu, monety/XP zostają.
   `trainingStreakFrom(trainingDays)`. Oba miejsca (nowy ekran + stary self-report w Pupilu)
   teraz zaliczają TEN SAM quest/streak — bezpieczne usunięcie starego UI jest już możliwe
   (krok 2 niżej), bo nie jest już jedyną ścieżką do nagród.
+- §313 — kafelek "ĆWICZENIA" na dashboardzie (`ExerciseStreakCard.tsx`, nowe id
+  `exercise-streak` w `dashboardLayout.ts`, wpięte w `index.tsx`'s `nodes`) — ZAWSZE
+  widoczny (nawet przy serii 0), tap → `/exercises`.
 
 **Do zrobienia (następna/kolejne zmiany)**:
 1. **Czeka na usera**: grafiki stick-man (user obiecał wysłać na czacie — "wklej je tutaj,
    zapiszę do repo"). Na razie `app/exercises.tsx` używa tych samych ikon co stary
    `TRAINING_ICON` w pet-quests.tsx (Dumbbell/Flame/Activity/Timer/Sparkles/Bike) —
    podmienić na `Image` jak grafiki przyjdą, zero zmiany struktury.
-2. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
-   użycie tam) — już bezpieczne po §312 (ten sam quest/streak zaliczany z nowego ekranu).
-   Reszta ekranu (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie
-   ćwiczenia przenosi się do nowego ekranu. Zrób to NA URZĄDZENIU dopiero po potwierdzeniu
-   że §312 faktycznie działa (priorytet testu wysoki w §312 — nie usuwać "na ślepo").
-3. Kafelek dashboardu (`dashboardLayout.ts`: `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
-   `SECTION_DESC`/`SECTION_GROUP`, playbook ARCHITECTURE §12) — nowa sekcja np.
-   `exercise-streak`, pokazuje `exerciseStreakFrom`, tap nawiguje do `app/exercises.tsx`.
-   Wizualnie w rodzinie "Zadania i nawyki" (jak `streak-wall`), flame-styling jak
-   `StreakFlame.tsx`.
-4. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
+2. **Czeka na usera (test na urządzeniu)**: USUŃ sekcję "Trening" z `app/pet-quests.tsx`
+   (self-report UI + `TrainingSessionModal` użycie tam) — już bezpieczne po §312 (ten sam
+   quest/streak zaliczany z nowego ekranu), ale NIE usuwać zanim user potwierdzi na
+   urządzeniu że logowanie w `app/exercises.tsx` faktycznie daje JEDNĄ (nie podwójną)
+   nagrodę i że streaki się zgadzają (priorytet testu wysoki w §312). Reszta ekranu
+   (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko SAMO logowanie ćwiczenia
+   przenosi się do nowego ekranu.
+3. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS — ekran już z niego korzysta
    (§311), dane realnie giną przy reinstalu/zmianie telefonu bez tego. Małe, niezależne,
    zrobić wkrótce.
-5. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
+4. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
    nagród (`markXDone()` dalej je woła z nowego ekranu), NIE kasować.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
