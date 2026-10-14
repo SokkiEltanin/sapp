@@ -21,6 +21,12 @@ interface ExercisesState {
   // personalQuests.ts (2026-10-14, poszerzone pod dowolne nazwy ćwiczeń z buildera planów).
   addLog: (exercise: string, amount: number, date?: string) => void;
   removeLog: (id: string) => void;
+  // Edycja wpisu (2026-10-14, user: "nawet nie mają edycji klikną źle i pizda") — do tej pory
+  // jedyna droga poprawienia pomyłki była `removeLog` + ponowne wpisanie, bez UI które by to
+  // w ogóle umożliwiało (martwa akcja store'u, nigdzie nie wołana). `updateLog` dokłada
+  // możliwość poprawienia SAMEJ ILOŚCI bez usuwania i tworzenia nowego wpisu (zachowuje
+  // oryginalny `createdAt`, więc kolejność historii dnia się nie zmienia).
+  updateLog: (id: string, amount: number) => void;
 }
 
 export const useExercisesStore = create<ExercisesState>()(
@@ -35,6 +41,9 @@ export const useExercisesStore = create<ExercisesState>()(
         }],
       })),
       removeLog: (id) => set((s) => ({ logs: s.logs.filter((l) => l.id !== id) })),
+      updateLog: (id, amount) => set((s) => ({
+        logs: s.logs.map((l) => (l.id === id ? { ...l, amount } : l)),
+      })),
     }),
     {
       name: 'exercises-v1',

@@ -116,6 +116,10 @@ ilość/jednostka) od razu, monety/XP zostają.
    checklist pełna w ARCHITECTURE.md §320 — budowa/edycja/duplikacja/usuwanie planu,
    odpalenie sesji i faktyczne odblokowanie questu/nagrody dla pozycji podpiętych pod jedno
    z 6 kanonicznych ćwiczeń.
+5. **§323 (2026-10-14)** — edycja/usuwanie wpisów loga (user: "nawet nie mają edycji klikną
+   źle i pizda") dodane w OBU miejscach (ekran Ćwiczenia + Dzisiejsza sesja) — ikonka "historia"
+   przy karcie/pozycji gdy dziś coś zalogowano. Priorytet testu wysoki: popraw/usuń wpis,
+   sprawdź że suma "Dziś" i streak się aktualizują.
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 

@@ -17740,6 +17740,44 @@ wróć na mapę kampanii/MAD — nadpisane pozycje i wygładzona ścieżka powin
 razu (ten sam `catmullRomPath`/store co edytor). Reset czyści wszystko i wraca do zygzaka
 z §321.
 
+## 323. Edycja/usuwanie wpisów loga ćwiczeń (2026-10-14)
+
+User, ostro: "Czemu robisz hujowo ćwiczenia nawet nie mają edycji klikną źle i pizda". Słuszne
+zgłoszenie dead-endu (CLAUDE.md §7) — `exercisesStore.removeLog(id)` istniał od §310, ale NIC
+w UI go nigdy nie wołało. Literówka w ilości albo zły quick-add ("Cel") nie dał się cofnąć bez
+grzebania w kodzie, ani w ekranie Ćwiczenia (§310-312), ani w nowej "Dzisiejszej sesji" planu
+(§320) — ten sam gap w OBU miejscach logowania.
+
+**Naprawa**:
+- `exercisesStore.ts` — nowa akcja `updateLog(id, amount)` (edycja ilości w miejscu, zachowuje
+  oryginalny `createdAt` — kolejność historii dnia się nie zmienia).
+- `useExerciseLogging.ts` — hook teraz eksportuje też `removeLog`/`updateLog` (były w storze,
+  ale hook ich nie przepuszczał).
+- `src/components/health/ExerciseLogHistory.tsx` (nowy, współdzielony) — lista dzisiejszych
+  wpisów dla danego klucza logowania (godzina + ilość), każdy z edycją (pole inline) i
+  usuwaniem (kosz). WSPÓLNY komponent dla obu miejsc, nie dwie kopie.
+- `app/exercises.tsx` — mała ikona "historia" przy karcie ćwiczenia (widoczna gdy dziś coś
+  zalogowano), rozwija listę wpisów pod polem input.
+- `app/training-session.tsx` — to samo przy pozycjach planu. Przy okazji: nagłówek pozycji
+  (`cardHead`) był owinięty w JEDEN `PressableScale` (tap = otwórz edytor ilości) — dodanie
+  drugiego przycisku (historia) OBOK niego wymagało rozdzielenia na dwa równorzędne elementy
+  (`cardHeadMain` z własnym `PressableScale` + osobny `historyBtn`), żeby uniknąć zagnieżdżonych
+  pressable'i (ten sam rodzaj ryzyka gestów co cała saga §315-§322, tu uniknięty świadomie
+  przy pisaniu, nie znaleziony później).
+
+**Celowo NIE cofane**: edycja/usunięcie wpisu NIE cofa już przyznanej nagrody questu
+(`markXDone()` w petStore to osobna, jednokierunkowa flaga — ten sam wzorzec co reszta silnika
+nagród, patrz §312). Poprawka wpływa na wyświetlaną sumę/streak idąc naprzód, nie retroaktywnie
+odbiera monet/XP już odebranych w Pupil → Zadania — świadomy zakres, nie przeoczenie.
+
+**Testy**: brak nowych (czysto prezentacyjny komponent + trywialny reducer store'u — ten sam
+poziom pokrycia co `removeLog`/`trainingPlansStore`, które też nie mają dedykowanych testów).
+`tsc --noEmit` czyste, `jest --silent` 105/105 suite, 1383 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — wysoki**: zaloguj coś błędnie na ekranie Ćwiczenia i w
+Dzisiejszej sesji, otwórz historię (ikonka zegara), popraw ilość i usuń wpis — suma "Dziś"
+powinna się zaktualizować natychmiast w obu miejscach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

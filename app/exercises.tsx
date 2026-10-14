@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon, ClipboardList, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon, ClipboardList, ChevronRight, ChevronDown, History } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
+import ExerciseLogHistory from '@/components/health/ExerciseLogHistory';
 import { useProfileStore } from '@/store/profileStore';
 import { useExerciseLogging } from '@/hooks/useExerciseLogging';
 import { amountLoggedOn } from '@/utils/personalQuests';
@@ -43,8 +44,9 @@ export default function ExercisesScreen() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { trainingLevel } = useProfileStore();
-  const { logs, targets, streak, today, logAmount: logAmountRaw } = useExerciseLogging();
+  const { logs, targets, streak, today, logAmount: logAmountRaw, removeLog, updateLog } = useExerciseLogging();
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
 
   const logAmount = (ex: typeof EXERCISE_META[number], amount: number) => {
     logAmountRaw({ exercise: ex.id, linkedExercise: ex.id, label: ex.label, unit: ex.unit, amount });
@@ -109,6 +111,14 @@ export default function ExercisesScreen() {
                     <Text style={s.quickBtnTxt}>Cel</Text>
                   </PressableScale>
                 )}
+                {todayAmt > 0 && (
+                  <PressableScale
+                    onPress={() => { haptic.tap(); setHistoryFor((prev) => (prev === ex.id ? null : ex.id)); }}
+                    style={s.historyBtn}
+                  >
+                    {historyFor === ex.id ? <ChevronDown size={15} color={c.text.muted} /> : <History size={15} color={c.text.muted} />}
+                  </PressableScale>
+                )}
               </View>
               <View style={s.inputRow}>
                 <TextInput
@@ -123,6 +133,14 @@ export default function ExercisesScreen() {
                   <Text style={s.saveBtnTxt}>Zapisz</Text>
                 </PressableScale>
               </View>
+              {historyFor === ex.id && (
+                <ExerciseLogHistory
+                  entries={logs.filter((l) => l.exercise === ex.id && l.date === today)}
+                  unit={ex.unit}
+                  onUpdate={updateLog}
+                  onDelete={removeLog}
+                />
+              )}
             </View>
           );
         })}
@@ -162,6 +180,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   quickBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 7 },
   quickBtnTxt: { fontSize: 11.5, fontWeight: '800', color: '#07160F' },
+  historyBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
 
   inputRow: { flexDirection: 'row', gap: spacing[2] },
   input: { flex: 1, backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13.5, color: c.text.primary },
