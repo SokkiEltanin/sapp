@@ -17391,6 +17391,51 @@ tsc/jest):
 3. Pinch — zoom w obie strony, punkt pod środkiem ekranu wizualnie nie "skacze".
 4. Przełącznik Kampania/MAD — ponowne centrowanie też bez czarnych pasów.
 
+## 318. Mapa bossów 2D — tło wektorowe zamiast kafelkowanego JPG (lag) (2026-10-14)
+
+User po §317 (poprawka czarnych pasów), nowy problem: "I to laguje wiec moze te mape to
+wektorem podobna zrob? Zeby nie lagowalao?" — mapa jest teraz widoczna (§317 zadziałało), ale
+przesuwanie/zoom czuje się ciężko.
+
+**Przyczyna**: tło mapy (`Image` z `assets/lokalizacje/LOKALIZACJA_MAPA_KAMPANII.jpg`, zdjęcie
+3000×2000px, 403KB) było renderowane z `resizeMode="repeat"` na CAŁYM płótnie
+(`canvasW`×`canvasH`, realnie rzędu 1500-2000px na stronę przy pełnym rosterze 51 bossów) —
+WEWNĄTRZ widoku animowanego przez `useAnimatedStyle` (pan/pinch, 60fps). Kafelkowanie
+bitmapy ("repeat") to w przeciwieństwie do prostego skalowania jednej warstwy operacja, którą
+silnik renderujący (zwłaszcza Android, stary pipeline widoków) musi efektywnie re-rasteryzować
+przy każdej zmianie scale/translate z gestu — stąd lag przy przesuwaniu/zoomowaniu, którego
+nie było (i nie mogło być) widać bez testu na urządzeniu.
+
+**Naprawa (`src/components/bosses/CampaignMap.tsx`)**: `Image`+`resizeMode="repeat"` USUNIĘTE
+całkowicie, zastąpione czysto wektorowym tłem w TYM SAMYM `Svg`, co rysuje ścieżkę (jedna
+warstwa więcej niż wcześniej mniej, nie więcej):
+- `<Rect>` pełnego rozmiaru płótna, kolor zależny od `isMad` (`#1E0A0C` czerwonawy / `#0B0E14`
+  neutralny) — zastępuje bazowy kolor zdjęcia.
+- `<Pattern>` siatki punktów (`GRID=56px` krok, `Circle r=1.6` `rgba(255,255,255,0.08)`) jako
+  `<Rect fill="url(#mapGrid)">` na wierzchu — daje wrażenie "mapy terenu" bez jednego pixela
+  rastra. Czysta geometria SVG skaluje się/przesuwa jako GPU-transform całej warstwy, bez
+  re-rasteryzacji zawartości przy każdej klatce gestu.
+- `LinearGradient` scrim ZOSTAJE (to nie był problem — prosty 2-kolorowy gradient na całej
+  warstwie, nie kafelkowana bitmapa) — tylko złagodzony (opacity 0.25→0.4→0.55 zamiast
+  0.55→0.68→0.82), bo bazowy `Rect` jest już ciemny z natury, mocny scrim na tym robiłby
+  mapę praktycznie czarną.
+- Plik `assets/lokalizacje/LOKALIZACJA_MAPA_KAMPANII.jpg` NIE usunięty z repo (był używany
+  wyłącznie tu — `grep` potwierdza) — zostaje nieużywany na wszelki wypadek, do ręcznego
+  usunięcia jeśli user potwierdzi że nie będzie wracał do wersji ze zdjęciem.
+
+**Celowo NIE zrobione**: brak dekoracyjnych wektorowych "biomów"/kształtów terenu (np. różne
+kolory/tekstury dla różnych regionów trasy) — user poprosił o "podobną" mapę bez lagów, nie o
+nowy design; siatka punktów to minimalny wektorowy zamiennik tła, nie próba odtworzenia
+wyglądu zdjęcia. Jeśli estetyka "zbyt pusta" — do rozbudowy osobnym zgłoszeniem.
+
+**Testy**: brak zmiany logiki testowalnej (czysto renderowa zamiana warstwy tła, żadna nowa
+pure function). `tsc --noEmit` czyste, `jest --silent` 104/104 suite, 1359 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, bez weryfikacji z tej sesji**: pan/pinch na mapie
+bossów powinny być teraz wyraźnie płynniejsze (brak kafelkowanego zdjęcia pod transformem).
+Jeśli WCIĄŻ laguje — kolejny podejrzany to liczba renderowanych węzłów/portretów
+(`BossArt`×liczba bossów, każdy to osobny `View`+ikona) przy dużym rosterze, nie samo tło.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -1,8 +1,8 @@
 import { memo, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, Pressable, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect, Pattern, Circle, Defs } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Lock, Swords } from 'lucide-react-native';
 import BossArt from './BossArt';
@@ -38,7 +38,7 @@ const NODE = 60;
 const POPUP_W = 248;
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 1.8;
-const MAP_BG = require('../../../assets/lokalizacje/LOKALIZACJA_MAPA_KAMPANII.jpg');
+const GRID = 56;
 
 type Popup = { kind: 'current' | 'defeated'; boss: Boss };
 
@@ -194,21 +194,37 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     <View style={st.wrap} onLayout={onLayoutViewport}>
       <GestureDetector gesture={composed}>
         <Reanimated.View style={[{ width: canvasW, height: canvasH }, canvasStyle]}>
-          <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: canvasW, height: canvasH }]} resizeMode="repeat" />
-          {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
-              na lekko czerwony"). */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={(isMad
-              ? ['rgba(40,8,10,0.55)', 'rgba(40,8,10,0.68)', 'rgba(40,8,10,0.82)']
-              : ['rgba(8,10,16,0.55)', 'rgba(8,10,16,0.68)', 'rgba(8,10,16,0.82)']) as [string, string, string]}
-            style={StyleSheet.absoluteFillObject}
-          />
-
+          {/* Tło WEKTOROWE, nie zdjęcie (user: "laguje... zrób wektorem, żeby nie lagowało").
+              Poprzednio: `Image` 3000×2000 JPG z `resizeMode="repeat"` kafelkowane na całym
+              płótnie — Android musi to tile'ować/rasteryzować na nowo przy KAŻDEJ zmianie
+              scale/translate z gestu (60fps podczas pan/pinch), bo kafelkowanie bitmapy pod
+              transformem nie jest darmowe jak proste skalowanie jednej warstwy. Siatka punktów
+              w tym samym `Svg` co ścieżka to czysta wektorowa geometria — silnik rysuje ją
+              razem z resztą mapy jedną warstwą, skalowanie/przesuwanie to tylko transform GPU,
+              bez re-rasteryzacji zawartości. */}
           <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
+            <Defs>
+              <Pattern id="mapGrid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
+                <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill="rgba(255,255,255,0.08)" />
+              </Pattern>
+            </Defs>
+            <Rect x={0} y={0} width={canvasW} height={canvasH} fill={isMad ? '#1E0A0C' : '#0B0E14'} />
+            <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
             {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
             {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
           </Svg>
+
+          {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
+              na lekko czerwony"). Zostaje jako `LinearGradient` — to prosty 2-kolorowy
+              gradient na całej warstwie, nie kafelkowana bitmapa, więc nie jest tu źródłem
+              laga. */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={(isMad
+              ? ['rgba(40,8,10,0.25)', 'rgba(40,8,10,0.4)', 'rgba(40,8,10,0.55)']
+              : ['rgba(8,10,16,0.25)', 'rgba(8,10,16,0.4)', 'rgba(8,10,16,0.55)']) as [string, string, string]}
+            style={StyleSheet.absoluteFillObject}
+          />
 
           {bosses.map((b, i) => {
             const isDefeated = i < currentIdx;
