@@ -3,20 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Mapa bossów przebudowana od zera — pełnoekranowa, pan+zoom 2D (2026-10-14)
+## 🆕 Mapa bossów 2D — DRUGA poprawka po teście na urządzeniu (2026-10-14)
 
-§314 (auto-scroll fix) okazał się NIEWYSTARCZAJĄCY — user po zrzucie: "Nie o to chodzi...
-chodziło o przebudowę całej zakładki bossów od zera". Pełny opis nowej architektury
-(`bossMapLayout.ts`, `Gesture.Pan`+`Gesture.Pinch`, kompaktowe kafle raid/event, usunięte
-"Medale") w ARCHITECTURE.md §315.
+§314 (auto-scroll fix) okazał się NIEWYSTARCZAJĄCY → §315 przebudowało mapę od zera na
+pełnoekranową pan+zoom 2D → user przetestował NA URZĄDZENIU i zgłosił (ostro, ze zrzutami):
+"zjebales nadal... skrajne przesunięcia wszystkie i ani nie widać bosa ani innych bossów".
+Realny bug na urządzeniu — czarne pasy w miejscu mapy. **To NIE był przewidziany tu wcześniej
+problem "tap łapany jako pan"** (to był zły trop z poprzedniej wersji tego wpisu) — prawdziwa
+przyczyna: (1) centrowanie kamery na starcie nie przycinało wyniku do granic płótna, (2)
+pinch-zoom pivotował wokół domyślnego środka widoku RN, niezgodnego z matematyką przycinania
+zakładającą origin (0,0). Naprawione w §317 (CampaignMap.tsx: przycięte centrowanie,
+`transformOrigin:'0 0'`, pinch z przeliczanym pivotem na środek viewportu).
 
-**Priorytet testu na urządzeniu — KRYTYCZNY, najwyższy w tej sesji** — nowy silnik gestów
-(pan+pinch+tap-przez-pan) NIE przeszedł testu na realnym dotyku (brak takiego środowiska tu).
-Konkretna checklist w §315 — NAJWAŻNIEJSZE: czy tapnięcie bossa na mapie otwiera popup, czy
-pan/pinch działają płynnie w obu kierunkach. Jeśli tapnięcie węzłów nie działa (gest pan
-"zjada" tapnięcia) — zgłoś, to pierwsza rzecz do zdebugowania (kandydat: zwiększyć
-`.minDistance()` na `Gesture.Pan()` w CampaignMap.tsx, albo dodać `Gesture.Tap()` osobno
-skomponowany przez `Gesture.Race` zamiast polegać na zwykłym `Pressable` pod spodem).
+**Priorytet testu na urządzeniu — KRYTYCZNY, DRUGA próba, poprzednia zawiodła** — checklist w
+§317: (1) brak czarnych pasów, mapa od razu wyśrodkowana na aktualnym bossie, (2) pan w każdą
+stronę nie odsłania pustki poza canvasem, (3) pinch zooma bez "skakania" punktu pod środkiem
+ekranu, (4) przełącznik Kampania/MAD też centruje bez pasów. Tapnięcie węzła → popup (z §315,
+wciąż niepotwierdzone, ale user w obu zrzutach nie zgłaszał TEGO jako problemu — priorytet
+niżej niż czarne pasy).
 
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 

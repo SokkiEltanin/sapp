@@ -17254,10 +17254,9 @@ Licznik medali ZOSTAJE jako mała odznaka liczby na kompaktowym kaflu (wyżej) �
 mówił że chce stracić SAM licznik, tylko ścianę ikon.
 
 **Celowo NIE zrobione / znane uproszczenia** (uczciwie spisane, nie przeoczenia):
-- Pinch-zoom zawsze pivotuje wokół ŚRODKA CAŁEGO płótna (`transform-origin` domyślny RN —
-  środek widoku), NIE wokół punktu dotyku/środka viewportu — prostsze i bezpieczniejsze do
-  zaimplementowania bez urządzenia do testów, kosztem nieco mniej "naturalnego" czucia zoomu
-  niż w prawdziwych mapach (Google Maps itd., gdzie zoom pivotuje pod palcami).
+- ~~Pinch-zoom zawsze pivotuje wokół ŚRODKA CAŁEGO płótna...~~ — **BŁĄD, nie tylko uproszczenie
+  UX** — patrz §317: to razem z nieprzycinanym centrowaniem kamery dawało realne czarne pasy
+  na urządzeniu, naprawione tam.
 - Brak unikania samoprzecięć trasy przy dużym rosterze (patrz `bossMapLayout.ts` wyżej).
 - Pan ma PROSTE ograniczenie granic (canvas nie odjeżdża całkowicie poza viewport), bez
   "elastycznego" odbicia/sprężyny przy granicy (`withSpring` na overshoot) — twardy klamp.
@@ -17337,6 +17336,60 @@ jednostkowego testu (sama logika to `require()` + warunek). `tsc --noEmit` czyst
 rozciąganie pokazują prawdziwe grafiki (pomarańczowe sylwetki), rower dalej jako ikona
 lucide. Jeśli któreś dopasowanie wygląda źle (np. zamienione miejscami) — łatwe do
 poprawienia, to tylko mapa w `exerciseIcons.ts`.
+
+## 317. Mapa bossów 2D — poprawka czarnych pasów (nieprzycięte centrowanie + pivot zoomu) (2026-10-14)
+
+User po §315 (dwa zrzuty, ostro): "Nie no zjebales nadal zobacz teraz jest tak to sa skrajne
+przesunięcia wszystkie i ani nie widać bosa ani innych bossów dlaczego tak zrobiles? Możesz
+raz a dobrze???" Zrzuty: duży czarny pas nad mapą na pierwszym, duży czarny pas po lewej
+połowie ekranu po przesunięciu na drugim — ani aktualny boss, ani inne nie widoczne.
+
+**Prawdziwa przyczyna (diagnoza statyczna kodu z §315, bez urządzenia — te sam kod co wyżej,
+dwa realne błędy matematyczne, nie "czucie" gestów)**:
+
+1. **Centrowanie startowe BEZ przycinania granic.** `onLayoutViewport` liczyło
+   `tx = width/2 - node.x` wprost, bez żadnego ograniczenia — w przeciwieństwie do
+   `pan.onUpdate`, które przycina wynik do `[min(0, viewport-canvas), max(0, viewport-canvas)]`.
+   Gdy aktualny boss leży blisko startu trasy (małe `x`/`y` w układzie lokalnym płótna) a
+   viewport jest teraz CAŁY EKRAN (po przebudowie na pełnoekranową mapę w §315), wycentrowanie
+   go na środku wymagało przesunięcia płótna POZA jego własną krawędź — ujawniając pustkę
+   (czarne tło `st.wrap`) tam, gdzie żadna treść nie jest rysowana. To właśnie czarne pasy ze
+   zrzutów — nie "zepsuta" mapa, tylko kamera wystawiona poza nią.
+2. **Pivot pinch-zoomu niezgodny z matematyką przycinania.** RN domyślnie skaluje
+   `transform` wokół ŚRODKA WŁASNEGO bounding-boxu widoku, nie (0,0) — a cała matematyka
+   przycinania (tu i w pan) zakłada origin w (0,0) płótna. Bez `transformOrigin:'0 0'` render
+   faktyczny i liczony stan (`translateX/Y`+`scale`) się rozjeżdżały przy `scale !== 1`,
+   pogłębiając ten sam efekt "offsetu poza canvas".
+
+**Naprawa (`src/components/bosses/CampaignMap.tsx`), trzy zmiany, żadna nowa zależność**:
+1. `onLayoutViewport` liczy teraz `minTX/maxTX/minTY/maxTY` IDENTYCZNĄ formułą jak
+   `pan.onUpdate` i przycina do niej wynikowe `tx`/`ty` przed zapisem do shared values —
+   kamera nigdy nie wystawi się poza `canvasW`×`canvasH`.
+2. `canvasStyle` (`useAnimatedStyle`) dostało `transformOrigin: '0 0'` — origin renderu
+   teraz zgodny z origin matematyki przycinania.
+3. `pinch.onUpdate` przeliczane tak, by punkt płótna pod ŚRODKIEM VIEWPORTU (prostszy,
+   bezpieczny wybór zamiast dynamicznego focal-point dwóch palców —
+   `nx = cx - (cx - startX.value) * (s / startScale.value)`, analogicznie Y) został wizualnie
+   na miejscu przy zoomie, a wynik przycinany TĄ SAMĄ formułą co pan/centrowanie startowe.
+
+**Nadal znane ograniczenie (uczciwie, bez zmiany od §315)**: `Gesture.Simultaneous(pan, pinch)`
+przy PRAWDZIWYM jednoczesnym pan+pinch (dwa palce poruszające się inaczej niż czysty zoom)
+może dawać drobne "przeciąganie się" między dwiema formułami piszącymi do tych samych shared
+values w tej samej klatce — zaakceptowane, nie zgłoszone przez użytkownika, do rewizji tylko
+jeśli faktycznie odczuwalne na urządzeniu.
+
+**Testy**: brak nowych czystych funkcji do testowania (to math osadzony w komponencie/
+workletach, nie w `bossMapLayout.ts` — ten plik bez zmian, 6 testów jak w §315 nadal
+przechodzą). `tsc --noEmit` czyste, `jest --silent` 104/104 suite, 1359 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, bez weryfikacji z tej sesji** (ten sam kod bez
+fizycznego dotyku co w §315 — DRUGA próba, poprzednia zawiodła na urządzeniu mimo przejścia
+tsc/jest):
+1. Bossy → mapa wypełnia cały ekran, BEZ czarnych pasów, od razu wyśrodkowana na aktualnym
+   bossie widocznym na środku.
+2. Przesuwanie w każdą stronę — canvas nigdy nie "uciek" tak, że widać czarne tło poza nim.
+3. Pinch — zoom w obie strony, punkt pod środkiem ekranu wizualnie nie "skacze".
+4. Przełącznik Kampania/MAD — ponowne centrowanie też bez czarnych pasów.
 
 ---
 
