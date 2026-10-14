@@ -17589,6 +17589,97 @@ ryzyko głównie w samym UI builderа, nie w fundamencie):
    Pupil → Zadania identycznie jak ręczny wpis na ekranie Ćwiczenia.
 5. Usuwanie planu z potwierdzeniem — nie kasuje już zalogowanych wpisów, tylko sam szablon.
 
+## 321. Mapa bossów — PRZEBUDOWA OD ZERA #2: zygzak po torach + zwykły ScrollView (2026-10-14)
+
+User po #424/#425 (dwa niezależne zrzuty — kampania i MAD bossy), bardzo stanowczo: "boss
+niektóre sa porozrzucane zle pokazuje sie na mapie, nie widać zupełnie tego aktualnego z
+kampanii, linią wgle przerwa sie kolorem buguje sie przybliżenie slabo dziala... Nie wiem co
+ty robisz możesz to zrobic lepiej jakos? Możesz zrobic to nawet od zera???" oraz osobno: "W
+mad boksach ta samo nie widac tego z którym teraz musiałbym walczyć:/ zaczyna sie od pustki
+niczego".
+
+**Diagnoza PRZED kolejną łatką — zweryfikowana bezpośrednim odpaleniem kodu w jest, nie
+zgadywaniem** (brak urządzenia do testów, więc każda hipoteza sprawdzona jak dało się to
+zrobić statycznie): napisany tymczasowy test uruchamiający realny `BOSSES`/`madCandidate`/
+`madBossFor`/`layoutBossMap` z prawdopodobnym stanem gracza (5 pokonanych bossów kampanii, 0
+MAD) potwierdził że:
+- dopasowanie id między `madBoss.id` (`mad_<baseId>`) a tablicą `madBosses` jest poprawne
+  (`findIndex` zwraca prawidłowy indeks, NIE -1) — teoria "id mismatch" OBALONA konkretnymi
+  danymi, nie tylko czytaniem kodu.
+- minimalna odległość między KAŻDĄ parą z 22 węzłów poprzedniego losowego-spaceru layoutu to
+  dokładnie STEP (170) między sąsiadami w sekwencji — dla tego konkretnego seeda/rosteru BRAK
+  nakładających się węzłów — teoria "z-order przesłania aktualnego węzła" też OBALONA dla
+  sprawdzonego przypadku.
+- matematyka kamery (`onLayoutViewport`/`recenter` z PR #425) poprawnie liczy pozycję
+  centrowania BEZ przycinania dla tego scenariusza (canvas 2017×1871, node0 w bezpiecznym
+  obszarze) — nic nie wymagałoby klamrowania.
+
+**Wniosek**: POJEDYNCZE elementy (ID-matching, kamera, brak nakładania) były matematycznie
+poprawne DLA SPRAWDZONYCH scenariuszy — ale nie da się w ten sposób sprawdzić KAŻDEGO
+możliwego stanu gracza/seeda bez urządzenia, a user dostał już CZTERY rundy poprawek
+(PR #419→#424→#425) na tę samą architekturę (losowy spacer 2D + ręczna matematyka
+translateX/Y/scale na shared values z klamrowaniem i pivotem) i mapa WCIĄŻ wygląda zepsuta.
+To przestało być kwestią "znajdź ten jeden brakujący bug" — to zbyt dużo ruchomych części do
+bezpiecznego utrzymania bez dostępu do realnego urządzenia. User explicite zaproponował
+przebudowę od zera — przyjęte, zamiast piątej rundy łatania.
+
+**Nowa architektura — DWIE zmiany, obie usuwają całą KLASĘ ryzyka, nie tylko jej objaw**:
+
+1. **`src/utils/bossMapLayout.ts` — zygzak po torach zamiast losowego spaceru w dowolnym
+   kierunku.** Y jest TERAZ ściśle funkcją indeksu (`PAD_Y + i*ROW_GAP`, bez jitteru) — każdy
+   kolejny boss jest MATEMATYCZNIE niżej niż poprzedni, co WYKLUCZA samoprzecięcia trasy
+   niezależnie od rosteru/seeda (dowód, nie założenie — test `__tests__/bossMapLayout.test.ts`
+   sprawdza to wprost: `nodes[i].y > nodes[i-1].y` dla WSZYSTKICH i). X porusza się po max 5
+   "torach" (`LANES`), krok zmienia tor o co najwyżej ±1 (deterministycznie, `hash01`) — wije
+   się nieokresowo (nie powtarzający się sinusoidalny wzór ze starszej wersji sprzed PR #415),
+   ale NIGDY nie skacze gwałtownie w bok. **`areaWidth` jako parametr** (nowość względem
+   poprzedniej wersji) — płótno ma szerokość RÓWNĄ zmierzonemu viewportowi (nie stałą), więc
+   zygzak zawsze dokładnie mieści się na ekranie, na każdym rozmiarze telefonu, bez
+   jakiegokolwiek poziomego przycinania.
+2. **`src/components/bosses/CampaignMap.tsx` — zwykły, natywny pionowy `ScrollView` zamiast
+   własnej matematyki gestów.** CAŁA poprzednia maszyneria (`Gesture.Pan`/`Gesture.Pinch`/
+   `GestureDetector`/Reanimated `translateX`/`translateY`/`scale`/`startX`/`startY`/
+   `startScale`, ręczne klamrowanie granic, ręczny `transformOrigin`/pivot zoomu) USUNIĘTA
+   CAŁKOWICIE. "Wskakiwanie" na aktualnego bossa to teraz jedno wywołanie
+   `scrollRef.current?.scrollTo({ y, animated: false })` — RN SAM przycina do granic treści
+   (`ScrollView` nie pozwoli przewinąć poza `contentSize`), więc nie ma już ŻADNEJ ręcznej
+   matematyki klamrowania do pomylenia. Re-centrowanie dalej reaguje na KAŻDĄ zmianę
+   `currentId` (ten sam `centeredOn` ref + `useEffect` wzorzec z PR #425, tylko ciało efektu
+   teraz woła `scrollTo` zamiast ustawiać shared values) — łapie spóźnioną hydratację store'u
+   i normalną zmianę po wygranej walce.
+
+**ŚWIADOMIE WYCIĘTE: swobodny pan w poziomie i pinch-zoom** (user pierwotnie potwierdził
+AskUserQuestion "prawdziwa mapa 2D z pan+zoom w obie strony"). Powód: RN `ScrollView` wspiera
+natywny pinch-zoom (`maximumZoomScale`/`minimumZoomScale`/`pinchGestureEnabled`) WYŁĄCZNIE na
+iOS — źródło RN oznacza te propsy `@platform ios` wprost (sprawdzone w
+`node_modules/react-native/.../ScrollView.js`, nie zgadywane). Ta apka jest na Androida
+(`com.sokki.sapp`, APK z GitHub) — odtworzenie zoomu na Androidzie wymagałoby z powrotem
+własnej matematyki gestów na shared values, czyli DOKŁADNIE tego samego źródła bugów od nowa.
+Świadomy kompromis na rzecz mapy która DZIAŁA (pionowy scroll, zawsze widoczny aktualny boss,
+żadnej ręcznej matematyki kamery) zamiast efektownej wersji która nie działała czwarty raz z
+rzędu. Jeśli po teście na urządzeniu user DALEJ chce zoom — to osobne zgłoszenie, ŚWIADOMIE,
+nie przy okazji, wiedząc o tym kompromisie.
+
+**Celowo NIE zmienione** (nie było dowodu że to problem): tło wektorowe/mgła/popup/renderowanie
+węzłów (§318) — bez zmian, to NIE była przyczyna zgłoszonych objawów wg diagnozy wyżej.
+
+**Testy**: `__tests__/bossMapLayout.test.ts` przepisane pod nowy kształt — 9 testów (było 6):
+Y ściśle rosnące (dowód braku samoprzecięć), X w granicach `areaWidth`, krok toru ≤1,
+płótno = dokładnie `areaWidth`, plus istniejące (count 0/1, determinizm, liczba węzłów).
+`tsc --noEmit` czyste, `jest --silent` 105/105 suite, 1374 testów (+3 vs poprzednia sesja).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, PIĄTA próba na tej mapie, ale fundamentalnie
+INNA architektura niż poprzednie cztery** (natywny ScrollView zamiast własnej matematyki
+gestów — mniejsza powierzchnia na nowe bugi tego samego rodzaju):
+1. Bossy (kampania i MAD) → mapa od razu przewinięta tak, że aktualny boss (kolorowa obwódka)
+   jest widoczny na ekranie bez przewijania.
+2. Przewijanie PIONOWE działa płynnie (zwykły natywny scroll — powinno być oczywiste).
+3. ŚWIADOMIE BRAK: przesuwania w poziomie i zoomu (patrz wyżej) — mapa jest teraz węższa niż
+   poprzednio (zygzak w stałej szerokości ekranu), to nie błąd.
+4. Tapnięcie aktualnego/pokonanego bossa otwiera popup z WALCZ.
+5. Przełącznik Kampania/MAD przełącza i na nowo przewija do właściwego aktualnego bossa
+   danego trybu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

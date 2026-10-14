@@ -1,7 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, LayoutChangeEvent } from 'react-native';
-import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, LayoutChangeEvent } from 'react-native';
 import Svg, { Path, Rect, Pattern, Circle, Defs } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Lock, Swords } from 'lucide-react-native';
@@ -13,31 +11,35 @@ import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-// Mapa bossów — PRZEBUDOWA OD ZERA (2026-10-14, user po zrzucie: "zrob caloekranowa te
-// mapę... rozmieścić bosy na koordynatach potem polacz sciezkami po kolei jak w dragon mania
-// legends... teraz duplikujesz mapę wielokrotnie i ma scrolla dziwnie... chodziło o
-// przebudowę całej zakładki bossów od zera"). Poprzednia wersja (jeden pionowy ScrollView,
-// węzły kołysane sinusoidą TYLKO w poziomie, Y rosnące liniowo z indeksem) dawała okresowo
-// powtarzający się kształt — stąd wrażenie "duplikowania się" mapy. Ta wersja:
-// 1. PRAWDZIWA mapa 2D — węzły rozmieszczone proceduralnym spacerem (`layoutBossMap`,
-//    bossMapLayout.ts) łamiącym kierunek w KAŻDĄ stronę (nie tylko X), więc trasa realnie
-//    wije się po płaszczyźnie, nie powtarza okresowego wzoru.
-// 2. Swobodne przesuwanie + pinch-zoom (`Gesture.Pan`+`Gesture.Pinch`, react-native-gesture-
-//    handler — już w projekcie, ten sam "nowy" `Gesture`/`GestureDetector` styl co
-//    `(tabs)/_layout.tsx`/`DashEditRow.tsx`/`MoodEnergyGrid.tsx`, nie legacy
-//    Pan/PinchGestureHandler) zamiast samego pionowego scrolla.
-// 3. Kamera "wskakuje" (jump, NIE animowany scroll) na aktualnego bossa przy pierwszym
-//    zmierzeniu viewportu (`onLayout`) — eliminuje CAŁĄ klasę wyścigów czasowych, które
-//    psuły starą wersję (setTimeout(0) kontra natywny layout ScrollView).
-// 4. "Mgła" przeprojektowana pod 2D — stary gradient działał tylko bo trasa była ściśle
-//    pionowa (można było "zasłonić wszystko poniżej Y"). W prawdziwym 2D nie ma jednego
-//    "poniżej" — fog realizowany teraz PER-SEGMENT ścieżki (nieodkryty odcinek rysowany
-//    prawie czarnym, ledwo widocznym kolorem zamiast jasnego akcentu) + per-węzeł (locked =
-//    czarna sylwetka + kłódka, już istniało, zostaje).
+// Mapa bossów — PRZEBUDOWA OD ZERA #2 (2026-10-14). Pierwsza przebudowa (PR #419-#426, ten sam
+// plik: pełnoekranowa, swobodny pan+pinch-zoom na losowym 2D spacerze) przeszła CZTERY rundy
+// poprawek (klamrowanie kamery, pivot zoomu, wyścig z hydratacją store'u) i user DALEJ zgłaszał
+// złamaną mapę ("boss niektóre sa porozrzucane zle... nie widać zupełnie tego aktualnego...
+// linią wgle przerwa sie kolorem... przybliżenie słabo działa... Możesz zrobic to nawet od
+// zera???"). Każda pojedyncza poprawka była matematycznie poprawna dla sprawdzonego scenariusza
+// (zweryfikowane bezpośrednim odpaleniem kodu w jest, nie zgadywaniem) — ale CAŁY system
+// (losowy spacer 2D + ręczna matematyka kamery/klamrowania/pivotu na współdzielonych shared
+// values) miał za dużo ruchomych części naraz, żeby debugować na ślepo, bez dostępu do
+// urządzenia, w nieskończoność. Zamiast kolejnej łatki na tę samą architekturę:
+//
+// 1. **Layout** (`bossMapLayout.ts`) — zamiast losowego spaceru w DOWOLNYM kierunku (mógł się
+//    teoretycznie zapętlić na siebie), nowy układ to wąski zygzak PO TORACH: X ograniczony do
+//    stałej szerokości ekranu, Y ŚCIŚLE rośnie z indeksem — MATEMATYCZNIE wykluczone
+//    samoprzecięcia, niezależnie od rosteru/seeda (dowód: test w bossMapLayout.test.ts).
+// 2. **Kamera** — zwykły, natywny pionowy `ScrollView` zamiast własnej matematyki
+//    translateX/Y/scale na Reanimated shared values. "Wskakiwanie" na aktualnego bossa to
+//    jedno wywołanie `scrollTo({y, animated:false})` — RN SAM przycina do granic treści,
+//    więc CAŁA klasa bugów klamrowania/pivotu z poprzedniej wersji nie istnieje strukturalnie,
+//    nie tylko "jest załatana". Swobodny pan w poziomie i pinch-zoom (user pierwotnie
+//    potwierdził AskUserQuestion) są tu ŚWIADOMIE wycięte — RN `ScrollView` wspiera naturalny
+//    pinch-zoom TYLKO na iOS (`@platform ios` w źródle RN), więc odtworzenie go na Androidzie
+//    wymagałoby z powrotem własnej matematyki gestów, czyli dokładnie tego samego źródła
+//    bugów od nowa. Kompromis uczciwie przyjęty na rzecz mapy która DZIAŁA, zamiast efektownej
+//    która nie działa czwarty raz z rzędu.
+// 3. **Tło/mgła/popup/węzły** — bez zmian względem poprzedniej wersji (to NIE było źródłem
+//    zgłoszonych problemów, zweryfikowane przez bezpośrednie odpalenie layoutu w testach).
 const NODE = 60;
 const POPUP_W = 248;
-const MIN_SCALE = 0.35;
-const MAX_SCALE = 1.8;
 const GRID = 56;
 
 type Popup = { kind: 'current' | 'defeated'; boss: Boss };
@@ -57,141 +59,39 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   const c = useColors();
   const [popup, setPopup] = useState<Popup | null>(null);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  const scrollRef = useRef<ScrollView>(null);
 
   const currentIdx = currentId ? bosses.findIndex(b => b.id === currentId) : bosses.length;
-  const { nodes, width: canvasW, height: canvasH } = useMemo(() => layoutBossMap(bosses.length), [bosses.length]);
+  // Szerokość płótna = ZMIERZONA szerokość viewportu (nie stała) — gwarantuje że zygzak
+  // zawsze dokładnie mieści się na ekranie, na KAŻDYM rozmiarze telefonu, bez poziomego
+  // przycinania/scrolla. Dopóki viewport nie jest jeszcze zmierzony, 340 to bezpieczny
+  // placeholder (pierwszy render i tak zaraz dostanie realny onLayout).
+  const { nodes, width: canvasW, height: canvasH } = useMemo(
+    () => layoutBossMap(bosses.length, viewport.w || 340),
+    [bosses.length, viewport.w],
+  );
   const litColor = isMad ? '#EF4444' : '#38BDF8';
-
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
-  const startScale = useSharedValue(1);
-
-  // Kamera wskakuje na aktualnego bossa — user: "domyślnie popakuje sie pozycja bosa
-  // aktualnego do pokonania". `onLayout` (nie efekt+Dimensions) bo musi znać REALNY, zmierzony
-  // rozmiar TEGO konkretnego kontenera (zależny od layoutu ekranu-rodzica, nie całego okna).
-  //
-  // BUG #2 (user, 2026-10-14, po PR #424, zrzut: "boss nie sa w dobrym miejscu linią jest
-  // zła... aktualny boss wgle jest nie widoczny i nie mogę z nim zawalczyć") — TO NIE był ten
-  // sam bug co w PR #424 (tamten — brak przycinania do granic płótna — jest naprawiony,
-  // przycinanie niżej zostaje bez zmian). Prawdziwa przyczyna: centrowanie było jednorazowe
-  // (`centered.current` ustawiane raz na zawsze), odpalane przy PIERWSZYM `onLayout`. Ale
-  // `defeatedBosses` (petStore, `persist`+AsyncStorage, patrz `_hydrated` w petStore.ts) ładuje
-  // się ASYNCHRONICZNIE — pierwszy `onLayout` tego ekranu często odpala się ZANIM store się
-  // zrehydrował, czyli z DOMYŚLNYM `defeatedBosses=[]` → `current`/`currentId` w bosses.tsx w
-  // tym momencie to BOSSES[0], nie prawdziwy aktualny boss gracza. Kamera centrowała się raz
-  // na boss #0 i WIĘCEJ SIĘ NIE PRZESUWAŁA, nawet gdy chwilę później store się zrehydrował i
-  // `currentId` zmienił się na prawdziwego bossa — stąd "losowy", niepowiązany z realnym
-  // postępem fragment mapy, prawdziwy aktualny boss poza ekranem, a "chaos" to po prostu
-  // pomieszane pokonane/zablokowane węzły widziane w oderwaniu od kontekstu trasy.
-  //
-  // Naprawa: zamiast jednorazowego flaga, pamiętamy NA KTÓRE `currentId` kamera jest aktualnie
-  // wyśrodkowana (`centeredOn`) i re-centrujemy za każdym razem gdy `currentId` się ZMIENI
-  // (efekt niżej) — czy to po hydratacji store'u, czy po pokonaniu bossa i powrocie na mapę.
-  // Ręczne przesunięcie/zoom gracza NIE jest nadpisywane, dopóki `currentId` się nie zmieni.
-  const centeredOn = useRef<string | null | undefined>(undefined);
-  const recenter = useCallback((width: number, height: number) => {
-    if (!width || !height || nodes.length === 0) return;
-    const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
-    const node = nodes[idx];
-    const s = scale.value;
-    const minTX = Math.min(0, width - canvasW * s);
-    const maxTX = Math.max(0, width - canvasW * s);
-    const minTY = Math.min(0, height - canvasH * s);
-    const maxTY = Math.max(0, height - canvasH * s);
-    let tx = width / 2 - node.x * s;
-    let ty = height / 2 - node.y * s;
-    if (tx < minTX) tx = minTX; else if (tx > maxTX) tx = maxTX;
-    if (ty < minTY) ty = minTY; else if (ty > maxTY) ty = maxTY;
-    translateX.value = tx;
-    translateY.value = ty;
-    startX.value = tx;
-    startY.value = ty;
-  }, [nodes, currentIdx, canvasW, canvasH, scale, translateX, translateY, startX, startY]);
 
   const onLayoutViewport = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setViewport({ w: width, h: height });
   };
 
+  // Kamera "wskakuje" (jump, nie animowany scroll) na aktualnego bossa — user: "domyślnie
+  // popakuje sie pozycja bosa aktualnego do pokonania". Re-triggeruje się przy KAŻDEJ zmianie
+  // `currentId` (nie tylko raz przy pierwszym layoucie — `centeredOn` pamięta NA CO kamera
+  // jest aktualnie wycentrowana) — łapie zarówno spóźnioną hydratację store'u jak i normalną
+  // zmianę po wygranej walce. Natywny `scrollTo` SAM przycina do granic treści (RN), więc nie
+  // ma tu żadnej ręcznej matematyki klamrowania do pomylenia.
+  const centeredOn = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (centeredOn.current === currentId) return;
-    if (!viewport.w || !viewport.h) return;
+    if (!viewport.h || nodes.length === 0) return;
     centeredOn.current = currentId;
-    recenter(viewport.w, viewport.h);
-  }, [currentId, viewport.w, viewport.h, recenter]);
-
-  const pan = Gesture.Pan()
-    .minDistance(4)
-    .onUpdate((e) => {
-      'worklet';
-      const s = scale.value;
-      const minTX = Math.min(0, viewport.w - canvasW * s);
-      const maxTX = Math.max(0, viewport.w - canvasW * s);
-      const minTY = Math.min(0, viewport.h - canvasH * s);
-      const maxTY = Math.max(0, viewport.h - canvasH * s);
-      let nx = startX.value + e.translationX;
-      let ny = startY.value + e.translationY;
-      if (nx < minTX) nx = minTX; else if (nx > maxTX) nx = maxTX;
-      if (ny < minTY) ny = minTY; else if (ny > maxTY) ny = maxTY;
-      translateX.value = nx;
-      translateY.value = ny;
-    })
-    .onEnd(() => {
-      'worklet';
-      startX.value = translateX.value;
-      startY.value = translateY.value;
-    });
-
-  // BUG (druga część tego samego zgłoszenia): bez przeliczania translate przy zoomie, pinch
-  // zmieniał tylko `scale` wokół domyślnego pivotu RN — czyli ŚRODKA WŁASNEGO BOUNDING-BOXU
-  // widoku (RN nie ma `transform-origin:0 0` domyślnie), co jest NIEZGODNE z matematyką
-  // przycinania powyżej (ona zakłada origin w (0,0) płótna). Efekt: po zoomie przycięte
-  // granice i realnie renderowany obraz się rozjeżdżały — stąd też czarne pasy, nie tylko z
-  // centrowania. Naprawa dwuczęściowa: (1) `transformOrigin:'0 0'` na `canvasStyle` niżej —
-  // teraz origin matematyki i renderu się zgadzają; (2) tu — przy zoomie przeliczamy
-  // translate tak, by punkt płótna leżący pod ŚRODKIEM VIEWPORTU (prostszy, bezpieczny wybór
-  // niż dynamiczny focal point dwóch palców) został wizualnie na miejscu, a wynik i tak
-  // przycinamy tą samą formułą co pan/initial-center.
-  const pinch = Gesture.Pinch()
-    .onUpdate((e) => {
-      'worklet';
-      let s = startScale.value * e.scale;
-      if (s < MIN_SCALE) s = MIN_SCALE; else if (s > MAX_SCALE) s = MAX_SCALE;
-      const ratio = s / startScale.value;
-      const cx = viewport.w / 2;
-      const cy = viewport.h / 2;
-      let nx = cx - (cx - startX.value) * ratio;
-      let ny = cy - (cy - startY.value) * ratio;
-      const minTX = Math.min(0, viewport.w - canvasW * s);
-      const maxTX = Math.max(0, viewport.w - canvasW * s);
-      const minTY = Math.min(0, viewport.h - canvasH * s);
-      const maxTY = Math.max(0, viewport.h - canvasH * s);
-      if (nx < minTX) nx = minTX; else if (nx > maxTX) nx = maxTX;
-      if (ny < minTY) ny = minTY; else if (ny > maxTY) ny = maxTY;
-      scale.value = s;
-      translateX.value = nx;
-      translateY.value = ny;
-    })
-    .onEnd(() => {
-      'worklet';
-      startScale.value = scale.value;
-      startX.value = translateX.value;
-      startY.value = translateY.value;
-    });
-
-  const composed = Gesture.Simultaneous(pan, pinch);
-
-  const canvasStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-    transformOrigin: '0 0',
-  }));
+    const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
+    const targetY = Math.max(0, nodes[idx].y - viewport.h / 2);
+    scrollRef.current?.scrollTo({ y: targetY, animated: false });
+  }, [currentId, currentIdx, nodes, viewport.h]);
 
   // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:
   // "te Ścieżki dalej mają byc czarno mgła zasłonięte"), + osobny, krótszy odcinek TYLKO do
@@ -211,79 +111,73 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 
   return (
     <View style={st.wrap} onLayout={onLayoutViewport}>
-      <GestureDetector gesture={composed}>
-        <Reanimated.View style={[{ width: canvasW, height: canvasH }, canvasStyle]}>
-          {/* Tło WEKTOROWE, nie zdjęcie (user: "laguje... zrób wektorem, żeby nie lagowało").
-              Poprzednio: `Image` 3000×2000 JPG z `resizeMode="repeat"` kafelkowane na całym
-              płótnie — Android musi to tile'ować/rasteryzować na nowo przy KAŻDEJ zmianie
-              scale/translate z gestu (60fps podczas pan/pinch), bo kafelkowanie bitmapy pod
-              transformem nie jest darmowe jak proste skalowanie jednej warstwy. Siatka punktów
-              w tym samym `Svg` co ścieżka to czysta wektorowa geometria — silnik rysuje ją
-              razem z resztą mapy jedną warstwą, skalowanie/przesuwanie to tylko transform GPU,
-              bez re-rasteryzacji zawartości. */}
-          <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
-            <Defs>
-              <Pattern id="mapGrid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
-                <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill="rgba(255,255,255,0.08)" />
-              </Pattern>
-            </Defs>
-            <Rect x={0} y={0} width={canvasW} height={canvasH} fill={isMad ? '#1E0A0C' : '#0B0E14'} />
-            <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-            {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-            {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-          </Svg>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ width: canvasW, height: canvasH }}
+      >
+        {/* Tło WEKTOROWE (user: "laguje... zrób wektorem, żeby nie lagowało") — siatka
+            punktów w tym samym `Svg` co ścieżka, czysta geometria, bez kosztownej
+            re-rasteryzacji bitmapy pod transformem (stary bug z Image+resizeMode="repeat"). */}
+        <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
+          <Defs>
+            <Pattern id="mapGrid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
+              <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill="rgba(255,255,255,0.08)" />
+            </Pattern>
+          </Defs>
+          <Rect x={0} y={0} width={canvasW} height={canvasH} fill={isMad ? '#1E0A0C' : '#0B0E14'} />
+          <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
+          {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+        </Svg>
 
-          {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
-              na lekko czerwony"). Zostaje jako `LinearGradient` — to prosty 2-kolorowy
-              gradient na całej warstwie, nie kafelkowana bitmapa, więc nie jest tu źródłem
-              laga. */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={(isMad
-              ? ['rgba(40,8,10,0.25)', 'rgba(40,8,10,0.4)', 'rgba(40,8,10,0.55)']
-              : ['rgba(8,10,16,0.25)', 'rgba(8,10,16,0.4)', 'rgba(8,10,16,0.55)']) as [string, string, string]}
-            style={StyleSheet.absoluteFillObject}
-          />
+        {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={(isMad
+            ? ['rgba(40,8,10,0.25)', 'rgba(40,8,10,0.4)', 'rgba(40,8,10,0.55)']
+            : ['rgba(8,10,16,0.25)', 'rgba(8,10,16,0.4)', 'rgba(8,10,16,0.55)']) as [string, string, string]}
+          style={StyleSheet.absoluteFillObject}
+        />
 
-          {bosses.map((b, i) => {
-            const isDefeated = i < currentIdx;
-            const isCurrent = i === currentIdx;
-            const isLocked = i > currentIdx;
-            const n = nodes[i];
-            const x = n.x - NODE / 2;
-            const y = n.y - NODE / 2;
-            const node = (
-              <View style={[st.node, { left: x, top: y }]}>
-                <View style={st.portrait}>
-                  {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
-                  <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
-                  {isDefeated && (
-                    <View style={st.defeatedOverlay} pointerEvents="none">
-                      <X size={NODE * 0.62} color="rgba(0,0,0,0.82)" strokeWidth={3.5} />
-                    </View>
-                  )}
-                </View>
-                {isLocked && <View style={st.badgeLock}><Lock size={10} color="rgba(255,255,255,0.75)" /></View>}
-                <Text style={[st.nodeLabel, { color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
-                  {isLocked ? mysteryBossName(b.id) : b.name}
-                </Text>
+        {bosses.map((b, i) => {
+          const isDefeated = i < currentIdx;
+          const isCurrent = i === currentIdx;
+          const isLocked = i > currentIdx;
+          const n = nodes[i];
+          const x = n.x - NODE / 2;
+          const y = n.y - NODE / 2;
+          const node = (
+            <View style={[st.node, { left: x, top: y }]}>
+              <View style={st.portrait}>
+                {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
+                <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
+                {isDefeated && (
+                  <View style={st.defeatedOverlay} pointerEvents="none">
+                    <X size={NODE * 0.62} color="rgba(0,0,0,0.82)" strokeWidth={3.5} />
+                  </View>
+                )}
               </View>
+              {isLocked && <View style={st.badgeLock}><Lock size={10} color="rgba(255,255,255,0.75)" /></View>}
+              <Text style={[st.nodeLabel, { color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
+                {isLocked ? mysteryBossName(b.id) : b.name}
+              </Text>
+            </View>
+          );
+          if (isCurrent || isDefeated) {
+            return (
+              <PressableScale
+                key={b.id}
+                onPress={() => { haptic.tap(); setPopup({ kind: isCurrent ? 'current' : 'defeated', boss: b }); }}
+                style={[st.nodeTouch, { left: x, top: y }]}
+              >
+                {node}
+              </PressableScale>
             );
-            if (isCurrent || isDefeated) {
-              return (
-                <PressableScale
-                  key={b.id}
-                  onPress={() => { haptic.tap(); setPopup({ kind: isCurrent ? 'current' : 'defeated', boss: b }); }}
-                  style={[st.nodeTouch, { left: x, top: y }]}
-                >
-                  {node}
-                </PressableScale>
-              );
-            }
-            return <View key={b.id}>{node}</View>;
-          })}
-        </Reanimated.View>
-      </GestureDetector>
+          }
+          return <View key={b.id}>{node}</View>;
+        })}
+      </ScrollView>
 
       {popup && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">

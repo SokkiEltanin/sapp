@@ -3,27 +3,43 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Mapa bossów 2D — CZWARTA poprawka (kamera + hydratacja store'u) (2026-10-14)
+## 🆕 Mapa bossów 2D — PRZEBUDOWA OD ZERA #2 (2026-10-14, §321)
 
-§314 → §315 (przebudowa od zera) → §317 (poprawka czarnych pasów po teście na urządzeniu) →
-§318 (lag — kafelkowane zdjęcie tła zamienione na wektorowe SVG) → PR #424 z OBOMA tymi
-poprawkami scalony → user zgłosił NOWY zrzut: boss "nie w dobrym miejscu", "linia zła", "jakis
-chaos", "aktualny boss wgle nie widoczny". **To inny, trzeci bug**, nie regresja #424 —
-wyścig z asynchroniczną hydratacją `usePetStore` (AsyncStorage, `_hydrated` w petStore.ts):
-pierwszy `onLayout` mapy często łapie store PRZED wczytaniem realnych danych
-(`defeatedBosses=[]` domyślnie), kamera centrowała się RAZ na ten fałszywy "aktualny" (boss
-#0) i WIĘCEJ SIĘ NIE RUSZAŁA nawet po dociągnięciu prawdziwych danych chwilę później.
-Naprawione w §319: centrowanie re-triggeruje się przy KAŻDEJ zmianie `currentId` (nie tylko
-raz przy pierwszym layoucie) — łapie spóźnioną hydratację ORAZ normalną zmianę po wygranej
-walce (bonus: teraz kamera skacze na nowego aktualnego bossa też po powrocie z walki, nie
-tylko przy pierwszym wejściu).
+Historia: §314→§315 (przebudowa #1, swobodny pan+pinch-zoom na losowym 2D spacerze)→§317
+(czarne pasy)→§318 (lag, tło na wektorowe)→§319 (kamera + hydratacja store'u) — PR #419/#424/
+#425, CZTERY rundy poprawek na TĘ SAMĄ architekturę. User dalej zgłaszał zepsutą mapę (dwa
+osobne zrzuty — kampania I MAD bossy): "boss niektóre sa porozrzucane zle... nie widać
+zupełnie tego aktualnego... linią wgle przerwa sie kolorem... przybliżenie slabo dziala...
+Możesz zrobic to nawet od zera???" / "W mad boksach ta samo nie widac tego z którym teraz
+musiałbym walczyć, zaczyna sie od pustki niczego".
 
-**Priorytet testu na urządzeniu — KRYTYCZNY, CZWARTA próba** — nowy test z §319: zimny start
-apki → od razu Bossy → aktualny boss widoczny na środku OD RAZU, bez przesuwania. Plus stare z
-§317/§318 (brak czarnych pasów — powinno być już OK) oraz: pan/pinch wyraźnie płynniejsze. Jeśli
-WCIĄŻ laguje po tej poprawce — podejrzany nr 2 to liczba renderowanych węzłów/portretów
-(`BossArt`×liczba bossów) przy dużym rosterze, nie tło (patrz §318, ostatni akapit). Tapnięcie
-węzła → popup (z §315, wciąż niepotwierdzone, user dotąd nie zgłaszał tego jako problemu).
+**Diagnoza przed kolejną łatką** (zweryfikowana odpaleniem realnego kodu w jest z
+prawdopodobnym stanem gracza, nie zgadywaniem) obaliła dwie konkretne teorie (ID-mismatch
+MAD, nakładanie się węzłów) — pojedyncze elementy były matematycznie poprawne DLA
+SPRAWDZONYCH scenariuszy, ale architektura (losowy spacer 2D + ręczna matematyka kamery na
+shared values) miała za dużo ruchomych części do bezpiecznego debugowania bez urządzenia.
+User explicite zaproponował przebudowę od zera — przyjęte.
+
+**Nowa architektura (§321), DWIE zmiany usuwające całą KLASĘ ryzyka**:
+1. `bossMapLayout.ts` — zygzak po torach (max 5, krok ±1), Y ŚCIŚLE rosnący z indeksem →
+   samoprzecięcia MATEMATYCZNIE wykluczone (dowód w teście, nie założenie). Płótno = dokładnie
+   zmierzona szerokość viewportu (`areaWidth` param), więc zawsze mieści się na ekranie.
+2. `CampaignMap.tsx` — CAŁA własna matematyka gestów (Gesture.Pan/Pinch, shared values,
+   klamrowanie, pivot zoomu) USUNIĘTA, zastąpiona zwykłym natywnym `ScrollView` +
+   `scrollTo({y, animated:false})`. RN sam przycina do granic treści — nie ma już ŻADNEJ
+   ręcznej matematyki klamrowania do pomylenia.
+
+**ŚWIADOMIE WYCIĘTE: swobodny pan w poziomie + pinch-zoom** — RN `ScrollView`'owy natywny
+pinch-zoom działa TYLKO na iOS (`@platform ios` w źródle RN, sprawdzone w node_modules, nie
+zgadywane), a apka jest na Androida. Odtworzenie zoomu wymagałoby z powrotem własnej
+matematyki gestów = dokładnie tego samego źródła bugów od nowa. Świadomy kompromis — jeśli
+user po teście DALEJ chce zoom, to osobne, świadome zgłoszenie, nie przy okazji.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, PIĄTA próba, ale INNA architektura (mniejsza
+powierzchnia na bugi tego samego rodzaju)**: zimny start → Bossy (kampania i MAD) → aktualny
+boss widoczny od razu bez przewijania; pionowy scroll płynny (zwykły natywny); tap bossa →
+popup z WALCZ; przełącznik Kampania/MAD przewija do właściwego aktualnego bossa. ŚWIADOMIE
+BRAK poziomego przesuwania/zoomu — mapa węższa niż poprzednio, to nie błąd.
 
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 
