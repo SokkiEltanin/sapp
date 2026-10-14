@@ -99,13 +99,25 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 
   // Auto-scroll do aktualnego węzła RAZ przy montowaniu (nie na każdy render — ekran-rodzic
   // re-renderuje się często, np. co tyknięcie odliczania energii, nie chcemy szarpać scrolla).
-  useEffect(() => {
+  // FIX (2026-10-14, user: "nie mam bosa kampania którym mogę kliknąć walcz" — po scrollu
+  // który w tej samej mapie wylądował na SAMEJ GÓRZE, nie przy aktualnym bossie) —
+  // `setTimeout(…, 0)` wyścigowo zgadywał "ScrollView już zmierzona", co na Androidzie
+  // bywa fałszywe (zwłaszcza z `nestedScrollEnabled`, patrz niżej — dłuższa ścieżka
+  // natywnego layoutu przy pierwszym mouncie): `scrollTo` wołane ZANIM treść faktycznie
+  // dostała swoją wysokość po cichu nic nie robi. `onContentSizeChange` na ScrollView
+  // zamiast tego — odpala się DOPIERO gdy natywna treść realnie ma już znany, policzony
+  // rozmiar (gwarancja z samego kontraktu tego callbacku), więc `scrollTo` zawsze trafia we
+  // właściwą pozycję. `didAutoScroll` ref (nie `useEffect`+`[]`) pilnuje że to leci TYLKO
+  // RAZ — `onContentSizeChange` może odpalić się więcej niż raz (np. gdyby `contentH` się
+  // zmieniło), a ręczne przewinięcie usera nie może zostać nadpisane kolejnym auto-scrollem.
+  const didAutoScroll = useRef(false);
+  const onContentSizeChange = () => {
+    if (didAutoScroll.current) return;
+    didAutoScroll.current = true;
     const idx = currentIdx >= 0 ? currentIdx : Math.max(bosses.length - 1, 0);
     const targetY = Math.max(0, nodeY(idx) - 260);
-    const t = setTimeout(() => scrollRef.current?.scrollTo({ y: targetY, animated: false }), 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    scrollRef.current?.scrollTo({ y: targetY, animated: false });
+  };
 
   if (bosses.length === 0) return null;
 
@@ -132,7 +144,11 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   // mapy").
   return (
     <View style={[st.wrap, { height: mapH }]}>
-      <ScrollView ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+      <ScrollView
+        ref={scrollRef} style={st.scroll} contentContainerStyle={{ height: contentH }}
+        showsVerticalScrollIndicator={false} nestedScrollEnabled
+        onContentSizeChange={onContentSizeChange}
+      >
         <Image source={MAP_BG} style={[StyleSheet.absoluteFillObject, { width: mapW, height: contentH }]} resizeMode="repeat" />
         {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego (user: "mapa zmienia kolor
             na lekko czerwony") — ten sam 3-stopniowy gradient, tylko podbarwiony. */}
@@ -144,9 +160,15 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           style={StyleSheet.absoluteFillObject}
         />
 
+        {/* Ścieżka "już przebyta" — STAŁY, jasny biały (NIE `c.border.default`, który w
+            ciemnym motywie bywa prawie niewidoczny na ciemnym tle mapy — user: "dziwnie się
+            pokazują niektóre jakby poza liniami", bo nie dało się prześledzić wzrokiem którędy
+            faktycznie biegnie trasa między węzłami) — mapa ma WŁASNE, stałe ciemne tło
+            niezależne od motywu appki, więc linia nie powinna go dziedziczyć. Grubsza
+            (5 zamiast 4) i wyraźniejsza (0.4 zamiast 0.6×border-koloru) dla czytelności. */}
         <Svg width={mapW} height={contentH} style={StyleSheet.absoluteFillObject}>
-          {!!fullPathD && <Path d={fullPathD} stroke={c.border.default} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />}
-          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!fullPathD && <Path d={fullPathD} stroke="rgba(255,255,255,0.4)" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
         </Svg>
 
         {bosses.map((b, i) => {
@@ -158,6 +180,13 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           const node = (
             <View style={[st.node, { left: x, top: y }]}>
               <View style={st.portrait}>
+                {/* Pierścień wokół AKTUALNEGO węzła (2026-10-14, user: "nie mam bosa kampania
+                    którym mogę kliknąć walcz" — nawet po naprawie auto-scrolla, aktualny
+                    węzeł wyglądał identycznie jak każdy pokonany/zablokowany portret, łatwo
+                    było go przeoczyć przy przewijaniu) — kolorowa obwódka w kolorze
+                    "oświetlonej" ścieżki (ten sam `litColor`, niebieski/czerwony wg wariantu),
+                    żeby jedyny klikalny-do-walki węzeł faktycznie rzucał się w oczy. */}
+                {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
                 <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
                 {isDefeated && (
                   <View style={st.defeatedOverlay} pointerEvents="none">
@@ -257,6 +286,10 @@ const st = StyleSheet.create({
   nodeTouch: { position: 'absolute', width: NODE, alignItems: 'center' },
   node: { position: 'absolute', width: NODE, alignItems: 'center' },
   portrait: { width: NODE, height: NODE, alignItems: 'center', justifyContent: 'center' },
+  currentRing: {
+    position: 'absolute', left: -7, top: -7, width: NODE + 14, height: NODE + 14,
+    borderRadius: (NODE + 14) / 2, borderWidth: 2.5,
+  },
   defeatedOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   badgeLock: {
     position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: 9,

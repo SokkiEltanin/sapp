@@ -3,6 +3,17 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Fix: mapa kampanii — auto-scroll lądował na szczycie, nie na bossie (2026-10-14)
+
+User: "nie mam bosa kampania którym mogę kliknąć walcz, i dziwnie się pokazują niektóre jakby
+poza liniami". Root cause (wyścig `setTimeout(0)` vs natywny layout ScrollView, fix:
+`onContentSizeChange`) + drugi fix (niewidoczna "już przebyta" ścieżka, kolorowa obwódka
+aktualnego węzła) w ARCHITECTURE.md §314. Priorytet testu na urządzeniu KRYTYCZNY — mapa
+kampanii była efektywnie bezużyteczna bez tego fixu. Część diagnozy (ścieżka) NIE jest
+100% potwierdzona z pikseli zrzutu (uczciwie przyznane w §314) — jeśli user zgłosi że
+"poza liniami" dalej występuje mimo jaśniejszej ścieżki, to inny, nieznaleziony jeszcze
+problem, wymaga dokładniejszego opisu/zrzutu.
+
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 
 User: "chciałem żeby z PUPILA USUNĄĆ ćwiczenia i zamiast tego dodać w zdrowiu zakładkę albo
