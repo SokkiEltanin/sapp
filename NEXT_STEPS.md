@@ -3,20 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Mapa bossów przebudowana od zera — pełnoekranowa, pan+zoom 2D (2026-10-14)
+## 🆕 Mapa bossów 2D — TRZECIA poprawka (czarne pasy naprawione, teraz lag) (2026-10-14)
 
-§314 (auto-scroll fix) okazał się NIEWYSTARCZAJĄCY — user po zrzucie: "Nie o to chodzi...
-chodziło o przebudowę całej zakładki bossów od zera". Pełny opis nowej architektury
-(`bossMapLayout.ts`, `Gesture.Pan`+`Gesture.Pinch`, kompaktowe kafle raid/event, usunięte
-"Medale") w ARCHITECTURE.md §315.
+§314 → §315 (przebudowa od zera) → §317 (poprawka czarnych pasów po teście na urządzeniu) →
+user zgłosił NOWY problem (mapa już widoczna, więc §317 zadziałało): "I to laguje wiec moze te
+mape to wektorem podobna zrob? Zeby nie lagowalao?". Przyczyna: tło mapy to było zdjęcie
+3000×2000 JPG kafelkowane (`Image resizeMode="repeat"`) na całym płótnie WEWNĄTRZ widoku
+animowanego gestami (pan/pinch, 60fps) — kafelkowanie bitmapy pod transformem jest kosztowne
+(re-rasteryzacja), inaczej niż proste skalowanie jednej warstwy. Naprawione w §318: tło
+zdjęciowe USUNIĘTE, zastąpione czysto wektorowym (SVG `Rect` + `Pattern` siatki punktów) w TYM
+SAMYM `Svg` co ścieżka — brak rastra pod transformem.
 
-**Priorytet testu na urządzeniu — KRYTYCZNY, najwyższy w tej sesji** — nowy silnik gestów
-(pan+pinch+tap-przez-pan) NIE przeszedł testu na realnym dotyku (brak takiego środowiska tu).
-Konkretna checklist w §315 — NAJWAŻNIEJSZE: czy tapnięcie bossa na mapie otwiera popup, czy
-pan/pinch działają płynnie w obu kierunkach. Jeśli tapnięcie węzłów nie działa (gest pan
-"zjada" tapnięcia) — zgłoś, to pierwsza rzecz do zdebugowania (kandydat: zwiększyć
-`.minDistance()` na `Gesture.Pan()` w CampaignMap.tsx, albo dodać `Gesture.Tap()` osobno
-skomponowany przez `Gesture.Race` zamiast polegać na zwykłym `Pressable` pod spodem).
+**Priorytet testu na urządzeniu — KRYTYCZNY, TRZECIA próba** — checklist §317 (brak czarnych
+pasów — powinno być już OK) + nowa z §318: pan/pinch wyraźnie płynniejsze, brak laga. Jeśli
+WCIĄŻ laguje po tej poprawce — podejrzany nr 2 to liczba renderowanych węzłów/portretów
+(`BossArt`×liczba bossów) przy dużym rosterze, nie tło (patrz §318, ostatni akapit). Tapnięcie
+węzła → popup (z §315, wciąż niepotwierdzone, user dotąd nie zgłaszał tego jako problemu).
 
 ## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
 
