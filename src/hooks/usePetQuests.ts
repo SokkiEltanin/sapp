@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useProfileStore } from '@/store/profileStore';
+import { useExercisesStore } from '@/store/exercisesStore';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
-import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/utils/personalQuests';
+import { ageFrom, targetsFor, dailyExercisePool, exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
 import { useMoodStore } from '@/store/moodStore';
@@ -30,13 +31,21 @@ export function usePetQuests() {
   // powodu (komentarz przy analogicznym miejscu w pet.tsx).
   const {
     xp, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, affection, affectionDay,
-    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay, trainingDays,
+    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay,
   } = usePetStore(useShallow((s) => ({
     xp: s.xp, claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
     weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims, affection: s.affection, affectionDay: s.affectionDay,
     pushupsDay: s.pushupsDay, squatsDay: s.squatsDay, situpsDay: s.situpsDay, plankDay: s.plankDay,
-    stretchDay: s.stretchDay, bikeDay: s.bikeDay, trainingDays: s.trainingDays,
+    stretchDay: s.stretchDay, bikeDay: s.bikeDay,
   })));
+  // Streak treningu (2026-10-14, faza 3 — ARCHITECTURE.md §312) — przepięty z
+  // `trainingStreakFrom(trainingDays)` (dni z ODEBRANĄ nagrodą questu) na
+  // `exerciseStreakFrom(logs)` (dni z DOWOLNYM zalogowanym ćwiczeniem w nowym
+  // `exercisesStore.ts`) — streak reaguje na realny trening, nie na klik "Odbierz" w
+  // pet-quests.tsx. `m_training` milestone (quests.ts) czyta to samo pole, więc dostaje tę
+  // samą poprawkę za darmo. Stare `trainingDays`/`markTrainingDay()` w petStore.ts zostają
+  // (nieużywane już tutaj, ale nieszkodliwe — patrz NEXT_STEPS.md, nie kasować bez powodu).
+  const exerciseLogs = useExercisesStore((s) => s.logs);
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const lvl = levelFromXp(xp);
   const { health, waterGoal, waterToday, recentDays, cardsCollected, synced } = usePetHealthSync();
@@ -83,7 +92,7 @@ export function usePetQuests() {
       moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
       stepsThisWeek: health.stepsThisWeek,
       affectionFull: affToday >= 100,
-      trainingStreak: trainingStreakFrom(trainingDays, t),
+      trainingStreak: exerciseStreakFrom(exerciseLogs, t),
       pushupTarget: personalTargets && todaysPool.includes('pushups') ? personalTargets.pushups : undefined,
       squatTarget: personalTargets && todaysPool.includes('squats') ? personalTargets.squats : undefined,
       situpTarget: personalTargets && todaysPool.includes('situps') ? personalTargets.situps : undefined,
@@ -97,7 +106,7 @@ export function usePetQuests() {
       stretchToday: stretchDay === t,
       bikeToday: bikeDay === t,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, foodMeals, foodProducts, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, foodMeals, foodProducts, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, exerciseLogs, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay]);
   const quests = useMemo(
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],

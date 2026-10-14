@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon } from 'lucide-react-native';
 
+import { useShallow } from 'zustand/react/shallow';
 import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
 import { useProfileStore } from '@/store/profileStore';
 import { useExercisesStore } from '@/store/exercisesStore';
+import { usePetStore } from '@/store/petStore';
 import { ageFrom, targetsFor, TRAINING_EXERCISES, TrainingExercise, PersonalQuestTargets, amountLoggedOn, exerciseStreakFrom } from '@/utils/personalQuests';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -30,10 +32,15 @@ const todayISO = () => {
 // user obiecał wysłać prawdziwe grafiki stick-man na czacie, podmiana później bez zmiany
 // struktury (tylko `icon` → `Image`).
 //
-// CELOWO NIE (jeszcze) w tej zmianie: podpięcie pod silnik nagród (monety/XP) ani usunięcie
-// starej sekcji "Trening" z pet-quests.tsx — plan w NEXT_STEPS.md, kolejna zmiana dopiero
-// gdy to tu udowodni się na urządzeniu. Oba systemy żyją więc chwilowo RÓWNOLEGLE (stary
-// self-report w Pupilu dalej daje nagrody; ten log to na razie czysta historia + streak).
+// Podpięte pod silnik nagród (2026-10-14, faza 3 — ARCHITECTURE.md §312): przekroczenie
+// celu TU woła to samo `markXDone()` (petStore) co stary self-report w pet-quests.tsx —
+// quest `b_pushups`/itd. (quests.ts) zaliczy się identycznie, Odbiór monet/XP wciąż żyje w
+// Pupil → Zadania (ten silnik NIE jest tu duplikowany, tylko wyzwalany z nowego miejsca).
+//
+// CELOWO NIE (jeszcze) w tej zmianie: dashboard-owy kafelek streaka i usunięcie starej
+// sekcji "Trening" z pet-quests.tsx (self-report tam dalej działa RÓWNOLEGLE — oba miejsca
+// teraz zaliczają TEN SAM quest, więc usunięcie starego jest już bezpieczne, ale to osobny,
+// kolejny krok — plan w NEXT_STEPS.md).
 interface ExerciseMeta { id: TrainingExercise; label: string; unit: string; icon: typeof Dumbbell; target: (t: PersonalQuestTargets) => number }
 const EXERCISES: ExerciseMeta[] = [
   { id: 'pushups', label: 'Pompki',       unit: 'powt.', icon: Dumbbell,  target: t => t.pushups },
@@ -50,6 +57,12 @@ export default function ExercisesScreen() {
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const logs = useExercisesStore((st) => st.logs);
   const addLog = useExercisesStore((st) => st.addLog);
+  const {
+    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markBikeDone,
+  } = usePetStore(useShallow((st) => ({
+    markPushupsDone: st.markPushupsDone, markSquatsDone: st.markSquatsDone, markSitupsDone: st.markSitupsDone,
+    markPlankDone: st.markPlankDone, markStretchDone: st.markStretchDone, markBikeDone: st.markBikeDone,
+  })));
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
   const today = todayISO();
@@ -59,21 +72,40 @@ export default function ExercisesScreen() {
   );
   const streak = useMemo(() => exerciseStreakFrom(logs, today), [logs, today]);
 
+  // Ten sam quest `b_<exercise>` (quests.ts) co stary self-report — wyzwolony STĄD zamiast
+  // z pet-quests.tsx/TrainingSessionModal. `MARK_DONE` nie jest `useMemo`/module-scope bo
+  // musi złapać ŚWIEŻE referencje store'owych akcji (useShallow wyżej), nie stare domknięcie.
+  const MARK_DONE: Record<TrainingExercise, () => void> = {
+    pushups: markPushupsDone, squats: markSquatsDone, situps: markSitupsDone,
+    plank: markPlankDone, stretch: markStretchDone, bike: markBikeDone,
+  };
+
+  // Jeśli TEN wpis przeprowadza dzisiejszą sumę przez próg celu (a wcześniej jeszcze go nie
+  // przekraczała — `markXDone()` jest idempotentne, ale drugi toast "odblokowano" po
+  // przekroczeniu celu DRUGI raz tego samego dnia byłby mylący) — zalicz quest + daj znać.
+  const logAmount = (ex: ExerciseMeta, amount: number) => {
+    const before = amountLoggedOn(logs, ex.id, today);
+    const target = targets ? ex.target(targets) : null;
+    addLog(ex.id, amount);
+    haptic.success();
+    const justUnlocked = target != null && before < target && before + amount >= target;
+    if (justUnlocked) {
+      MARK_DONE[ex.id]();
+      toast.success(`${ex.label}: cel osiągnięty! Nagroda czeka w Pupil → Zadania`);
+    } else {
+      toast.success(`Zapisano: ${ex.label} +${amount} ${ex.unit}`);
+    }
+  };
+
   const save = (ex: ExerciseMeta) => {
     const raw = inputs[ex.id];
     const amount = parseFloat((raw ?? '').replace(',', '.'));
     if (!raw || isNaN(amount) || amount <= 0) return;
-    addLog(ex.id, amount);
+    logAmount(ex, amount);
     setInputs((prev) => ({ ...prev, [ex.id]: '' }));
-    haptic.success();
-    toast.success(`Zapisano: ${ex.label} +${amount} ${ex.unit}`);
   };
 
-  const quickAdd = (ex: ExerciseMeta, amount: number) => {
-    addLog(ex.id, amount);
-    haptic.success();
-    toast.success(`Zapisano: ${ex.label} +${amount} ${ex.unit}`);
-  };
+  const quickAdd = (ex: ExerciseMeta, amount: number) => logAmount(ex, amount);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
