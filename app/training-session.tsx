@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Check, Circle, Dumbbell } from 'lucide-react-native';
+import { ChevronLeft, Check, Circle, Dumbbell, History, ChevronDown } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
+import ExerciseLogHistory from '@/components/health/ExerciseLogHistory';
 import { useTrainingPlansStore } from '@/store/trainingPlansStore';
 import { useExerciseLogging } from '@/hooks/useExerciseLogging';
 import { planItemDoneToday, planItemLogKey } from '@/utils/trainingPlans';
@@ -28,9 +29,10 @@ export default function TrainingSessionScreen() {
   const s = useMemo(() => makeS(c), [c]);
   const { planId } = useLocalSearchParams<{ planId?: string }>();
   const plan = useTrainingPlansStore((st) => st.plans.find((p) => p.id === planId));
-  const { logs, today, logAmount } = useExerciseLogging();
+  const { logs, today, logAmount, removeLog, updateLog } = useExerciseLogging();
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
 
   if (!plan) {
     return (
@@ -78,19 +80,29 @@ export default function TrainingSessionScreen() {
           const open = openId === it.id;
           return (
             <View key={it.id} style={[s.card, done && s.cardDone]}>
-              <PressableScale onPress={() => openItem(it.id, it.targetAmount)} style={s.cardHead}>
-                <View style={s.iconWrap}>
-                  {it.linkedExercise
-                    ? <ExerciseIcon id={it.linkedExercise} fallback={Dumbbell} size={18} color="#FB923C" />
-                    : (done ? <Check size={18} color="#2AC68F" /> : <Circle size={18} color={c.text.muted} />)}
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.cardLabel}>{it.name}</Text>
-                  <Text style={s.cardSub}>
-                    {todayAmt} / {it.targetAmount} {it.unit}{done ? ' ✓' : ''}
-                  </Text>
-                </View>
-              </PressableScale>
+              <View style={s.cardHead}>
+                <PressableScale onPress={() => openItem(it.id, it.targetAmount)} style={s.cardHeadMain}>
+                  <View style={s.iconWrap}>
+                    {it.linkedExercise
+                      ? <ExerciseIcon id={it.linkedExercise} fallback={Dumbbell} size={18} color="#FB923C" />
+                      : (done ? <Check size={18} color="#2AC68F" /> : <Circle size={18} color={c.text.muted} />)}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.cardLabel}>{it.name}</Text>
+                    <Text style={s.cardSub}>
+                      {todayAmt} / {it.targetAmount} {it.unit}{done ? ' ✓' : ''}
+                    </Text>
+                  </View>
+                </PressableScale>
+                {todayAmt > 0 && (
+                  <PressableScale
+                    onPress={() => { haptic.tap(); setHistoryFor((prev) => (prev === it.id ? null : it.id)); }}
+                    style={s.historyBtn}
+                  >
+                    {historyFor === it.id ? <ChevronDown size={15} color={c.text.muted} /> : <History size={15} color={c.text.muted} />}
+                  </PressableScale>
+                )}
+              </View>
 
               {open && (
                 <View style={s.inputRow}>
@@ -105,6 +117,15 @@ export default function TrainingSessionScreen() {
                     <Text style={s.saveBtnTxt}>Zapisz</Text>
                   </PressableScale>
                 </View>
+              )}
+
+              {historyFor === it.id && (
+                <ExerciseLogHistory
+                  entries={logs.filter((l) => l.exercise === planItemLogKey(it) && l.date === today)}
+                  unit={it.unit}
+                  onUpdate={updateLog}
+                  onDelete={removeLog}
+                />
               )}
             </View>
           );
@@ -134,7 +155,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: spacing[2] },
   cardDone: { borderColor: '#2AC68F55', backgroundColor: '#2AC68F0D' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardHeadMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
+  historyBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   iconWrap: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: '#FB923C1F', alignItems: 'center', justifyContent: 'center' },
   cardLabel: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   cardSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },

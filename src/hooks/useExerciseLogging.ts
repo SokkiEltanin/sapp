@@ -35,6 +35,8 @@ export function useExerciseLogging() {
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const logs = useExercisesStore((st) => st.logs);
   const addLog = useExercisesStore((st) => st.addLog);
+  const removeLog = useExercisesStore((st) => st.removeLog);
+  const updateLog = useExercisesStore((st) => st.updateLog);
   const {
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markBikeDone,
   } = usePetStore(useShallow((st) => ({
@@ -70,5 +72,5 @@ export function useExerciseLogging() {
     toast.success(`Zapisano: ${opts.label} +${opts.amount} ${opts.unit}`);
   };
 
-  return { logs, targets, streak, today, logAmount };
+  return { logs, targets, streak, today, logAmount, removeLog, updateLog };
 }
