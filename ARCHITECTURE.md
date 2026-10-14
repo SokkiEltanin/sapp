@@ -16947,6 +16947,62 @@ poziomu zależnie od `MAD_UNLOCK_LEVEL`), niepokonane-jeszcze-w-kampanii dalej j
 sylwetki z kłódką. Sprawdź też że przełączanie zakładek Kampania↔MAD nie gubi scrolla/
 pozycji żadnej z dwóch map.
 
+## 310. Ćwiczenia — faza 1: fundament loga (bez UI, zero zmiany zachowania) (2026-10-14)
+
+User: "chciałem żeby z PUPILA USUNĄĆ ćwiczenia i zamiast tego dodać w zdrowiu zakładkę albo
+kafelek i na dashbordzie ze streaku przenosi nas na ćwiczenia i tam zrobić ze stickmanem
+plany treningowe i zaznaczać ile czego się zrobiło ile czasu i w ogóle żeby było można wpisać
+że jeździło się tyle km na rowerze itp albo tyle pompek albo tyle rozciągania itp." Potwierdzone
+(AskUserQuestion): (a) zakres v1 = od razu elastyczny log (dowolne ćwiczenie, dowolna
+jednostka/ilość), nie sztywny plan; (b) monety/XP za ćwiczenia ZOSTAJĄ, dalej zasilają
+pupila — tylko miejsce interakcji się zmienia.
+
+**Kontekst — stary system** (NIETKNIĘTY w tej zmianie): 6 questów treningowych self-report
+(`b_pushups`/`b_squats`/`b_situps`/`b_plank`/`b_stretch`/`b_bikeride`, `quests.ts` BONUS) z
+rotowaną dzienną pulą 3 z 6 (`dailyExercisePool`, personalQuests.ts), binarne "zrobione dziś"
+(`pushupsDay`/.../`bikeDay` w petStore.ts, `markPushupsDone()` itd.), sekcja "Trening" na
+samej górze `app/pet-quests.tsx`. Nagroda = `questRewardMult(level)` jak każdy inny quest.
+Streak (`m_training` w MILESTONES, quests.ts) liczony z `trainingDays` — dzień zapisywany
+TYLKO przy ODBIORZE nagrody questu treningowego (`markTrainingDay()`, wołane z `onClaimQuest`
+w pet-quests.tsx), nie przy samym zrobieniu.
+
+**Dlaczego faza 1 jest czysto fundamentem**: `pushupsToday` itd. w `QuestCtx`
+(usePetQuests.ts) dalej czytają stare `pushupsDay` itd. z petStore — PRZEŁĄCZENIE ich na nowy
+log zanim istnieje ekran, który do niego faktycznie pisze, zepsułoby istniejący, działający
+self-report (tap "Rozpocznij" → `TrainingSessionModal` → `onComplete` → `markPushupsDone()`
+— quest nigdy by się nie zaznaczał jako zrobiony, bo `pushupsToday` czytałby pusty log).
+Celowo DWA RÓWNOLEGŁE, jeszcze niepołączone źródła na tę fazę: stary binarny self-report
+(żywy, nietknięty) i nowy log (istnieje, ale nic go jeszcze nie woła) — podłączenie
+(przepięcie `QuestCtx`/`trainingStreak` na nowy log + realny UI logowania + usunięcie starej
+sekcji z pet-quests.tsx) to NASTĘPNA zmiana, dopiero gdy ekran "Ćwiczenia" w Zdrowiu będzie
+gotowy do przejęcia pisania do obu (loga NA HISTORIĘ + starego `markXDone()` NA kompatybilność
+z istniejącym silnikiem nagród, żeby reward engine nie wymagał przepisywania).
+
+**Co dodane**:
+1. `src/utils/personalQuests.ts` — `ExerciseLogEntry` (`{id, exercise, amount, date,
+   createdAt}`, `amount` = powtórzenia/sekundy/minuty/km zależnie od ćwiczenia), czyste
+   funkcje `amountLoggedOn(logs, exercise, date)` (SUMA — wiele wpisów tego samego ćwiczenia
+   tego samego dnia się dodaje, w przeciwieństwie do starego binarnego pola gdzie drugi tap
+   nic nie zmieniał) i `exerciseStreakFrom(logs, today)` (ten sam chodzenie-wstecz wzorzec co
+   `trainingStreakFrom`, ale źródłem jest REALNY log, nie claimed-day rekord — streak ruszy w
+   momencie zalogowania ćwiczenia, nie dopiero po kliknięciu "Odbierz" nagrodę; to będzie
+   źródło dla przyszłego kafelka streaka na dashboardzie).
+2. `src/store/exercisesStore.ts` — nowy, lekki Zustand+persist store (`exercises-v1`,
+   `throttledPersistStorage`, ten sam wzorzec co `profileStore.ts` — osobny plik, NIE
+   dokładane do już ogromnego `petStore.ts`), append-only log + `addLog`/`removeLog`.
+   **Celowo NIE dodane do `backupService.ts` CLOUD_COLS jeszcze** — poczekaj aż ekran
+   faktycznie z niego korzysta, żeby nie backupować pustego/martwego store'u; dopisz PRZED
+   ekranem Zdrowia w następnej zmianie (patrz NEXT_STEPS.md).
+
+**Testy**: `__tests__/personalQuests.test.ts` — 8 nowych (`amountLoggedOn`: pusty log,
+sumowanie wielu wpisów tego samego dnia, izolacja innego ćwiczenia/dnia;
+`exerciseStreakFrom`: pusty log, różne ćwiczenia każdego dnia dalej liczą streak, "nie dziś
+ale wczoraj tak", kilka wpisów tego samego dnia = jeden dzień streaka, dziura przerywa
+serię). `tsc --noEmit` czyste, `jest --silent` 103/103 suite, 1353 testy (+8).
+
+**Priorytet testu na urządzeniu — brak** (zero zmiany zachowania — nowy kod nieużywany przez
+żaden ekran jeszcze).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -1,4 +1,4 @@
-import { ageFrom, targetsFor, dailyExercisePool, TRAINING_EXERCISES, DAILY_EXERCISE_COUNT, trainingStreakFrom } from '@/utils/personalQuests';
+import { ageFrom, targetsFor, dailyExercisePool, TRAINING_EXERCISES, DAILY_EXERCISE_COUNT, trainingStreakFrom, amountLoggedOn, exerciseStreakFrom, ExerciseLogEntry } from '@/utils/personalQuests';
 
 describe('personalQuests — ageFrom', () => {
   test('brak daty urodzenia → null', () => {
@@ -108,5 +108,53 @@ describe('personalQuests — trainingStreakFrom', () => {
   test('dziura w środku → seria liczy się tylko od najnowszej ciągłej reszty', () => {
     const days = { '2026-08-11': true, '2026-08-10': true, '2026-08-08': true, '2026-08-07': true } as Record<string, true>;
     expect(trainingStreakFrom(days, '2026-08-11')).toBe(2); // 11 i 10, 9 brakuje → stop
+  });
+});
+
+describe('personalQuests — amountLoggedOn (log ćwiczeń, fundament ekranu Zdrowie)', () => {
+  const log = (exercise: ExerciseLogEntry['exercise'], amount: number, date: string): ExerciseLogEntry =>
+    ({ id: `${exercise}-${date}-${amount}-${Math.random()}`, exercise, amount, date, createdAt: `${date}T00:00:00.000Z` });
+
+  test('brak wpisów → 0', () => {
+    expect(amountLoggedOn([], 'pushups', '2026-08-11')).toBe(0);
+  });
+
+  test('kilka wpisów tego samego ćwiczenia tego samego dnia → SUMUJĄ się', () => {
+    const logs = [log('pushups', 10, '2026-08-11'), log('pushups', 5, '2026-08-11')];
+    expect(amountLoggedOn(logs, 'pushups', '2026-08-11')).toBe(15);
+  });
+
+  test('inne ćwiczenie / inny dzień nie wlicza się', () => {
+    const logs = [log('pushups', 10, '2026-08-11'), log('squats', 10, '2026-08-11'), log('pushups', 10, '2026-08-10')];
+    expect(amountLoggedOn(logs, 'pushups', '2026-08-11')).toBe(10);
+  });
+});
+
+describe('personalQuests — exerciseStreakFrom (log-based, zastępuje trainingDays dla kafelka dashboardu)', () => {
+  const log = (exercise: ExerciseLogEntry['exercise'], date: string): ExerciseLogEntry =>
+    ({ id: `${exercise}-${date}-${Math.random()}`, exercise, amount: 1, date, createdAt: `${date}T00:00:00.000Z` });
+
+  test('brak logów → 0', () => {
+    expect(exerciseStreakFrom([], '2026-08-11')).toBe(0);
+  });
+
+  test('dziś + wczoraj + przedwczoraj, RÓŻNE ćwiczenia każdego dnia → wciąż liczy się 3 (dowolne ćwiczenie)', () => {
+    const logs = [log('pushups', '2026-08-11'), log('squats', '2026-08-10'), log('bike', '2026-08-09')];
+    expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(3);
+  });
+
+  test('nie zalogowane DZIŚ, ale wczoraj tak → liczy się seria do wczoraj', () => {
+    const logs = [log('plank', '2026-08-10')];
+    expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(1);
+  });
+
+  test('kilka wpisów tego samego dnia liczy się jako JEDEN dzień streaka', () => {
+    const logs = [log('pushups', '2026-08-11'), log('situps', '2026-08-11'), log('plank', '2026-08-11')];
+    expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(1);
+  });
+
+  test('dziura w środku → seria tylko od najnowszej ciągłej reszty', () => {
+    const logs = [log('pushups', '2026-08-11'), log('squats', '2026-08-10'), log('bike', '2026-08-08')];
+    expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(2);
   });
 });
