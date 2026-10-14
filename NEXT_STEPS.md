@@ -3,19 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Mapa bossów 2D — TRZECIA poprawka (czarne pasy naprawione, teraz lag) (2026-10-14)
+## 🆕 Mapa bossów 2D — CZWARTA poprawka (kamera + hydratacja store'u) (2026-10-14)
 
 §314 → §315 (przebudowa od zera) → §317 (poprawka czarnych pasów po teście na urządzeniu) →
-user zgłosił NOWY problem (mapa już widoczna, więc §317 zadziałało): "I to laguje wiec moze te
-mape to wektorem podobna zrob? Zeby nie lagowalao?". Przyczyna: tło mapy to było zdjęcie
-3000×2000 JPG kafelkowane (`Image resizeMode="repeat"`) na całym płótnie WEWNĄTRZ widoku
-animowanego gestami (pan/pinch, 60fps) — kafelkowanie bitmapy pod transformem jest kosztowne
-(re-rasteryzacja), inaczej niż proste skalowanie jednej warstwy. Naprawione w §318: tło
-zdjęciowe USUNIĘTE, zastąpione czysto wektorowym (SVG `Rect` + `Pattern` siatki punktów) w TYM
-SAMYM `Svg` co ścieżka — brak rastra pod transformem.
+§318 (lag — kafelkowane zdjęcie tła zamienione na wektorowe SVG) → PR #424 z OBOMA tymi
+poprawkami scalony → user zgłosił NOWY zrzut: boss "nie w dobrym miejscu", "linia zła", "jakis
+chaos", "aktualny boss wgle nie widoczny". **To inny, trzeci bug**, nie regresja #424 —
+wyścig z asynchroniczną hydratacją `usePetStore` (AsyncStorage, `_hydrated` w petStore.ts):
+pierwszy `onLayout` mapy często łapie store PRZED wczytaniem realnych danych
+(`defeatedBosses=[]` domyślnie), kamera centrowała się RAZ na ten fałszywy "aktualny" (boss
+#0) i WIĘCEJ SIĘ NIE RUSZAŁA nawet po dociągnięciu prawdziwych danych chwilę później.
+Naprawione w §319: centrowanie re-triggeruje się przy KAŻDEJ zmianie `currentId` (nie tylko
+raz przy pierwszym layoucie) — łapie spóźnioną hydratację ORAZ normalną zmianę po wygranej
+walce (bonus: teraz kamera skacze na nowego aktualnego bossa też po powrocie z walki, nie
+tylko przy pierwszym wejściu).
 
-**Priorytet testu na urządzeniu — KRYTYCZNY, TRZECIA próba** — checklist §317 (brak czarnych
-pasów — powinno być już OK) + nowa z §318: pan/pinch wyraźnie płynniejsze, brak laga. Jeśli
+**Priorytet testu na urządzeniu — KRYTYCZNY, CZWARTA próba** — nowy test z §319: zimny start
+apki → od razu Bossy → aktualny boss widoczny na środku OD RAZU, bez przesuwania. Plus stare z
+§317/§318 (brak czarnych pasów — powinno być już OK) oraz: pan/pinch wyraźnie płynniejsze. Jeśli
 WCIĄŻ laguje po tej poprawce — podejrzany nr 2 to liczba renderowanych węzłów/portretów
 (`BossArt`×liczba bossów) przy dużym rosterze, nie tło (patrz §318, ostatni akapit). Tapnięcie
 węzła → popup (z §315, wciąż niepotwierdzone, user dotąd nie zgłaszał tego jako problemu).

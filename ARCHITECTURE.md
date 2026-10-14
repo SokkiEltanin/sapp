@@ -17436,6 +17436,60 @@ bossów powinny być teraz wyraźnie płynniejsze (brak kafelkowanego zdjęcia p
 Jeśli WCIĄŻ laguje — kolejny podejrzany to liczba renderowanych węzłów/portretów
 (`BossArt`×liczba bossów, każdy to osobny `View`+ikona) przy dużym rosterze, nie samo tło.
 
+## 319. Mapa bossów 2D — kamera centrowała się na bossie SPRZED hydratacji store'u (2026-10-14)
+
+User po #424 (zrzut): "boss nie sa w dobtm miejscu linią jest zła wgle to jakis chaos nie
+możesz zbudować tego raz a dobrze? I mam wrażenie ze aktualny boss wgle jest nie widoczny i
+nie mogę z nim zawalczyć". Zrzut: widoczny tylko malutki fragment jasnej (odkrytej) ścieżki w
+rogu ekranu, reszta ekranu to gęsto upakowane zablokowane/pokonane węzły bez wyraźnego
+"aktualnego" bossa z obwódką nigdzie w kadrze.
+
+**To NIE jest ten sam bug co w #424** (tamten — brak przycinania centrowania do granic płótna
+— jest naprawiony i przycinanie w kodzie poniżej zostaje bez zmian). Prawdziwa przyczyna,
+inna klasa buga — **wyścig z hydratacją store'u**:
+
+1. `usePetStore` to `persist`+AsyncStorage (`petStore.ts`) — `defeatedBosses` (i inne pola)
+   ładują się ASYNCHRONICZNIE po starcie apki; do tego czasu store trzyma wartości domyślne
+   (`defeatedBosses: []`), flaga `_hydrated` zaczyna jako `false` (patrz `onRehydrateStorage`,
+   `petStore.ts:1154-1156`, plus fail-safe `setTimeout` 4s na wypadek błędu/wolnego dysku,
+   `petStore.ts:1313`).
+2. `app/bosses.tsx` liczy `current = BOSSES.find(b => !defeatedBosses.includes(b.id))` BEZ
+   sprawdzania `_hydrated` — pierwszy render po wejściu na zakładkę (zwłaszcza zimny start
+   apki) bardzo często łapie store PRZED rehydratacją, czyli `defeatedBosses=[]`, czyli
+   `current = BOSSES[0]` (pierwszy boss w grze), NIE prawdziwy aktualny boss gracza.
+3. `CampaignMap`'s centrowanie kamery było JEDNORAZOWE (`centered.current` ustawiane raz na
+   zawsze przy pierwszym `onLayout`) — złapało ten fałszywy, przed-hydratacyjny `currentId`,
+   wycentrowało się na boss #0, i WIĘCEJ SIĘ NIE RUSZYŁO, nawet gdy chwilę później store się
+   zrehydrował i `currentId` zmienił się na prawdziwego bossa gracza. Stąd kamera utknęła na
+   przypadkowym fragmencie trasy, niepowiązanym z realnym postępem — "chaos" ze zrzutu to po
+   prostu pomieszane pokonane/zablokowane węzły oglądane w oderwaniu od swojego kontekstu
+   (prawdziwy "aktualny" z obwódką świetlną był zwyczajnie POZA kadrem).
+
+**Naprawa (`src/components/bosses/CampaignMap.tsx`)**: jednorazowy `centered` ref zastąpiony
+`centeredOn` (`useRef<string|null|undefined>`) trzymającym, na JAKIE `currentId` kamera jest
+aktualnie wycentrowana. Nowy `useEffect` reaguje na KAŻDĄ zmianę `currentId` (nie tylko
+pierwszy `onLayout`) i re-centruje, jeśli `currentId` różni się od `centeredOn.current` — to
+łapie zarówno spóźnioną hydratację store'u, jak i normalną zmianę aktualnego bossa po wygranej
+walce (powrót na mapę z nowym celem też dostaje jump kamery, nie tylko pierwsze wejście).
+Ręczne przesunięcie/zoom gracza NIE jest nadpisywane, dopóki `currentId` faktycznie się nie
+zmieni (strażnik `centeredOn.current === currentId` no-opuje efekt przy zwykłych re-renderach
+z innego powodu, np. tykające odliczanie energii).
+
+**Dlaczego to umknęło wcześniej**: #424 testowane/diagnozowane statycznie (bez urządzenia) na
+PIERWSZYM renderze z poprawnymi danymi w założeniu — nie uwzględniało asynchronicznej
+hydratacji AsyncStorage, która na realnym urządzeniu (zwłaszcza przy zimnym starcie, większej
+ilości danych w storze niż w emulatorze) dała realny, powtarzalny wyścig.
+
+**Testy**: brak nowych czystych funkcji (fix to retiming efektu w komponencie, nie nowa
+logika matematyczna — `bossMapLayout.ts` bez zmian). `tsc --noEmit` czyste, `jest --silent`
+104/104 suite, 1359 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, CZWARTA próba na tej mapie**: zimny start apki →
+od razu Bossy → aktualny boss (z kolorową obwódką) widoczny na środku ekranu BEZ dodatkowego
+przesuwania. Dodatkowo: pokonanie bossa (walka) → powrót na mapę → kamera skacze na NOWEGO
+aktualnego bossa automatycznie (nowe zachowanie z tego fixa, wcześniej camera stała w miejscu
+po pierwszym centrowaniu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
