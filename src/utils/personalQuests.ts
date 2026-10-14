@@ -94,3 +94,45 @@ export function trainingStreakFrom(trainingDays: Record<string, true>, today: st
   }
   return streak;
 }
+
+// ── Ćwiczenia — elastyczny log (2026-10-14, user: "chciałem żeby z PUPILA USUNĄĆ
+// ćwiczenia i zamiast tego dodać w zdrowiu... zaznaczać ile czego się zrobiło ile czasu...
+// że jeździło się tyle km na rowerze itp albo tyle pompek albo tyle rozciągania"). Fundament
+// pod nowy ekran "Ćwiczenia" w Zdrowiu (osobny store `exercisesStore.ts`, ten plik tylko
+// definiuje KSZTAŁT wpisu + czystą logikę nad nim — ten sam podział co reszta tego pliku:
+// dane w store, logika tutaj). Faza 1 — czysto fundament, NIC jeszcze nie woła tych funkcji
+// (stary self-report w pet-quests.tsx/petStore.ts zostaje nietknięty, żeby nie zepsuć
+// działającej ścieżki przed gotowym zamiennikiem) — podpięcie do UI/ekranu Zdrowia i
+// usunięcie z Pupila to osobna, następna zmiana.
+export interface ExerciseLogEntry {
+  id: string;
+  exercise: TrainingExercise;
+  amount: number;   // powtórzenia / sekundy / minuty / km — zależnie od jednostki (patrz META w
+                     // TrainingSessionModal.tsx dla reps/seconds/minutes; km tylko dla roweru,
+                     // osobna jednostka od sekundowego/minutowego self-reportu dotychczasowego)
+  date: string;      // YYYY-MM-DD
+  createdAt: string; // ISO — kolejność wpisów w historii tego samego dnia
+}
+
+// Suma zalogowana danego dnia dla jednego ćwiczenia — można logować kilka razy dziennie
+// (np. dwie sesje pompek), wpisy się SUMUJĄ, nie nadpisują (w przeciwieństwie do starego
+// binarnego pushupsDay/itd. w petStore.ts, gdzie drugi tap tego samego dnia nic nie zmieniał).
+export function amountLoggedOn(logs: ExerciseLogEntry[], exercise: TrainingExercise, date: string): number {
+  return logs.filter(l => l.exercise === exercise && l.date === date).reduce((sum, l) => sum + l.amount, 0);
+}
+
+// Streak dni z DOWOLNYM zalogowanym ćwiczeniem — ten sam chodzenie-wstecz wzorzec co
+// `trainingStreakFrom` wyżej, ale źródłem jest REALNY log (co/ile/kiedy wpisane), nie osobny
+// claimed-day rekord (`trainingDays`, zapisywany dopiero przy odbiorze nagrody w
+// pet-quests.tsx) — streak rusza w momencie zalogowania ćwiczenia, nie dopiero po odbiorze
+// monet, co ma sens dla kafelka na dashboardzie (powinien reagować na realny trening, nie na
+// to czy user pamiętał kliknąć "Odbierz").
+export function exerciseStreakFrom(logs: ExerciseLogEntry[], today: string): number {
+  const days = new Set(logs.map(l => l.date));
+  let streak = 0;
+  const start = days.has(today) ? 0 : -1;
+  for (let i = start; i >= -364; i--) {
+    if (days.has(offsetDate(today, i))) streak++; else break;
+  }
+  return streak;
+}

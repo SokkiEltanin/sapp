@@ -3,6 +3,47 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ćwiczenia — przeniesienie z Pupila do Zdrowia (w budowie, 2026-10-14)
+
+User: "chciałem żeby z PUPILA USUNĄĆ ćwiczenia i zamiast tego dodać w zdrowiu zakładkę albo
+kafelek i na dashbordzie ze streaku przenosi nas na ćwiczenia i tam zrobić ze stickmanem
+plany treningowe i zaznaczać ile czego się zrobiło ile czasu... że jeździło się tyle km na
+rowerze itp albo tyle pompek albo tyle rozciągania". Potwierdzone: elastyczny log (dowolna
+ilość/jednostka) od razu, monety/XP zostają.
+
+**Zrobione (§310)**: fundament loga — `ExerciseLogEntry`/`amountLoggedOn`/`exerciseStreakFrom`
+w `personalQuests.ts`, nowy `exercisesStore.ts`. Nic jeszcze go nie używa — zero zmiany
+zachowania na razie.
+
+**Do zrobienia (następna/kolejne zmiany)**:
+1. **Czeka na usera**: grafiki stick-man (user obiecał wysłać na czacie — "wklej je tutaj,
+   zapiszę do repo"). Do czasu ich dostarczenia — proste placeholder SVG stick-figures (ten
+   sam wzorzec co `TRAINING_ICON` tymczasowa ikona w pet-quests.tsx), podmienić jak przyjdą.
+2. Nowy ekran `app/exercises.tsx` (albo pod Zdrowiem) — plan/log: per ćwiczenie (6 z
+   `TRAINING_EXERCISES`) target z `targetsFor()`, pole/stepper do wpisania realnej ilości →
+   `useExercisesStore().addLog()`. Przy osiągnięciu targetu TEŻ wywołać stare
+   `markPushupsDone()`/itd. (petStore) — zachowuje istniejący silnik nagród (`b_pushups` itd.
+   w quests.ts) bez przepisywania go, nowy log dokłada tylko historię/elastyczność NA
+   WIERZCHU.
+3. Przepiąć `QuestCtx.trainingStreak` (usePetQuests.ts) z `trainingStreakFrom(trainingDays)`
+   na nowe `exerciseStreakFrom(logs)` — streak reaguje na realne zalogowanie, nie na klik
+   "Odbierz". `m_training` milestone (quests.ts) korzysta z tego samego pola, więc fix
+   automatyczny.
+4. Kafelek dashboardu (`dashboardLayout.ts`: `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
+   `SECTION_DESC`/`SECTION_GROUP`, playbook ARCHITECTURE §12) — nowa sekcja np.
+   `exercise-streak`, pokazuje `exerciseStreakFrom`, tap nawiguje do `app/exercises.tsx`.
+   Wizualnie w rodzinie "Zadania i nawyki" (jak `streak-wall`), flame-styling jak
+   `StreakFlame.tsx`.
+5. Wejście z Zdrowia (`app/(tabs)/health.tsx`) — kafelek/link do `app/exercises.tsx`.
+6. USUŃ sekcję "Trening" z `app/pet-quests.tsx` (self-report UI + `TrainingSessionModal`
+   użycie tam) — reszta ekranu (Zadania/Odbierz) zostaje, bo to wciąż silnik nagród, tylko
+   SAMO logowanie ćwiczenia przenosi się do nowego ekranu.
+7. Dopisz `exercises-v1` do `backupService.ts` CLOUD_COLS (PRZED/RAZEM z punktem 2 —
+   komentarz w exercisesStore.ts § 310 świadomie to odłożył, żeby nie backupować pustego
+   store'u zanim cokolwiek do niego pisze).
+8. Stare `pushupsDay`/`squatsDay`/.../`trainingDays` w petStore.ts — zostają jako silnik
+   nagród (krok 2 dalej je woła), NIE kasować.
+
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 
 User (po przebudowie mapy kampanii, §305): "potem musimy jak wgram nowe bosy i grafiki
