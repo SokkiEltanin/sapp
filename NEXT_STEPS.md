@@ -3,30 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Kreator dashboardu — Faza 1+2 (2026-10-15, §327, §328)
+## 🆕 Kreator dashboardu — Faza 1+2+3 (2026-10-15, §327, §328, §329)
 
-Ustawienia → Personalizacja → "Kreator kafelków" — zakładki "Twoje serie" (`StreakWallCard`:
-zaokrąglenie/proporcje/skala liczby/gradient-czy-płasko/pasek postępu/płomień) i "Rekordy"
-(`PersonalRecordsCard`: zaokrąglenie/proporcje/skala liczby/kolor akcentu/ikona w tle), obie z
-podglądem na prawdziwych danych i draft→wdróż, każda z WŁASNYM store'em (nie jeden wspólny
-schemat — pola celowo różne per karta, patrz §328). **Priorytet testu WYSOKI** — patrz checklist
-w ARCHITECTURE.md §327/§328.
+Ustawienia → Personalizacja → "Kreator kafelków" — trzy zakładki, każda z WŁASNYM store'em (nie
+jeden wspólny schemat — pola celowo różne per karta):
+- "Twoje serie" (`StreakWallCard`): zaokrąglenie/proporcje/skala liczby/gradient-czy-płasko/
+  pasek postępu/płomień.
+- "Rekordy" (`PersonalRecordsCard`): zaokrąglenie/proporcje/skala liczby/kolor akcentu/ikona w tle.
+- "Odliczania" (`CountdownsCard`, §329 — INNY kształt, lista+pierścień nie siatka kafelków):
+  zaokrąglenie karty/rozmiar pierścienia/grubość pierścienia/widocznych pozycji.
+
+Wszystkie z podglądem na prawdziwych danych i draft→wdróż. **Priorytet testu WYSOKI** — patrz
+checklist w ARCHITECTURE.md §327/§328/§329.
 
 **Ważne przed dalszą rozbudową**: user opisywał pierwotnie "rząd 4 kafelków woda/słodycze/
 minuty/pogoda" na bazie STAREGO zrzutu — research + świeże zrzuty potwierdziły że to już nie
 istnieje (zastąpione przez `DailyRings`+`StreakWallCard`+`CountdownsCard`+chip pogody).
-Realny dashboard ma 20+ heterogenicznych kart. Faza 1/2 celowo wąska (dwa komponenty), żeby nie
-budować na złym założeniu po raz drugi.
+Realny dashboard ma 20+ heterogenicznych kart. Faza 1/2/3 celowo wąska (trzy komponenty), żeby
+nie budować na złym założeniu po raz drugi.
 
 **Otwarte, jawnie odłożone na kolejne fazy** (user chce to wszystko, ale NIE w jednym PR):
 1. Rozszerzenie TEGO SAMEGO wzorca (`styleOverride` prop + osobny draft/live store per karta)
-   na kolejne karty dashboardu — kandydat: `CountdownsCard` (inny kształt — banner, nie siatka
-   kafelków, więc wymaga przemyślenia jakie wymiary stylu w ogóle mają tu sens, nie kopiowania
-   1:1 pól ze StreakWallCard/PersonalRecordsCard).
+   na kolejne karty dashboardu — kandydaci: `PinnedNotesCard`, `SinceCountersCard` (podobny
+   kształt do `CountdownsCard` — lista, nie siatka), `GCalCard`.
 2. Przepinanie nawigacji "kafelek → dowolny ekran" — dziś `onTile` w `StreakWallCard` ma stały
-   routing per-prefiks klucza (`h:`/`c:`/`ex:`), `PersonalRecordsCard` routing na `/achievements`
-   dla całej karty. Zmiana na user-wybieralny cel wymaga: (a) nowego pola w store
-   (`navOverride: Record<string, RouteTarget>`), (b) ograniczonej, bezpiecznej listy
+   routing per-prefiks klucza (`h:`/`c:`/`ex:`), `PersonalRecordsCard`/`CountdownsCard` routing
+   na stały ekran dla całej karty/wiersza. Zmiana na user-wybieralny cel wymaga: (a) nowego pola
+   w store (`navOverride: Record<string, RouteTarget>`), (b) ograniczonej, bezpiecznej listy
    dopuszczalnych celów (NIE dowolny string — złamałby nawigację), (c) UI wyboru w kreatorze.
    Nie zaczynać bez przemyślenia które cele mają sens dla których kafelków.
 3. Warstwy/z-order, pełny edytor graficzny (justowanie elementów WEWNĄTRZ kafla) — czeka na to,
