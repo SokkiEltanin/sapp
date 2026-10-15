@@ -1993,6 +1993,15 @@ export default function SettingsScreen() {
           keywords: ['dashboard', 'kafelki', 'widgety', 'edytuj', 'układ', 'sekcje'],
           control: { kind: 'link', onPress: () => { useDashboardLayout.getState().requestEdit(); router.push('/(tabs)' as any); } },
         },
+        {
+          // Kreator dashboardu, Faza 1 (2026-10-15, §327) — póki co tylko "Twoje serie"
+          // (kształt/tło/pasek/płomień), z realnym podglądem i draft→wdróż. Celowo OSOBNY wpis
+          // od "Edytuj dashboard" (to przestawia KOLEJNOŚĆ/widoczność sekcji, nie ich WYGLĄD).
+          id: 'dashboard-tile-creator', title: 'Kreator kafelków', subtitle: 'Kształt, kolory i warstwy — z podglądem na żywo',
+          icon: LucideIcons.Paintbrush, accentColor: '#F472B6',
+          keywords: ['kreator', 'kafelki', 'styl', 'wygląd', 'kolory', 'zaokrąglenie', 'twoje serie'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/dashboard-tile-creator' as any); } },
+        },
       ],
     },
     {
