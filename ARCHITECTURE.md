@@ -17942,6 +17942,97 @@ poruszyć i się zatrzymuje, czy nie rusza się wcale od pierwszej klatki.
 
 ---
 
+## 327. Kreator dashboardu — Faza 1: styl "Twoje serie" z realnym podglądem (2026-10-15)
+
+User, po serii makiet HTML w Artifact (szybka pętla iteracji wyglądu, ale eksport wymagał
+kopiowania wyboru z powrotem do czatu, a HTML nigdy nie renderuje się 1:1 jak RN): "zrobisz mi
+prawdziwy kreator w ustawieniach ze wszystkim w aplikacji... ja będę sobie robił edytował
+kreował poprawiał... a potem wdrożę", a potem rozszerzył to o: draft/podgląd przed wdrożeniem,
+podgląd na realnych danych, edycja KAŻDEGO panelu, przepinanie nawigacji (kafelek→ekran),
+edycja graficzna (justowanie/skalowanie/zaokrąglenie/warstwy), pełnoekranowy podgląd z gestem
+cofania.
+
+**Przed kodem: weryfikacja czego to w ogóle dotyczy.** User opisywał "rząd 4 kafelków woda/
+słodycze/minuty/pogoda" na bazie STAREGO zrzutu ekranu. Subagent-research (`Explore`) przeszukał
+cały obecny `app/(tabs)/index.tsx` i nie znalazł takiego rzędu — zamiast tego: `DailyRings`
+(4 pierścienie SVG: kroki/woda/budżet/nawyki), `StreakWallCard`/"Twoje serie" (zmienna siatka
+serii, w tym realnie "Woda"/"Bez słodyczy"/"Ćwiczenia" jako osobne nawyki/liczniki — PATRZ
+§304, §313, §324), `CountdownsCard`, pogoda jako osobny chip w nagłówku. User potwierdził
+świeżymi zrzutami: dashboard ma DWADZIEŚCIA+ heterogenicznych kart (licznik u góry sticky,
+Twoje serie, pupil, ciekawostka, listy, zapiski, sklepy, porównania, rekordy, praca, osiągnięcia,
+wydatki, pixelyear nastroju/kroków, plan zajęć, jedzenie...) — stary zrzut był z wersji SPRZED
+przebudowy na pierścienie, dokładnie ta sama klasa pomyłki co cała saga OTA z §319-§326 (appka
+nie aktualizuje się sama). Bez tej weryfikacji kreator zostałby podłączony pod komponent, który
+już nie istnieje.
+
+**Decyzja o zakresie — rozłożenie na fazy, nie jeden PR na całość.** Pełna wizja usera
+("edycja KAŻDEGO panelu" + przepinanie nawigacji + pełny edytor graficzny justify/scale/radius/
+warstwy) to wielofazowy projekt — próba zrobienia WSZYSTKIEGO naraz na appce z 20+ typami kart
+(każdy o fundamentalnie innym kształcie treści) skończyłaby się niedopracowanym, trudnym do
+zweryfikowania kodem (dokładnie to, przed czym ostrzega CLAUDE.md: "No half-finished
+implementations"). Faza 1 celuje w JEDEN, samodzielny, już dobrze zdefiniowany komponent
+(`StreakWallCard`/"Twoje serie") i buduje PEŁNY mechanizm (draft/live store, prawdziwy podgląd,
+wdrożenie, pełny ekran) na nim — tak żeby Faza 2 (kolejne karty) i Faza 3 (przepinanie nawigacji,
+edycja graficzna wyższego poziomu) ROZSZERZAŁY ten sam, już sprawdzony mechanizm zamiast
+wymyślać go od nowa pod presją większego zakresu.
+
+**Architektura (ten sam wzorzec co edytor mapy bossów, §322 — draft/live split + jeden
+komponent współdzielony między realnym ekranem a kreatorem, bez osobnej "makiety")**:
+
+1. **`src/store/streakTileStyleStore.ts`** (nowy, persisted, `streak-tile-style-v1`) —
+   `StreakTileStyle { cornerRadius, aspectRatio, gradientMode: 'gradient'|'flat',
+   showProgressBar, showFlame, numberScale }`. DWA pola: `live` (to, co REALNIE renderuje się
+   na dashboardzie) i `draft` (to, czym user kręci w kreatorze) — bawienie się kreatorem NIE
+   zmienia prawdziwego dashboardu, dopóki `publish()` nie skopiuje `draft` → `live`.
+   `DEFAULT_STREAK_TILE_STYLE` odtwarza DOKŁADNIE dotychczasowe zaszyte na sztywno wartości
+   (`radius.lg=16`, `aspectRatio=1.7` z komentarza "kafelki są za długie", gradient+pasek+
+   płomień zawsze włączone) — więc bez żadnego `publish()` nic się wizualnie nie zmienia.
+
+2. **`StreakWallCard.tsx`** — nowy opcjonalny prop `styleOverride?: StreakTileStyle`. Bez
+   niego karta sama czyta `live` ze store'a (prawdziwy dashboard, `app/(tabs)/index.tsx:3098`,
+   WOLNY od zmian — nie musiał nawet wiedzieć, że store istnieje). Kreator podaje `draft` —
+   renderuje się DOKŁADNIE TEN SAM komponent co na dashboardzie, więc podgląd w kreatorze = co
+   do piksela to, co zobaczysz po "Wdróż" (prawdziwy WYSIWYG, nie HTML-owa makieta do ręcznego
+   przepisywania — to był główny zarzut usera do podejścia z Artifact).
+
+3. **`app/dashboard-tile-creator.tsx`** (nowy ekran, modal — `app/_layout.tsx`, ten sam wzorzec
+   co `work/add` — `presentation:'modal'`, `slide_from_bottom`, zero ręcznego Androidowego
+   back-handlingu, natywny dismiss za darmo) — renderuje `StreakWallCard` z PRAWDZIWYMI danymi
+   usera (dokładnie ta sama kompozycja co `streakWall` memo w `index.tsx:627` — habits/liczniki
+   auto/ćwiczenia — ŻYWE store'y, nie snapshot: CLAUDE.md §3 dotyczy handlerów PISZĄCYCH
+   `expenses` po paragonie, nie czytania do podglądu). Kontrolki: zaokrąglenie rogów/proporcje/
+   skala liczby jako STEPPERY (+/-), nie suwak-drag — świadomie, żeby NIE wprowadzać kolejnej
+   klasy gestowego buga (ta sama lekcja co edytor mapy bossów w §322: `PanResponder` zamiast
+   `Gesture.Pan`, tu jeszcze prościej — brak gestu w ogóle). Gradient/płasko jako segmented
+   control, pasek postępu/płomień jako `Switch`. "Wdróż" (`publish()`, aktywny tylko gdy
+   `draft !== live`), "Cofnij zmiany" (`discardDraft()`), "Domyślne" (`resetDraftToDefault()`).
+
+4. **Podgląd pełnoekranowy** — natywny RN `Modal` (`presentationStyle="fullScreen"`,
+   `onRequestClose`) zamiast osobnej trasy — Android hardware-back zamyka go DARMO przez
+   `onRequestClose` (ten sam wzorzec co `calendar.tsx`/`expenses/subscriptions.tsx`), plus
+   widoczny ✕ dla iOS (bez sprzętowego cofania). Renderuje tę samą kartę na pełnym, ciemnym
+   tle `colors.bg.primary`, żeby user widział ją w realistycznym, dużym kontekście.
+
+**Testy**: brak nowych — store to prosty, bezstanowy-logicznie draft/live split (ten sam wzorzec
+co `bossMapLayoutStore`, który też nie ma dedykowanego testu); realna logika stylowania to
+proste podstawienia wartości w JSX, nie algorytm do testowania jednostkowo. `tsc --noEmit`
+czyste, `jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**NIE w Fazie 1 (jawnie odłożone, nie zgubione — patrz NEXT_STEPS.md)**: edycja innych typów
+kart dashboardu (pupil, ciekawostka, wykresy, listy — każda ma inny kształt treści, wymaga
+osobnego przemyślenia), przepinanie nawigacji "kafelek → dowolny ekran" (dziś routing per
+kafelek jest stały w `onTile`), kolor akcentu per-kategoria (dziś kolor kafla ZAWSZE pochodzi z
+`streakColor(dni)` — progu serii, nie z wyboru usera — nadpisanie go wymaga osobnej decyzji
+projektowej, nie tylko nowego pola w store), warstwy/z-order.
+
+**Priorytet testu na urządzeniu — WYSOKI, nowa funkcja**: Ustawienia → Personalizacja →
+"Kreator kafelków" → suwaki/przełączniki realnie zmieniają podgląd na żywo (z prawdziwymi
+seriami), pełnoekranowy podgląd otwiera się i zamyka (gest cofania na Androidzie ORAZ ✕),
+"Wdróż" faktycznie zmienia wygląd "Twoje serie" na prawdziwym dashboardzie, "Cofnij
+zmiany"/"Domyślne" działają, ustawienie przetrwa zamknięcie appki (persist).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

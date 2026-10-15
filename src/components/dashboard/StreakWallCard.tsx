@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Snowflake } from 'lucide-react-native';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
+import { useStreakTileStyleStore, StreakTileStyle } from '@/store/streakTileStyleStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -38,10 +39,17 @@ function darken(hex: string, amt: number): string {
 // serii — już istniał, tylko kafel wcześniej próbował upchnąć te same info skrótowo obok
 // niego). Płomień = StreakFlame (już zbudowany, animowany, ten sam schemat kolorów) zamiast
 // osobnego chipa + statycznej ikony w tle. Po przekroczeniu progu — pop „gratulacje" (toast).
-function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: string }) {
+// `styleOverride` (2026-10-15, Kreator dashboardu Faza 1) — normalnie NIE podawany: karta
+// sama czyta `live` z `streakTileStyleStore` (ustawienia wdrożone w kreatorze). Kreator
+// (`app/dashboard-tile-creator.tsx`) podaje tu `draft`, żeby renderować TEN SAM komponent co
+// prawdziwy dashboard z jeszcze-niewdrożonym stylem — zero osobnej "makiety" do rozjeżdżania
+// się z prawdziwym kodem.
+function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakItem[]; cardBg: string; styleOverride?: StreakTileStyle }) {
   const c = useColors();
   const s = makeS(c);
   const freezes = useStreakFreezeStore(st => st.freezes);
+  const liveTileStyle = useStreakTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveTileStyle;
   // BEZ ucinania do 6 (2026-08-12, wcześniejszy fix) I BEZ filtrowania zerowych serii
   // (2026-08-12, ten fix) — user: "jak nie ma streaku pisze zero na dniach". Dawniej
   // `days > 0` chowało złamane serie całkowicie (np. zjadłeś słodycz dziś → licznik "bez
@@ -135,14 +143,17 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
+    const radiusStyle = { borderRadius: tileStyle.cornerRadius };
     const content = (
       <>
-        <View style={s.tileFlame} pointerEvents="none">
-          <StreakFlameGlow days={r.days} size={64} />
-        </View>
-        <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</DisplayText>
+        {tileStyle.showFlame && (
+          <View style={s.tileFlame} pointerEvents="none">
+            <StreakFlameGlow days={r.days} size={64} />
+          </View>
+        )}
+        <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF', fontSize: 24 * tileStyle.numberScale, lineHeight: 26 * tileStyle.numberScale }]}>{r.days}</DisplayText>
         <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
-        {tierProgress != null && (
+        {tierProgress != null && tileStyle.showProgressBar && (
           <View style={s.tierBarTrack} pointerEvents="none">
             <View style={[s.tierBarFill, { width: `${tierProgress * 100}%` }]} />
           </View>
@@ -150,11 +161,13 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
       </>
     );
     return (
-      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile} style={s.tileTouch}>
+      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile} style={[s.tileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
         {isZero ? (
-          <View style={[s.tile, s.tileZero]}>{content}</View>
+          <View style={[s.tile, s.tileZero, radiusStyle]}>{content}</View>
+        ) : tileStyle.gradientMode === 'flat' ? (
+          <View style={[s.tile, radiusStyle, { backgroundColor: color }]}>{content}</View>
         ) : (
-          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tile}>
+          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.tile, radiusStyle]}>
             {content}
           </LinearGradient>
         )}
