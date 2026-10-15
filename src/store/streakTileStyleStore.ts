@@ -5,7 +5,7 @@ import { throttledPersistStorage } from '@/utils/throttledStorage';
 export type HabitCalendarStyle = 'water' | 'year';
 export type FlameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type ContentAlign = 'left' | 'center';
-export type StreakLayoutPreset = 'classic' | 'ring' | 'stripe';
+export type StreakLayoutPreset = 'classic' | 'ring' | 'stripe' | 'compact';
 
 export interface StreakTileStyle {
   // Faza 8 (2026-10-15, §334) — user: "zmianę zupełną kafelków", nie tylko parametry
@@ -21,6 +21,9 @@ export interface StreakTileStyle {
   // ignoruje `gradientMode`/`flameCorner`(pasek ma STAŁY róg, prawy-dolny, spójnie z resztą
   // appki)/`flameOnTop`/`showProgressBar` — ale `contentAlign` i `showFlame` (płomień-watermark
   // da się wyłączyć) dalej mają sens w tym stylu.
+  // `'compact'` (Faza 10, §336) — czwarty styl, najgęstszy: mała ikona + liczba w jednym
+  // rzędzie, etykieta pod spodem, minimalny padding. `numberScale` ma zastosowanie, reszta
+  // (gradient/pasek/róg płomienia/wyrównanie/pasek postępu) nie — ten sam traktament co 'ring'.
   layoutPreset: StreakLayoutPreset;
   cornerRadius: number;
   aspectRatio: number;

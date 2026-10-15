@@ -207,6 +207,25 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
       );
     }
 
+    // Styl "Kompaktowy" (2026-10-15, Kreator Faza 10, §336) — czwarty alternatywny styl,
+    // najgęstszy: mała ikona + liczba w jednym rzędzie, etykieta pod spodem jednym wierszem.
+    // Bez wodotrysków (bez gradientu/watermarku/pierścienia) — czysto informacyjny, dla usera
+    // który chce zmieścić dużo serii na małym miejscu, nie dekoracji.
+    if (tileStyle.layoutPreset === 'compact') {
+      return (
+        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
+          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
+          <View style={[s.compactTile, { borderRadius: tileStyle.cornerRadius }]}>
+            <Flame size={15} color={isZero ? c.text.muted : color} fill={isZero ? c.text.muted : color} strokeWidth={0} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <DisplayText style={[s.compactNum, { color: isZero ? c.text.muted : c.text.primary, fontSize: 17 * tileStyle.numberScale, lineHeight: 19 * tileStyle.numberScale }]}>{r.days}</DisplayText>
+              <Text style={s.compactLabel} numberOfLines={1}>{r.name}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
@@ -300,6 +319,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   stripeGhost: { position: 'absolute', right: -14, bottom: -12, opacity: 0.14 },
   stripeLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
+
+  // Styl "Kompaktowy" (§336)
+  compactTile: {
+    flex: 1, backgroundColor: c.bg.elevated, flexDirection: 'row', alignItems: 'center',
+    gap: 6, paddingHorizontal: spacing[2],
+  },
+  compactNum: { letterSpacing: -0.5 },
+  compactLabel: { fontFamily: fonts.label, fontSize: 8.5, color: c.text.muted, marginTop: 1 },
 }));
 
 export default memo(StreakWallCard);

@@ -207,7 +207,7 @@ export default function DashboardTileCreator() {
           <>
             <Text style={s.sectionLabel}>Styl kafelka</Text>
             <View style={s.segmented}>
-              {([['classic', 'Klasyczny'], ['ring', 'Pierścień'], ['stripe', 'Pasek akcentu']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
+              {([['classic', 'Klasyczny'], ['ring', 'Pierścień'], ['stripe', 'Pasek akcentu'], ['compact', 'Kompaktowy']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
                 const on = streaksDraft.layoutPreset === m;
                 return (
                   <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ layoutPreset: m }); }}
