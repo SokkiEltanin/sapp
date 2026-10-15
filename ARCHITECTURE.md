@@ -18241,6 +18241,45 @@ faktycznie zmienia prawdziwy ekran Bossy (i kampanię, i MAD — oba czytają te
 
 ---
 
+## 333. Kreator dashboardu — Faza 7: paleta progów + odstępy (2026-10-15)
+
+User opisał dużą wizję (kopiowanie komponentów między ekranami, przepinanie danych, grupy
+komponentów) — AskUserQuestion z trzema opcjami skali, user: "zrób jak uważasz ja opisałem
+wszystko". Wybrana droga: najpierw pogłębić istniejące kreatory (niższe ryzyko, brak nowej
+architektury), zaczynając od najkonkretniejszej, dobrze zdefiniowanej części żądania —
+"modyfikacje streku każdego progu" i "ustawienia spacowania między kafelkami". Pełny system
+kopiowania/przepinania komponentów między ekranami ZOSTAJE jawnie odłożony (patrz
+NEXT_STEPS.md) — to osobny podsystem, nie rozszerzenie obecnego wzorca.
+
+**`tierColorOverrides: Record<number, string>`** (klucz = indeks progu 0-7, `STREAK_TIERS` w
+`streakTiers.ts`) — ŚWIADOMIE NIE modyfikuje `streakColor()`/`STREAK_TIERS` bezpośrednio. Ta
+funkcja jest importowana w ~5 miejscach appki (kalendarz roku, płomień licznika itd. — patrz
+komentarz na górze `streakTiers.ts`) — zmiana tam zmieniłaby wygląd rzeczy NIEZWIĄZANYCH z tym
+kreatorem. Zamiast tego `StreakWallCard.renderTile` sam sprawdza nadpisanie PRZED wywołaniem
+`streakColor()`: `tileStyle.tierColorOverrides[streakTier(r.days).i] ?? streakColor(r.days)`.
+Progi (minimalna liczba dni per próg) CELOWO nieedytowalne — zmiana tempa odblokowywania
+kolorów wpłynęłaby na motywacyjne tempo całej appki (patrz obszerny komentarz w
+`streakTiers.ts` o celowym rozstawieniu progów po skardze usera na "różowy kolor dręczy"), zbyt
+ryzykowne żeby wystawić jako prosty suwak bez osobnej decyzji projektowej — jawnie odłożone.
+
+**`tileGap: number`** — odstęp między kafelkami w siatce "Twoje serie" (domyślnie 8, dotychczasowa
+`spacing[2]`), zastosowany inline na `s.grid` (ten sam wzorzec co radius/gradient w §327).
+
+**Kreator** — nowa sekcja "Paleta progów": 8 wierszy (jeden per próg, z nazwą + progiem w dniach),
+każdy z rzędem 8 preset-swatchy + przyciskiem reset. "Odstęp między kafelkami" dołożony do
+istniejącej sekcji "Kształt" (stepper, tylko gdy `activeCard==='streaks'`).
+
+**Testy**: brak nowych — proste podstawienia koloru/odstępu. `tsc --noEmit` czyste,
+`jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: zmiana koloru konkretnego progu widoczna na
+kafelkach, których seria już w tym progu jest (np. "Legenda" przy serii 100+ dni), reset
+pojedynczego progu wraca do domyślnego koloru, zmiana odstępu widoczna w siatce, "Wdróż"
+przenosi wszystko na prawdziwy dashboard. Inne miejsca appki (kalendarz roku, płomień licznika)
+MUSZĄ zostać bez zmian — to weryfikuje że nadpisanie faktycznie jest zaizolowane do tej karty.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
