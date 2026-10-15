@@ -105,6 +105,21 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   // Naprawa: klucz strażnika to teraz TRÓJKA `currentId`+`viewport.w`+`viewport.h` — każda
   // GENUINE zmiana zmierzonego rozmiaru (szerokość też, bo wpływa na pozycje torów zygzaka —
   // patrz `nodes` wyżej) re-centruje kamerę na tym samym bossie, nie tylko zmiana bossa.
+  //
+  // BUG #5 (user, 2026-10-15, zrzut WYKONANY NA ŻĄDANIE "zaraz po wejściu, nie po przewinięciu"
+  // — nadal widać TYLKO wczesne pokonane węzły + pierwszy zablokowany, zero śladu pierścienia
+  // aktualnego). §325 nie wystarczyło: wysokość płótna (`canvasH`) praktycznie NIE zależy od
+  // `viewport.h` (ROW_GAP/PAD_Y są stałe, liczba bossów też) — więc nawet JEDNO poprawne
+  // wywołanie `onLayout` już dawało prawidłowy `targetY`, teoria "wielu przebiegów layoutu"
+  // nie wyjaśnia dalszego błędu. Realny podejrzany: `scrollTo({animated:false})` wołane
+  // SYNCHRONICZNIE w efekcie, w momencie gdy ekran WŁAŚNIE wjeżdża (natywna animacja przejścia
+  // expo-router/react-native-screens) — to znany przypadek na Androidzie, gdzie natywny
+  // scroll-responder jeszcze nie jest podłączony/gotowy i komenda scrollTo jest PO CICHU
+  // gubiona (bez błędu, bez warninga) — a żaden kolejny `onLayout` już nie przyjdzie, bo
+  // wymiary się po animacji nie zmieniają, więc nic już tego nie naprawia. Naprawa: nie tylko
+  // jedno wywołanie, ale KILKA odroczonych powtórzeń tego samego `scrollTo` (0 / 60 / 250 / 600
+  // ms) — łapie moment, w którym natywny responder faktycznie już przyjmuje komendy, niezależnie
+  // od tego jak długo akurat trwała animacja przejścia na danym urządzeniu.
   const centeredOn = useRef<string>('');
   useEffect(() => {
     if (!viewport.h || !viewport.w || nodes.length === 0) return;
@@ -113,7 +128,10 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     centeredOn.current = key;
     const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
     const targetY = Math.max(0, nodes[idx].y - viewport.h / 2);
-    scrollRef.current?.scrollTo({ y: targetY, animated: false });
+    const jump = () => scrollRef.current?.scrollTo({ y: targetY, animated: false });
+    jump();
+    const timers = [60, 250, 600].map(ms => setTimeout(jump, ms));
+    return () => timers.forEach(clearTimeout);
   }, [currentId, currentIdx, nodes, viewport.w, viewport.h]);
 
   // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:

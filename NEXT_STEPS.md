@@ -54,9 +54,20 @@ poprzednie pięć) — strażnik centrowania kamery (`centeredOn`) pamiętał TY
 rozmiar viewportu. RN na realnym urządzeniu potrafi dostarczyć `onLayout` wielokrotnie przy
 starcie (layout się "ustatecznia") — pierwszy przebieg z tymczasowym rozmiarem już "zużywał"
 strażnika, blokując re-centrowanie gdy przyszedł docelowy, prawdziwy rozmiar. Naprawione:
-klucz strażnika to teraz `currentId`+`viewport.w`+`viewport.h`. **Priorytet testu KRYTYCZNY,
-SZÓSTA próba** — jeśli WCIĄŻ źle, poproś usera o zrzut ZARAZ po otwarciu zakładki (nie po
-przewinięciu), żeby odróżnić "start źle" od "dryfuje później".
+klucz strażnika to teraz `currentId`+`viewport.w`+`viewport.h`.
+
+**§326 (2026-10-15) — SIÓDMA runda**: user dostarczył DOKŁADNIE żądany zrzut (zaraz po wejściu,
+nie po przewinięciu) PO §325 — wyglądał identycznie jak przed fixem, zero śladu aktualnego
+bossa. §325 nie wystarczyło (wysokość mapy w praktyce nie zależy od `viewport.h`, więc jedno
+poprawne `onLayout` już wystarczało — teoria "wielu przebiegów" nie wyjaśniała dalszego buga).
+Nowa hipoteza: `scrollTo` wołany jest w momencie, gdy ekran WŁAŚNIE wjeżdża (animacja przejścia
+expo-router) — znany przypadek na Androidzie, gdzie komenda do jeszcze niepodłączonego
+scroll-respondera jest PO CICHU gubiona, a żaden kolejny `onLayout` już nie przychodzi, żeby to
+naprawić. Naprawione: `scrollTo` wołany z kilkoma odroczonymi powtórzeniami (60/250/600 ms) nie
+tylko raz. **Priorytet testu KRYTYCZNY, SIÓDMA próba** — pamiętaj o ręcznym OTA przed testem
+(patrz wyżej). Jeśli WCIĄŻ źle, kolejny krok to prośba o krótkie WIDEO otwarcia zakładki (nie
+zrzut) — żeby zobaczyć czy kamera w ogóle próbuje się ruszyć i zatrzymuje się, czy nie rusza
+się wcale.
 
 ## 🆕 Edytor mapy bossów — ręczne rozstawienie (2026-10-14, §322)
 
