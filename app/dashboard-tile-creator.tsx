@@ -207,7 +207,7 @@ export default function DashboardTileCreator() {
           <>
             <Text style={s.sectionLabel}>Styl kafelka</Text>
             <View style={s.segmented}>
-              {([['classic', 'Klasyczny'], ['ring', 'Pierścień']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
+              {([['classic', 'Klasyczny'], ['ring', 'Pierścień'], ['stripe', 'Pasek akcentu']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
                 const on = streaksDraft.layoutPreset === m;
                 return (
                   <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ layoutPreset: m }); }}
@@ -266,8 +266,11 @@ export default function DashboardTileCreator() {
 
         {activeCard === 'streaks' ? (
           <>
-            {/* Tło i warstwy / Pozycja i warstwy nie mają odpowiednika w stylu "Pierścień"
-                (§334) — gradient/płomień/wyrównanie dotyczą WYŁĄCZNIE klasycznego kafla. */}
+            {/* Tło i warstwy / Pozycja i warstwy dotyczą WYŁĄCZNIE klasycznego kafla —
+                "Pierścień" (§334) i "Pasek akcentu" (§335) mają własne, stałe zasady
+                gradientu/rogu płomienia, nie korzystają z tych pól (poza showFlame/
+                contentAlign u paska — upraszczam i chowam całość razem z resztą, żeby nie
+                mnożyć warunków pole-po-polu; wartości zostają zapamiętane na później). */}
             {streaksDraft.layoutPreset === 'classic' && (<>
             <Text style={s.sectionLabel}>Tło i warstwy</Text>
             <View style={s.card}>

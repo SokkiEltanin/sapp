@@ -18317,6 +18317,37 @@ ustawione (gradient/płomień itd. NIE wyzerowane), "Wdróż" trafia na prawdziw
 
 ---
 
+## 335. Kreator dashboardu — Faza 9: drugi alternatywny styl kafelka, "Pasek akcentu" (2026-10-15)
+
+Drugi `layoutPreset` po "Pierścień" (§334) — waliduje że ta architektura (wczesny `return` w
+`renderTile`, wartości nieaktualnych pól zostają w store, kreator warunkowo chowa nieaktualne
+sekcje) faktycznie generalizuje się na WIĘCEJ niż dwie opcje, nie jest specyficzna dla
+pierścienia.
+
+**`'stripe'`** — neutralne tło (`c.bg.elevated`) zamiast gradientu koloru progu + cienki
+kolorowy pasek z boku (`borderLeftWidth`, kolor progu — respektuje nadpisania z §333) + duży,
+cichy `Flame` jako watermark w tle. ŚWIADOMIE reużywa `Flame` z `lucide-react-native` (już
+zaimportowany do nagłówka karty), NIE `StreakFlameGlow` — ten komponent jest zbyt
+dekoracyjny/wielowarstwowy (3 warstwy + poświata + kontur, patrz `StreakFlame.tsx`) na rolę
+subtelnego tła, pojedyncza płaska ikona przy niskiej opacity robi dokładnie to co trzeba.
+
+**Które pola mają sens gdzie — NIE wszystko-albo-nic**: w przeciwieństwie do "Pierścień" (gdzie
+żadne z gradient/flame/align/progress/numberScale nie miało sensu), "Pasek akcentu" dalej
+używa `numberScale` (liczba renderuje się normalnie, tylko na neutralnym tle) — więc "Skala
+liczby" w kreatorze zostaje widoczna dla OBU stylów klasyczny+pasek, chowana tylko dla
+pierścienia. `showFlame`/`contentAlign` też technicznie mają zastosowanie w pasku, ale kreator
+UPRASZCZA i chowa całą sekcję "Tło i warstwy"/"Pozycja i warstwy" razem dla każdego stylu
+niż "Klasyczny" — świadomy kompromis (nie mnożyć warunków pole-po-polu), wartości tych pól
+zostają zapamiętane, user traci tylko możliwość ich zmiany PODCZAS gdy pasek jest aktywny.
+
+**Testy**: brak nowych. `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: "Styl kafelka" ma teraz 3 opcje, "Pasek akcentu"
+pokazuje kolorowy pasek+watermark+neutralne tło (NIE gradient), kolor paska respektuje
+nadpisania progów, "Skala liczby" dalej działa w tym stylu (w przeciwieństwie do pierścienia).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

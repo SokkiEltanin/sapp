@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 9: drugi alternatywny styl, "Pasek akcentu" (2026-10-15, §335)
+
+"Styl kafelka" ma teraz 3 opcje: Klasyczny/Pierścień/Pasek akcentu. Waliduje że architektura
+`layoutPreset` generalizuje się dobrze — kolejne style to coraz mniejszy krańcowy koszt.
+**Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §335.
+
+**Otwarte, ten sam mechanizm**: jeszcze więcej presetów (z wcześniejszych makiet HTML w
+Artifact tej sesji: "Siatka kompaktowa" — ultra-gęsty 2-wierszowy układ; "Analityczny" —
+ikona-w-kwadraciku + mikro-etykieta, ale wymaga przemyślenia bo oryginalny mockup zakładał
+per-domenowe ikony (woda/słodycze), a kafelki serii mają DOWOLNE nazwy nawyków, nie stały
+zestaw — nie kopiować 1:1 bez tego dostosowania). Nie zaczynane teraz — jeden preset na raz,
+zgodnie z zasadą ustaloną w §334.
+
 ## 🆕 Kreator dashboardu — Faza 8: zupełna zmiana stylu kafelka (2026-10-15, §334)
 
 Zakładka "Twoje serie" → "Styl kafelka" → Klasyczny/Pierścień — pierwsza realizacja "zmiany
