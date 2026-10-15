@@ -18448,6 +18448,40 @@ suite, 1389 testów.
 notatek i przełączniki podglądu treści/tagów, oraz że pasek zakładek (teraz 5) przewija się
 płynnie i nie ścieśnia etykiet.
 
+## 339. Kreator dashboardu — Faza 13: szósta karta, "Kalendarz" (2026-10-15)
+
+Szósta i OSTATNIA karta z pierwotnej listy kandydatów z §327 (StreakWall/Records/Countdowns/
+SinceCounters/PinnedNotes/GCal — komplet). `GCalCard` ma trzeci odrębny kształt treści (po
+liczba+próg i tekst+tagi) — lista eventów w dwóch sekcjach Dziś/Jutro, kolor PER-EVENT
+(`e.color ?? c.brand.gcal`).
+
+**Nowy store `gcalTileStyleStore.ts`** — pola: `maxVisible` (limit na SEKCJĘ, domyślnie 5 —
+dotychczas nieograniczone), `showTime` (godzina startu), `showDot` (kolorowa kropka
+kalendarza). ŚWIADOMIE bez pola koloru — ten sam powód co brak akcentu w "Licznikach" (§337):
+kolor jest pochodną danych per-event (kalendarz źródłowy), nie stałą wartością karty.
+
+**`GCalCard.tsx`** — `styleOverride?: GCalTileStyle`, `.slice(0, maxVisible)` na obu sekcjach
+niezależnie, `showDot`/`showTime` jako warunkowe gałęzie renderu (nie dodatkowa brama jak w
+§338 — tu nie ma odpowiednika "notatka i tak nie ma treści", dot/godzina są zawsze dostępne w
+danych eventu, więc przełącznik to czysty wybór widoczności).
+
+**`app/dashboard-tile-creator.tsx`** — szósta zakładka "Kalendarz". Realne dane (`realGcalToday`/
+`realGcalTomorrow`) — identyczna logika co `gcalToday`/`gcalTomorrow` w `index.tsx` (dziś =
+eventy jeszcze nie zakończone, jutro = wszystko), ale `gcalEvents` czytane LIVE z
+`useCalendarStore` (nie nowy fetch — dashboard już woła `fetchEvents()` na mount, kreator
+korzysta z tego samego stanu w pamięci).
+
+**Komplet kandydatów §327 osiągnięty** — kolejny krok w tym kierunku to już NOWE karty poza
+pierwotną listą, albo przejście do innego odłożonego wątku (kolejny ekran poza dashboardem,
+albo wielki system kopiowania/przepinania komponentów) — patrz NEXT_STEPS.md.
+
+**Testy**: brak nowych (czysto UI/stylistyczne). `tsc --noEmit` czyste, `jest --silent` 106/106
+suite, 1389 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → Personalizacja → Kreator kafelków →
+"Kalendarz" (wymaga podłączonego Google Kalendarza z co najmniej jednym eventem dziś/jutro).
+Sprawdź limit na sekcję i przełączniki godziny/kropki.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

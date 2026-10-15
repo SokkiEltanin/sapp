@@ -5,6 +5,7 @@ import { CalendarEvent } from '@/types';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
+import { useGCalTileStyleStore, GCalTileStyle } from '@/store/gcalTileStyleStore';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['gcal']` (2026-08-26, kolejny mały krok
 // rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i historii). Guard
@@ -15,37 +16,43 @@ export interface GCalCardProps {
   today: CalendarEvent[];
   tomorrow: CalendarEvent[];
   cardBg: string;
+  // Kreator dashboardu, Faza 13 (§339) — ten sam zero-footprint wzorzec co inne karty.
+  styleOverride?: GCalTileStyle;
 }
 
-function GCalCard({ today, tomorrow, cardBg }: GCalCardProps) {
+function GCalCard({ today, tomorrow, cardBg, styleOverride }: GCalCardProps) {
   const c = useColors();
   const s = makeS(c);
+  const liveStyle = useGCalTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveStyle;
   if (today.length === 0 && tomorrow.length === 0) return null;
+  const todayShown = today.slice(0, tileStyle.maxVisible);
+  const tomorrowShown = tomorrow.slice(0, tileStyle.maxVisible);
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.cardHeader}>
         <CalendarDays size={13} color={c.text.muted} />
         <Text style={s.cardTitle}>Google Kalendarz</Text>
       </View>
-      {today.length > 0 && (
+      {todayShown.length > 0 && (
         <>
           <Text style={s.gcalDayLabel}>Dziś</Text>
-          {today.map(e => (
+          {todayShown.map(e => (
             <View key={e.id} style={s.gcalRow}>
-              <View style={[s.gcalDot, { backgroundColor: e.color ?? c.brand.gcal }]} />
-              {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
+              {tileStyle.showDot && <View style={[s.gcalDot, { backgroundColor: e.color ?? c.brand.gcal }]} />}
+              {tileStyle.showTime && e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
               <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
             </View>
           ))}
         </>
       )}
-      {tomorrow.length > 0 && (
+      {tomorrowShown.length > 0 && (
         <>
-          <Text style={[s.gcalDayLabel, { marginTop: today.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
-          {tomorrow.map(e => (
+          <Text style={[s.gcalDayLabel, { marginTop: todayShown.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
+          {tomorrowShown.map(e => (
             <View key={e.id} style={s.gcalRow}>
-              <View style={[s.gcalDot, { backgroundColor: e.color ?? c.brand.gcal }]} />
-              {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
+              {tileStyle.showDot && <View style={[s.gcalDot, { backgroundColor: e.color ?? c.brand.gcal }]} />}
+              {tileStyle.showTime && e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
               <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
             </View>
           ))}

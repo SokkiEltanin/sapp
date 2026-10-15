@@ -16,6 +16,8 @@ import { useMoodStore } from '@/store/moodStore';
 import { useDayKey } from '@/hooks/useDayKey';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { getAllNotes, Note } from '@/utils/notesStorage';
+import { useCalendarStore } from '@/store/calendarStore';
+import { shiftClockRange } from '@/utils/workEvents';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildRecords } from '@/utils/personalRecords';
 import { STREAK_TIERS } from '@/utils/streakTiers';
@@ -24,19 +26,22 @@ import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
+import GCalCard from '@/components/dashboard/GCalCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE } from '@/store/sinceCountersTileStyleStore';
 import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
+import { useGCalTileStyleStore, DEFAULT_GCAL_TILE_STYLE } from '@/store/gcalTileStyleStore';
 
-type CardKey = 'streaks' | 'records' | 'countdowns' | 'since' | 'notes';
+type CardKey = 'streaks' | 'records' | 'countdowns' | 'since' | 'notes' | 'gcal';
 const CARD_TABS: { key: CardKey; label: string }[] = [
   { key: 'streaks', label: 'Twoje serie' },
   { key: 'records', label: 'Rekordy' },
   { key: 'countdowns', label: 'Odliczania' },
   { key: 'since', label: 'Liczniki' },
   { key: 'notes', label: 'Notatki' },
+  { key: 'gcal', label: 'Kalendarz' },
 ];
 const CARD_PREVIEW_TITLES: Record<CardKey, string> = {
   streaks: 'Twoje serie',
@@ -44,6 +49,7 @@ const CARD_PREVIEW_TITLES: Record<CardKey, string> = {
   countdowns: 'Odliczania',
   since: 'Liczniki',
   notes: 'Przypięte notatki',
+  gcal: 'Google Kalendarz',
 };
 const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
 const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8', '#3B82F6', '#636FF6', '#8B5CF6'];
@@ -121,12 +127,22 @@ export default function DashboardTileCreator() {
   const resetNotesDefault = usePinnedNotesTileStyleStore(st => st.resetDraftToDefault);
   const notesLive = usePinnedNotesTileStyleStore(st => st.live);
 
-  const DRAFTS: Record<CardKey, object> = { streaks: streaksDraft, records: recordsDraft, countdowns: countdownsDraft, since: sinceDraft, notes: notesDraft };
-  const LIVES: Record<CardKey, object> = { streaks: streaksLive, records: recordsLive, countdowns: countdownsLive, since: sinceLive, notes: notesLive };
-  const DEFAULTS: Record<CardKey, object> = { streaks: DEFAULT_STREAK_TILE_STYLE, records: DEFAULT_RECORDS_TILE_STYLE, countdowns: DEFAULT_COUNTDOWNS_TILE_STYLE, since: DEFAULT_SINCE_COUNTERS_TILE_STYLE, notes: DEFAULT_PINNED_NOTES_TILE_STYLE };
-  const PUBLISH_FNS: Record<CardKey, () => void> = { streaks: publishStreaks, records: publishRecords, countdowns: publishCountdowns, since: publishSince, notes: publishNotes };
-  const DISCARD_FNS: Record<CardKey, () => void> = { streaks: discardStreaksDraft, records: discardRecordsDraft, countdowns: discardCountdownsDraft, since: discardSinceDraft, notes: discardNotesDraft };
-  const RESET_FNS: Record<CardKey, () => void> = { streaks: resetStreaksDefault, records: resetRecordsDefault, countdowns: resetCountdownsDefault, since: resetSinceDefault, notes: resetNotesDefault };
+  // GCal store (§339, Faza 13) — szósta i ostatnia karta z pierwotnej listy kandydatów §327.
+  // Trzeci kształt treści (lista eventów, dwie sekcje Dziś/Jutro) — bez koloru, pochodna
+  // danych kalendarza per-event, ten sam powód co brak akcentu w §337.
+  const gcalDraft = useGCalTileStyleStore(st => st.draft);
+  const setGcalDraft = useGCalTileStyleStore(st => st.setDraft);
+  const publishGcal = useGCalTileStyleStore(st => st.publish);
+  const discardGcalDraft = useGCalTileStyleStore(st => st.discardDraft);
+  const resetGcalDefault = useGCalTileStyleStore(st => st.resetDraftToDefault);
+  const gcalLive = useGCalTileStyleStore(st => st.live);
+
+  const DRAFTS: Record<CardKey, object> = { streaks: streaksDraft, records: recordsDraft, countdowns: countdownsDraft, since: sinceDraft, notes: notesDraft, gcal: gcalDraft };
+  const LIVES: Record<CardKey, object> = { streaks: streaksLive, records: recordsLive, countdowns: countdownsLive, since: sinceLive, notes: notesLive, gcal: gcalLive };
+  const DEFAULTS: Record<CardKey, object> = { streaks: DEFAULT_STREAK_TILE_STYLE, records: DEFAULT_RECORDS_TILE_STYLE, countdowns: DEFAULT_COUNTDOWNS_TILE_STYLE, since: DEFAULT_SINCE_COUNTERS_TILE_STYLE, notes: DEFAULT_PINNED_NOTES_TILE_STYLE, gcal: DEFAULT_GCAL_TILE_STYLE };
+  const PUBLISH_FNS: Record<CardKey, () => void> = { streaks: publishStreaks, records: publishRecords, countdowns: publishCountdowns, since: publishSince, notes: publishNotes, gcal: publishGcal };
+  const DISCARD_FNS: Record<CardKey, () => void> = { streaks: discardStreaksDraft, records: discardRecordsDraft, countdowns: discardCountdownsDraft, since: discardSinceDraft, notes: discardNotesDraft, gcal: discardGcalDraft };
+  const RESET_FNS: Record<CardKey, () => void> = { streaks: resetStreaksDefault, records: resetRecordsDefault, countdowns: resetCountdownsDefault, since: resetSinceDefault, notes: resetNotesDefault, gcal: resetGcalDefault };
   const isDirty = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(LIVES[activeCard]);
   const isDefault = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(DEFAULTS[activeCard]);
 
@@ -183,6 +199,32 @@ export default function DashboardTileCreator() {
   const [realPinnedNotes, setRealPinnedNotes] = useState<Note[]>([]);
   useEffect(() => { getAllNotes().then(ns => setRealPinnedNotes(ns.filter(n => n.pinned))).catch(() => {}); }, []);
 
+  // GCal (§339) — ta sama logika co `gcalToday`/`gcalTomorrow` w app/(tabs)/index.tsx (dziś =
+  // nie zakończone, jutro = wszystko). `gcalEvents` czyta się LIVE z `useCalendarStore` (już w
+  // pamięci po wejściu na dashboard, które woła `fetchEvents()` na mount — brak potrzeby
+  // ponownego fetchu tutaj).
+  const gcalEvents = useCalendarStore(st => st.gcalEvents);
+  const tomorrowKey = useMemo(() => {
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  }, [dayKey]);
+  const realGcalToday = useMemo(() => {
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const t2m = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+    return gcalEvents
+      .filter(e => e.date === dayKey)
+      .filter(e => {
+        const r = shiftClockRange(e);
+        if (!r) return true;
+        return t2m(r.end) >= nowMins;
+      })
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+  }, [gcalEvents, dayKey]);
+  const realGcalTomorrow = useMemo(
+    () => gcalEvents.filter(e => e.date === tomorrowKey).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
+    [gcalEvents, tomorrowKey],
+  );
+
   const doPublish = () => { haptic.success(); PUBLISH_FNS[activeCard](); };
   const doDiscard = () => { haptic.tap(); DISCARD_FNS[activeCard](); };
   const doResetDefault = () => { haptic.tap(); RESET_FNS[activeCard](); };
@@ -228,7 +270,9 @@ export default function DashboardTileCreator() {
             ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
             : activeCard === 'since'
             ? <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />
-            : <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />}
+            : activeCard === 'notes'
+            ? <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />
+            : <GCalCard today={realGcalToday} tomorrow={realGcalTomorrow} cardBg={c.bg.card} styleOverride={gcalDraft} />}
         </View>
         {activeCard === 'countdowns' && realCountdowns.length === 0 && (
           <Text style={s.hint}>Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach, żeby zobaczyć realny podgląd.</Text>
@@ -238,6 +282,9 @@ export default function DashboardTileCreator() {
         )}
         {activeCard === 'notes' && realPinnedNotes.length === 0 && (
           <Text style={s.hint}>Brak przypiętych notatek na koncie — przypnij jedną w Notatkach, żeby zobaczyć realny podgląd.</Text>
+        )}
+        {activeCard === 'gcal' && realGcalToday.length === 0 && realGcalTomorrow.length === 0 && (
+          <Text style={s.hint}>Brak eventów z Google Kalendarza na dziś/jutro — podłącz kalendarz w Ustawieniach, żeby zobaczyć realny podgląd.</Text>
         )}
         <TouchableOpacity onPress={() => { haptic.tap(); setFullPreview(true); }} style={s.fullBtn}>
           <Maximize2 size={14} color={c.text.secondary} />
@@ -304,6 +351,23 @@ export default function DashboardTileCreator() {
             <View style={s.row}>
               <Text style={s.rowLabel}>Tagi</Text>
               <Switch value={notesDraft.showTags} onValueChange={v => { haptic.tap(); setNotesDraft({ showTags: v }); }}
+                trackColor={{ false: c.border.default, true: c.accent.blue }} />
+            </View>
+          </View>
+        ) : activeCard === 'gcal' ? (
+          <View style={s.card}>
+            <Stepper label="Widocznych na sekcję" value={gcalDraft.maxVisible} min={1} max={10} step={1}
+              onChange={v => setGcalDraft({ maxVisible: v })} c={c} s={s} />
+            <View style={s.divider} />
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Godzina</Text>
+              <Switch value={gcalDraft.showTime} onValueChange={v => { haptic.tap(); setGcalDraft({ showTime: v }); }}
+                trackColor={{ false: c.border.default, true: c.accent.blue }} />
+            </View>
+            <View style={s.divider} />
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Kolorowa kropka</Text>
+              <Switch value={gcalDraft.showDot} onValueChange={v => { haptic.tap(); setGcalDraft({ showDot: v }); }}
                 trackColor={{ false: c.border.default, true: c.accent.blue }} />
             </View>
           </View>
@@ -546,7 +610,9 @@ export default function DashboardTileCreator() {
               ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
               : activeCard === 'since'
               ? <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />
-              : <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />}
+              : activeCard === 'notes'
+              ? <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />
+              : <GCalCard today={realGcalToday} tomorrow={realGcalTomorrow} cardBg={c.bg.card} styleOverride={gcalDraft} />}
           </View>
           <Text style={s.fullHint}>Cofnij (gest/przycisk) albo ✕, żeby wyjść</Text>
         </SafeAreaView>
