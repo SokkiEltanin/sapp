@@ -17778,6 +17778,82 @@ poziom pokrycia co `removeLog`/`trainingPlansStore`, które też nie mają dedyk
 Dzisiejszej sesji, otwórz historię (ikonka zegara), popraw ilość i usuń wpis — suma "Dziś"
 powinna się zaktualizować natychmiast w obu miejscach.
 
+## 324. Ćwiczenia — kalendarz/historia, miesięczne podsumowanie, kafelek w "Twoich seriach" (2026-10-15)
+
+User po §323, dalej niezadowolony mimo że edycja/usuwanie już działały (tylko dla DZISIAJ):
+"Nadal zle zrobiles powinna byc cała zakładka, nie ma historii nie wiem ile wczoraj zrobiłem
+i nie mogę edytować/dodawac. Na dashbordzie chce aby ten kafelek byl w strekach a nie osobno
+bo osobno zajmuje mnóstwo miejsca co zaburza inne widgety. Jak wchodzę nie widze postępu w
+sensie looku na całość np tego miesiąca". Cztery osobne, konkretne braki — wszystkie
+zaadresowane:
+
+**1. Historia + edycja/dodawanie dla DOWOLNEGO dnia (nie tylko dziś)** — nowy ekran
+`app/exercises-history.tsx`, wzorzec 1:1 z `water-calendar.tsx` (pierwszy w appce ekran z
+edycją WSTECZNĄ dnia, 2026-10-03, user o wodzie: "wczoraj wypiłem ale nie było internetu i mi
+nie złapało" — identyczny problem, ten sam sprawdzony wzorzec): okno rolkowe 35/371 dni
+kończące się dziś, pasek "ostatnie 7 dni" zawsze widoczny + zwijana pełna siatka
+miesiąc/rok (SVG + nakładka dotykowa zwykłym `Pressable`, NIE `onPress` na elementach SVG —
+`water-calendar.tsx` już raz nadepnęło na ten problem, tu uniknięty od razu). Tap na dzień →
+`ExerciseLogHistory` (§323, teraz z nowym propem `resolveLabel` — dzień ćwiczeń, w
+przeciwieństwie do wody, może mieć WIELE różnych ćwiczeń z różnymi jednostkami naraz, więc
+lista pokazuje nazwę+jednostkę PER WPIS, nie jedną wspólną) + formularz dopisania zaległego
+wpisu dla TEJ konkretnej daty (chipsy 6 kanonicznych ćwiczeń + ilość).
+- **`useExerciseLogging.ts`** — dodane `addLog` (surowe, bez sprawdzania nagrody) obok
+  `logAmount`. CELOWO osobno: `logAmount` zawsze sprawdza próg nagrody względem DZISIEJSZEJ
+  sumy — wołanie jej dla wstecznego wpisu niesłusznie mogłoby odblokować DZISIEJSZY quest na
+  podstawie starych danych. Backfill = czysty zapis, nagrody są z natury "zrobione dziś", nie
+  retroaktywne.
+- **`src/utils/exerciseCalendar.ts`** (nowy, testowany) — `exerciseDayCell`
+  (distinctCount/totalAmount/entryCount danego dnia) i `exerciseMonthSummary` (agregat dla
+  PRAWDZIWEGO miesiąca kalendarzowego, dopasowanie przez prefiks `'YYYY-MM'` daty, bez
+  parsowania Date — bez stref czasowych do pomylenia). `ymd`/`fmtDay`/`tierAlpha` z
+  `waterCalendar.ts` reużyte WPROST (wystarczająco generyczne, zero logiki wodnej) zamiast
+  duplikowane.
+
+**2. "Jak wchodzę nie widzę postępu... np tego miesiąca"** — dwa poziomy, oba zaadresowane:
+- `app/exercises.tsx` dostał na samej górze banner "Historia i postęp" (obok już istniejącego
+  "Moje plany treningowe") — pierwsze co widać po wejściu, nie coś do odkrycia. Płomień serii
+  w nagłówku też teraz klikalny → ten sam ekran.
+- Sam `exercises-history.tsx` ma osobny pasek miesięczny (`exerciseMonthSummary` na
+  PRAWDZIWYM `YYYY-MM`, NIE oknie rolkowym 35 dni jak siatka kalendarza) — "aktywnych dni /
+  wpisów / różnych ćwiczeń" dla bieżącego miesiąca kalendarzowego. User explicite rozróżnił
+  "tego miesiąca" od ogólnej historii — stąd dwa osobne, różnie liczone widoki w jednym
+  ekranie, nie jeden kompromis między nimi.
+
+**3. Dashboard — kafelek w "Twoich seriach", nie osobno** — user: "osobno zajmuje mnóstwo
+miejsca co zaburza inne widgety". Okazało się, że combined-streaks widget JUŻ ISTNIAŁ
+(`StreakWallCard.tsx`, "Twoje serie" — siatka 2-na-rząd wszystkich serii nawyków + auto-
+liczników "dni bez"), tylko ćwiczenia miały WŁASNY, osobny, pełnoszerokościowy
+`ExerciseStreakCard.tsx`/`exercise-streak` node (§313) zamiast być w nim. Naprawa:
+- `app/(tabs)/index.tsx` — `streakWall` (tablica zasilająca `StreakWallCard`) dostaje
+  dodatkowy wpis `{ key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak }`, ZAWSZE
+  (nie warunkowo) — zachowuje poprzednią własność "zawsze widoczny punkt wejścia", tylko teraz
+  jako pozycja WEWNĄTRZ karty, nie osobna karta. `exercise-streak` node i import
+  `ExerciseStreakCard` USUNIĘTE z `index.tsx`, sam plik komponentu USUNIĘTY (zero innych
+  referencji, zweryfikowane grepem przed kasowaniem).
+- `StreakWallCard.tsx`'s `onTile` dostał nową gałąź `key.startsWith('ex:')` → `/exercises-
+  history` (bogatszy widok niż generyczny `/habit-year`, którego używają nawyki/liczniki).
+- `dashboardLayout.ts` — `'exercise-streak'` usunięte z `DEFAULT_DASHBOARD_SECTIONS`/
+  `SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP`. `effectiveOrder()` (już istniejące)
+  automatycznie czyści ten id z zapisanych układów userów bez migracji.
+
+**Celowo NIE zrobione — "cała zakładka" (literalnie nowa ikona w dolnym pasku zakładek)**:
+zinterpretowane jako "niech ten DZIAŁ będzie kompletny/bogaty", nie jako dosłowna prośba o
+nową pozycję w nawigacji dolnej — struktura tab-bara to większa, ryzykowniejsza decyzja
+nawigacyjna niż to, co konkretne dalsze zdania w zgłoszeniu opisywały (historia/edycja/
+miesiąc/dashboard, wszystko zaadresowane wyżej). Jeśli user naprawdę chciał dosłownie nowej
+ikony w tab-barze — osobne, jawne zgłoszenie, nie zgadywane teraz.
+
+**Testy**: `exerciseCalendar.test.ts` (nowy) — 6 testów (`exerciseDayCell` licy UNIKALNE
+ćwiczenia/sumę/liczbę wpisów poprawnie, `exerciseMonthSummary` filtruje po prefiksie
+miesiąca, liczy unikalne aktywne dni nie wpisy). `tsc --noEmit` czyste, `jest --silent`
+106/106 suite, 1389 testów (+6).
+
+**Priorytet testu na urządzeniu — wysoki**: ekran Ćwiczenia → "Historia i postęp" → kalendarz
+pokazuje poprzednie dni (kolor wg liczby różnych ćwiczeń), pasek miesiąca ma sensowne liczby,
+tap na dzień pokazuje/pozwala dopisać wpisy. Dashboard → "Twoje serie" zawiera teraz pozycję
+"Ćwiczenia" zamiast osobnej dużej karty, tap na nią prowadzi do historii.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

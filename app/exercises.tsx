@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon, ClipboardList, ChevronRight, ChevronDown, History } from 'lucide-react-native';
+import { ChevronLeft, Check, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Settings as SettingsIcon, ClipboardList, ChevronRight, ChevronDown, History, CalendarDays } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
@@ -67,9 +67,9 @@ export default function ExercisesScreen() {
       <View style={s.header}>
         <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
         <Text style={s.headerTitle}>Ćwiczenia</Text>
-        <View style={s.streakPill}>
+        <PressableScale onPress={() => { haptic.tap(); router.push('/exercises-history' as any); }} style={s.streakPill}>
           <StreakFlame days={streak} size={28} />
-        </View>
+        </PressableScale>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -81,6 +81,18 @@ export default function ExercisesScreen() {
             </Text>
           </PressableScale>
         )}
+
+        {/* Historia/kalendarz (2026-10-15, ARCHITECTURE.md §324, user: "jak wchodzę nie widze
+            postępu w sensie looku na całość np tego miesiąca... nie ma historii") — pierwsze
+            co widać po wejściu, nie coś do odkrycia. */}
+        <PressableScale onPress={() => { haptic.tap(); router.push('/exercises-history' as any); }} style={s.plansBanner}>
+          <View style={s.plansBannerIcon}><CalendarDays size={18} color="#FB923C" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.plansBannerTitle}>Historia i postęp</Text>
+            <Text style={s.plansBannerSub}>Kalendarz, ten miesiąc, popraw zaległy dzień</Text>
+          </View>
+          <ChevronRight size={18} color={c.text.muted} />
+        </PressableScale>
 
         <PressableScale onPress={() => { haptic.tap(); router.push('/training-plans' as any); }} style={s.plansBanner}>
           <View style={s.plansBannerIcon}><ClipboardList size={18} color="#FB923C" /></View>

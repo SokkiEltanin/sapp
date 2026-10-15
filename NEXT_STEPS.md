@@ -120,6 +120,15 @@ ilość/jednostka) od razu, monety/XP zostają.
    źle i pizda") dodane w OBU miejscach (ekran Ćwiczenia + Dzisiejsza sesja) — ikonka "historia"
    przy karcie/pozycji gdy dziś coś zalogowano. Priorytet testu wysoki: popraw/usuń wpis,
    sprawdź że suma "Dziś" i streak się aktualizują.
+6. **§324 (2026-10-15)** — user dalej niezadowolony mimo §323 ("powinna byc cała zakładka,
+   nie ma historii nie wiem ile wczoraj zrobiłem... Na dashbordzie chce aby ten kafelek byl w
+   strekach a nie osobno... Jak wchodzę nie widze postępu... np tego miesiąca"). Zrobione:
+   nowy `app/exercises-history.tsx` (kalendarz 1:1 wzorzec `water-calendar.tsx`, edycja
+   WSTECZNA dowolnego dnia, pasek miesięczny), kafelek dashboardu złożony do istniejącego
+   `StreakWallCard`/"Twoje serie" (stary osobny `ExerciseStreakCard` USUNIĘTY). Priorytet
+   testu WYSOKI — checklist w ARCHITECTURE.md §324. NIE zrobione: dosłowna nowa ikona w
+   dolnym pasku zakładek (zinterpretowane jako "zrób ten dział kompletny", nie nawigacja —
+   jeśli to było o coś innego, user musi powiedzieć wprost).
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 

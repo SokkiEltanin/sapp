@@ -116,6 +116,10 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
       haptic.tap();
       if (r.key.startsWith('h:')) router.push((r.kind === 'water' ? `/water-calendar?id=${r.key.slice(2)}` : `/habit-year?id=${r.key.slice(2)}`) as any);
       else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
+      // `ex:` — wpis "Ćwiczenia" (2026-10-15, złożony tu z dawnego osobnego kafla
+      // `exercise-streak`/`ExerciseStreakCard.tsx`, patrz app/(tabs)/index.tsx) — własna,
+      // bogatsza historia (`/exercises-history`), nie generyczny `/habit-year`.
+      else if (r.key.startsWith('ex:')) router.push('/exercises-history' as any);
       else router.push('/counters' as any);
     };
     // Pasek postępu do NASTĘPNEGO progu (2026-09-22, user: "jestem zestresowany na różowym
