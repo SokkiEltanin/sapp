@@ -11,6 +11,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
+import { useSinceCountersTileStyleStore, SinceCountersTileStyle } from '@/store/sinceCountersTileStyleStore';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['counters-since']` (2026-08-26, kolejny
 // mały krok rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i
@@ -36,11 +37,17 @@ export interface SinceCountersCardProps {
   since: SinceCounterEntry[];
   cardBg: string;
   accentColor: string;
+  // Kreator dashboardu, Faza 11 (§337) — kreator przekazuje `draft`, prawdziwy dashboard
+  // (app/(tabs)/index.tsx) tego propu NIE podaje, więc czyta `live` ze store'u (zero zmian w
+  // istniejącym call site, patrz ten sam wzorzec w StreakWallCard/PersonalRecordsCard/CountdownsCard).
+  styleOverride?: SinceCountersTileStyle;
 }
 
-function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProps) {
+function SinceCountersCard({ since, cardBg, accentColor, styleOverride }: SinceCountersCardProps) {
   const c = useColors();
   const s = makeS(c);
+  const liveStyle = useSinceCountersTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveStyle;
   if (since.length === 0) return null;
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
@@ -52,7 +59,7 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
         </TouchableOpacity>
       </View>
       <View style={{ gap: spacing[2] }}>
-        {since.slice(0, 7).map(({ cn, days }) => {
+        {since.slice(0, tileStyle.maxVisible).map(({ cn, days }) => {
           // 2026-09-26, audyt dashboardu — `streakTier(days).color` dawał Bordo (czerwień) NA
           // ZERZE (streakTier() domyślnie zwraca indeks 0 gdy ŻADEN próg nie jest spełniony —
           // ten sam bug co StreakWallCard.tsx już naprawił, patrz komentarz tam), więc świeżo
@@ -71,12 +78,14 @@ function SinceCountersCard({ since, cardBg, accentColor }: SinceCountersCardProp
               ? `${tier.name} · próg za ${tier.next - days} ${plPlural(tier.next - days, 'dzień', 'dni', 'dni')}`
               : `${tier.name} · najwyższy próg`;
           return (
-            <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26' }]}
+            <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26', borderRadius: tileStyle.rowRadius }]}
               onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.75}>
-              <View style={s.sinceGlowWrap} pointerEvents="none">
-                <RadialGlow size={110} color={tc} opacity={0.18} />
-              </View>
-              <DisplayText style={[s.sinceNum, { color: tc }]}>{days}</DisplayText>
+              {tileStyle.showGlow && (
+                <View style={s.sinceGlowWrap} pointerEvents="none">
+                  <RadialGlow size={110} color={tc} opacity={0.18} />
+                </View>
+              )}
+              <DisplayText style={[s.sinceNum, { color: tc, fontSize: 30 * tileStyle.numberScale, minWidth: 46 * tileStyle.numberScale }]}>{days}</DisplayText>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
                 <Text style={s.sinceMeta} numberOfLines={1}>{metaTxt}</Text>

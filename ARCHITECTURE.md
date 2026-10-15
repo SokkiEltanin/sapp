@@ -18369,6 +18369,50 @@ presetów faktycznie maleje, jak zakładano w §335).
 **Priorytet testu na urządzeniu — WYSOKI**: "Styl kafelka" ma teraz 4 opcje, "Kompaktowy"
 pokazuje gęsty rząd ikona+liczba+etykieta, wyraźnie mniejszy/gęstszy niż pozostałe trzy style.
 
+## 337. Kreator dashboardu — Faza 11: czwarta karta, "Liczniki" (2026-10-15)
+
+Pierwsza karta od Fazy 3 (§329) rozszerzająca kreator na zupełnie NOWY komponent (nie nowy
+preset na już wpiętym). Kandydat wskazany w NEXT_STEPS.md po Fazie 1 (§327): `SinceCountersCard`
+("Liczniki" — ręczne liczniki "ile dni temu", `nodes['counters-since']` w `app/(tabs)/index.tsx`).
+
+**Nowy store `sinceCountersTileStyleStore.ts`** — ten sam wzorzec draft/live/`setDraft`/
+`publish`/`discardDraft`/`resetDraftToDefault`, ale WŁASNE pola, bo karta ma INNY kształt
+(kolumna wierszy liczba+poświata+nazwa/meta, nie siatka kafelków jak serie/rekordy):
+- `rowRadius` (zaokrąglenie wiersza, domyślnie 16 = `radius.lg`, dotychczasowa wartość zaszyta).
+- `numberScale` (skala wielkiej liczby dni, domyślnie 1 — skaluje `fontSize`/`minWidth` razem,
+  ten sam trik co w innych kartach: baza w `StyleSheet.create` zostaje, inline merge w JSX).
+- `maxVisible` (ile wierszy pokazać, domyślnie 7 — dotychczasowy zaszyty `.slice(0,7)`).
+- `showGlow` (czy `RadialGlow` pod liczbą jest widoczny, domyślnie `true`).
+
+**ŚWIADOMIE bez koloru akcentu** — kolor wiersza/liczby pochodzi z `streakColor(days)` (ten sam
+próg-kolor co "Twoje serie"), nie z osobnego pola karty. Nadpisanie tego TU wymagałoby tej samej
+izolacji co `tierColorOverrides` w §333 (żeby nie zmienić wygladu w ~5 innych miejscach appki
+używających `streakColor()`) — nierobione teraz bez osobnej decyzji, to nie jest ten sam
+przypadek co `accentColor` w "Rekordach" (tam kolor jest JEDNĄ stałą wartością karty, tu jest
+POCHODNĄ danych per wiersz).
+
+**`SinceCountersCard.tsx`** — `styleOverride?: SinceCountersTileStyle` prop (ten sam zero-
+footprint wzorzec, prawdziwy dashboard nic nie przekazuje → czyta `live`). `.slice(0, 7)` →
+`.slice(0, tileStyle.maxVisible)`, `sinceRow`'s `borderRadius` i `sinceNum`'s `fontSize`/
+`minWidth` scalane inline, `RadialGlow` renderowany warunkowo pod `showGlow`.
+
+**`app/dashboard-tile-creator.tsx`** — czwarta zakładka "Liczniki". Przy tej okazji
+`isDirty`/`isDefault`/`doPublish`/`doDiscard`/`doResetDefault` przepisane z narastającego
+ternary-chaina na lookup przez `Record<CardKey, ...>` (4 karty to już nieczytelne jako
+zagnieżdżone `? :` — czysty refaktor wymagany przez dodanie karty, zero zmiany zachowania dla
+pierwszych trzech). Realne dane podglądu — `realSince`, identyczne filtrowanie/sortowanie co
+`dashSince` w `app/(tabs)/index.tsx` (`kind==='since' && mode!=='auto' && onDashboard!==false`,
+sort po dniach malejąco).
+
+**Testy**: brak nowych (czysto UI/stylistyczne). `tsc --noEmit` czyste, `jest --silent` 106/106
+suite, 1389 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → Personalizacja → Kreator kafelków →
+"Liczniki" (wymaga co najmniej jednego ręcznego licznika "ile dni temu" na koncie, np. "Jadłem
+jeżyki" — auto-liczniki typu "bez słodyczy" są w karcie "Twoje serie", nie tutaj). Sprawdź
+zaokrąglenie wiersza, skalę liczby, limit widocznych pozycji i przełącznik poświaty — podgląd
+pełnoekranowy też.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

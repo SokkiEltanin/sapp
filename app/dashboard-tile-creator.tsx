@@ -8,7 +8,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { useHabits } from '@/hooks/useHabits';
-import { useCounters, autoDaysWithout, isOver, daysUntil, isDuringEvent } from '@/store/countersStore';
+import { useCounters, autoDaysWithout, isOver, daysUntil, isDuringEvent, daysSince } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
 import { useExercisesStore } from '@/store/exercisesStore';
@@ -21,16 +21,25 @@ import { STREAK_TIERS } from '@/utils/streakTiers';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
+import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
+import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE } from '@/store/sinceCountersTileStyleStore';
 
-type CardKey = 'streaks' | 'records' | 'countdowns';
+type CardKey = 'streaks' | 'records' | 'countdowns' | 'since';
 const CARD_TABS: { key: CardKey; label: string }[] = [
   { key: 'streaks', label: 'Twoje serie' },
   { key: 'records', label: 'Rekordy' },
   { key: 'countdowns', label: 'Odliczania' },
+  { key: 'since', label: 'Liczniki' },
 ];
+const CARD_PREVIEW_TITLES: Record<CardKey, string> = {
+  streaks: 'Twoje serie',
+  records: 'Rekordy życiowe',
+  countdowns: 'Odliczania',
+  since: 'Liczniki',
+};
 const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
 const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8', '#3B82F6', '#636FF6', '#8B5CF6'];
 
@@ -52,6 +61,9 @@ const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8
 // pierwsza prawdziwa realizacja "edycji graficznej" z pierwotnej prośby usera, nie tylko
 // kolor/rozmiar. Pełna wizja z NEXT_STEPS.md (edycja KAŻDEGO panelu dashboardu) to kolejne
 // fazy — rozszerzające ten sam wzorzec na kolejne karty, nie przepisujące go od nowa.
+// Faza 11 (§337) dołożyła "Liczniki" (`SinceCountersCard`) — pierwsza NOWA karta od Fazy 3,
+// własny kształt (lista wierszy: liczba+poświata+nazwa/meta), własne pola (rowRadius/
+// numberScale/maxVisible/showGlow), zero aspectRatio/gradientMode skopiowanych z kafelków serii.
 export default function DashboardTileCreator() {
   const c = useColors();
   const s = makeS(c);
@@ -86,16 +98,20 @@ export default function DashboardTileCreator() {
   const resetCountdownsDefault = useCountdownsTileStyleStore(st => st.resetDraftToDefault);
   const countdownsLive = useCountdownsTileStyleStore(st => st.live);
 
-  const isDirty = activeCard === 'streaks'
-    ? JSON.stringify(streaksDraft) !== JSON.stringify(streaksLive)
-    : activeCard === 'records'
-    ? JSON.stringify(recordsDraft) !== JSON.stringify(recordsLive)
-    : JSON.stringify(countdownsDraft) !== JSON.stringify(countdownsLive);
-  const isDefault = activeCard === 'streaks'
-    ? JSON.stringify(streaksDraft) !== JSON.stringify(DEFAULT_STREAK_TILE_STYLE)
-    : activeCard === 'records'
-    ? JSON.stringify(recordsDraft) !== JSON.stringify(DEFAULT_RECORDS_TILE_STYLE)
-    : JSON.stringify(countdownsDraft) !== JSON.stringify(DEFAULT_COUNTDOWNS_TILE_STYLE);
+  // Since-counters store (§337, Faza 11) — czwarta karta, kształt listy wierszy (bliski
+  // "Odliczaniom"), własne pola (rowRadius/numberScale/maxVisible/showGlow).
+  const sinceDraft = useSinceCountersTileStyleStore(st => st.draft);
+  const setSinceDraft = useSinceCountersTileStyleStore(st => st.setDraft);
+  const publishSince = useSinceCountersTileStyleStore(st => st.publish);
+  const discardSinceDraft = useSinceCountersTileStyleStore(st => st.discardDraft);
+  const resetSinceDefault = useSinceCountersTileStyleStore(st => st.resetDraftToDefault);
+  const sinceLive = useSinceCountersTileStyleStore(st => st.live);
+
+  const DRAFTS: Record<CardKey, object> = { streaks: streaksDraft, records: recordsDraft, countdowns: countdownsDraft, since: sinceDraft };
+  const LIVES: Record<CardKey, object> = { streaks: streaksLive, records: recordsLive, countdowns: countdownsLive, since: sinceLive };
+  const DEFAULTS: Record<CardKey, object> = { streaks: DEFAULT_STREAK_TILE_STYLE, records: DEFAULT_RECORDS_TILE_STYLE, countdowns: DEFAULT_COUNTDOWNS_TILE_STYLE, since: DEFAULT_SINCE_COUNTERS_TILE_STYLE };
+  const isDirty = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(LIVES[activeCard]);
+  const isDefault = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(DEFAULTS[activeCard]);
 
   // Te same realne dane co dashboard — patrz `streakWall`/`records` w app/(tabs)/index.tsx.
   // Celowo NIE snapshot (CLAUDE.md §3 to dotyczy handlerów PISZĄCYCH `expenses` po paragonie —
@@ -135,25 +151,36 @@ export default function DashboardTileCreator() {
     () => counters.filter(cn => cn.kind === 'until' && cn.onDashboard !== false && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
     [counters, dayKey],
   );
+  // Te same realne dane co `dashSince` w app/(tabs)/index.tsx (kind='since', mode!=='auto',
+  // onDashboard!==false, posortowane po dniach malejąco).
+  const realSince = useMemo(
+    () => counters.filter(cn => cn.kind === 'since' && cn.mode !== 'auto' && cn.onDashboard !== false)
+      .map(cn => ({ cn, days: daysSince(cn) }))
+      .sort((a, b) => b.days - a.days),
+    [counters, dayKey],
+  );
   const { color: timeAccentColor } = useTimeAccent();
 
   const doPublish = () => {
     haptic.success();
     if (activeCard === 'streaks') publishStreaks();
     else if (activeCard === 'records') publishRecords();
-    else publishCountdowns();
+    else if (activeCard === 'countdowns') publishCountdowns();
+    else publishSince();
   };
   const doDiscard = () => {
     haptic.tap();
     if (activeCard === 'streaks') discardStreaksDraft();
     else if (activeCard === 'records') discardRecordsDraft();
-    else discardCountdownsDraft();
+    else if (activeCard === 'countdowns') discardCountdownsDraft();
+    else discardSinceDraft();
   };
   const doResetDefault = () => {
     haptic.tap();
     if (activeCard === 'streaks') resetStreaksDefault();
     else if (activeCard === 'records') resetRecordsDefault();
-    else resetCountdownsDefault();
+    else if (activeCard === 'countdowns') resetCountdownsDefault();
+    else resetSinceDefault();
   };
 
   return (
@@ -183,17 +210,22 @@ export default function DashboardTileCreator() {
 
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.sectionLabel}>
-          Podgląd — „{activeCard === 'streaks' ? 'Twoje serie' : activeCard === 'records' ? 'Rekordy życiowe' : 'Odliczania'}" (prawdziwe dane)
+          Podgląd — „{CARD_PREVIEW_TITLES[activeCard]}" (prawdziwe dane)
         </Text>
         <View style={s.previewWrap}>
           {activeCard === 'streaks'
             ? <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={streaksDraft} />
             : activeCard === 'records'
             ? <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />
-            : <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />}
+            : activeCard === 'countdowns'
+            ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
+            : <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />}
         </View>
         {activeCard === 'countdowns' && realCountdowns.length === 0 && (
           <Text style={s.hint}>Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach, żeby zobaczyć realny podgląd.</Text>
+        )}
+        {activeCard === 'since' && realSince.length === 0 && (
+          <Text style={s.hint}>Brak ręcznych liczników "ile dni temu" na koncie — dodaj jeden w Licznikach, żeby zobaczyć realny podgląd.</Text>
         )}
         <TouchableOpacity onPress={() => { haptic.tap(); setFullPreview(true); }} style={s.fullBtn}>
           <Maximize2 size={14} color={c.text.secondary} />
@@ -234,6 +266,17 @@ export default function DashboardTileCreator() {
             <View style={s.divider} />
             <Stepper label="Widocznych pozycji" value={countdownsDraft.maxVisible} min={1} max={6} step={1}
               onChange={v => setCountdownsDraft({ maxVisible: v })} c={c} s={s} />
+          </View>
+        ) : activeCard === 'since' ? (
+          <View style={s.card}>
+            <Stepper label="Zaokrąglenie wiersza" value={sinceDraft.rowRadius} min={0} max={28} step={2}
+              onChange={v => setSinceDraft({ rowRadius: v })} c={c} s={s} />
+            <View style={s.divider} />
+            <Stepper label="Skala liczby" value={sinceDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
+              onChange={v => setSinceDraft({ numberScale: v })} c={c} s={s} />
+            <View style={s.divider} />
+            <Stepper label="Widocznych pozycji" value={sinceDraft.maxVisible} min={1} max={10} step={1}
+              onChange={v => setSinceDraft({ maxVisible: v })} c={c} s={s} />
           </View>
         ) : (
           <View style={s.card}>
@@ -427,6 +470,21 @@ export default function DashboardTileCreator() {
               </View>
             </View>
           </>
+        ) : activeCard === 'since' ? (
+          <>
+            {/* "Liczniki" (§337) nie ma koloru akcentu (kolor wiersza pochodzi z progu serii,
+                ten sam `streakColor()` co "Twoje serie" — zmiana tego TU wymagałaby tej samej
+                izolacji co `tierColorOverrides`, nie robię teraz bez osobnej decyzji) — tylko
+                poświata da się wyłączyć. */}
+            <Text style={s.sectionLabel}>Warstwy</Text>
+            <View style={s.card}>
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Poświata</Text>
+                <Switch value={sinceDraft.showGlow} onValueChange={v => { haptic.tap(); setSinceDraft({ showGlow: v }); }}
+                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
+              </View>
+            </View>
+          </>
         ) : null}
 
         <View style={s.actionsRow}>
@@ -455,7 +513,9 @@ export default function DashboardTileCreator() {
               ? <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={streaksDraft} />
               : activeCard === 'records'
               ? <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />
-              : <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />}
+              : activeCard === 'countdowns'
+              ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
+              : <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />}
           </View>
           <Text style={s.fullHint}>Cofnij (gest/przycisk) albo ✕, żeby wyjść</Text>
         </SafeAreaView>
