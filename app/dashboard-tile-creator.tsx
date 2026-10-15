@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +15,7 @@ import { useExercisesStore } from '@/store/exercisesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useDayKey } from '@/hooks/useDayKey';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
+import { getAllNotes, Note } from '@/utils/notesStorage';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildRecords } from '@/utils/personalRecords';
 import { STREAK_TIERS } from '@/utils/streakTiers';
@@ -22,23 +23,27 @@ import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCar
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
+import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE } from '@/store/sinceCountersTileStyleStore';
+import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
 
-type CardKey = 'streaks' | 'records' | 'countdowns' | 'since';
+type CardKey = 'streaks' | 'records' | 'countdowns' | 'since' | 'notes';
 const CARD_TABS: { key: CardKey; label: string }[] = [
   { key: 'streaks', label: 'Twoje serie' },
   { key: 'records', label: 'Rekordy' },
   { key: 'countdowns', label: 'Odliczania' },
   { key: 'since', label: 'Liczniki' },
+  { key: 'notes', label: 'Notatki' },
 ];
 const CARD_PREVIEW_TITLES: Record<CardKey, string> = {
   streaks: 'Twoje serie',
   records: 'Rekordy życiowe',
   countdowns: 'Odliczania',
   since: 'Liczniki',
+  notes: 'Przypięte notatki',
 };
 const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
 const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8', '#3B82F6', '#636FF6', '#8B5CF6'];
@@ -107,9 +112,21 @@ export default function DashboardTileCreator() {
   const resetSinceDefault = useSinceCountersTileStyleStore(st => st.resetDraftToDefault);
   const sinceLive = useSinceCountersTileStyleStore(st => st.live);
 
-  const DRAFTS: Record<CardKey, object> = { streaks: streaksDraft, records: recordsDraft, countdowns: countdownsDraft, since: sinceDraft };
-  const LIVES: Record<CardKey, object> = { streaks: streaksLive, records: recordsLive, countdowns: countdownsLive, since: sinceLive };
-  const DEFAULTS: Record<CardKey, object> = { streaks: DEFAULT_STREAK_TILE_STYLE, records: DEFAULT_RECORDS_TILE_STYLE, countdowns: DEFAULT_COUNTDOWNS_TILE_STYLE, since: DEFAULT_SINCE_COUNTERS_TILE_STYLE };
+  // Pinned-notes store (§338, Faza 12) — piąta karta, drugi kompletnie nowy kształt treści
+  // (tekst+tagi) od Fazy 3. Zero koloru/progu do nadpisania — tylko ile/co pokazać.
+  const notesDraft = usePinnedNotesTileStyleStore(st => st.draft);
+  const setNotesDraft = usePinnedNotesTileStyleStore(st => st.setDraft);
+  const publishNotes = usePinnedNotesTileStyleStore(st => st.publish);
+  const discardNotesDraft = usePinnedNotesTileStyleStore(st => st.discardDraft);
+  const resetNotesDefault = usePinnedNotesTileStyleStore(st => st.resetDraftToDefault);
+  const notesLive = usePinnedNotesTileStyleStore(st => st.live);
+
+  const DRAFTS: Record<CardKey, object> = { streaks: streaksDraft, records: recordsDraft, countdowns: countdownsDraft, since: sinceDraft, notes: notesDraft };
+  const LIVES: Record<CardKey, object> = { streaks: streaksLive, records: recordsLive, countdowns: countdownsLive, since: sinceLive, notes: notesLive };
+  const DEFAULTS: Record<CardKey, object> = { streaks: DEFAULT_STREAK_TILE_STYLE, records: DEFAULT_RECORDS_TILE_STYLE, countdowns: DEFAULT_COUNTDOWNS_TILE_STYLE, since: DEFAULT_SINCE_COUNTERS_TILE_STYLE, notes: DEFAULT_PINNED_NOTES_TILE_STYLE };
+  const PUBLISH_FNS: Record<CardKey, () => void> = { streaks: publishStreaks, records: publishRecords, countdowns: publishCountdowns, since: publishSince, notes: publishNotes };
+  const DISCARD_FNS: Record<CardKey, () => void> = { streaks: discardStreaksDraft, records: discardRecordsDraft, countdowns: discardCountdownsDraft, since: discardSinceDraft, notes: discardNotesDraft };
+  const RESET_FNS: Record<CardKey, () => void> = { streaks: resetStreaksDefault, records: resetRecordsDefault, countdowns: resetCountdownsDefault, since: resetSinceDefault, notes: resetNotesDefault };
   const isDirty = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(LIVES[activeCard]);
   const isDefault = JSON.stringify(DRAFTS[activeCard]) !== JSON.stringify(DEFAULTS[activeCard]);
 
@@ -160,28 +177,15 @@ export default function DashboardTileCreator() {
     [counters, dayKey],
   );
   const { color: timeAccentColor } = useTimeAccent();
+  // Notatki (§338) — jedyna karta z danymi async (AsyncStorage, nie Zustand) — ten sam loader
+  // co `index.tsx` (`getAllNotes().then(ns => ns.filter(n => n.pinned))`), odświeżany raz przy
+  // wejściu na ekran (kreator nie potrzebuje live-refresh na fokusie jak realny dashboard).
+  const [realPinnedNotes, setRealPinnedNotes] = useState<Note[]>([]);
+  useEffect(() => { getAllNotes().then(ns => setRealPinnedNotes(ns.filter(n => n.pinned))).catch(() => {}); }, []);
 
-  const doPublish = () => {
-    haptic.success();
-    if (activeCard === 'streaks') publishStreaks();
-    else if (activeCard === 'records') publishRecords();
-    else if (activeCard === 'countdowns') publishCountdowns();
-    else publishSince();
-  };
-  const doDiscard = () => {
-    haptic.tap();
-    if (activeCard === 'streaks') discardStreaksDraft();
-    else if (activeCard === 'records') discardRecordsDraft();
-    else if (activeCard === 'countdowns') discardCountdownsDraft();
-    else discardSinceDraft();
-  };
-  const doResetDefault = () => {
-    haptic.tap();
-    if (activeCard === 'streaks') resetStreaksDefault();
-    else if (activeCard === 'records') resetRecordsDefault();
-    else if (activeCard === 'countdowns') resetCountdownsDefault();
-    else resetSinceDefault();
-  };
+  const doPublish = () => { haptic.success(); PUBLISH_FNS[activeCard](); };
+  const doDiscard = () => { haptic.tap(); DISCARD_FNS[activeCard](); };
+  const doResetDefault = () => { haptic.tap(); RESET_FNS[activeCard](); };
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -196,7 +200,10 @@ export default function DashboardTileCreator() {
         </TouchableOpacity>
       </View>
 
-      <View style={s.tabs}>
+      {/* ScrollView horyzontalny (§338) — 5 zakładek nie mieści się już wygodnie jako
+          `flex:1` row (ciasne etykiety typu "Twoje serie"); kolejne karty tylko pogłębiłyby
+          problem, więc przechodzę na przewijaną listę zamiast dalszego ściskania. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
         {CARD_TABS.map(t => {
           const on = activeCard === t.key;
           return (
@@ -206,7 +213,7 @@ export default function DashboardTileCreator() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.sectionLabel}>
@@ -219,13 +226,18 @@ export default function DashboardTileCreator() {
             ? <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />
             : activeCard === 'countdowns'
             ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
-            : <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />}
+            : activeCard === 'since'
+            ? <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />
+            : <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />}
         </View>
         {activeCard === 'countdowns' && realCountdowns.length === 0 && (
           <Text style={s.hint}>Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach, żeby zobaczyć realny podgląd.</Text>
         )}
         {activeCard === 'since' && realSince.length === 0 && (
           <Text style={s.hint}>Brak ręcznych liczników "ile dni temu" na koncie — dodaj jeden w Licznikach, żeby zobaczyć realny podgląd.</Text>
+        )}
+        {activeCard === 'notes' && realPinnedNotes.length === 0 && (
+          <Text style={s.hint}>Brak przypiętych notatek na koncie — przypnij jedną w Notatkach, żeby zobaczyć realny podgląd.</Text>
         )}
         <TouchableOpacity onPress={() => { haptic.tap(); setFullPreview(true); }} style={s.fullBtn}>
           <Maximize2 size={14} color={c.text.secondary} />
@@ -277,6 +289,23 @@ export default function DashboardTileCreator() {
             <View style={s.divider} />
             <Stepper label="Widocznych pozycji" value={sinceDraft.maxVisible} min={1} max={10} step={1}
               onChange={v => setSinceDraft({ maxVisible: v })} c={c} s={s} />
+          </View>
+        ) : activeCard === 'notes' ? (
+          <View style={s.card}>
+            <Stepper label="Widocznych notatek" value={notesDraft.maxVisible} min={1} max={8} step={1}
+              onChange={v => setNotesDraft({ maxVisible: v })} c={c} s={s} />
+            <View style={s.divider} />
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Podgląd treści</Text>
+              <Switch value={notesDraft.showBody} onValueChange={v => { haptic.tap(); setNotesDraft({ showBody: v }); }}
+                trackColor={{ false: c.border.default, true: c.accent.blue }} />
+            </View>
+            <View style={s.divider} />
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Tagi</Text>
+              <Switch value={notesDraft.showTags} onValueChange={v => { haptic.tap(); setNotesDraft({ showTags: v }); }}
+                trackColor={{ false: c.border.default, true: c.accent.blue }} />
+            </View>
           </View>
         ) : (
           <View style={s.card}>
@@ -515,7 +544,9 @@ export default function DashboardTileCreator() {
               ? <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />
               : activeCard === 'countdowns'
               ? <CountdownsCard countdowns={realCountdowns} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={countdownsDraft} />
-              : <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />}
+              : activeCard === 'since'
+              ? <SinceCountersCard since={realSince} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={sinceDraft} />
+              : <PinnedNotesCard notes={realPinnedNotes} cardBg={c.bg.card} accentColor={timeAccentColor} styleOverride={notesDraft} />}
           </View>
           <Text style={s.fullHint}>Cofnij (gest/przycisk) albo ✕, żeby wyjść</Text>
         </SafeAreaView>
@@ -564,7 +595,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   deployTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
 
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
-  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
+  tabBtn: { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   tabTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
 
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1, justifyContent: 'flex-end' },

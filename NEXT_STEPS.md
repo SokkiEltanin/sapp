@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 12: piąta karta, "Notatki" (2026-10-15, §338)
+
+Kreator kafelków ma teraz 5 zakładek (zakładki przeniesione na przewijany poziomo pasek — nie
+mieściły się już jako równa siatka). "Notatki" (`PinnedNotesCard`) — druga karta z kształtem
+tekst+tagi (po "Licznikach"), pierwsza z danymi ASYNCHRONICZNYMI (AsyncStorage, nie Zustand).
+**Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §338.
+
+**Otwarte, ten sam wzorzec do rozszerzenia dalej**: `GCalCard` (Google Kalendarz) — ostatni
+kandydat z pierwotnej listy §327. Inny kształt niż wszystkie 5 dotychczasowych kart (lista
+eventów z godzinami, dwie sekcje Dziś/Jutro, kolor PER-EVENT z `e.color`, nie jeden kolor
+karty) — wymaga własnego przemyślenia pól (np. czy pokazywać godzinę, limit eventów na dzień
+czy łącznie, czy kropka-kolor jest edytowalna). Nie zaczynane teraz — jedna karta na raz.
+
+Po `GCalCard` pierwotna lista kandydatów z §327 będzie WYCZERPANA (StreakWall/Records/
+Countdowns/SinceCounters/PinnedNotes/GCal = sześć głównych kart dashboardu objętych
+kreatorem) — kolejny krok w TYM kierunku to albo nowe karty nieujęte w pierwotnej liście (np.
+`MonthWrappedCard`, odznaki, pogoda-chip), albo przejście do innego z wcześniej odłożonych
+wątków (kolejny ekran poza dashboardem — boss-fight.tsx/Pupil/Ćwiczenia z §332, albo wielka,
+jawnie odłożona wizja kopiowania/przepinania komponentów między ekranami z §333).
+
 ## 🆕 Kreator dashboardu — Faza 11: czwarta karta, "Liczniki" (2026-10-15, §337)
 
 Kreator kafelków ma teraz 4 zakładki: Twoje serie/Rekordy/Odliczania/**Liczniki**

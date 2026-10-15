@@ -7,6 +7,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { usePinnedNotesTileStyleStore, PinnedNotesTileStyle } from '@/store/pinnedNotesTileStyleStore';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['pinned-notes']` (2026-08-25, pierwszy,
 // celowo mały krok w stronę rozbicia ~5400-liniowego dashboardu na mniejsze komponenty — patrz
@@ -19,11 +20,15 @@ export interface PinnedNotesCardProps {
   notes: Note[];
   cardBg: string;
   accentColor: string;
+  // Kreator dashboardu, Faza 12 (§338) — ten sam zero-footprint wzorzec co inne karty.
+  styleOverride?: PinnedNotesTileStyle;
 }
 
-function PinnedNotesCard({ notes, cardBg, accentColor }: PinnedNotesCardProps) {
+function PinnedNotesCard({ notes, cardBg, accentColor, styleOverride }: PinnedNotesCardProps) {
   const c = useColors();
   const s = makeS(c);
+  const liveStyle = usePinnedNotesTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveStyle;
   if (notes.length === 0) return null;
   return (
     <View style={[s.card, { backgroundColor: cardBg, gap: spacing[2] }]}>
@@ -31,7 +36,7 @@ function PinnedNotesCard({ notes, cardBg, accentColor }: PinnedNotesCardProps) {
         <Pin size={13} color={accentColor} />
         <Text style={s.cardTitle}>Przypięte notatki</Text>
       </View>
-      {notes.slice(0, 4).map(n => (
+      {notes.slice(0, tileStyle.maxVisible).map(n => (
         <TouchableOpacity
           key={n.id}
           style={s.pinNoteRow}
@@ -41,8 +46,8 @@ function PinnedNotesCard({ notes, cardBg, accentColor }: PinnedNotesCardProps) {
           <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
           <View style={{ flex: 1 }}>
             <Text style={s.pinNoteTitle} numberOfLines={1}>{n.title || 'Bez tytułu'}</Text>
-            {!!n.body?.trim() && <Text style={s.pinNoteBody} numberOfLines={2}>{n.body.trim()}</Text>}
-            {(n.tags ?? []).length > 0 && (
+            {tileStyle.showBody && !!n.body?.trim() && <Text style={s.pinNoteBody} numberOfLines={2}>{n.body.trim()}</Text>}
+            {tileStyle.showTags && (n.tags ?? []).length > 0 && (
               <Text style={s.pinNoteTags} numberOfLines={1}>{n.tags.map(t => `#${t}`).join(' ')}</Text>
             )}
           </View>
