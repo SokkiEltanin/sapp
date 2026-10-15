@@ -18413,6 +18413,41 @@ jeżyki" — auto-liczniki typu "bez słodyczy" są w karcie "Twoje serie", nie 
 zaokrąglenie wiersza, skalę liczby, limit widocznych pozycji i przełącznik poświaty — podgląd
 pełnoekranowy też.
 
+## 338. Kreator dashboardu — Faza 12: piąta karta, "Notatki" (2026-10-15)
+
+Druga karta od Fazy 3 z zupełnie nowym kształtem treści (po "Licznikach" w §337) —
+`PinnedNotesCard` to tekst+tagi, nie liczba+próg jak cztery dotychczasowe karty. Żadnego
+koloru/gradientu/progu do nadpisania — jedyne, co realnie różni wygląd, to ILE notatek pokazać
+i CZY pokazywać podgląd treści/tagi.
+
+**Nowy store `pinnedNotesTileStyleStore.ts`** — ten sam wzorzec, pola: `maxVisible` (domyślnie
+4 = dotychczasowy zaszyty `.slice(0,4)`), `showBody` (podgląd treści notatki, domyślnie
+`true`), `showTags` (lista tagów, domyślnie `true`).
+
+**`PinnedNotesCard.tsx`** — `styleOverride?: PinnedNotesTileStyle` (ten sam zero-footprint
+wzorzec). `showBody`/`showTags` to DODATKOWA brama NAD istniejącymi warunkami (`!!n.body?.trim()`/
+`tags.length>0`) — wyłączenie przełącznika chowa sekcję nawet gdy notatka realnie ma treść/tagi,
+włączenie nie pokazuje nic, czego notatka sama nie ma.
+
+**`app/dashboard-tile-creator.tsx`** — piąta zakładka "Notatki", pierwsza z danymi
+ASYNCHRONICZNYMI (notatki żyją w AsyncStorage przez `notesStorage.ts`, nie w Zustand) — nowy
+`useEffect` ładujący `getAllNotes().then(ns => ns.filter(n => n.pinned))` raz przy wejściu na
+ekran (bez live-refresh na fokusie jak realny dashboard — kreator nie musi reagować na zmiany
+zrobione w INNYM ekranie w tej samej sesji, user i tak wraca tu świadomie). Przy tej okazji
+`doPublish`/`doDiscard`/`doResetDefault` przepisane z `if/else if` na lookup przez
+`Record<CardKey, () => void>` (ten sam powód co `isDirty`/`isDefault` w §337 — 5 kart to już
+nieczytelny łańcuch, zero zmiany zachowania). Zakładki (`CARD_TABS`) przeniesione z `flex:1`
+row na przewijany horyzontalnie `ScrollView` — 5 etykiet (w tym "Twoje serie") nie mieściło się
+już wygodnie w jednym rzędzie o równej szerokości.
+
+**Testy**: brak nowych (czysto UI/stylistyczne). `tsc --noEmit` czyste, `jest --silent` 106/106
+suite, 1389 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → Personalizacja → Kreator kafelków →
+"Notatki" (wymaga co najmniej jednej przypiętej notatki na koncie). Sprawdź limit widocznych
+notatek i przełączniki podglądu treści/tagów, oraz że pasek zakładek (teraz 5) przewija się
+płynnie i nie ścieśnia etykiet.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
