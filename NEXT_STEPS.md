@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator ekranów — Faza 6: pierwszy ekran poza dashboardem (2026-10-15, §332)
+
+User potwierdził (AskUserQuestion): chce TEN SAM mechanizm na KOLEJNYCH EKRANACH appki, nie
+tylko na kafelkach dashboardu. Ustawienia → Personalizacja → "Kreator mapy bossów" (osobny
+ekran, `app/campaign-map-creator.tsx`, osobny store `campaignMapStyleStore.ts`) — rozmiar
+węzła/grubość ścieżki/pierścienia/jasność siatki/zaokrąglenie popupu, z podglądem na
+prawdziwym postępie kampanii. **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §332.
+
+**Ustalony wzorzec dla kolejnych ekranów** (ważne na przyszłość): każdy obszar appki dostaje
+WŁASNY plik kreatora + własny store + własny wpis w Ustawieniach, NIE kolejną zakładkę w
+`dashboard-tile-creator.tsx` (to by zrobiło z niego przypadkowy worek niepowiązanych rzeczy —
+ten plik zostaje TYLKO dla widgetów dashboardu). Kolejni kandydaci do zapytania usera: ekran
+walki z bossem (`boss-fight.tsx`), ekran Pupila, ekran Ćwiczeń — nie zgadywać który następny,
+zapytać.
+
 ## 🆕 Kreator dashboardu — Faza 5: pozycja i warstwy (2026-10-15, §331)
 
 Zakładka "Twoje serie" → sekcja "Pozycja i warstwy" — róg płomienia (4 opcje), czy płomień

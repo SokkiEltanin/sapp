@@ -661,6 +661,7 @@ export default function RootLayout() {
           <Stack.Screen name="bank-review" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="work/add" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="dashboard-tile-creator" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="campaign-map-creator" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
         </Stack>
         <PomodoroIndicator />
         <Toast />

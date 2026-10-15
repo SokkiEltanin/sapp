@@ -2002,6 +2002,14 @@ export default function SettingsScreen() {
           keywords: ['kreator', 'kafelki', 'styl', 'wygląd', 'kolory', 'zaokrąglenie', 'twoje serie'],
           control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/dashboard-tile-creator' as any); } },
         },
+        {
+          // Kreator ekranów, Faza 6 (2026-10-15, §332) — PIERWSZY ekran kreatora POZA
+          // dashboardem (user: "nie chce budować samych kafelków tylko wszystko ekrany itp").
+          id: 'campaign-map-creator', title: 'Kreator mapy bossów', subtitle: 'Rozmiar węzłów, ścieżka, pierścień — z podglądem na żywo',
+          icon: LucideIcons.Map, accentColor: '#38BDF8',
+          keywords: ['kreator', 'mapa', 'bossowie', 'styl', 'wygląd', 'węzły', 'ścieżka'],
+          control: { kind: 'link', onPress: () => { haptic.tap(); router.push('/campaign-map-creator' as any); } },
+        },
       ],
     },
     {
