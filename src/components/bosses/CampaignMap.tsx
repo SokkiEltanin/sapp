@@ -9,6 +9,7 @@ import { Boss, mysteryBossName, fmtEnergyCountdown } from '@/utils/bosses';
 import { baseBossId } from '@/utils/madBosses';
 import { layoutBossMap, applyLayoutOverrides, catmullRomPath } from '@/utils/bossMapLayout';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
+import { useCampaignMapStyleStore, CampaignMapStyle } from '@/store/campaignMapStyleStore';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -40,7 +41,11 @@ import { haptic } from '@/utils/haptics';
 //    która nie działa czwarty raz z rzędu.
 // 3. **Tło/mgła/popup/węzły** — bez zmian względem poprzedniej wersji (to NIE było źródłem
 //    zgłoszonych problemów, zweryfikowane przez bezpośrednie odpalenie layoutu w testach).
-const NODE = 60;
+// `BASE_NODE` — domyślny rozmiar węzła, używany TYLKO jako baza w statycznym `st` niżej
+// (StyleSheet.create poza komponentem, nie może reagować na store). Realny, aktualny rozmiar
+// to `mapStyle.nodeSize` (§332) — komponent ma WŁASNĄ, przesłaniającą stałą `NODE` w swoim
+// zakresie (patrz niżej), a wszystkie rozmiary zależne od niej w `st` są nadpisywane inline.
+const BASE_NODE = 60;
 const POPUP_W = 248;
 const GRID = 56;
 
@@ -52,13 +57,19 @@ type Popup = { kind: 'current' | 'defeated'; boss: Boss };
 // patrz komentarz w bosses.tsx przy wywołaniu z `variant="mad"`: ten sam komponent obsługuje
 // kampanię i MAD (identyczna sekwencyjna logika), tylko inny kolor ścieżki/aury i ew. blokada
 // poziomu w popupie aktualnego celu.
-function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, energyRegenAt, variant = 'campaign', locked, lockMessage }: {
+// `styleOverride` (2026-10-15, Kreator ekranów Faza 6, §332) — ten sam wzorzec co dashboard
+// (§327): bez override karta czyta `live` ze store'a, kreator (`app/campaign-map-creator.tsx`)
+// podaje `draft`.
+function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, energyRegenAt, variant = 'campaign', locked, lockMessage, styleOverride }: {
   bosses: Boss[]; currentId: string | null; onPressCurrent: () => void;
   energy?: number; energyMax?: number; energyRegenAt?: string | null;
-  variant?: 'campaign' | 'mad'; locked?: boolean; lockMessage?: string;
+  variant?: 'campaign' | 'mad'; locked?: boolean; lockMessage?: string; styleOverride?: CampaignMapStyle;
 }) {
   const isMad = variant === 'mad';
   const c = useColors();
+  const liveMapStyle = useCampaignMapStyleStore(st => st.live);
+  const mapStyle = styleOverride ?? liveMapStyle;
+  const NODE = mapStyle.nodeSize;
   const [popup, setPopup] = useState<Popup | null>(null);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const scrollRef = useRef<ScrollView>(null);
@@ -162,13 +173,13 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
         <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
           <Defs>
             <Pattern id="mapGrid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
-              <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill="rgba(255,255,255,0.08)" />
+              <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill={`rgba(255,255,255,${mapStyle.gridOpacity})`} />
             </Pattern>
           </Defs>
           <Rect x={0} y={0} width={canvasW} height={canvasH} fill={isMad ? '#1E0A0C' : '#0B0E14'} />
           <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-          {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={7} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
         </Svg>
 
         {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego. */}
@@ -187,10 +198,19 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           const n = nodes[i];
           const x = n.x - NODE / 2;
           const y = n.y - NODE / 2;
+          const ringSize = NODE + 14;
           const node = (
-            <View style={[st.node, { left: x, top: y }]}>
-              <View style={st.portrait}>
-                {isCurrent && <View style={[st.currentRing, { borderColor: litColor }]} pointerEvents="none" />}
+            <View style={[st.node, { left: x, top: y, width: NODE }]}>
+              <View style={[st.portrait, { width: NODE, height: NODE }]}>
+                {isCurrent && (
+                  <View
+                    style={[st.currentRing, {
+                      borderColor: litColor, borderWidth: mapStyle.ringWidth,
+                      width: ringSize, height: ringSize, borderRadius: ringSize / 2,
+                    }]}
+                    pointerEvents="none"
+                  />
+                )}
                 <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={isLocked} powered={isMad && !isLocked} />
                 {isDefeated && (
                   <View style={st.defeatedOverlay} pointerEvents="none">
@@ -199,7 +219,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
                 )}
               </View>
               {isLocked && <View style={st.badgeLock}><Lock size={10} color="rgba(255,255,255,0.75)" /></View>}
-              <Text style={[st.nodeLabel, { color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
+              <Text style={[st.nodeLabel, { width: NODE + 32, color: isLocked ? c.text.muted : '#fff' }, isDefeated && { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
                 {isLocked ? mysteryBossName(b.id) : b.name}
               </Text>
             </View>
@@ -209,7 +229,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
               <PressableScale
                 key={b.id}
                 onPress={() => { haptic.tap(); setPopup({ kind: isCurrent ? 'current' : 'defeated', boss: b }); }}
-                style={[st.nodeTouch, { left: x, top: y }]}
+                style={[st.nodeTouch, { left: x, top: y, width: NODE }]}
               >
                 {node}
               </PressableScale>
@@ -222,7 +242,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
       {popup && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
           <Pressable style={st.popupBackdrop} onPress={() => setPopup(null)} />
-          <View style={[st.popup, { left: popupLeft, top: popupTop, width: POPUP_W }]}>
+          <View style={[st.popup, { left: popupLeft, top: popupTop, width: POPUP_W, borderRadius: mapStyle.popupRadius }]}>
             <View style={{ alignItems: 'center' }}>
               <BossArt id={popup.boss.id} emoji={popup.boss.emoji} size={popup.kind === 'current' ? 88 : 60} mystery={false} powered={isMad} />
             </View>
@@ -268,19 +288,21 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 
 const st = StyleSheet.create({
   wrap: { flex: 1, overflow: 'hidden', backgroundColor: '#05060A' },
-  nodeTouch: { position: 'absolute', width: NODE, alignItems: 'center' },
-  node: { position: 'absolute', width: NODE, alignItems: 'center' },
-  portrait: { width: NODE, height: NODE, alignItems: 'center', justifyContent: 'center' },
+  // Wartości NODE-zależne tu to tylko BAZA — realny, aktualny rozmiar nadpisywany inline
+  // w JSX z `mapStyle.nodeSize` (§332), bo ten statyczny obiekt nie może reagować na store.
+  nodeTouch: { position: 'absolute', width: BASE_NODE, alignItems: 'center' },
+  node: { position: 'absolute', width: BASE_NODE, alignItems: 'center' },
+  portrait: { width: BASE_NODE, height: BASE_NODE, alignItems: 'center', justifyContent: 'center' },
   currentRing: {
-    position: 'absolute', left: -7, top: -7, width: NODE + 14, height: NODE + 14,
-    borderRadius: (NODE + 14) / 2, borderWidth: 2.5,
+    position: 'absolute', left: -7, top: -7, width: BASE_NODE + 14, height: BASE_NODE + 14,
+    borderRadius: (BASE_NODE + 14) / 2, borderWidth: 2.5,
   },
   defeatedOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   badgeLock: {
     position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: 9,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
   },
-  nodeLabel: { fontSize: 10, fontWeight: '800', textAlign: 'center', marginTop: 4, width: NODE + 32, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  nodeLabel: { fontSize: 10, fontWeight: '800', textAlign: 'center', marginTop: 4, width: BASE_NODE + 32, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   popupBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   popup: {

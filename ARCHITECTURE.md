@@ -18186,6 +18186,61 @@ dashboard.
 
 ---
 
+## 332. Kreator ekranów — Faza 6: pierwszy ekran poza dashboardem, mapa bossów (2026-10-15)
+
+User: "nie chce budować samych kafelków tylko wszystko ekrany itp" — po pięciu fazach
+ograniczonych do dashboardu (§327-§331), pierwszy raz ten sam mechanizm (draft/live store +
+`styleOverride` prop + ekran-kreator z realnym podglądem) zastosowany do INNEGO obszaru appki.
+AskUserQuestion z userem potwierdził konkretny kierunek: "ten sam mechanizm na kolejnych
+ekranach, każdy ze swoim trybem edycji" (nie globalny motyw, nie edytor układu).
+
+**Mapa bossów wybrana jako cel** — najdojrzalszy, najbardziej dopracowany ekran tej sesji
+(§314→§326, siedem rund poprawek), już ma infrastrukturę edytora POZYCJI węzłów
+(`bossMapLayoutStore.ts`, §322) — kreator STYLU to naturalne rozszerzenie, nie nowy obszar od
+zera.
+
+**Architektura — OSOBNY ekran/plik, nie kolejna zakładka w `dashboard-tile-creator.tsx`.**
+Mapa bossów to inny obszar appki niż dashboard — wrzucenie jej jako czwartej zakładki do
+kreatora kafelków zrobiłoby z niego przypadkowy worek niepowiązanych rzeczy. Nowy
+`app/campaign-map-creator.tsx`, osobny wpis w Ustawieniach → Personalizacja, osobny modal w
+`_layout.tsx` — ten sam WZORZEC co kreator dashboardu, ale fizycznie osobny ekran. Każdy
+kolejny obszar appki (gdy przyjdzie kolej) dostaje analogicznie własny plik kreatora, nie
+kolejną zakładkę gdziekolwiek.
+
+**`campaignMapStyleStore.ts`** — `{nodeSize, pathWidth, ringWidth, gridOpacity, popupRadius}`,
+domyślne wartości odtwarzają dokładnie dotychczasowy, zaszyty na sztywno wygląd (`NODE=60`,
+strokeWidth=7, ringWidth=2.5, gridOpacity=0.08, popupRadius=16). ŚWIADOMIE BRAK koloru akcentu
+— różnica niebieski/czerwony kampania/MAD jest semantyczna ("oszalały wariant" =
+niebezpieczeństwo), nadpisanie jednym wspólnym kolorem zgubiłoby to rozróżnienie — ta sama
+zasada co przy kolorze progu serii w §330.
+
+**`CampaignMap.tsx`** — `styleOverride` prop (ten sam wzorzec co §327). Komplikacja: `NODE`
+było dotąd MODUŁOWĄ stałą (60) używaną zarówno w logice renderowania komponentu JAK I w
+statycznym `StyleSheet.create` POZA komponentem (nie może reagować na store). Rozwiązanie:
+zmienna modułowa przemianowana na `BASE_NODE` (czysta baza dla statycznego `st`), a wewnątrz
+komponentu lokalna `const NODE = mapStyle.nodeSize` PRZESŁANIA ją w całym ciele funkcji — każde
+użycie `NODE` w JSX/logice automatycznie dostaje aktualną, dynamiczną wartość, a rozmiary
+zależne od niej w `st` (`node`/`portrait`/`currentRing`/`nodeTouch`/`nodeLabel`) są nadpisywane
+inline w JSX, ten sam zabieg co radius/gradient w `StreakWallCard.tsx` (§327).
+
+**Kreator** — BEZ zakładek (jeden ekran, jeden config, nie 3 karty jak dashboard). Podgląd
+używa PRAWDZIWEGO postępu kampanii (`usePetStore` `defeatedBosses` + `BOSSES.find(...)`, ten
+sam wzorzec co `app/bosses.tsx`), z `locked`/`lockMessage` zamiast prawdziwego `onPressCurrent`
+— to ekran DO STYLOWANIA, przypadkowe wejście w walkę z kreatora byłoby mylące. Pełnoekranowy
+podgląd (natywny `Modal`, `onRequestClose`) renderuje `CampaignMap` z `flex:1` dokładnie tak
+jak na prawdziwym ekranie bossów — w trybie inline (wewnątrz przewijanego kreatora) mapa
+dostaje wysokość na sztywno (420px), bo nie jest tam jedynym elementem na ekranie.
+
+**Testy**: brak nowych — proste podstawienia w JSX/stylach. `tsc --noEmit` czyste,
+`jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → Personalizacja → "Kreator mapy
+bossów" → zmiana rozmiaru węzła/grubości ścieżki/pierścienia/siatki/popupu widoczna na żywo w
+podglądzie (z prawdziwym postępem kampanii), pełnoekranowy podgląd otwiera/zamyka się, "Wdróż"
+faktycznie zmienia prawdziwy ekran Bossy (i kampanię, i MAD — oba czytają ten sam store).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
