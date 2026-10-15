@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 4: przepinanie nawigacji (2026-10-15, §330)
+
+Zakładka "Twoje serie" → sekcja "Cel po kliknięciu" (widoczna tylko gdy są kafelki nawyków) —
+per-nawyk wybór Wody/Roku jako celu tapnięcia (`/water-calendar` vs `/habit-year`). ŚWIADOMIE
+wąski zakres — to JEDYNE miejsce gdzie appka ma dwa bezpieczne, poprawne cele dla tego samego
+kafelka; liczniki/ćwiczenia mają jeden stały cel, nic tam do wyboru. **Priorytet testu WYSOKI**
+— patrz checklist w ARCHITECTURE.md §330.
+
+**Dalej otwarte** (pełne "dowolny ekran jako cel" — user mówił "dowolny pulpit", ale realnie
+appka nie ma dziś więcej niż te dwa bezpieczne cele per typ kafelka; rozszerzenie na
+`PersonalRecordsCard`/`CountdownsCard` wymagałoby najpierw ZBUDOWANIA alternatywnych celów dla
+tych kart, których dziś nie ma — nie jest to "tylko UI do wyboru", trzeba by zdecydować co w
+ogóle miałoby być alternatywą).
+
 ## 🆕 Kreator dashboardu — Faza 1+2+3 (2026-10-15, §327, §328, §329)
 
 Ustawienia → Personalizacja → "Kreator kafelków" — trzy zakładki, każda z WŁASNYM store'em (nie

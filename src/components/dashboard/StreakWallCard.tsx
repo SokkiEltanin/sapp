@@ -122,7 +122,13 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
     const isZero = r.days < 1;
     const onTile = () => {
       haptic.tap();
-      if (r.key.startsWith('h:')) router.push((r.kind === 'water' ? `/water-calendar?id=${r.key.slice(2)}` : `/habit-year?id=${r.key.slice(2)}`) as any);
+      if (r.key.startsWith('h:')) {
+        const habitId = r.key.slice(2);
+        // Nadpisanie z kreatora (§330) wygrywa z domyślnym `kind==='water'` — brak wpisu w
+        // mapie (zwykły przypadek) zachowuje się DOKŁADNIE jak przed §330.
+        const style = tileStyle.habitCalendarOverrides[habitId] ?? (r.kind === 'water' ? 'water' : 'year');
+        router.push((style === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
+      }
       else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
       // `ex:` — wpis "Ćwiczenia" (2026-10-15, złożony tu z dawnego osobnego kafla
       // `exercise-streak`/`ExerciseStreakCard.tsx`, patrz app/(tabs)/index.tsx) — własna,

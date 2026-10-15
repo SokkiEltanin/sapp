@@ -20,7 +20,7 @@ import { buildRecords } from '@/utils/personalRecords';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
-import { useStreakTileStyleStore, StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 
@@ -60,6 +60,7 @@ export default function DashboardTileCreator() {
   const publishStreaks = useStreakTileStyleStore(st => st.publish);
   const discardStreaksDraft = useStreakTileStyleStore(st => st.discardDraft);
   const resetStreaksDefault = useStreakTileStyleStore(st => st.resetDraftToDefault);
+  const setHabitCalendarOverride = useStreakTileStyleStore(st => st.setDraftHabitCalendar);
   const streaksLive = useStreakTileStyleStore(st => st.live);
 
   // Records store (§328, Faza 2) — ten sam mechanizm, druga karta.
@@ -111,6 +112,9 @@ export default function DashboardTileCreator() {
     const exercise: StreakItem = { key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak };
     return [exercise, ...fromHabits, ...fromCounters];
   }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak]);
+  // Kafelki nawyków (§330, "Cel po kliknięciu") — jedyne z `realStreaks`, dla których istnieje
+  // realny wybór celu (patrz komentarz w streakTileStyleStore.ts).
+  const habitStreaks = useMemo(() => realStreaks.filter(r => r.key.startsWith('h:')), [realStreaks]);
   // `healthDays` pominięte (pusty obiekt) — na prawdziwym dashboardzie ładowane asynchronicznie
   // z Health Connect (kroki/sen/waga, patrz index.tsx `reloadHealth`), za dużo do powielania w
   // samym podglądzie stylu. Rekordy oparte o wydatki/nastrój/jedzenie dalej liczą się z
@@ -253,6 +257,40 @@ export default function DashboardTileCreator() {
                   trackColor={{ false: c.border.default, true: c.accent.blue }} />
               </View>
             </View>
+
+            {/* Przepinanie nawigacji (§330) — TYLKO dla kafelków nawyków: to jedyne miejsce,
+                gdzie appka ma DWA sensowne, bezpieczne cele (kalendarz wody / kalendarz roku).
+                Liczniki (c:) i ćwiczenia (ex:) mają jeden, stały cel — nie ma tu czego wybierać. */}
+            {habitStreaks.length > 0 && (
+              <>
+                <Text style={s.sectionLabel}>Cel po kliknięciu</Text>
+                <View style={s.card}>
+                  {habitStreaks.map((h, i) => {
+                    const habitId = h.key.slice(2);
+                    const current = streaksDraft.habitCalendarOverrides[habitId] ?? (h.kind === 'water' ? 'water' : 'year');
+                    return (
+                      <View key={h.key}>
+                        {i > 0 && <View style={s.divider} />}
+                        <View style={[s.row, { alignItems: 'flex-start' }]}>
+                          <Text style={s.rowLabel} numberOfLines={1}>{h.name}</Text>
+                          <View style={s.segmented}>
+                            {([['water', 'Wody'], ['year', 'Roku']] as [HabitCalendarStyle, string][]).map(([m, lbl]) => {
+                              const on = current === m;
+                              return (
+                                <TouchableOpacity key={m} onPress={() => { haptic.tap(); setHabitCalendarOverride(habitId, m); }}
+                                  style={[s.segBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                                  <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </>
         ) : activeCard === 'records' ? (
           <>

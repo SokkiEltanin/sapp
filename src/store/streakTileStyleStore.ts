@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 
+export type HabitCalendarStyle = 'water' | 'year';
+
 export interface StreakTileStyle {
   cornerRadius: number;
   aspectRatio: number;
@@ -9,12 +11,20 @@ export interface StreakTileStyle {
   showProgressBar: boolean;
   showFlame: boolean;
   numberScale: number;
+  // Przepinanie nawigacji (2026-10-15, Kreator Faza 4, §330) — user: "kafelek po kliknięciu
+  // przenosi TUTAJ". ŚWIADOMIE nie "dowolny ekran z appki" (złamałoby nawigację — kafelek
+  // Wody prowadzący do Pracy nie ma sensu i user by się zgubił), tylko wybór między DWOMA
+  // widokami, które appka JUŻ uznaje za poprawne dla kafelka nawyku (`h:` w onTile niżej) —
+  // bogaty kalendarz wody vs generyczny kalendarz roku. Dziś wybierane automatycznie po
+  // `kind==='water'`; to pozwala to nadpisać per-nawyk (klucz = goły id nawyku, BEZ `h:`
+  // prefiksu). Brak wpisu = zachowanie domyślne (jak dotąd).
+  habitCalendarOverrides: Record<string, HabitCalendarStyle>;
 }
 
 // Wartości dokładnie odtwarzające TERAŹNIEJSZY, zaszyty na sztywno wygląd StreakWallCard
 // (radius.lg=16, aspectRatio=1.7 z komentarza "kafelki są za długie", gradient+pasek+płomień
-// zawsze włączone) — więc dopóki nikt nic nie wdroży z kreatora, `live` renderuje się
-// BIT-W-BIT tak samo jak przed tą zmianą.
+// zawsze włączone, zero nadpisań nawigacji) — więc dopóki nikt nic nie wdroży z kreatora,
+// `live` renderuje się BIT-W-BIT tak samo jak przed tą zmianą.
 export const DEFAULT_STREAK_TILE_STYLE: StreakTileStyle = {
   cornerRadius: 16,
   aspectRatio: 1.7,
@@ -22,6 +32,7 @@ export const DEFAULT_STREAK_TILE_STYLE: StreakTileStyle = {
   showProgressBar: true,
   showFlame: true,
   numberScale: 1,
+  habitCalendarOverrides: {},
 };
 
 // Kreator dashboardu, Faza 1 (2026-10-15, user: "zrobisz mi prawdziwy kreator w ustawieniach
@@ -38,6 +49,8 @@ interface StreakTileStyleState {
   draft: StreakTileStyle;
   _hydrated: boolean;
   setDraft: (patch: Partial<StreakTileStyle>) => void;
+  // `null` usuwa nadpisanie (wraca do zachowania domyślnego dla tego nawyku).
+  setDraftHabitCalendar: (habitId: string, style: HabitCalendarStyle | null) => void;
   publish: () => void;
   discardDraft: () => void;
   resetDraftToDefault: () => void;
@@ -50,6 +63,11 @@ export const useStreakTileStyleStore = create<StreakTileStyleState>()(
       draft: DEFAULT_STREAK_TILE_STYLE,
       _hydrated: false,
       setDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
+      setDraftHabitCalendar: (habitId, style) => set((s) => {
+        const next = { ...s.draft.habitCalendarOverrides };
+        if (style) next[habitId] = style; else delete next[habitId];
+        return { draft: { ...s.draft, habitCalendarOverrides: next } };
+      }),
       publish: () => set((s) => ({ live: s.draft })),
       discardDraft: () => set((s) => ({ draft: s.live })),
       resetDraftToDefault: () => set({ draft: DEFAULT_STREAK_TILE_STYLE }),
