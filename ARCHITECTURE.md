@@ -17894,6 +17894,54 @@ startuje źle" od "kamera dryfuje po czymś innym".
 
 ---
 
+## 326. Mapa bossów — scrollTo gubiony podczas animacji przejścia ekranu (SIÓDMA próba) (2026-10-15)
+
+User dostarczył DOKŁADNIE żądany zrzut ("Zrzut po wejściu od razu jak prosiłeś") PO wdrożeniu
+§325 — i obraz wyglądał identycznie jak przed tym fixem: widoczne wczesne pokonane węzły
+("Potwór Stresu" z przekreśleniem) + pierwszy zablokowany węzeł, ale ZERO śladu pierścienia
+aktualnego bossa w kadrze. §325 nie pomogło.
+
+**Dlaczego §325 nie mogło wystarczyć**: teoria "wieloprzebiegowego layoutu" zakładała, że
+kolejne `onLayout` przynoszą RÓŻNE wymiary, które wymagają ponownego scrolla. Ale wysokość
+płótna mapy (`canvasH`) w `bossMapLayout.ts` praktycznie NIE zależy od `viewport.h` (stałe
+`ROW_GAP`/`PAD_Y`, liczba bossów się nie zmienia) — więc nawet JEDNO poprawne wywołanie
+`onLayout` już dawało prawidłowy `targetY`. Szerszy klucz strażnika z §325 dawał więcej
+PRÓB wywołania `scrollTo`, ale jeśli problemem było coś inne niż "zbyt mało prób" — nie mogło
+pomóc.
+
+**Nowa hipoteza, celowo inna klasa buga**: `scrollTo({animated:false})` w `useEffect` wołane
+jest SYNCHRONICZNIE praktycznie w momencie montowania ekranu — czyli dokładnie w trakcie
+natywnej animacji przejścia (expo-router / react-native-screens, native-stack). To znany,
+udokumentowany w społeczności RN przypadek na Androidzie: komenda `scrollTo` wysłana do
+natywnego ScrollView, którego scroll-responder jeszcze nie jest w pełni podłączony/gotowy
+(bo widok wciąż "wjeżdża" na ekran), jest PO CICHU ignorowana — bez błędu, bez ostrzeżenia w
+JS. I w przeciwieństwie do §325: żaden kolejny `onLayout` już nie przychodzi po zakończeniu
+animacji (wymiary się nie zmieniają), więc nic już tego nie naprawia — kamera zostaje
+na pozycji startowej (szczyt mapy) na zawsze, do następnej realnej zmiany `currentId`/
+wymiarów.
+
+**Naprawa (`CampaignMap.tsx`, efekt centrujący)**: `scrollTo` wywoływany nie tylko raz, ale
+z dodatkowymi odroczonymi powtórzeniami tego samego celu (`setTimeout` na 60/250/600 ms, plus
+wywołanie natychmiastowe jak wcześniej) — łapie moment, w którym natywny scroll-responder
+faktycznie już przyjmuje komendy, niezależnie jak długo trwała akurat animacja przejścia na
+danym urządzeniu. Timery czyszczone w cleanupie efektu (zmiana `currentId`/wymiarów w trakcie
+odliczania nie zostawia "wiszącego" starego scrolla).
+
+**Testy**: brak nowych — zmiana dotyczy tylko retimingu wywołania efektu pobocznego
+(`scrollTo`), nie logiki matematycznej (`bossMapLayout.ts` bez zmian). `tsc --noEmit` czyste,
+`jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Uczciwie**: to SIÓDMA próba na tej mapie. Hipoteza celuje w inną klasę buga niż §325
+(timing względem animacji nawigacji, nie wieloprzebiegowy layout) i jest zgodna z WSZYSTKIMI
+dotychczasowymi obserwacjami (zrzut zawsze pokazuje "szczyt" mapy, zawsze "zaraz po wejściu").
+Wciąż nieprzetestowane na urządzeniu z tej sesji — priorytet testu: zimny start → Bossy →
+aktualny boss widoczny i wycentrowany BEZ przewijania. Jeśli WCIĄŻ źle po tej poprawce, kolejny
+krok powinien być inny niż kolejna poprawka samego `scrollTo` — np. poproszenie o nagranie
+krótkiego wideo otwarcia zakładki (nie zrzutu) żeby zobaczyć, czy kamera w ogóle PRÓBUJE się
+poruszyć i się zatrzymuje, czy nie rusza się wcale od pierwszej klatki.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
