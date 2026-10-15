@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 
 export type HabitCalendarStyle = 'water' | 'year';
+export type FlameCorner = 'tl' | 'tr' | 'bl' | 'br';
+export type ContentAlign = 'left' | 'center';
 
 export interface StreakTileStyle {
   cornerRadius: number;
@@ -11,6 +13,15 @@ export interface StreakTileStyle {
   showProgressBar: boolean;
   showFlame: boolean;
   numberScale: number;
+  // Pozycja i warstwy (2026-10-15, Kreator Faza 5, §331) — user: "edycje graficzne
+  // justowanie skalowanie zaokrąglenie cornerów, warstwy itp". `flameCorner` = w którym rogu
+  // siedzi watermark płomienia (dziś zaszyte na sztywno: prawy-dolny). `flameOnTop` = czy
+  // płomień rysuje się NAD tekstem (efektowne, ale może zasłonić liczbę przy dużym rozmiarze)
+  // czy POD nim jak dziś (tekst zawsze czytelny). `contentAlign` = wyrównanie liczby/etykiety
+  // w poziomie wewnątrz kafla.
+  flameCorner: FlameCorner;
+  flameOnTop: boolean;
+  contentAlign: ContentAlign;
   // Przepinanie nawigacji (2026-10-15, Kreator Faza 4, §330) — user: "kafelek po kliknięciu
   // przenosi TUTAJ". ŚWIADOMIE nie "dowolny ekran z appki" (złamałoby nawigację — kafelek
   // Wody prowadzący do Pracy nie ma sensu i user by się zgubił), tylko wybór między DWOMA
@@ -33,6 +44,9 @@ export const DEFAULT_STREAK_TILE_STYLE: StreakTileStyle = {
   showFlame: true,
   numberScale: 1,
   habitCalendarOverrides: {},
+  flameCorner: 'br',
+  flameOnTop: false,
+  contentAlign: 'left',
 };
 
 // Kreator dashboardu, Faza 1 (2026-10-15, user: "zrobisz mi prawdziwy kreator w ustawieniach

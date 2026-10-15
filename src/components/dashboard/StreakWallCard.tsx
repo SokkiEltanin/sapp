@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Snowflake } from 'lucide-react-native';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { useStreakTileStyleStore, StreakTileStyle } from '@/store/streakTileStyleStore';
+import { useStreakTileStyleStore, StreakTileStyle, FlameCorner } from '@/store/streakTileStyleStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -31,6 +31,15 @@ function darken(hex: string, amt: number): string {
   const b = Math.round((n & 255) * (1 - amt));
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
+
+// Pozycja rogu płomienia (§331) — wartości identyczne jak dotychczasowy, zaszyty na sztywno
+// `right:-12, bottom:-10` dla 'br', więc domyślne ustawienie renderuje się bit-w-bit jak dawniej.
+const FLAME_CORNER_POS: Record<FlameCorner, { top?: number; bottom?: number; left?: number; right?: number }> = {
+  br: { right: -12, bottom: -10 },
+  bl: { left: -12, bottom: -10 },
+  tr: { right: -12, top: -10 },
+  tl: { left: -12, top: -10 },
+};
 
 // „Twoje serie" — Duolingo-style: kolor kafla wg progu serii (bordo → czerwień → pomarańcz
 // → róż → błękit → fiolet legenda), im dłuższa seria tym "gorętszy" kolor. User (2026-08-12,
@@ -150,15 +159,16 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
     const radiusStyle = { borderRadius: tileStyle.cornerRadius };
-    const content = (
+    const alignStyle = { alignItems: tileStyle.contentAlign === 'center' ? ('center' as const) : ('flex-start' as const) };
+    const flame = tileStyle.showFlame && (
+      <View style={[s.tileFlame, FLAME_CORNER_POS[tileStyle.flameCorner]]} pointerEvents="none">
+        <StreakFlameGlow days={r.days} size={64} />
+      </View>
+    );
+    const text = (
       <>
-        {tileStyle.showFlame && (
-          <View style={s.tileFlame} pointerEvents="none">
-            <StreakFlameGlow days={r.days} size={64} />
-          </View>
-        )}
         <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF', fontSize: 24 * tileStyle.numberScale, lineHeight: 26 * tileStyle.numberScale }]}>{r.days}</DisplayText>
-        <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
+        <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)', textAlign: tileStyle.contentAlign }]} numberOfLines={1}>{r.name}</Text>
         {tierProgress != null && tileStyle.showProgressBar && (
           <View style={s.tierBarTrack} pointerEvents="none">
             <View style={[s.tierBarFill, { width: `${tierProgress * 100}%` }]} />
@@ -166,14 +176,17 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
         )}
       </>
     );
+    // Kolejność dzieci = kolejność malowania w RN (jak w CSS) — płomień NA WIERZCHU tekstu
+    // tylko gdy `flameOnTop`, inaczej (domyślnie, jak dawniej) tekst maluje się NAD nim.
+    const content = tileStyle.flameOnTop ? <>{text}{flame}</> : <>{flame}{text}</>;
     return (
       <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile} style={[s.tileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
         {isZero ? (
-          <View style={[s.tile, s.tileZero, radiusStyle]}>{content}</View>
+          <View style={[s.tile, s.tileZero, radiusStyle, alignStyle]}>{content}</View>
         ) : tileStyle.gradientMode === 'flat' ? (
-          <View style={[s.tile, radiusStyle, { backgroundColor: color }]}>{content}</View>
+          <View style={[s.tile, radiusStyle, alignStyle, { backgroundColor: color }]}>{content}</View>
         ) : (
-          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.tile, radiusStyle]}>
+          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.tile, radiusStyle, alignStyle]}>
             {content}
           </LinearGradient>
         )}

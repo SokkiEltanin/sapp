@@ -18154,6 +18154,38 @@ wybrany kalendarz. Nawyki bez nadpisania dalej zachowują się jak dotąd.
 
 ---
 
+## 331. Kreator dashboardu — Faza 5: pozycja i warstwy (2026-10-15)
+
+User: "Pełny edytor dawaj" — po czterech fazach (3 karty + nawigacja) pierwsza realizacja
+WŁAŚCIWEJ "edycji graficznej" z pierwotnej prośby ("justowanie skalowanie zaokrąglenie
+cornerów, warstwy itp"), na "Twoje serie" jako najdojrzalszej, najbardziej dopracowanej karcie.
+
+**Trzy nowe pola `StreakTileStyle`**:
+1. `flameCorner: 'tl'|'tr'|'bl'|'br'` — w którym rogu kafla siedzi watermark płomienia (dziś
+   zaszyty na sztywno `right:-12, bottom:-10`, czyli `'br'` — nowy `FLAME_CORNER_POS` lookup w
+   `StreakWallCard.tsx` ma identyczne wartości dla `'br'`, więc default renderuje się bit-w-bit
+   jak dawniej).
+2. `flameOnTop: boolean` — WARSTWY dosłownie: w React Native (jak w CSS) kolejność malowania
+   = kolejność dzieci w JSX, nie jakiś osobny z-index. Dotąd płomień renderował się PIERWSZY
+   (czyli zawsze POD tekstem) — teraz `content = flameOnTop ? <>{text}{flame}</> : <>{flame}{text}</>`
+   faktycznie przestawia kolejność malowania, nie tylko pozycję.
+3. `contentAlign: 'left'|'center'` — wyrównanie liczby/etykiety w poziomie (`alignItems` na
+   kaflu + `textAlign` na etykiecie).
+
+**Kreator** — nowa sekcja "Pozycja i warstwy" (tylko "Twoje serie"): siatka 4 przycisków-rogów
+(strzałki ↖↗↙↘) zamiast stepperów (wybór dyskretny z 4 opcji, stepper by tu nie pasował),
+switch "Płomień na wierzchu", segmented "Wyrównanie treści".
+
+**Testy**: brak nowych — proste podstawienia w JSX/stylach, nie algorytm. `tsc --noEmit`
+czyste, `jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: zmiana rogu płomienia widoczna na żywo w podglądzie,
+"Płomień na wierzchu" faktycznie zasłania liczbę (nie tylko zmienia coś niewidocznego),
+wyrównanie "Środek" centruje liczbę+etykietę, wszystko razem z "Wdróż" trafia na prawdziwy
+dashboard.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
