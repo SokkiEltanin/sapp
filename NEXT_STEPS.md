@@ -3,6 +3,39 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 7: paleta progów + odstępy (2026-10-15, §333)
+
+Zakładka "Twoje serie" → "Paleta progów" (kolor każdego z 8 progów serii osobno, progi same —
+minimalna liczba dni — NIEedytowalne, celowo) + "Odstęp między kafelkami" w sekcji "Kształt".
+**Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §333.
+
+**DUŻA, jawnie odłożona wizja usera** (2026-10-15, po Fazie 6): "chce edytować każdy ekran, i
+możliwość robienia komponentów i ich edycji i kopiowania... np. dodaje streak wody na
+dashboardzie i dodaje streak słodyczy w jedzeniu... kopiuje komponent i edytuje i zapisuje jako
+inny z innymi podpięciami... edytor musi być skomplikowany bo chce mieć inne palety kolorów,
+modyfikacje streku każdego progu, zmianę zupełną kafelków, ustawienia spacowania między
+kafelkami, robienia grup komponentów itp".
+
+To NIE jest rozszerzenie obecnego wzorca (draft/live store + styleOverride) — to osobny
+podsystem: rejestr komponentów (co da się kopiować), generyczne UI do przepinania danych (nie
+lista gotowych metryk jak dziś w `CustomTile`), i sposób UMIESZCZANIA komponentu na ekranie
+który dziś jest ręcznie napisanym kodem React, nie płótnem. Realnie wielotygodniowy, ryzykowny
+projekt — AskUserQuestion z trzema opcjami skali, user zdecydował zostawić wybór kolejności
+mnie: wybrałem pogłębianie istniejących kreatorów jako pierwsze (niższe ryzyko, od razu
+użyteczne), **ale pełen system kopiowania/przepinania komponentów między ekranami POZOSTAJE
+otwarty i jawnie nieruszany** — to świadoma decyzja o kolejności, nie zapomniana funkcja.
+
+**Istotny fakt odkryty przy okazji**: appka JUŻ ma częściowy fundament pod to — `CustomTile`
+system w `dashboardLayout.ts` (`type:'stat'` z `metric`/`viz`/`period`/`target`/`tag`) pozwala
+userowi dodać DANE-POWIĄZANY kafelek na dashboard, wybierając metrykę z gotowego rejestru. To
+nie jest "skopiuj dowolny komponent i przepnij", ale pokazuje że częściowa infrastruktura data-
+bindingu już istnieje i może być punktem wyjścia, gdy przyjdzie czas na pełny system.
+
+**Następny krok w TYM kierunku** (gdy user zdecyduje że czas): zacząć od pytania czy rozszerzyć
+ISTNIEJĄCY `CustomTile` system na inne ekrany (prostsze, reużywa gotowe) czy budować pełny,
+generyczny rejestr komponentów z kopiowaniem (user wprost to opisał, ale dużo większe ryzyko
+architektoniczne) — to osobna decyzja, nie zgadywać.
+
 ## 🆕 Kreator ekranów — Faza 6: pierwszy ekran poza dashboardem (2026-10-15, §332)
 
 User potwierdził (AskUserQuestion): chce TEN SAM mechanizm na KOLEJNYCH EKRANACH appki, nie

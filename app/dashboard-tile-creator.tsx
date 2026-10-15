@@ -17,6 +17,7 @@ import { useDayKey } from '@/hooks/useDayKey';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildRecords } from '@/utils/personalRecords';
+import { STREAK_TIERS } from '@/utils/streakTiers';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
@@ -31,6 +32,7 @@ const CARD_TABS: { key: CardKey; label: string }[] = [
   { key: 'countdowns', label: 'Odliczania' },
 ];
 const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
+const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8', '#3B82F6', '#636FF6', '#8B5CF6'];
 
 // Kreator dashboardu — FAZA 1 (2026-10-15, ARCHITECTURE.md §327). User: "zrobisz mi prawdziwy
 // kreator w ustawieniach ze wszystkim w aplikacji... ja będę sobie robił edytował kreował
@@ -63,6 +65,7 @@ export default function DashboardTileCreator() {
   const discardStreaksDraft = useStreakTileStyleStore(st => st.discardDraft);
   const resetStreaksDefault = useStreakTileStyleStore(st => st.resetDraftToDefault);
   const setHabitCalendarOverride = useStreakTileStyleStore(st => st.setDraftHabitCalendar);
+  const setTierColor = useStreakTileStyleStore(st => st.setDraftTierColor);
   const streaksLive = useStreakTileStyleStore(st => st.live);
 
   // Records store (§328, Faza 2) — ten sam mechanizm, druga karta.
@@ -225,6 +228,13 @@ export default function DashboardTileCreator() {
             <Stepper label="Skala liczby"
               value={activeCard === 'streaks' ? streaksDraft.numberScale : recordsDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
               onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} c={c} s={s} />
+            {activeCard === 'streaks' && (
+              <>
+                <View style={s.divider} />
+                <Stepper label="Odstęp między kafelkami" value={streaksDraft.tileGap} min={0} max={20} step={2}
+                  onChange={v => setStreaksDraft({ tileGap: v })} c={c} s={s} />
+              </>
+            )}
           </View>
         )}
 
@@ -297,6 +307,33 @@ export default function DashboardTileCreator() {
                   })}
                 </View>
               </View>
+            </View>
+
+            {/* Paleta progów (§333) — kolor KAŻDEGO z 8 progów serii nadpisywalny osobno.
+                Progi (minimalna liczba dni) NIE są tu edytowalne, tylko kolor — patrz komentarz
+                w streakTileStyleStore.ts. */}
+            <Text style={s.sectionLabel}>Paleta progów</Text>
+            <View style={s.card}>
+              {STREAK_TIERS.map((tier, i) => {
+                const current = streaksDraft.tierColorOverrides[i] ?? tier.color;
+                return (
+                  <View key={tier.name}>
+                    {i > 0 && <View style={s.divider} />}
+                    <View style={[s.row, { alignItems: 'flex-start' }]}>
+                      <Text style={s.rowLabel}>{tier.name} <Text style={{ color: c.text.muted, fontWeight: '400' }}>od {tier.min} dni</Text></Text>
+                      <View style={s.swatchRow}>
+                        {TIER_COLOR_PRESETS.map(hex => (
+                          <TouchableOpacity key={hex} onPress={() => { haptic.tap(); setTierColor(i, hex); }}
+                            style={[s.swatch, { backgroundColor: hex }, current === hex && s.swatchOn]} />
+                        ))}
+                        <TouchableOpacity onPress={() => { haptic.tap(); setTierColor(i, null); }} style={s.swatchReset}>
+                          <RotateCcw size={12} color={c.text.secondary} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
 
             {/* Przepinanie nawigacji (§330) — TYLKO dla kafelków nawyków: to jedyne miejsce,
@@ -440,6 +477,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1, justifyContent: 'flex-end' },
   swatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: 'transparent' },
   swatchOn: { borderColor: c.text.primary },
+  swatchReset: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.elevated },
 
   scroll: { paddingHorizontal: spacing[4], paddingBottom: spacing[6], gap: spacing[2] },
   sectionLabel: {

@@ -116,7 +116,7 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
       </View>
 
       {/* SIATKA — WSZYSTKIE serie jako jednolite kwadraty, 2 na rząd (jak w Duolingo) */}
-      <View style={s.grid}>
+      <View style={[s.grid, { gap: tileStyle.tileGap }]}>
         {rows.map(r => renderTile(r))}
       </View>
     </TouchableOpacity>
@@ -127,8 +127,11 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
     // jest spełniony — czyli też przy 0 dniach, mimo że 0 nie powinno "być" żadnym tierem.
     // streakColor() ma osobny, poprawny fallback (szary) dla days<1 — tego trzeba użyć do
     // KOLORU kafla, inaczej złamana seria świeci się na czerwono zamiast wyglądać na "zimną".
-    const color = streakColor(r.days);
+    // Nadpisanie palety per próg (§333) — tylko kolor KAFLA w TEJ karcie, `streakColor()`/
+    // `STREAK_TIERS` same w sobie zostają nietknięte (patrz komentarz w streakTileStyleStore.ts
+    // — ta funkcja jest współdzielona z ~5 innymi miejscami appki).
     const isZero = r.days < 1;
+    const color = isZero ? streakColor(r.days) : (tileStyle.tierColorOverrides[streakTier(r.days).i] ?? streakColor(r.days));
     const onTile = () => {
       haptic.tap();
       if (r.key.startsWith('h:')) {

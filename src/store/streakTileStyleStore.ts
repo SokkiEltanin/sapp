@@ -30,6 +30,18 @@ export interface StreakTileStyle {
   // `kind==='water'`; to pozwala to nadpisać per-nawyk (klucz = goły id nawyku, BEZ `h:`
   // prefiksu). Brak wpisu = zachowanie domyślne (jak dotąd).
   habitCalendarOverrides: Record<string, HabitCalendarStyle>;
+  // Paleta progów + odstępy (2026-10-15, Kreator Faza 7, §333) — user: "chce mieć inne palety
+  // kolorów modyfikacje streku każdego progu... ustawienia spacowania między kafelkami".
+  // `tierColorOverrides` — klucz = indeks progu (0-7, patrz `STREAK_TIERS` w streakTiers.ts),
+  // wartość = nadpisany kolor TEGO kafla. ŚWIADOMIE nie modyfikuje `streakColor()`/
+  // `STREAK_TIERS` bezpośrednio — ta funkcja jest importowana w ~5 miejscach appki (kalendarz
+  // roku, płomień licznika itd.), zmiana tam zmieniłaby wygląd rzeczy NIEZWIĄZANYCH z tym
+  // kreatorem. Nadpisanie działa TYLKO wewnątrz `StreakWallCard`, reszta appki zostaje jak
+  // była. Progi (minimalna liczba dni) NIE są tu edytowalne — to zmieniłoby tempo motywacyjne
+  // całej appki (patrz obszerny komentarz przy STREAK_TIERS o celowym rozstawieniu progów),
+  // zbyt ryzykowne żeby wystawiać jako prosty suwak bez osobnej decyzji projektowej.
+  tierColorOverrides: Record<number, string>;
+  tileGap: number;
 }
 
 // Wartości dokładnie odtwarzające TERAŹNIEJSZY, zaszyty na sztywno wygląd StreakWallCard
@@ -47,6 +59,8 @@ export const DEFAULT_STREAK_TILE_STYLE: StreakTileStyle = {
   flameCorner: 'br',
   flameOnTop: false,
   contentAlign: 'left',
+  tierColorOverrides: {},
+  tileGap: 8,
 };
 
 // Kreator dashboardu, Faza 1 (2026-10-15, user: "zrobisz mi prawdziwy kreator w ustawieniach
@@ -65,6 +79,8 @@ interface StreakTileStyleState {
   setDraft: (patch: Partial<StreakTileStyle>) => void;
   // `null` usuwa nadpisanie (wraca do zachowania domyślnego dla tego nawyku).
   setDraftHabitCalendar: (habitId: string, style: HabitCalendarStyle | null) => void;
+  // `null` usuwa nadpisanie koloru tego progu (wraca do domyślnego `STREAK_TIERS[i].color`).
+  setDraftTierColor: (tierIndex: number, color: string | null) => void;
   publish: () => void;
   discardDraft: () => void;
   resetDraftToDefault: () => void;
@@ -81,6 +97,11 @@ export const useStreakTileStyleStore = create<StreakTileStyleState>()(
         const next = { ...s.draft.habitCalendarOverrides };
         if (style) next[habitId] = style; else delete next[habitId];
         return { draft: { ...s.draft, habitCalendarOverrides: next } };
+      }),
+      setDraftTierColor: (tierIndex, color) => set((s) => {
+        const next = { ...s.draft.tierColorOverrides };
+        if (color) next[tierIndex] = color; else delete next[tierIndex];
+        return { draft: { ...s.draft, tierColorOverrides: next } };
       }),
       publish: () => set((s) => ({ live: s.draft })),
       discardDraft: () => set((s) => ({ draft: s.live })),
