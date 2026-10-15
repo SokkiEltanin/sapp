@@ -18081,6 +18081,39 @@ stanu obu kart (każda ma swój store).
 
 ---
 
+## 329. Kreator dashboardu — Faza 3: trzecia karta ("Odliczania") (2026-10-15)
+
+Rozszerzenie §327/§328 na kartę o INNYM kształcie niż poprzednie dwie — `CountdownsCard` to
+pionowa LISTA wierszy (pierścień `RingCountdown` + nazwa/status/data), nie siatka kafelków z
+liczbą. Test tego, czy wzorzec (draft/live store + `styleOverride` prop) faktycznie przenosi
+się na różne kształty treści, nie tylko na warianty tego samego kształtu.
+
+**Pola store'a (`countdownsTileStyleStore.ts`) dopasowane do TEGO kształtu, nie skopiowane z
+§327/§328**: `cornerRadius` (karta, nie kafelek — tu nie ma osobnych kafelków do zaokrąglania),
+`ringSize`/`ringStrokeWidth` (bezpośrednio odpowiadają propsom, które `RingCountdown.tsx` JUŻ
+miał — `size=64`/`strokeWidth=6` domyślne, zero zmian w tym komponencie), `maxVisible`
+(dotąd zaszyte na sztywno `.slice(0, 3)` w `CountdownsCard.tsx`, teraz konfigurowalne). ŚWIADOMIE
+brak `aspectRatio`/`numberScale` — te pojęcia nie mają tu odpowiednika (nie ma "kafelka" o
+proporcjach, numer-dni renderuje `RingCountdown` samo, skalowane przez `size`).
+
+**Kreator** — zakładka "Odliczania" dostała WŁASNĄ sekcję "Kształt" (4 steppery: zaokrąglenie/
+rozmiar pierścienia/grubość pierścienia/widocznych pozycji) zamiast reużycia sekcji
+zaokrąglenie+proporcje+skala z poprzednich dwóch kart — druga sekcja ("Tło i warstwy"/"Kolor i
+warstwy") nie ma tu odpowiednika, więc renderuje się `null`. Dane do podglądu: te same filtry co
+`activeCountdowns` w `index.tsx` (kind='until', nieskończone/trwające, posortowane po dacie),
+`accentColor` z `useTimeAccent()` (ten sam hook co prawdziwy dashboard — kolor zależny od pory
+dnia, NIE stylowalny w kreatorze, bo to nie jest własność karty tylko globalny motyw czasowy).
+Pusta lista odliczań na koncie testowym → czytelny komunikat zamiast milczącego pustego miejsca.
+
+**Testy**: brak nowych — ten sam powód co §327/§328. `tsc --noEmit` czyste, `jest --silent`
+106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: zakładka "Odliczania" pokazuje prawdziwe aktywne
+odliczania (albo czytelny komunikat gdy brak), zmiana rozmiaru/grubości pierścienia i liczby
+widocznych pozycji widoczna na żywo, "Wdróż" zmienia prawdziwą kartę na dashboardzie.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

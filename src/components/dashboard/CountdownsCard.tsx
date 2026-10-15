@@ -8,6 +8,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { useCountdownsTileStyleStore, CountdownsTileStyle } from '@/store/countdownsTileStyleStore';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['countdowns']` (2026-08-25, kolejny mały
 // krok rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i historii).
@@ -23,14 +24,20 @@ export interface CountdownsCardProps {
   countdowns: Counter[];
   cardBg: string;
   accentColor: string;
+  // `styleOverride` (2026-10-15, Kreator dashboardu Faza 3, §329) — ten sam wzorzec co
+  // StreakWallCard (§327)/PersonalRecordsCard (§328): bez override karta czyta `live` ze
+  // store'a, kreator podaje `draft`.
+  styleOverride?: CountdownsTileStyle;
 }
 
-function CountdownsCard({ countdowns, cardBg, accentColor }: CountdownsCardProps) {
+function CountdownsCard({ countdowns, cardBg, accentColor, styleOverride }: CountdownsCardProps) {
   const c = useColors();
   const s = makeS(c);
+  const liveTileStyle = useCountdownsTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveTileStyle;
   if (countdowns.length === 0) return null;
   return (
-    <View style={[s.card, { backgroundColor: cardBg }]}>
+    <View style={[s.card, { backgroundColor: cardBg, borderRadius: tileStyle.cornerRadius }]}>
       <View style={s.cardHeader}>
         <CalendarClock size={13} color={accentColor} />
         <Text style={s.cardTitle}>Odliczania</Text>
@@ -39,7 +46,7 @@ function CountdownsCard({ countdowns, cardBg, accentColor }: CountdownsCardProps
         </TouchableOpacity>
       </View>
       <View style={{ gap: spacing[3], marginTop: spacing[2] }}>
-        {countdowns.slice(0, 3).map(cn => {
+        {countdowns.slice(0, tileStyle.maxVisible).map(cn => {
           const during = isDuringEvent(cn);
           const left = daysUntil(cn);
           const endLeft = daysUntilEnd(cn);
@@ -52,7 +59,7 @@ function CountdownsCard({ countdowns, cardBg, accentColor }: CountdownsCardProps
           const dateShort = cn.date.slice(5).split('-').reverse().join('.');
           return (
             <TouchableOpacity key={cn.id} style={s.cdRow} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
-              <RingCountdown progress={progress} color={ringColor} days={ringDays} />
+              <RingCountdown progress={progress} color={ringColor} days={ringDays} size={tileStyle.ringSize} strokeWidth={tileStyle.ringStrokeWidth} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
                 <Text style={[s.cdStatus, { color: ringColor }]} numberOfLines={1}>{label}</Text>
