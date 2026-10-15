@@ -26,7 +26,6 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'countdowns',
   'counters-since',
   'streak-wall',
-  'exercise-streak',
   'personal-records',
   'trivia',
   'time-capsule',
@@ -78,7 +77,6 @@ export const SECTION_TITLES: Record<string, string> = {
   'countdowns':     'Odliczania do wydarzeń',
   'counters-since': 'Liczniki (dni bez / temu)',
   'streak-wall':    'Twoje serie (ściana serii)',
-  'exercise-streak': 'Ćwiczenia (seria)',
   'personal-records': 'Rekordy życiowe',
   'trivia':         'Ciekawostka dnia',
   'time-capsule':   'List do przyszłego siebie',
@@ -128,8 +126,7 @@ export const SECTION_DESC: Record<string, string> = {
   'today-tasks':    'Lista zadań na dziś i zaległych',
   'countdowns':     'Odliczanie dni do wydarzeń',
   'counters-since': 'Ile dni bez / od czegoś',
-  'streak-wall':    'Wszystkie aktywne serie (nawyki + dni bez) w rankingu',
-  'exercise-streak': 'Seria dni z zalogowanym ćwiczeniem — stuknij, żeby zalogować dziś',
+  'streak-wall':    'Wszystkie aktywne serie (nawyki + dni bez + ćwiczenia) w rankingu',
   'personal-records': 'Twoje all-time rekordy: kroki, sen, bez słodyczy, nastrój',
   'trivia':         'Ciekawostka dnia — nauka, książki, rozwój, świat (stuknij po nową)',
   'time-capsule':   'Napisz wiadomość, która odblokuje się za jakiś czas',
@@ -171,9 +168,6 @@ export const SECTION_GROUP: Record<string, string> = {
   // zupełnie inna koncepcja niż serie/streaki). Przeniesione do "Zadania i nawyki", bo to
   // koncepcyjnie ta sama rodzina co `habits-today`/`daily-rings` — codzienne, nawykowe.
   'streak-wall': 'Zadania i nawyki',
-  // "nowy serial cwiczen" (2026-10-14, user) — ta sama rodzina co streak-wall/habits-today,
-  // nie osobna grupa tylko dla tego jednego kafla.
-  'exercise-streak': 'Zadania i nawyki',
   'finances': 'Finanse', 'fixed-variable': 'Finanse', 'sweets-vs-food': 'Finanse',
   'spend-by-day': 'Finanse', 'top-products': 'Finanse', 'work-hours': 'Finanse',
   'shops-collection': 'Finanse', 'food-breakdown': 'Finanse',

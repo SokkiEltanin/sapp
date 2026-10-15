@@ -72,5 +72,11 @@ export function useExerciseLogging() {
     toast.success(`Zapisano: ${opts.label} +${opts.amount} ${opts.unit}`);
   };
 
-  return { logs, targets, streak, today, logAmount, removeLog, updateLog };
+  // `addLog` eksportowane WPROST (obok `logAmount`) — 2026-10-15, historia/kalendarz
+  // (app/exercises-history.tsx) musi móc dopisać wpis do PRZESZŁEGO dnia (backfill). Celowo
+  // NIE przez `logAmount` — ta funkcja zawsze sprawdza próg nagrody względem DZISIEJSZEJ
+  // sumy (`today`, nie parametr) — wołanie jej dla przeszłej daty niesłusznie mogłoby
+  // odblokować DZISIEJSZY quest na podstawie starych danych. Backfill = czysty zapis danych,
+  // bez sprawdzania nagród (te są z natury "zrobione DZIŚ", nie retroaktywne).
+  return { logs, targets, streak, today, logAmount, removeLog, updateLog, addLog };
 }

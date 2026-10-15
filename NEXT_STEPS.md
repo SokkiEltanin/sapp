@@ -48,6 +48,16 @@ Ustawienia → Aplikacja → "Sprawdź aktualizację (OTA)" → Restart, PRZED k
 urządzeniu, inaczej test i tak trafia w starą, zbuforowaną paczkę JS. Warto to user'owi
 przypominać przy każdym kolejnym teście tej funkcji, dopóki się nie utrwali w nawyku.
 
+**§325 (2026-10-15) — SZÓSTA runda, po edytorze (§322)**: user dalej ze zrzutem "bossy sa
+rozjebane po mapie poza ekranem nie widac aktualnego". Znaleziony NOWY bug (inny niż
+poprzednie pięć) — strażnik centrowania kamery (`centeredOn`) pamiętał TYLKO `currentId`, nie
+rozmiar viewportu. RN na realnym urządzeniu potrafi dostarczyć `onLayout` wielokrotnie przy
+starcie (layout się "ustatecznia") — pierwszy przebieg z tymczasowym rozmiarem już "zużywał"
+strażnika, blokując re-centrowanie gdy przyszedł docelowy, prawdziwy rozmiar. Naprawione:
+klucz strażnika to teraz `currentId`+`viewport.w`+`viewport.h`. **Priorytet testu KRYTYCZNY,
+SZÓSTA próba** — jeśli WCIĄŻ źle, poproś usera o zrzut ZARAZ po otwarciu zakładki (nie po
+przewinięciu), żeby odróżnić "start źle" od "dryfuje później".
+
 ## 🆕 Edytor mapy bossów — ręczne rozstawienie (2026-10-14, §322)
 
 Po §321 user, zanim zdążył przetestować przebudowę #2: "zrobisz edytor ja sam ustawie wszystko
@@ -120,6 +130,15 @@ ilość/jednostka) od razu, monety/XP zostają.
    źle i pizda") dodane w OBU miejscach (ekran Ćwiczenia + Dzisiejsza sesja) — ikonka "historia"
    przy karcie/pozycji gdy dziś coś zalogowano. Priorytet testu wysoki: popraw/usuń wpis,
    sprawdź że suma "Dziś" i streak się aktualizują.
+6. **§324 (2026-10-15)** — user dalej niezadowolony mimo §323 ("powinna byc cała zakładka,
+   nie ma historii nie wiem ile wczoraj zrobiłem... Na dashbordzie chce aby ten kafelek byl w
+   strekach a nie osobno... Jak wchodzę nie widze postępu... np tego miesiąca"). Zrobione:
+   nowy `app/exercises-history.tsx` (kalendarz 1:1 wzorzec `water-calendar.tsx`, edycja
+   WSTECZNA dowolnego dnia, pasek miesięczny), kafelek dashboardu złożony do istniejącego
+   `StreakWallCard`/"Twoje serie" (stary osobny `ExerciseStreakCard` USUNIĘTY). Priorytet
+   testu WYSOKI — checklist w ARCHITECTURE.md §324. NIE zrobione: dosłowna nowa ikona w
+   dolnym pasku zakładek (zinterpretowane jako "zrób ten dział kompletny", nie nawigacja —
+   jeśli to było o coś innego, user musi powiedzieć wprost).
 
 ## 🆕 Czeka na usera: nowe grafiki bossów do wpięcia (2026-10-13)
 

@@ -83,7 +83,6 @@ import MoodMiniCal from '@/components/dashboard/MoodMiniCal';
 import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
-import ExerciseStreakCard from '@/components/dashboard/ExerciseStreakCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
@@ -609,17 +608,30 @@ export default function DashboardScreen() {
   // sensu, słodycze spoko i woda ale bez sensu ile dni temu jadłem tam się pojawia") — mają
   // WŁASNY kafelek niżej (`counters-since`/`SinceCountersCard.tsx`, `dashSince`), mieszanie
   // auto-śledzonych streaków z ręcznie tapanymi licznikami w JEDNYM widgecie myliło.
+  // Ćwiczenia (2026-10-14, §313) — liczone osobno (dni z DOWOLNYM zalogowanym ćwiczeniem, nie
+  // nawyki/liczniki), ale DOŁĄCZONE do `streakWall` niżej (2026-10-15, user: "chce aby ten
+  // kafelek byl w strekach a nie osobno bo osobno zajmuje mnóstwo miejsca co zaburza inne
+  // widgety" — poprzednio osobny, pełnoszerokościowy `ExerciseStreakCard`/`exercise-streak`
+  // node, usunięty). ZAWSZE w tablicy (nie tylko gdy >0), bo to był kafelek "zawsze widoczny,
+  // stałe wejście do logowania" — ten sam efekt teraz jako zawsze-obecna pozycja w "Twoje
+  // serie" zamiast osobnej karty.
+  const exerciseLogs = useExercisesStore(st => st.logs);
+  const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
+
+  // "Ściana serii" widget — habit streaks + AUTO "dni bez" liczniki (avoid-type, śledzone
+  // same z zakupów, np. "bez słodyczy"). RĘCZNE liczniki "ile dni temu" (kind='since' BEZ
+  // mode='auto', np. user: "Jadłem jeżyki") NIE wchodzą tutaj (2026-09-25, user zrzutem: "bez
+  // sensu, słodycze spoko i woda ale bez sensu ile dni temu jadłem tam się pojawia") — mają
+  // WŁASNY kafelek niżej (`counters-since`/`SinceCountersCard.tsx`, `dashSince`), mieszanie
+  // auto-śledzonych streaków z ręcznie tapanymi licznikami w JEDNYM widgecie myliło.
   const streakWall = useMemo<StreakItem[]>(() => {
     const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id), kind: h.kind }));
     const fromCounters = counters
       .filter(cn => cn.kind === 'since' && cn.mode === 'auto' && cn.onDashboard !== false)
       .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
-    return [...fromHabits, ...fromCounters];
-  }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey]);
-  // Kafelek "Ćwiczenia" (2026-10-14, patrz ARCHITECTURE.md §313) — osobny z `streak-wall`
-  // wyżej (ten pokazuje dni z DOWOLNYM zalogowanym ćwiczeniem, nie nawyki/liczniki).
-  const exerciseLogs = useExercisesStore(st => st.logs);
-  const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
+    const exercise: StreakItem = { key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak };
+    return [exercise, ...fromHabits, ...fromCounters];
+  }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey, exerciseStreak]);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -3077,14 +3089,13 @@ export default function DashboardScreen() {
             // ZŁAMANE serie jako 0 (motywacyjnie, styl Duolingo), ale zewnętrzny guard tutaj
             // chował całą kartę, gdy WSZYSTKIE serie akurat spadły na 0 (np. dzień po zjedzeniu
             // słodycza z jedynym licznikiem na koncie) — dokładnie odwrotność intencji karty.
+            // `streakWall` ZAWSZE zawiera wpis "Ćwiczenia" (patrz jego budowa wyżej), więc
+            // `.length > 0` jest teraz zawsze prawdziwe — karta już nie znika, co jest
+            // dokładnie tym co dawny osobny `exercise-streak` node chciał (STAŁY punkt
+            // wejścia do logowania). `exercise-streak` jako OSOBNY, pełnoszerokościowy node
+            // retired (2026-10-15, user: "osobno zajmuje mnóstwo miejsca co zaburza inne
+            // widgety") — ten sam streak teraz jako pozycja WEWNĄTRZ tej karty.
             nodes['streak-wall'] = streakWall.length > 0 && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
-            // "Ćwiczenia" (2026-10-14, patrz ARCHITECTURE.md §313) — user: "damy kafelek na
-            // dashbordzie przypięty w streaku nowy serial cwiczen". Bez `> 0` guard-a
-            // (odwrotnie niż `streak-wall` wyżej) — kafelek ma być ZAWSZE widoczny, nawet przy
-            // 0 (ten sam Duolingo-styl zachęty co `StreakWallCard`'s zera, nie znikanie przy
-            // złamanej/jeszcze-nie-zaczętej serii — user chce, żeby to był STAŁY punkt wejścia
-            // do logowania, nie coś co pojawia się dopiero gdy już masz serię).
-            nodes['exercise-streak'] = <ExerciseStreakCard streak={exerciseStreak} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
