@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 5: pozycja i warstwy (2026-10-15, §331)
+
+Zakładka "Twoje serie" → sekcja "Pozycja i warstwy" — róg płomienia (4 opcje), czy płomień
+rysuje się NAD tekstem (realne warstwy — kolejność malowania w JSX), wyrównanie liczby/etykiety
+(lewo/środek). Pierwsza faza robiąca faktyczną "edycję graficzną" z pierwotnej listy usera, nie
+tylko kolor/rozmiar/gradient. **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §331.
+
+**Dalej otwarte, ten sam wzorzec do rozszerzenia**: "Rekordy"/"Odliczania" nie mają jeszcze
+własnej sekcji pozycja/warstwy (rekordy mają ikonę-w-tle, mogłaby dostać podobny
+corner-picker; odliczania nie mają odpowiednika "warstw" w obecnym kształcie — pierścień+tekst
+to już stały układ, nie ma czego przestawiać). Nie robione teraz świadomie — każda karta
+dostaje tylko te wymiary stylu, które realnie coś znaczą dla JEJ kształtu (ta sama zasada co
+przy §329).
+
 ## 🆕 Kreator dashboardu — Faza 4: przepinanie nawigacji (2026-10-15, §330)
 
 Zakładka "Twoje serie" → sekcja "Cel po kliknięciu" (widoczna tylko gdy są kafelki nawyków) —

@@ -20,7 +20,7 @@ import { buildRecords } from '@/utils/personalRecords';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
-import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 
@@ -45,9 +45,11 @@ const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F871
 // store per karta (pola się różnią: gradient/pasek/płomień u serii, kolor akcentu/ikona-tło u
 // rekordów, rozmiar/grubość pierścienia u odliczań — to NIE jest jeden uniwersalny schemat na
 // siłę, tylko wspólny WZORZEC, bo "Odliczania" ma inny KSZTAŁT treści, lista+pierścień zamiast
-// siatki kafelków). Pełna wizja z NEXT_STEPS.md (edycja KAŻDEGO panelu, przepinanie nawigacji
-// kafelek→ekran, warstwy/justowanie) to kolejne fazy — rozszerzające ten sam wzorzec na kolejne
-// karty, nie przepisujące go od nowa.
+// siatki kafelków). Faza 4 (§330) dołożyła przepinanie nawigacji per nawyk. Faza 5 (§331)
+// dołożyła pozycję/warstwy (róg płomienia, czy jest na wierzchu tekstu, wyrównanie treści) —
+// pierwsza prawdziwa realizacja "edycji graficznej" z pierwotnej prośby usera, nie tylko
+// kolor/rozmiar. Pełna wizja z NEXT_STEPS.md (edycja KAŻDEGO panelu dashboardu) to kolejne
+// fazy — rozszerzające ten sam wzorzec na kolejne karty, nie przepisujące go od nowa.
 export default function DashboardTileCreator() {
   const c = useColors();
   const s = makeS(c);
@@ -258,6 +260,45 @@ export default function DashboardTileCreator() {
               </View>
             </View>
 
+            <Text style={s.sectionLabel}>Pozycja i warstwy</Text>
+            <View style={s.card}>
+              <View style={[s.row, { alignItems: 'flex-start' }]}>
+                <Text style={s.rowLabel}>Róg płomienia</Text>
+                <View style={s.cornerGrid}>
+                  {([['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']] as [FlameCorner, string][]).map(([m, sym]) => {
+                    const on = streaksDraft.flameCorner === m;
+                    return (
+                      <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ flameCorner: m }); }}
+                        style={[s.cornerBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                        <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{sym}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={s.divider} />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Płomień na wierzchu</Text>
+                <Switch value={streaksDraft.flameOnTop} onValueChange={v => { haptic.tap(); setStreaksDraft({ flameOnTop: v }); }}
+                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
+              </View>
+              <View style={s.divider} />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Wyrównanie treści</Text>
+                <View style={s.segmented}>
+                  {([['left', 'Do lewej'], ['center', 'Środek']] as [StreakTileStyle['contentAlign'], string][]).map(([m, lbl]) => {
+                    const on = streaksDraft.contentAlign === m;
+                    return (
+                      <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ contentAlign: m }); }}
+                        style={[s.segBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                        <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
             {/* Przepinanie nawigacji (§330) — TYLKO dla kafelków nawyków: to jedyne miejsce,
                 gdzie appka ma DWA sensowne, bezpieczne cele (kalendarz wody / kalendarz roku).
                 Liczniki (c:) i ćwiczenia (ex:) mają jeden, stały cel — nie ma tu czego wybierać. */}
@@ -425,6 +466,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   segTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+
+  cornerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: 76, justifyContent: 'flex-end' },
+  cornerBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
 
   actionsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[4] },
   ghostBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.md, backgroundColor: c.bg.elevated },
