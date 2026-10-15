@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 10: trzeci alternatywny styl, "Kompaktowy" (2026-10-15, §336)
+
+"Styl kafelka" ma teraz 4 opcje: Klasyczny/Pierścień/Pasek akcentu/Kompaktowy. **Priorytet
+testu WYSOKI** — checklist w ARCHITECTURE.md §336.
+
+**Otwarte**: "Analityczny" (ikona-w-kwadraciku + mikro-etykieta) dalej czeka na dostosowanie —
+oryginalny mockup z Artifact zakładał per-domenowe ikony (woda/słodycze/pogoda), kafelki serii
+mają dowolne nazwy nawyków. 4 style to już solidny wybór — kolejny preset nie jest pilny,
+warto sprawdzić na urządzeniu czy user w ogóle chce więcej, zanim dołoży się piąty.
+
 ## 🆕 Kreator dashboardu — Faza 9: drugi alternatywny styl, "Pasek akcentu" (2026-10-15, §335)
 
 "Styl kafelka" ma teraz 3 opcje: Klasyczny/Pierścień/Pasek akcentu. Waliduje że architektura

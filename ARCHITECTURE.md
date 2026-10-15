@@ -18348,6 +18348,29 @@ nadpisania progów, "Skala liczby" dalej działa w tym stylu (w przeciwieństwie
 
 ---
 
+## 336. Kreator dashboardu — Faza 10: trzeci alternatywny styl, "Kompaktowy" (2026-10-15)
+
+Czwarty `layoutPreset` (po Klasyczny/Pierścień/Pasek akcentu). Najgęstszy z czterech — mała
+ikona płomienia + liczba w jednym rzędzie, etykieta pod spodem jednym wierszem, minimalny
+padding, zero dekoracji (bez gradientu/watermarku/pierścienia). Dla usera który chce zmieścić
+dużo serii na małym miejscu, nie efektu wizualnego.
+
+Ten sam traktament co "Pierścień" (§334) co do pól: `numberScale` ma zastosowanie (liczba
+skaluje się normalnie), `gradientMode`/`showProgressBar`/`showFlame`/`flameCorner`/
+`flameOnTop`/`contentAlign` nie mają odpowiednika w tym układzie — kreator chowa "Tło i
+warstwy"/"Pozycja i warstwy" tak samo jak dla pierścienia i paska.
+
+Czwarta opcja w segmented "Styl kafelka" w kreatorze — żadnych innych zmian w UI kreatora,
+wzorzec z §334/§335 okazał się w pełni wystarczający (dowód że koszt krańcowy kolejnych
+presetów faktycznie maleje, jak zakładano w §335).
+
+**Testy**: brak nowych. `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: "Styl kafelka" ma teraz 4 opcje, "Kompaktowy"
+pokazuje gęsty rząd ikona+liczba+etykieta, wyraźnie mniejszy/gęstszy niż pozostałe trzy style.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
