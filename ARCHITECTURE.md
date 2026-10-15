@@ -17854,6 +17854,44 @@ pokazuje poprzednie dni (kolor wg liczby różnych ćwiczeń), pasek miesiąca m
 tap na dzień pokazuje/pozwala dopisać wpisy. Dashboard → "Twoje serie" zawiera teraz pozycję
 "Ćwiczenia" zamiast osobnej dużej karty, tap na nią prowadzi do historii.
 
+## 325. Mapa bossów — kamera nie re-centrowała się po wieloprzebiegowym layoucie na urządzeniu (2026-10-15)
+
+User, po §321/§322 (przebudowa od zera #2 + edytor), dalej ze zrzutem: "bossy sa rozjebane po
+mapie poza ekranem nie widac aktualnego z którym mogę walczyć". Szósta runda na tej mapie —
+diagnoza tym razem celowo inna niż poprzednio: zamiast kolejnej statycznej symulacji w jest
+(wyczerpana w §321 — potwierdziła poprawność matematyki dla sprawdzonych scenariuszy, co NIE
+pomogło na urządzeniu), poszukano klasy buga która z DEFINICJI nie mogła wyjść w jest, bo jest
+nie ma prawdziwego, wieloprzebiegowego silnika layoutu RN.
+
+**Znaleziony bug**: `centeredOn` (ref-strażnik pilnujący "czy kamera już wycentrowana") w
+§319/§321 pamiętał TYLKO `currentId`. RN (zwłaszcza Android) potrafi dostarczyć `onLayout`
+WIELOKROTNIE przy starcie ekranu, gdy layout się "ustatecznia" (pierwszy przebieg z
+tymczasowym rozmiarem, kolejny już z docelowym, np. po domknięciu się paska zakładek/safe-area
+insets). Każde takie wywołanie to wciąż TEN SAM `currentId` — strażnik widział "już
+wycentrowane na to id" i blokował PONOWNY `scrollTo`, nawet gdy drugi `onLayout` przyniósł
+zupełnie inny, docelowy rozmiar viewportu. Efekt: kamera zostawała wycentrowana względem
+PIERWSZEGO, tymczasowego rozmiaru ekranu — realny, powtarzalny offset na urządzeniu, którego
+żadna symulacja w jest (jednorazowe, statyczne wywołanie funkcji) nie mogła ujawnić.
+
+**Naprawa (`CampaignMap.tsx`)**: klucz strażnika to teraz TRÓJKA `currentId`+`viewport.w`+
+`viewport.h` zamiast samego `currentId` — każda GENUINE zmiana zmierzonego rozmiaru (nie tylko
+zmiana bossa) re-centruje kamerę. Szerokość uwzględniona też, nie tylko wysokość — wpływa na
+pozycje torów zygzaka (`nodes`), więc jej zmiana też wymaga ponownego scrolla.
+
+**Uczciwie**: to SZÓSTA próba na tej mapie, dalej bez możliwości weryfikacji na urządzeniu z
+tej sesji. W przeciwieństwie do poprzednich rund (każda matematycznie poprawna, ale dla
+niewłaściwego pytania), ten fix celuje w klasę buga specyficzną DLA realnych urządzeń
+(wieloprzebiegowy layout) — bardziej prawdopodobne trafienie, ale wciąż nieprzetestowane.
+
+**Testy**: brak nowych (zmiana retiming efektu, nie nowa logika matematyczna —
+`bossMapLayout.ts`/`applyLayoutOverrides` bez zmian, już przetestowane w §321/§322). `tsc
+--noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, SZÓSTA próba**: zimny start → Bossy → aktualny
+boss widoczny od razu, wycentrowany, BEZ przewijania. Jeśli WCIĄŻ źle — proszę o zrzut ekranu
+ZARAZ po otwarciu zakładki (nie po jakimkolwiek przewinięciu), to pomoże odróżnić "kamera
+startuje źle" od "kamera dryfuje po czymś innym".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

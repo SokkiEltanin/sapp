@@ -91,15 +91,30 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   // jest aktualnie wycentrowana) — łapie zarówno spóźnioną hydratację store'u jak i normalną
   // zmianę po wygranej walce. Natywny `scrollTo` SAM przycina do granic treści (RN), więc nie
   // ma tu żadnej ręcznej matematyki klamrowania do pomylenia.
-  const centeredOn = useRef<string | null | undefined>(undefined);
+  //
+  // BUG #4 (user, 2026-10-15, po §321: "bossy sa rozjebane po mapie poza ekranem nie widac
+  // aktualnego") — klucz `centeredOn` pamiętał TYLKO `currentId`, nie `viewport.h`. RN
+  // (zwłaszcza Android) potrafi dostarczyć `onLayout` WIELOKROTNIE przy starcie ekranu, gdy
+  // layout się "ustatecznia" (np. pierwszy przebieg zanim pasek zakładek/safe-area się
+  // domknie, kolejny z już docelowym rozmiarem) — każde wywołanie TO ten sam `currentId`, więc
+  // stary strażnik "już wycentrowane na to id" blokował jakikolwiek PONOWNY `scrollTo`, nawet
+  // gdy drugi `onLayout` przyniósł zupełnie inną, docelową wysokość viewportu. Efekt: kamera
+  // zostawała wycentrowana względem PIERWSZEGO, tymczasowego rozmiaru ekranu — na realnym
+  // urządzeniu (gdzie layout faktycznie ma wiele przebiegów) to dawało widoczny offset, czego
+  // nie dało się złapać w testach jest (brak prawdziwego, wieloprzebiegowego silnika layoutu).
+  // Naprawa: klucz strażnika to teraz TRÓJKA `currentId`+`viewport.w`+`viewport.h` — każda
+  // GENUINE zmiana zmierzonego rozmiaru (szerokość też, bo wpływa na pozycje torów zygzaka —
+  // patrz `nodes` wyżej) re-centruje kamerę na tym samym bossie, nie tylko zmiana bossa.
+  const centeredOn = useRef<string>('');
   useEffect(() => {
-    if (centeredOn.current === currentId) return;
-    if (!viewport.h || nodes.length === 0) return;
-    centeredOn.current = currentId;
+    if (!viewport.h || !viewport.w || nodes.length === 0) return;
+    const key = `${currentId ?? ''}:${viewport.w}:${viewport.h}`;
+    if (centeredOn.current === key) return;
+    centeredOn.current = key;
     const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
     const targetY = Math.max(0, nodes[idx].y - viewport.h / 2);
     scrollRef.current?.scrollTo({ y: targetY, animated: false });
-  }, [currentId, currentIdx, nodes, viewport.h]);
+  }, [currentId, currentIdx, nodes, viewport.w, viewport.h]);
 
   // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:
   // "te Ścieżki dalej mają byc czarno mgła zasłonięte"), + osobny, krótszy odcinek TYLKO do
