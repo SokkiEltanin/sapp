@@ -18280,6 +18280,43 @@ MUSZĄ zostać bez zmian — to weryfikuje że nadpisanie faktycznie jest zaizol
 
 ---
 
+## 334. Kreator dashboardu — Faza 8: zupełna zmiana stylu kafelka (2026-10-15)
+
+User (z dużej wizji po Fazie 6): "zmianę zupełną kafelków" — nie kolejny parametr
+istniejącego wyglądu, tylko inna IDENTYFIKACJA wizualna. Pierwsza realizacja tego konkretnego
+punktu, na "Twoje serie".
+
+**`layoutPreset: 'classic' | 'ring'`** w `StreakTileStyle`. `'classic'` = dotychczasowy
+gradientowy kwadrat z płomieniem (bez zmian). `'ring'` = zupełnie inny układ: neutralne tło +
+pierścień postępu zamiast koloru-tła-jako-informacji — REUŻYWA `RingCountdown` (komponent z
+"Odliczań", §329) zamiast pisać nowy pierścień od zera, ten sam wzorzec co `catmullRomPath`
+współdzielone między mapą bossów a jej edytorem w §322. Kolor pierścienia dalej respektuje
+nadpisania z "Palety progów" (§333) — `color` liczony jest raz, wyżej, niezależnie od
+`layoutPreset`.
+
+**Pola, które tracą sens w trybie 'ring', ZOSTAJĄ w typie/store, nie są usuwane** —
+`gradientMode`/`showFlame`/`flameCorner`/`flameOnTop`/`contentAlign`/`showProgressBar`/
+`numberScale` są wtedy po prostu ignorowane przez `renderTile` (wczesny `return` dla gałęzi
+`ring`, przed ich policzeniem). Dzięki temu przełączenie `'ring'`→`'classic'`→`'ring'` nie
+zeruje tego co user wcześniej ustawił w klasycznym stylu — każdy styl pamięta swoje ustawienia
+niezależnie, mimo współdzielonego jednego obiektu stylu.
+
+**Kreator** — nowa sekcja "Styl kafelka" (segmented, tylko "Twoje serie" — Rekordy/Odliczania
+mają już swój inny, ustalony kształt treści, ten sam wybór nie miałby tam sensu). Sekcje
+nieaktualne w trybie 'ring' ("Tło i warstwy", "Pozycja i warstwy", stepper "Skala liczby") są
+WARUNKOWO ukrywane zamiast zostawione martwe/mylące na ekranie — "Paleta progów" i "Cel po
+kliknięciu" zostają widoczne zawsze, bo dalej mają sens niezależnie od stylu kafelka.
+
+**Testy**: brak nowych — nowa gałąź renderowania, nie nowy algorytm. `tsc --noEmit` czyste,
+`jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: przełączenie "Styl kafelka" → "Pierścień" pokazuje
+zupełnie inny wygląd (nie tylko inny kolor/rozmiar), pierścień respektuje nadpisania koloru
+progu, przełączenie z powrotem na "Klasyczny" przywraca dokładnie to co było wcześniej
+ustawione (gradient/płomień itd. NIE wyzerowane), "Wdróż" trafia na prawdziwy dashboard.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

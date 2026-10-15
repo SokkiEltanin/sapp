@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 8: zupełna zmiana stylu kafelka (2026-10-15, §334)
+
+Zakładka "Twoje serie" → "Styl kafelka" → Klasyczny/Pierścień — pierwsza realizacja "zmiany
+zupełnej kafelków" z dużej wizji usera, nie parametr tego samego wyglądu tylko inna
+identyfikacja (reużywa `RingCountdown` z Odliczań). **Priorytet testu WYSOKI** — checklist w
+ARCHITECTURE.md §334.
+
+**Otwarte, naturalne rozszerzenie**: więcej presetów (np. "Analityczny"/"Pasek akcentu" z
+wcześniejszych makiet HTML w Artifact, patrz historia sesji) — ten sam mechanizm (wczesny
+`return` w `renderTile` per preset), nie nowa architektura. Niezaczynane teraz świadomie —
+jeden nowy preset na raz, żeby każdy dostał porządne dopracowanie zamiast masowej, płytkiej
+sztampy.
+
 ## 🆕 Kreator dashboardu — Faza 7: paleta progów + odstępy (2026-10-15, §333)
 
 Zakładka "Twoje serie" → "Paleta progów" (kolor każdego z 8 progów serii osobno, progi same —

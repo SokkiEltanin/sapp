@@ -21,7 +21,7 @@ import { STREAK_TIERS } from '@/utils/streakTiers';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
-import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 
@@ -200,6 +200,26 @@ export default function DashboardTileCreator() {
           <Text style={s.fullBtnTxt}>Podgląd pełnoekranowy</Text>
         </TouchableOpacity>
 
+        {/* Styl kafelka (§334) — "zmiana ZUPEŁNA kafelków", nie parametr istniejącego wyglądu.
+            Tylko "Twoje serie" na razie — Rekordy/Odliczania mają już swój ustalony, inny
+            kształt treści (hero+siatka / lista+pierścień), nie ten sam wybór tu miałby sens. */}
+        {activeCard === 'streaks' && (
+          <>
+            <Text style={s.sectionLabel}>Styl kafelka</Text>
+            <View style={s.segmented}>
+              {([['classic', 'Klasyczny'], ['ring', 'Pierścień']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = streaksDraft.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         <Text style={s.sectionLabel}>Kształt</Text>
         {activeCard === 'countdowns' ? (
           <View style={s.card}>
@@ -224,10 +244,16 @@ export default function DashboardTileCreator() {
             <Stepper label="Proporcje kafelka"
               value={activeCard === 'streaks' ? streaksDraft.aspectRatio : recordsDraft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
               onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} c={c} s={s} />
-            <View style={s.divider} />
-            <Stepper label="Skala liczby"
-              value={activeCard === 'streaks' ? streaksDraft.numberScale : recordsDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
-              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} c={c} s={s} />
+            {/* Skala liczby nie ma odpowiednika w stylu "Pierścień" — RingCountdown rysuje
+                liczbę dni sam, w swojej własnej skali (patrz §334). */}
+            {!(activeCard === 'streaks' && streaksDraft.layoutPreset === 'ring') && (
+              <>
+                <View style={s.divider} />
+                <Stepper label="Skala liczby"
+                  value={activeCard === 'streaks' ? streaksDraft.numberScale : recordsDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
+                  onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} c={c} s={s} />
+              </>
+            )}
             {activeCard === 'streaks' && (
               <>
                 <View style={s.divider} />
@@ -240,6 +266,9 @@ export default function DashboardTileCreator() {
 
         {activeCard === 'streaks' ? (
           <>
+            {/* Tło i warstwy / Pozycja i warstwy nie mają odpowiednika w stylu "Pierścień"
+                (§334) — gradient/płomień/wyrównanie dotyczą WYŁĄCZNIE klasycznego kafla. */}
+            {streaksDraft.layoutPreset === 'classic' && (<>
             <Text style={s.sectionLabel}>Tło i warstwy</Text>
             <View style={s.card}>
               <View style={s.row}>
@@ -308,6 +337,7 @@ export default function DashboardTileCreator() {
                 </View>
               </View>
             </View>
+            </>)}
 
             {/* Paleta progów (§333) — kolor KAŻDEGO z 8 progów serii nadpisywalny osobno.
                 Progi (minimalna liczba dni) NIE są tu edytowalne, tylko kolor — patrz komentarz

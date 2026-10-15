@@ -10,6 +10,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { StreakFlameGlow, streakTier, streakColor } from '@/components/counters/StreakFlame';
+import RingCountdown from '@/components/counters/RingCountdown';
 import DisplayText from '@/components/ui/DisplayText';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -158,6 +159,27 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
     const tierProgress = !isZero && tier.next != null
       ? Math.min(1, Math.max(0, (r.days - tier.min) / (tier.next - tier.min)))
       : null;
+    // Styl "Pierścień" (2026-10-15, Kreator Faza 8, §334) — user: "zmianę zupełną kafelków",
+    // nie tylko parametry tego SAMEGO wyglądu. Zupełnie inna identyfikacja wizualna: zamiast
+    // gradientowego kwadratu z płomieniem w rogu — neutralne tło + pierścień postępu (reużywa
+    // `RingCountdown`, już istniejący komponent z Odliczań, §329 — ten sam wzorzec co
+    // `catmullRomPath` współdzielone między mapą a jej edytorem w §322: jeden komponent,
+    // dwa miejsca użycia, zero duplikacji). Krótkie zamknięcie TUTAJ (nie na dole funkcji) —
+    // reszta (gradient/płomień/wyrównanie/pasek) dotyczy WYŁĄCZNIE klasycznego stylu, więc nie
+    // ma sensu jej liczyć gdy i tak nie zostanie użyta.
+    if (tileStyle.layoutPreset === 'ring') {
+      const ringProgress = isZero ? 0 : (tierProgress ?? 1);
+      return (
+        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
+          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
+          <View style={[s.ringTile, { borderRadius: tileStyle.cornerRadius }]}>
+            <RingCountdown progress={ringProgress} color={isZero ? c.text.muted : color} days={r.days} size={52} strokeWidth={5} />
+            <Text style={[s.ringLabel, { color: isZero ? c.text.muted : c.text.primary }]} numberOfLines={1}>{r.name}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
@@ -237,6 +259,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // user (2026-08-13): "Twoje serie używają cienkiej czcionki dla LICZBY".
   tileNum: { fontSize: 24, letterSpacing: -0.5, lineHeight: 26 },
   tileLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
+
+  // Styl "Pierścień" (§334) — ten sam `tileTouch`-vs-`tile` podział co klasyczny styl
+  // (proporcje na zewnątrz, wygląd wewnątrz), ale neutralne tło zamiast gradientu koloru progu.
+  ringTileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
+  ringTile: { flex: 1, backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center', gap: 4, padding: spacing[2] },
+  ringLabel: { fontFamily: fonts.label, fontSize: 10, fontWeight: '700', textAlign: 'center' },
 }));
 
 export default memo(StreakWallCard);

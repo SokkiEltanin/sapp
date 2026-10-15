@@ -5,8 +5,18 @@ import { throttledPersistStorage } from '@/utils/throttledStorage';
 export type HabitCalendarStyle = 'water' | 'year';
 export type FlameCorner = 'tl' | 'tr' | 'bl' | 'br';
 export type ContentAlign = 'left' | 'center';
+export type StreakLayoutPreset = 'classic' | 'ring';
 
 export interface StreakTileStyle {
+  // Faza 8 (2026-10-15, §334) — user: "zmianę zupełną kafelków", nie tylko parametry
+  // istniejącego wyglądu. `'classic'` = dotychczasowy gradientowy kwadrat z płomieniem
+  // (reszta pól niżej, bez zmiany znaczenia). `'ring'` = zupełnie inna identyfikacja: neutralne
+  // tło + pierścień postępu (reużywa `RingCountdown` z Odliczań, §329) — w tym trybie
+  // `gradientMode`/`showFlame`/`flameCorner`/`flameOnTop`/`contentAlign`/`showProgressBar`/
+  // `numberScale` są IGNOROWANE (nie mają odpowiednika w tym układzie), ale zostają w typie i w
+  // store'cie, żeby przełączenie z powrotem na `'classic'` przywróciło dokładnie to, co user
+  // tam miał ustawione — nic się nie zeruje przy przełączaniu stylu tam i z powrotem.
+  layoutPreset: StreakLayoutPreset;
   cornerRadius: number;
   aspectRatio: number;
   gradientMode: 'gradient' | 'flat';
@@ -49,6 +59,7 @@ export interface StreakTileStyle {
 // zawsze włączone, zero nadpisań nawigacji) — więc dopóki nikt nic nie wdroży z kreatora,
 // `live` renderuje się BIT-W-BIT tak samo jak przed tą zmianą.
 export const DEFAULT_STREAK_TILE_STYLE: StreakTileStyle = {
+  layoutPreset: 'classic',
   cornerRadius: 16,
   aspectRatio: 1.7,
   gradientMode: 'gradient',
