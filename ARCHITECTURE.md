@@ -18033,6 +18033,54 @@ zmiany"/"Domyślne" działają, ustawienie przetrwa zamknięcie appki (persist).
 
 ---
 
+## 328. Kreator dashboardu — Faza 2: druga karta ("Rekordy życiowe") (2026-10-15)
+
+Rozszerzenie §327 na kolejną kartę, dokładnie wg planu zapisanego wtedy w NEXT_STEPS.md
+("zacząć od kolejnej najbardziej 'kafelkowej'"). `PersonalRecordsCard` wybrana bo strukturalnie
+najbliższa `StreakWallCard` — hero-kafelek + siatka mniejszych kafelków z liczbą+etykietą+ikoną
+w tle, więc te same wymiary stylu (zaokrąglenie/proporcje/skala liczby) mają tu od razu sens, bez
+wymyślania nowego schematu.
+
+**Architektura — WZORZEC, nie jeden uniwersalny schemat.** Kusząca alternatywa byłaby jeden
+wspólny `TileStyle` dla wszystkich kart — ODRZUCONA świadomie: `StreakWallCard` ma
+gradient/pasek-postępu/płomień (pojęcia specyficzne dla "serii"), `PersonalRecordsCard` ma
+kolor-akcentu-do-wyboru/ikonę-w-tle (pojęcia specyficzne dla "rekordów" — kolor tu NIE pochodzi
+z progu jak w seriach, jest stały złoty, więc user może go realnie zmienić, w przeciwieństwie do
+koloru kafla serii który ZAWSZE wynika z `streakColor(dni)`). Wymuszenie jednego schematu albo
+zostawiłoby martwe pola (gradient dla rekordów, których nigdy nie miały), albo zmusiło do
+kompromisów w obu kartach. Zamiast tego: DRUGI, osobny store (`recordsTileStyleStore.ts`,
+identyczny KSZTAŁT co `streakTileStyleStore.ts` — `live`/`draft`/`publish`/`discardDraft`/
+`resetDraftToDefault`, persist `records-tile-style-v1`) z WŁASNYMI, dopasowanymi do karty polami.
+
+**`PersonalRecordsCard.tsx`** — ten sam `styleOverride` prop co `StreakWallCard`. Jedna
+komplikacja nowa względem Fazy 1: kolor (`GOLD`) był dotąd modułowym `const`, używanym WEWNĄTRZ
+`themedStyles` (cache'owane tylko po palecie, nie po stylu) — podmiana na `tileStyle.accentColor`
+wymagała wyniesienia WSZYSTKICH miejsc korzystających z koloru z `makeS` do inline merge w
+`renderRec()` (ten sam zabieg co `radiusStyle`/`gradientMode` w `StreakWallCard` z §327) —
+inaczej kolor zamroziłby się na pierwszej wartości z jaką `makeS` się odpalił.
+
+**`app/dashboard-tile-creator.tsx`** — zakładki u góry ("Twoje serie" / "Rekordy") zamiast
+osobnego ekranu per karta; `activeCard` state przełącza które store'y/kontrolki/podgląd są
+aktywne. Kontrolki wspólne (zaokrąglenie/proporcje/skala) renderują się zawsze, sekcja
+"Tło i warstwy" (serie) vs "Kolor i warstwy" (rekordy) jest WARUNKOWA — różne pola, różne UI
+(segmented dla gradientu, siatka kolorowych swatchy dla akcentu rekordów). Dane do podglądu
+rekordów: `buildRecords({}, expenses, moodEntries, foodMeals, foodProducts)` — `healthDays`
+świadomie pusty obiekt (kroki/sen/waga ładują się asynchronicznie z Health Connect w
+`index.tsx`, za dużo infrastruktury do powielania w samym podglądzie stylu) — to zresztą
+DOKŁADNIE ten sam stan startowy co na realnym dashboardzie przed odpowiedzią Health Connect
+(`useState<StatCtx['healthDays']>({})`), więc rekordy oparte o wydatki/nastrój/jedzenie dalej
+liczą się z prawdziwych danych, tylko kroki/sen/waga-rekordy nie pojawią się w podglądzie.
+
+**Testy**: brak nowych — ten sam powód co §327 (proste podstawienia stylu, nie algorytm).
+`tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: zakładka "Rekordy" w kreatorze pokazuje prawdziwe
+rekordy, zmiana koloru akcentu/zaokrąglenia/proporcji/ikony-w-tle widoczna na żywo, "Wdróż"
+zmienia prawdziwą kartę "Rekordy życiowe" na dashboardzie, przełączanie zakładek NIE miesza
+stanu obu kart (każda ma swój store).
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

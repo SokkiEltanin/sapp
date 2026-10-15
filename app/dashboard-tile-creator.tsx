@@ -12,10 +12,21 @@ import { useCounters, autoDaysWithout } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
 import { useExercisesStore } from '@/store/exercisesStore';
+import { useMoodStore } from '@/store/moodStore';
 import { useDayKey } from '@/hooks/useDayKey';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
+import { buildRecords } from '@/utils/personalRecords';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
+import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import { useStreakTileStyleStore, StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
+
+type CardKey = 'streaks' | 'records';
+const CARD_TABS: { key: CardKey; label: string }[] = [
+  { key: 'streaks', label: 'Twoje serie' },
+  { key: 'records', label: 'Rekordy' },
+];
+const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
 
 // Kreator dashboardu — FAZA 1 (2026-10-15, ARCHITECTURE.md §327). User: "zrobisz mi prawdziwy
 // kreator w ustawieniach ze wszystkim w aplikacji... ja będę sobie robił edytował kreował
@@ -25,33 +36,51 @@ import { useStreakTileStyleStore, StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } f
 // (dokładnie to samo źródło co `streakWall` w app/(tabs)/index.tsx), więc podgląd tutaj = to,
 // co realnie zobaczysz po "Wdróż", co do piksela.
 //
-// Zakres Fazy 1 ŚWIADOMIE wąski — tylko "Twoje serie" (jeden, samodzielny komponent), nie cały
-// dashboard. Pełna wizja z NEXT_STEPS.md (edycja KAŻDEGO panelu, przepinanie nawigacji kafelek→
-// ekran, warstwy/justowanie) to Faza 2/3 — rozszerzające TEN SAM mechanizm (draft/live store +
-// `styleOverride` prop) na kolejne karty, nie przepisujące go od nowa.
+// Faza 1 (§327) zrobiła "Twoje serie", Faza 2 (§328) dołożyła "Rekordy życiowe" jako zakładkę
+// obok — TEN SAM mechanizm (draft/live store + `styleOverride` prop), osobny store per karta
+// (pola się różnią: gradient/pasek/płomień u serii, kolor akcentu/ikona-tło u rekordów — to NIE
+// jest jeden uniwersalny schemat na siłę, tylko wspólny WZORZEC). Pełna wizja z NEXT_STEPS.md
+// (edycja KAŻDEGO panelu, przepinanie nawigacji kafelek→ekran, warstwy/justowanie) to kolejne
+// fazy — rozszerzające ten sam wzorzec na kolejne karty, nie przepisujące go od nowa.
 export default function DashboardTileCreator() {
   const c = useColors();
   const s = makeS(c);
-  const draft = useStreakTileStyleStore(st => st.draft);
-  const setDraft = useStreakTileStyleStore(st => st.setDraft);
-  const publish = useStreakTileStyleStore(st => st.publish);
-  const discardDraft = useStreakTileStyleStore(st => st.discardDraft);
-  const resetDraftToDefault = useStreakTileStyleStore(st => st.resetDraftToDefault);
-  const live = useStreakTileStyleStore(st => st.live);
+  const [activeCard, setActiveCard] = useState<CardKey>('streaks');
   const [fullPreview, setFullPreview] = useState(false);
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(live);
-  const isDefault = JSON.stringify(draft) !== JSON.stringify(DEFAULT_STREAK_TILE_STYLE);
+  // Streaks store (§327, Faza 1)
+  const streaksDraft = useStreakTileStyleStore(st => st.draft);
+  const setStreaksDraft = useStreakTileStyleStore(st => st.setDraft);
+  const publishStreaks = useStreakTileStyleStore(st => st.publish);
+  const discardStreaksDraft = useStreakTileStyleStore(st => st.discardDraft);
+  const resetStreaksDefault = useStreakTileStyleStore(st => st.resetDraftToDefault);
+  const streaksLive = useStreakTileStyleStore(st => st.live);
 
-  // Te same realne dane co dashboard — patrz `streakWall` w app/(tabs)/index.tsx:627. Celowo
-  // NIE snapshot (CLAUDE.md §3 to dotyczy handlerów PISZĄCYCH `expenses` po paragonie — tu
-  // tylko CZYTAMY do podglądu, więc żywy store jest w porządku, a nawet dokładniejszy).
+  // Records store (§328, Faza 2) — ten sam mechanizm, druga karta.
+  const recordsDraft = useRecordsTileStyleStore(st => st.draft);
+  const setRecordsDraft = useRecordsTileStyleStore(st => st.setDraft);
+  const publishRecords = useRecordsTileStyleStore(st => st.publish);
+  const discardRecordsDraft = useRecordsTileStyleStore(st => st.discardDraft);
+  const resetRecordsDefault = useRecordsTileStyleStore(st => st.resetDraftToDefault);
+  const recordsLive = useRecordsTileStyleStore(st => st.live);
+
+  const isDirty = activeCard === 'streaks'
+    ? JSON.stringify(streaksDraft) !== JSON.stringify(streaksLive)
+    : JSON.stringify(recordsDraft) !== JSON.stringify(recordsLive);
+  const isDefault = activeCard === 'streaks'
+    ? JSON.stringify(streaksDraft) !== JSON.stringify(DEFAULT_STREAK_TILE_STYLE)
+    : JSON.stringify(recordsDraft) !== JSON.stringify(DEFAULT_RECORDS_TILE_STYLE);
+
+  // Te same realne dane co dashboard — patrz `streakWall`/`records` w app/(tabs)/index.tsx.
+  // Celowo NIE snapshot (CLAUDE.md §3 to dotyczy handlerów PISZĄCYCH `expenses` po paragonie —
+  // tu tylko CZYTAMY do podglądu, więc żywy store jest w porządku, a nawet dokładniejszy).
   const { habits, getStreak } = useHabits();
   const counters = useCounters(st => st.counters);
   const expenses = useExpensesStore(st => st.expenses);
   const foodMeals = useFoodStore(st => st.meals);
   const foodProducts = useFoodStore(st => st.products);
   const exerciseLogs = useExercisesStore(st => st.logs);
+  const moodEntries = useMoodStore(st => st.entries);
   const dayKey = useDayKey();
   const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
   const realStreaks = useMemo<StreakItem[]>(() => {
@@ -62,11 +91,22 @@ export default function DashboardTileCreator() {
     const exercise: StreakItem = { key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak };
     return [exercise, ...fromHabits, ...fromCounters];
   }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak]);
+  // `healthDays` pominięte (pusty obiekt) — na prawdziwym dashboardzie ładowane asynchronicznie
+  // z Health Connect (kroki/sen/waga, patrz index.tsx `reloadHealth`), za dużo do powielania w
+  // samym podglądzie stylu. Rekordy oparte o wydatki/nastrój/jedzenie dalej liczą się z
+  // prawdziwych danych — `{}` to zresztą DOKŁADNIE ten sam stan początkowy co na realnym
+  // dashboardzie, zanim Health Connect odpowie (index.tsx `useState<StatCtx['healthDays']>({})`).
+  const realRecords = useMemo(
+    () => buildRecords({}, expenses, moodEntries, foodMeals, foodProducts),
+    [expenses, moodEntries, foodMeals, foodProducts],
+  );
 
   const doPublish = () => {
     haptic.success();
-    publish();
+    if (activeCard === 'streaks') publishStreaks(); else publishRecords();
   };
+  const doDiscard = () => { haptic.tap(); if (activeCard === 'streaks') discardStreaksDraft(); else discardRecordsDraft(); };
+  const doResetDefault = () => { haptic.tap(); if (activeCard === 'streaks') resetStreaksDefault(); else resetRecordsDefault(); };
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -81,10 +121,26 @@ export default function DashboardTileCreator() {
         </TouchableOpacity>
       </View>
 
+      <View style={s.tabs}>
+        {CARD_TABS.map(t => {
+          const on = activeCard === t.key;
+          return (
+            <TouchableOpacity key={t.key} onPress={() => { haptic.tap(); setActiveCard(t.key); }}
+              style={[s.tabBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+              <Text style={[s.tabTxt, on && { color: c.accent.blue }]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.sectionLabel}>Podgląd — „Twoje serie" (prawdziwe dane)</Text>
+        <Text style={s.sectionLabel}>
+          Podgląd — „{activeCard === 'streaks' ? 'Twoje serie' : 'Rekordy życiowe'}" (prawdziwe dane)
+        </Text>
         <View style={s.previewWrap}>
-          <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={draft} />
+          {activeCard === 'streaks'
+            ? <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={streaksDraft} />
+            : <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />}
         </View>
         <TouchableOpacity onPress={() => { haptic.tap(); setFullPreview(true); }} style={s.fullBtn}>
           <Maximize2 size={14} color={c.text.secondary} />
@@ -93,51 +149,82 @@ export default function DashboardTileCreator() {
 
         <Text style={s.sectionLabel}>Kształt</Text>
         <View style={s.card}>
-          <Stepper label="Zaokrąglenie rogów" value={draft.cornerRadius} min={0} max={32} step={2}
-            onChange={v => setDraft({ cornerRadius: v })} c={c} s={s} />
+          <Stepper label="Zaokrąglenie rogów"
+            value={activeCard === 'streaks' ? streaksDraft.cornerRadius : recordsDraft.cornerRadius} min={0} max={32} step={2}
+            onChange={v => activeCard === 'streaks' ? setStreaksDraft({ cornerRadius: v }) : setRecordsDraft({ cornerRadius: v })} c={c} s={s} />
           <View style={s.divider} />
-          <Stepper label="Proporcje kafelka" value={draft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
-            onChange={v => setDraft({ aspectRatio: v })} c={c} s={s} />
+          <Stepper label="Proporcje kafelka"
+            value={activeCard === 'streaks' ? streaksDraft.aspectRatio : recordsDraft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
+            onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} c={c} s={s} />
           <View style={s.divider} />
-          <Stepper label="Skala liczby" value={draft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
-            onChange={v => setDraft({ numberScale: v })} c={c} s={s} />
+          <Stepper label="Skala liczby"
+            value={activeCard === 'streaks' ? streaksDraft.numberScale : recordsDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
+            onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} c={c} s={s} />
         </View>
 
-        <Text style={s.sectionLabel}>Tło i warstwy</Text>
-        <View style={s.card}>
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Tło</Text>
-            <View style={s.segmented}>
-              {([['gradient', 'Gradient'], ['flat', 'Płasko']] as [StreakTileStyle['gradientMode'], string][]).map(([m, lbl]) => {
-                const on = draft.gradientMode === m;
-                return (
-                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setDraft({ gradientMode: m }); }}
-                    style={[s.segBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
-                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+        {activeCard === 'streaks' ? (
+          <>
+            <Text style={s.sectionLabel}>Tło i warstwy</Text>
+            <View style={s.card}>
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Tło</Text>
+                <View style={s.segmented}>
+                  {([['gradient', 'Gradient'], ['flat', 'Płasko']] as [StreakTileStyle['gradientMode'], string][]).map(([m, lbl]) => {
+                    const on = streaksDraft.gradientMode === m;
+                    return (
+                      <TouchableOpacity key={m} onPress={() => { haptic.tap(); setStreaksDraft({ gradientMode: m }); }}
+                        style={[s.segBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                        <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={s.divider} />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Pasek postępu</Text>
+                <Switch value={streaksDraft.showProgressBar} onValueChange={v => { haptic.tap(); setStreaksDraft({ showProgressBar: v }); }}
+                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
+              </View>
+              <View style={s.divider} />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Płomień w tle</Text>
+                <Switch value={streaksDraft.showFlame} onValueChange={v => { haptic.tap(); setStreaksDraft({ showFlame: v }); }}
+                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
+              </View>
             </View>
-          </View>
-          <View style={s.divider} />
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Pasek postępu</Text>
-            <Switch value={draft.showProgressBar} onValueChange={v => { haptic.tap(); setDraft({ showProgressBar: v }); }}
-              trackColor={{ false: c.border.default, true: c.accent.blue }} />
-          </View>
-          <View style={s.divider} />
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Płomień w tle</Text>
-            <Switch value={draft.showFlame} onValueChange={v => { haptic.tap(); setDraft({ showFlame: v }); }}
-              trackColor={{ false: c.border.default, true: c.accent.blue }} />
-          </View>
-        </View>
+          </>
+        ) : (
+          <>
+            <Text style={s.sectionLabel}>Kolor i warstwy</Text>
+            <View style={s.card}>
+              <View style={[s.row, { alignItems: 'flex-start' }]}>
+                <Text style={s.rowLabel}>Kolor akcentu</Text>
+                <View style={s.swatchRow}>
+                  {RECORD_COLOR_PRESETS.map(hex => {
+                    const on = recordsDraft.accentColor === hex;
+                    return (
+                      <TouchableOpacity key={hex} onPress={() => { haptic.tap(); setRecordsDraft({ accentColor: hex }); }}
+                        style={[s.swatch, { backgroundColor: hex }, on && s.swatchOn]} />
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={s.divider} />
+              <View style={s.row}>
+                <Text style={s.rowLabel}>Ikona w tle</Text>
+                <Switch value={recordsDraft.showBgIcon} onValueChange={v => { haptic.tap(); setRecordsDraft({ showBgIcon: v }); }}
+                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
+              </View>
+            </View>
+          </>
+        )}
 
         <View style={s.actionsRow}>
-          <TouchableOpacity onPress={() => { haptic.tap(); discardDraft(); }} style={s.ghostBtn} disabled={!isDirty}>
+          <TouchableOpacity onPress={doDiscard} style={s.ghostBtn} disabled={!isDirty}>
             <Text style={[s.ghostBtnTxt, !isDirty && { opacity: 0.4 }]}>Cofnij zmiany</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { haptic.tap(); resetDraftToDefault(); }} style={s.ghostBtn} disabled={!isDefault}>
+          <TouchableOpacity onPress={doResetDefault} style={s.ghostBtn} disabled={!isDefault}>
             <RotateCcw size={13} color={c.text.secondary} style={{ opacity: isDefault ? 1 : 0.4 }} />
             <Text style={[s.ghostBtnTxt, !isDefault && { opacity: 0.4 }]}>Domyślne</Text>
           </TouchableOpacity>
@@ -155,7 +242,9 @@ export default function DashboardTileCreator() {
             <X size={18} color={c.text.secondary} />
           </TouchableOpacity>
           <View style={s.fullBody}>
-            <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={draft} />
+            {activeCard === 'streaks'
+              ? <StreakWallCard streaks={realStreaks} cardBg={c.bg.card} styleOverride={streaksDraft} />
+              : <PersonalRecordsCard records={realRecords} cardBg={c.bg.card} styleOverride={recordsDraft} />}
           </View>
           <Text style={s.fullHint}>Cofnij (gest/przycisk) albo ✕, żeby wyjść</Text>
         </SafeAreaView>
@@ -202,6 +291,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 8,
   },
   deployTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+
+  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
+  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
+  tabTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1, justifyContent: 'flex-end' },
+  swatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: 'transparent' },
+  swatchOn: { borderColor: c.text.primary },
 
   scroll: { paddingHorizontal: spacing[4], paddingBottom: spacing[6], gap: spacing[2] },
   sectionLabel: {

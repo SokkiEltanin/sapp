@@ -8,9 +8,9 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { useRecordsTileStyleStore, RecordsTileStyle } from '@/store/recordsTileStyleStore';
 
 const ICONS: Record<string, any> = { footprints: Footprints, moon: Moon, flame: Flame, smile: Smile, scale: Scale };
-const GOLD = '#FBBF24';
 
 // Data rekordu (2026-09-29, audyt czytelności) — karta pokazywała WARTOŚĆ bez żadnej daty,
 // nie dało się ocenić czy rekord jest świeży czy sprzed lat. 'dziś'/'wczoraj' dla ostatnich
@@ -32,9 +32,15 @@ function fmtRecordDate(iso?: string): string | null {
 // dostaje HERO na pełną szerokość ze złotym medalem i wielką wartością; reszta to siatka
 // kwadratów z tłem-ikoną. Mono (wartości białe), złoto = jedyny „dodatek" (to półka
 // trofeów). Liczby z buildRecords (personalRecords.ts).
-function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardBg: string }) {
+// `styleOverride` (2026-10-15, Kreator dashboardu Faza 2, §328) — ten sam wzorzec co
+// `StreakWallCard` (§327): bez override karta czyta `live` ze store'a (prawdziwy dashboard),
+// kreator podaje `draft`, więc renderuje się dokładnie TEN SAM komponent w obu miejscach.
+function PersonalRecordsCard({ records, cardBg, styleOverride }: { records: RecordItem[]; cardBg: string; styleOverride?: RecordsTileStyle }) {
   const c = useColors();
   const s = makeS(c);
+  const liveTileStyle = useRecordsTileStyleStore(st => st.live);
+  const tileStyle = styleOverride ?? liveTileStyle;
+  const GOLD = tileStyle.accentColor;
   if (records.length === 0) return null;
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
@@ -60,14 +66,15 @@ function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardB
   function renderRec(r: RecordItem, hero: boolean) {
     const Ic = ICONS[r.icon] ?? Trophy;
     const dateLabel = fmtRecordDate(r.date);
+    const radiusStyle = { borderRadius: tileStyle.cornerRadius };
     if (hero) {
       return (
-        <View key={r.key} style={s.hero}>
-          <Ic size={110} color={GOLD} strokeWidth={1.3} style={s.heroBgIcon} />
-          <View style={s.medal}><Medal size={20} color="#12100F" strokeWidth={2.4} /></View>
+        <View key={r.key} style={[s.hero, radiusStyle, { backgroundColor: GOLD + '14', borderColor: GOLD + '3A' }]}>
+          {tileStyle.showBgIcon && <Ic size={110} color={GOLD} strokeWidth={1.3} style={s.heroBgIcon} />}
+          <View style={[s.medal, { backgroundColor: GOLD }]}><Medal size={20} color="#12100F" strokeWidth={2.4} /></View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.heroEyebrow}>NAJLEPSZY WYNIK</Text>
-            <DisplayText style={s.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{r.value}</DisplayText>
+            <Text style={[s.heroEyebrow, { color: GOLD }]}>NAJLEPSZY WYNIK</Text>
+            <DisplayText style={[s.heroValue, { fontSize: 30 * tileStyle.numberScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{r.value}</DisplayText>
             <Text style={s.heroLabel} numberOfLines={2}>{r.label}</Text>
             {dateLabel && <Text style={s.heroDate}>{dateLabel}</Text>}
           </View>
@@ -75,9 +82,9 @@ function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardB
       );
     }
     return (
-      <View key={r.key} style={s.tile}>
-        <Ic size={74} color={GOLD} strokeWidth={1.4} style={s.bgIcon} />
-        <DisplayText style={s.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{r.value}</DisplayText>
+      <View key={r.key} style={[s.tile, radiusStyle, { aspectRatio: tileStyle.aspectRatio }]}>
+        {tileStyle.showBgIcon && <Ic size={74} color={GOLD} strokeWidth={1.4} style={s.bgIcon} />}
+        <DisplayText style={[s.value, { fontSize: 27 * tileStyle.numberScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{r.value}</DisplayText>
         <Text style={s.label} numberOfLines={2}>{r.label}</Text>
         {dateLabel && <Text style={s.tileDate}>{dateLabel}</Text>}
       </View>
@@ -91,33 +98,35 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   title: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
   headCount: { fontSize: 12, fontWeight: '800', color: c.text.muted, fontVariant: ['tabular-nums'] },
 
-  // HERO — flagowy rekord
+  // HERO — flagowy rekord. Kolor/promień/skala PRZENIESIONE do inline mergy w renderRec()
+  // (2026-10-15, §328) — zależą od `tileStyle`, które zmienia się per-render (draft w
+  // kreatorze), a `makeS` jest cache'owane TYLKO po palecie kolorów (patrz themedStyles.ts) —
+  // zaszycie ich tutaj zamroziłoby je na pierwszej wartości.
   hero: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: GOLD + '14', borderRadius: radius.lg,
-    borderWidth: 1, borderColor: GOLD + '3A',
+    borderWidth: 1,
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
     overflow: 'hidden',
   },
   heroBgIcon: { position: 'absolute', top: -14, right: -12, opacity: 0.18 },
   medal: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  heroEyebrow: { fontFamily: fonts.label, fontSize: 9, color: GOLD, letterSpacing: 1, textTransform: 'uppercase' },
-  heroValue: { fontSize: 30, color: c.text.primary, letterSpacing: -0.5, marginTop: 2 },
+  heroEyebrow: { fontFamily: fonts.label, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' },
+  heroValue: { color: c.text.primary, letterSpacing: -0.5, marginTop: 2 },
   heroLabel: { fontSize: 12, fontWeight: '600', color: c.text.secondary, marginTop: 1, lineHeight: 16 },
   heroDate: { fontSize: 10, color: c.text.muted, marginTop: 2 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tile: {
-    flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.5,
-    backgroundColor: c.fill.subtle, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle,
+    flexBasis: '47%', flexGrow: 1, minWidth: 130,
+    backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
   bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.18 },
-  value: { fontSize: 27, color: c.text.primary, letterSpacing: -0.5 },
+  value: { color: c.text.primary, letterSpacing: -0.5 },
   label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3, lineHeight: 15 },
   tileDate: { fontSize: 9, color: c.text.muted, marginTop: 1 },
 }));
