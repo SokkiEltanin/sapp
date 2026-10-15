@@ -18114,6 +18114,46 @@ widocznych pozycji widoczna na żywo, "Wdróż" zmienia prawdziwą kartę na das
 
 ---
 
+## 330. Kreator dashboardu — Faza 4: przepinanie nawigacji kafelka (2026-10-15)
+
+Pierwszy raz w tej serii faz NIE jest to rozszerzenie na kolejną kartę, tylko nowa KATEGORIA
+funkcji — user chciał od początku "połączenia między [kafelkami]... ten kafelek po kliknięciu
+przenosi TUTAJ". NEXT_STEPS.md (zapisane w §327) jawnie ostrzegało: NIE dowolny string jako cel
+— złamałby nawigację. Zamiast więc pełnego "wybierz dowolny ekran z appki" (ryzykowne — kafelek
+Wody prowadzący do zakładki Praca nie ma żadnego sensu i user by się zgubił), zbudowane: wybór
+między DWOMA widokami, które `StreakWallCard.onTile` JUŻ uznaje za poprawne dla kafelka nawyku
+(`h:` prefiks) — bogaty kalendarz wody (`/water-calendar`) vs generyczny kalendarz roku
+(`/habit-year`), dziś wybierane automatycznie po `kind==='water'`. To JEDYNE miejsce w całej
+karcie, gdzie istnieje realny, bezpieczny wybór — liczniki (`c:`) i ćwiczenia (`ex:`) mają
+jeden, stały, poprawny cel, nie ma tu czego nadpisywać.
+
+**`streakTileStyleStore.ts`** — nowe pole `habitCalendarOverrides: Record<string,
+HabitCalendarStyle>` (klucz = goły id nawyku, bez `h:` prefiksu) w `StreakTileStyle`, plus
+dedykowana akcja `setDraftHabitCalendar(habitId, style|null)` (zamiast generycznego `setDraft`
+— bo to aktualizacja ZAGNIEŻDŻONEJ mapy, nie płaskiego pola). `null` usuwa nadpisanie (powrót do
+zachowania domyślnego). Pusta mapa domyślnie → `DEFAULT_STREAK_TILE_STYLE` renderuje się
+DOKŁADNIE jak przed §330, zero zmiany zachowania bez jawnego wdrożenia.
+
+**`StreakWallCard.tsx` `onTile`** — nadpisanie z `tileStyle.habitCalendarOverrides` wygrywa z
+domyślnym `kind==='water'`, ale tylko gdy wpis istnieje. Ponieważ `tileStyle` już wcześniej (§327)
+to `styleOverride ?? liveTileStyle`, to nadpisanie DZIAŁA w podglądzie kreatora bez żadnej
+dodatkowej zmiany — tapnięcie kafelka W PODGLĄDZIE kreatora faktycznie nawiguje według DRAFT, nie
+LIVE, więc user widzi efekt swojego wyboru nawigacji tak samo "na żywo" jak zmianę koloru.
+
+**Kreator** — nowa sekcja "Cel po kliknięciu" (tylko zakładka "Twoje serie", tylko gdy są jakieś
+kafelki nawyków) — lista nawyków z segmented-control (Wody/Roku) per nawyk, aktualny wybór
+odczytany z nadpisania albo domyślnego zachowania.
+
+**Testy**: brak nowych — proste podstawienie wartości w routingu, nie algorytm. `tsc --noEmit`
+czyste, `jest --silent` 106/106 suite, 1389 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI**: zakładka "Twoje serie" → "Cel po kliknięciu" →
+zmiana Wody/Roku dla konkretnego nawyku → tapnięcie TEGO kafelka w podglądzie kreatora otwiera
+wybrany kalendarz → "Wdróż" → to samo tapnięcie na PRAWDZIWYM dashboardzie otwiera ten sam,
+wybrany kalendarz. Nawyki bez nadpisania dalej zachowują się jak dotąd.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*
