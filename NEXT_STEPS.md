@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 11: czwarta karta, "Liczniki" (2026-10-15, §337)
+
+Kreator kafelków ma teraz 4 zakładki: Twoje serie/Rekordy/Odliczania/**Liczniki**
+(`SinceCountersCard` — ręczne liczniki "ile dni temu", NIE auto-liczniki typu "bez słodyczy",
+te są w "Twoje serie"). Pierwsza nowa karta od Fazy 3 — potwierdza że wzorzec (osobny store +
+`styleOverride` prop) generalizuje się dobrze na komponenty o innym kształcie treści (lista
+wierszy, nie siatka). **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §337.
+
+**Otwarte, ten sam wzorzec do rozszerzenia dalej** (kandydaci z §327's listy, dalej aktualni):
+`PinnedNotesCard`, `GCalCard`. Oba inny kształt niż dotychczasowe 4 karty (notatki = tekst+tag,
+kalendarz = lista eventów z godzinami) — każdy wymaga własnego zestawu pól, nie kopiowania.
+Nie zaczynane teraz — jedna karta na raz, ten sam rytm co presety w Fazach 8-10.
+
 ## 🆕 Kreator dashboardu — Faza 10: trzeci alternatywny styl, "Kompaktowy" (2026-10-15, §336)
 
 "Styl kafelka" ma teraz 4 opcje: Klasyczny/Pierścień/Pasek akcentu/Kompaktowy. **Priorytet
