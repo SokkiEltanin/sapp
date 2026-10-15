@@ -180,6 +180,33 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
       );
     }
 
+    // Styl "Pasek akcentu" (2026-10-15, Kreator Faza 9, §335) — drugi alternatywny styl po
+    // "Pierścień" (§334), waliduje że `layoutPreset` generalizuje się na WIĘCEJ niż dwie
+    // opcje, nie jest specyficzny dla pierścienia. Neutralne tło zamiast gradientu + cienki
+    // kolorowy pasek z boku (kolor progu) + duży, cichy `Flame` jako watermark w tle (reużywa
+    // ikonę już zaimportowaną do nagłówka karty, NIE `StreakFlameGlow` — ten jest zbyt
+    // dekoracyjny/wielowarstwowy na rolę subtelnego tła).
+    if (tileStyle.layoutPreset === 'stripe') {
+      return (
+        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
+          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
+          <View style={[s.stripeTile, {
+            borderRadius: tileStyle.cornerRadius,
+            borderLeftColor: isZero ? c.text.muted : color,
+            alignItems: tileStyle.contentAlign === 'center' ? 'center' : 'flex-start',
+          }]}>
+            {tileStyle.showFlame && (
+              <View style={s.stripeGhost} pointerEvents="none">
+                <Flame size={74} color={isZero ? c.text.muted : color} fill={isZero ? c.text.muted : color} strokeWidth={0} />
+              </View>
+            )}
+            <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : c.text.primary, fontSize: 24 * tileStyle.numberScale, lineHeight: 26 * tileStyle.numberScale }]}>{r.days}</DisplayText>
+            <Text style={[s.stripeLabel, { color: c.text.secondary, textAlign: tileStyle.contentAlign }]} numberOfLines={1}>{r.name}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
     // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
     // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
@@ -265,6 +292,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   ringTileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
   ringTile: { flex: 1, backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center', gap: 4, padding: spacing[2] },
   ringLabel: { fontFamily: fonts.label, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+
+  // Styl "Pasek akcentu" (§335)
+  stripeTile: {
+    flex: 1, backgroundColor: c.bg.elevated, borderLeftWidth: 3, overflow: 'hidden', position: 'relative',
+    paddingHorizontal: spacing[2], paddingTop: spacing[2], paddingBottom: spacing[1],
+  },
+  stripeGhost: { position: 'absolute', right: -14, bottom: -12, opacity: 0.14 },
+  stripeLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
 }));
 
 export default memo(StreakWallCard);
