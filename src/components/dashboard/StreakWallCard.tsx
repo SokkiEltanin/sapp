@@ -1,19 +1,17 @@
 import { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Snowflake } from 'lucide-react-native';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { useStreakTileStyleStore, StreakTileStyle, FlameCorner } from '@/store/streakTileStyleStore';
+import { useStreakTileStyleStore, StreakTileStyle } from '@/store/streakTileStyleStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
-import { StreakFlameGlow, streakTier, streakColor } from '@/components/counters/StreakFlame';
-import RingCountdown from '@/components/counters/RingCountdown';
-import DisplayText from '@/components/ui/DisplayText';
+import { streakTier } from '@/components/counters/StreakFlame';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
+import { StreakTile } from './StreakTile';
 
 // `kind` (2026-10-13, user: "woda jak wchodzę ze streaka jest inna [zakładka] niż na
 // zdrowiu... ujednolicić") — jedyny powód tego pola: odróżnić nawyk "Woda" (ma WŁASNY,
@@ -22,25 +20,6 @@ import { haptic } from '@/utils/haptics';
 export interface StreakItem { key: string; name: string; days: number; kind?: string }
 
 const SEEN_KEY = 'streak_tiers_v1';
-
-// Second gradient stop for a tile — same hue, mixed toward black for depth (matches the
-// diagonal-gradient pattern MonthWrappedCard already uses for its cards).
-function darken(hex: string, amt: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.round(((n >> 16) & 255) * (1 - amt));
-  const g = Math.round(((n >> 8) & 255) * (1 - amt));
-  const b = Math.round((n & 255) * (1 - amt));
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-// Pozycja rogu płomienia (§331) — wartości identyczne jak dotychczasowy, zaszyty na sztywno
-// `right:-12, bottom:-10` dla 'br', więc domyślne ustawienie renderuje się bit-w-bit jak dawniej.
-const FLAME_CORNER_POS: Record<FlameCorner, { top?: number; bottom?: number; left?: number; right?: number }> = {
-  br: { right: -12, bottom: -10 },
-  bl: { left: -12, bottom: -10 },
-  tr: { right: -12, top: -10 },
-  tl: { left: -12, top: -10 },
-};
 
 // „Twoje serie" — Duolingo-style: kolor kafla wg progu serii (bordo → czerwień → pomarańcz
 // → róż → błękit → fiolet legenda), im dłuższa seria tym "gorętszy" kolor. User (2026-08-12,
@@ -116,153 +95,35 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
         <Text style={s.headCount}>{rows.length}</Text>
       </View>
 
-      {/* SIATKA — WSZYSTKIE serie jako jednolite kwadraty, 2 na rząd (jak w Duolingo) */}
+      {/* SIATKA — WSZYSTKIE serie jako jednolite kwadraty, 2 na rząd (jak w Duolingo).
+          Wygląd każdego kafla wyekstrahowany do `StreakTile.tsx` (system kopiowania
+          komponentów, §340+) — `onTile` (nawigacja) zostaje TUTAJ, bo to zachowanie
+          specyficzne dla PRAWDZIWEGO dashboardu; `ScreenCanvas` na innych ekranach
+          przekazuje `StreakTile` inny `onPress` (otwarcie pickera metryki). */}
       <View style={[s.grid, { gap: tileStyle.tileGap }]}>
-        {rows.map(r => renderTile(r))}
+        {rows.map(r => (
+          <StreakTile key={r.key} item={r} tileStyle={tileStyle} onPress={() => onTile(r)}
+            sizeStyle={[s.gridTileTouch, { aspectRatio: tileStyle.aspectRatio }]} />
+        ))}
       </View>
     </TouchableOpacity>
   );
 
-  function renderTile(r: StreakItem) {
-    // streakTier() domyślnie zwraca indeks 0 (Bordo, ciemna czerwień) gdy ŻADEN próg nie
-    // jest spełniony — czyli też przy 0 dniach, mimo że 0 nie powinno "być" żadnym tierem.
-    // streakColor() ma osobny, poprawny fallback (szary) dla days<1 — tego trzeba użyć do
-    // KOLORU kafla, inaczej złamana seria świeci się na czerwono zamiast wyglądać na "zimną".
-    // Nadpisanie palety per próg (§333) — tylko kolor KAFLA w TEJ karcie, `streakColor()`/
-    // `STREAK_TIERS` same w sobie zostają nietknięte (patrz komentarz w streakTileStyleStore.ts
-    // — ta funkcja jest współdzielona z ~5 innymi miejscami appki).
-    const isZero = r.days < 1;
-    const color = isZero ? streakColor(r.days) : (tileStyle.tierColorOverrides[streakTier(r.days).i] ?? streakColor(r.days));
-    const onTile = () => {
-      haptic.tap();
-      if (r.key.startsWith('h:')) {
-        const habitId = r.key.slice(2);
-        // Nadpisanie z kreatora (§330) wygrywa z domyślnym `kind==='water'` — brak wpisu w
-        // mapie (zwykły przypadek) zachowuje się DOKŁADNIE jak przed §330.
-        const style = tileStyle.habitCalendarOverrides[habitId] ?? (r.kind === 'water' ? 'water' : 'year');
-        router.push((style === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
-      }
-      else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
-      // `ex:` — wpis "Ćwiczenia" (2026-10-15, złożony tu z dawnego osobnego kafla
-      // `exercise-streak`/`ExerciseStreakCard.tsx`, patrz app/(tabs)/index.tsx) — własna,
-      // bogatsza historia (`/exercises-history`), nie generyczny `/habit-year`.
-      else if (r.key.startsWith('ex:')) router.push('/exercises-history' as any);
-      else router.push('/counters' as any);
-    };
-    // Pasek postępu do NASTĘPNEGO progu (2026-09-22, user: "jestem zestresowany na różowym
-    // kolorze... zaczyna dręczyć nie motywować" — patrz obszerny komentarz przy STREAK_TIERS
-    // w StreakFlame.tsx). Nawet po wstawieniu 2 dodatkowych progów, odcinki bez zmiany koloru
-    // wciąż trwają kilkanaście dni — pasek daje codzienny, widoczny mikroruch W TRAKCIE takiego
-    // odcinka, nie tylko skok raz na jakiś czas. Brak paska dla tieru terminalnego (Legenda,
-    // `next === null` — to już "wygrane", nic do czego dążyć) i dla złamanej serii (isZero).
-    const tier = streakTier(r.days);
-    const tierProgress = !isZero && tier.next != null
-      ? Math.min(1, Math.max(0, (r.days - tier.min) / (tier.next - tier.min)))
-      : null;
-    // Styl "Pierścień" (2026-10-15, Kreator Faza 8, §334) — user: "zmianę zupełną kafelków",
-    // nie tylko parametry tego SAMEGO wyglądu. Zupełnie inna identyfikacja wizualna: zamiast
-    // gradientowego kwadratu z płomieniem w rogu — neutralne tło + pierścień postępu (reużywa
-    // `RingCountdown`, już istniejący komponent z Odliczań, §329 — ten sam wzorzec co
-    // `catmullRomPath` współdzielone między mapą a jej edytorem w §322: jeden komponent,
-    // dwa miejsca użycia, zero duplikacji). Krótkie zamknięcie TUTAJ (nie na dole funkcji) —
-    // reszta (gradient/płomień/wyrównanie/pasek) dotyczy WYŁĄCZNIE klasycznego stylu, więc nie
-    // ma sensu jej liczyć gdy i tak nie zostanie użyta.
-    if (tileStyle.layoutPreset === 'ring') {
-      const ringProgress = isZero ? 0 : (tierProgress ?? 1);
-      return (
-        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
-          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
-          <View style={[s.ringTile, { borderRadius: tileStyle.cornerRadius }]}>
-            <RingCountdown progress={ringProgress} color={isZero ? c.text.muted : color} days={r.days} size={52} strokeWidth={5} />
-            <Text style={[s.ringLabel, { color: isZero ? c.text.muted : c.text.primary }]} numberOfLines={1}>{r.name}</Text>
-          </View>
-        </TouchableOpacity>
-      );
+  function onTile(r: StreakItem) {
+    haptic.tap();
+    if (r.key.startsWith('h:')) {
+      const habitId = r.key.slice(2);
+      // Nadpisanie z kreatora (§330) wygrywa z domyślnym `kind==='water'` — brak wpisu w
+      // mapie (zwykły przypadek) zachowuje się DOKŁADNIE jak przed §330.
+      const style = tileStyle.habitCalendarOverrides[habitId] ?? (r.kind === 'water' ? 'water' : 'year');
+      router.push((style === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
     }
-
-    // Styl "Pasek akcentu" (2026-10-15, Kreator Faza 9, §335) — drugi alternatywny styl po
-    // "Pierścień" (§334), waliduje że `layoutPreset` generalizuje się na WIĘCEJ niż dwie
-    // opcje, nie jest specyficzny dla pierścienia. Neutralne tło zamiast gradientu + cienki
-    // kolorowy pasek z boku (kolor progu) + duży, cichy `Flame` jako watermark w tle (reużywa
-    // ikonę już zaimportowaną do nagłówka karty, NIE `StreakFlameGlow` — ten jest zbyt
-    // dekoracyjny/wielowarstwowy na rolę subtelnego tła).
-    if (tileStyle.layoutPreset === 'stripe') {
-      return (
-        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
-          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
-          <View style={[s.stripeTile, {
-            borderRadius: tileStyle.cornerRadius,
-            borderLeftColor: isZero ? c.text.muted : color,
-            alignItems: tileStyle.contentAlign === 'center' ? 'center' : 'flex-start',
-          }]}>
-            {tileStyle.showFlame && (
-              <View style={s.stripeGhost} pointerEvents="none">
-                <Flame size={74} color={isZero ? c.text.muted : color} fill={isZero ? c.text.muted : color} strokeWidth={0} />
-              </View>
-            )}
-            <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : c.text.primary, fontSize: 24 * tileStyle.numberScale, lineHeight: 26 * tileStyle.numberScale }]}>{r.days}</DisplayText>
-            <Text style={[s.stripeLabel, { color: c.text.secondary, textAlign: tileStyle.contentAlign }]} numberOfLines={1}>{r.name}</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
-    // Styl "Kompaktowy" (2026-10-15, Kreator Faza 10, §336) — czwarty alternatywny styl,
-    // najgęstszy: mała ikona + liczba w jednym rzędzie, etykieta pod spodem jednym wierszem.
-    // Bez wodotrysków (bez gradientu/watermarku/pierścienia) — czysto informacyjny, dla usera
-    // który chce zmieścić dużo serii na małym miejscu, nie dekoracji.
-    if (tileStyle.layoutPreset === 'compact') {
-      return (
-        <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
-          style={[s.ringTileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
-          <View style={[s.compactTile, { borderRadius: tileStyle.cornerRadius }]}>
-            <Flame size={15} color={isZero ? c.text.muted : color} fill={isZero ? c.text.muted : color} strokeWidth={0} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <DisplayText style={[s.compactNum, { color: isZero ? c.text.muted : c.text.primary, fontSize: 17 * tileStyle.numberScale, lineHeight: 19 * tileStyle.numberScale }]}>{r.days}</DisplayText>
-              <Text style={s.compactLabel} numberOfLines={1}>{r.name}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
-    // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
-    // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
-    // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
-    const radiusStyle = { borderRadius: tileStyle.cornerRadius };
-    const alignStyle = { alignItems: tileStyle.contentAlign === 'center' ? ('center' as const) : ('flex-start' as const) };
-    const flame = tileStyle.showFlame && (
-      <View style={[s.tileFlame, FLAME_CORNER_POS[tileStyle.flameCorner]]} pointerEvents="none">
-        <StreakFlameGlow days={r.days} size={64} />
-      </View>
-    );
-    const text = (
-      <>
-        <DisplayText style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF', fontSize: 24 * tileStyle.numberScale, lineHeight: 26 * tileStyle.numberScale }]}>{r.days}</DisplayText>
-        <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)', textAlign: tileStyle.contentAlign }]} numberOfLines={1}>{r.name}</Text>
-        {tierProgress != null && tileStyle.showProgressBar && (
-          <View style={s.tierBarTrack} pointerEvents="none">
-            <View style={[s.tierBarFill, { width: `${tierProgress * 100}%` }]} />
-          </View>
-        )}
-      </>
-    );
-    // Kolejność dzieci = kolejność malowania w RN (jak w CSS) — płomień NA WIERZCHU tekstu
-    // tylko gdy `flameOnTop`, inaczej (domyślnie, jak dawniej) tekst maluje się NAD nim.
-    const content = tileStyle.flameOnTop ? <>{text}{flame}</> : <>{flame}{text}</>;
-    return (
-      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile} style={[s.tileTouch, { aspectRatio: tileStyle.aspectRatio }]}>
-        {isZero ? (
-          <View style={[s.tile, s.tileZero, radiusStyle, alignStyle]}>{content}</View>
-        ) : tileStyle.gradientMode === 'flat' ? (
-          <View style={[s.tile, radiusStyle, alignStyle, { backgroundColor: color }]}>{content}</View>
-        ) : (
-          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.tile, radiusStyle, alignStyle]}>
-            {content}
-          </LinearGradient>
-        )}
-      </TouchableOpacity>
-    );
+    else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
+    // `ex:` — wpis "Ćwiczenia" (2026-10-15, złożony tu z dawnego osobnego kafla
+    // `exercise-streak`/`ExerciseStreakCard.tsx`, patrz app/(tabs)/index.tsx) — własna,
+    // bogatsza historia (`/exercises-history`), nie generyczny `/habit-year`.
+    else if (r.key.startsWith('ex:')) router.push('/exercises-history' as any);
+    else router.push('/counters' as any);
   }
 }
 
@@ -276,57 +137,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   // JEDNOLITE KWADRATY, 2 na rząd. BEZ flexGrow → samotny kafel zostaje pół-szerokości
-  // (nie rozciąga się na cały ekran). tileTouch = tylko rozmiar/proporcje (żeby LinearGradient
-  // i płaski zero-stan mogły dzielić dokładnie ten sam kształt); tile = wygląd.
+  // (nie rozciąga się na cały ekran). Tylko rozmiar/proporcje — wygląd żyje w `StreakTile.tsx`
+  // teraz (§340+, wcześniej `tileTouch`/`ringTileTouch` tu, dwie IDENTYCZNE kopie tego samego
+  // obiektu pod różnymi nazwami bo każdy styl miał własną gałąź `renderTile` — zunifikowane
+  // przy ekstrakcji, bo wszystkie 4 style i tak używały tych samych wartości).
   // Skurczone (2026-08-13, user: "kafelki są za długie") — niższy aspectRatio (szerszy
   // względem wysokości) + mniejszy minWidth, żeby cała sekcja nie zajmowała tyle miejsca
   // na dashboardzie przy kilku seriach naraz.
-  tileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
-  tile: {
-    flex: 1, borderRadius: radius.lg,
-    paddingHorizontal: spacing[2], paddingTop: spacing[2], paddingBottom: spacing[1],
-    overflow: 'hidden', position: 'relative',
-  },
-  tileZero: { backgroundColor: '#23273A', borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle },
-  tileFlame: { position: 'absolute', right: -12, bottom: -10 },
-  // Pasek postępu do następnego progu serii (2026-09-22) — cienki, przy samym dole kafla,
-  // NAD płomieniem w z-order (deklarowany później w JSX) ale pod jego wizualnym środkiem
-  // ciężkości (płomień jest w prawym-dolnym rogu, pasek na całej szerokości u dołu).
-  tierBarTrack: {
-    position: 'absolute', left: spacing[2], right: spacing[2], bottom: 5,
-    height: 3, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
-  },
-  tierBarFill: { height: '100%', borderRadius: radius.full, backgroundColor: '#FFFFFF' },
-  // BEZ fontWeight — ArchivoBlack to already-heavy font (jedyny plik/waga zarejestrowana
-  // w useFonts), a fontWeight obok custom fontFamily na Androidzie potrafi po cichu cofnąć
-  // się do systemowego (cienkiego) fontu, bo RN szuka pliku "ArchivoBlack-Bold" którego nie
-  // ma. Ten sam wzorzec co WSZĘDZIE indziej z fonts.display (TopPill/StreakCard/
-  // PersonalRecordsCard/DailyRings) — tileNum był jedynym miejscem z dodanym fontWeight,
-  // user (2026-08-13): "Twoje serie używają cienkiej czcionki dla LICZBY".
-  tileNum: { fontSize: 24, letterSpacing: -0.5, lineHeight: 26 },
-  tileLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
-
-  // Styl "Pierścień" (§334) — ten sam `tileTouch`-vs-`tile` podział co klasyczny styl
-  // (proporcje na zewnątrz, wygląd wewnątrz), ale neutralne tło zamiast gradientu koloru progu.
-  ringTileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
-  ringTile: { flex: 1, backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center', gap: 4, padding: spacing[2] },
-  ringLabel: { fontFamily: fonts.label, fontSize: 10, fontWeight: '700', textAlign: 'center' },
-
-  // Styl "Pasek akcentu" (§335)
-  stripeTile: {
-    flex: 1, backgroundColor: c.bg.elevated, borderLeftWidth: 3, overflow: 'hidden', position: 'relative',
-    paddingHorizontal: spacing[2], paddingTop: spacing[2], paddingBottom: spacing[1],
-  },
-  stripeGhost: { position: 'absolute', right: -14, bottom: -12, opacity: 0.14 },
-  stripeLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
-
-  // Styl "Kompaktowy" (§336)
-  compactTile: {
-    flex: 1, backgroundColor: c.bg.elevated, flexDirection: 'row', alignItems: 'center',
-    gap: 6, paddingHorizontal: spacing[2],
-  },
-  compactNum: { letterSpacing: -0.5 },
-  compactLabel: { fontFamily: fonts.label, fontSize: 8.5, color: c.text.muted, marginTop: 1 },
+  gridTileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
 }));
 
 export default memo(StreakWallCard);

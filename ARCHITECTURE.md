@@ -18482,6 +18482,62 @@ suite, 1389 testów.
 "Kalendarz" (wymaga podłączonego Google Kalendarza z co najmniej jednym eventem dziś/jutro).
 Sprawdź limit na sekcję i przełączniki godziny/kropki.
 
+## 340. System kopiowania komponentów — Faza 14: ekstrakcja `StreakTile`, fundament (2026-10-16)
+
+Po zamknięciu kompletu kart Kreatora (§327-§339), user wybrał kierunek: DUŻY system
+kopiowania/przepinania komponentów między ekranami (np. skopiować kafel serii "woda" z
+dashboardu, wkleić na ekranie Jedzenia przepięty na "słodycze"). Doprecyzowanie od usera: to
+NIE ma być kolejny ekran-ustawień z suwakami (jak kreator kafelków) — to ma być WOLNE PŁÓTNO
+(jak Figma/Canva: swobodna pozycja/rozmiar, elementy mogą się nakładać) z tapnięciem na kafel
+otwierającym picker metryki (nie drag-źródła-danych-na-kafel — prostsze, bardziej odkrywalne).
+
+To fundamentalnie inny paradygmat niż Kreator (parametryzacja ISTNIEJĄCEGO, sztywnego layoutu
+RN) — wymaga: (a) komponentu kafla jako samodzielnej, przenośnej jednostki (nie zamkniętej w
+`renderTile()` jednej konkretnej karty), (b) generycznego store'u pozycji/rozmiaru/podpięcia
+per ekran, (c) gestów przeciągania/zmiany rozmiaru (`react-native-gesture-handler` +
+`react-native-reanimated`, już w zależnościach, wzorzec 1:1 z `DashEditRow.tsx`'s
+`Gesture.Pan()`/`useSharedValue`/`runOnJS`), (d) generycznego resolvera "jakie metryki da się
+przypiąć" niezależnego od ekranu.
+
+Faza 14 kładzie fundament, ZERO zmiany widocznego zachowania:
+
+**`StreakTile.tsx`** (nowy) — wyekstrahowana z `StreakWallCard.tsx`'s dawnej wewnętrznej
+`renderTile()` cała logika wyglądu JEDNEGO kafla serii (wszystkie 4 `layoutPreset`y:
+klasyczny/pierścień/pasek/kompaktowy), jako samodzielny, eksportowany komponent
+`<StreakTile item={StreakItem} tileStyle={StreakTileStyle} onPress={...} sizeStyle={...} />`.
+`onPress` i `sizeStyle` są PROPAMI (nie zaszytą logiką) właśnie po to, żeby dało się ten SAM
+komponent użyć w DWÓCH kontekstach z różnym zachowaniem po tapnięciu (nawigacja do
+`/habit-year` na prawdziwym dashboardzie vs. otwarcie pickera metryki na wolnym płótnie) i
+różnym sposobem rozmieszczenia (flexBasis+aspectRatio w siatce vs. `position:'absolute'` +
+`width`/`height` na płótnie) — wnętrze komponentu nie zakłada ŻADNEGO z tych dwóch, tylko
+wypełnia (`flex:1`) dowolny box jaki dostanie. `StreakWallCard.tsx` zredukowany do: sortowania,
+toastu o nowym progu, nagłówka karty i siatki wołającej `<StreakTile>` per wiersz z
+`onTile(r)` (nawigacja, zostaje w `StreakWallCard` — to zachowanie specyficzne dla dashboardu)
+— bit-w-bit ten sam wygląd/zachowanie co przed ekstrakcją (zweryfikowane: identyczne wartości
+stylów, identyczna struktura JSX, tylko przeniesiona do innego pliku).
+
+**`src/hooks/useAllStreakItems.ts`** (nowy) — ta sama logika co `index.tsx`'s `streakWall` i
+`dashboard-tile-creator.tsx`'s `realStreaks` (habity + auto-liczniki "dni bez" + ćwiczenia →
+`StreakItem[]`), jako OSOBNY, reużywalny hook. ŚWIADOMIE NIE podpięty do `index.tsx` ani do
+kreatora — oba te ekrany JUŻ wołają `useHabits()`/`useCounters()`/itd. dla innych swoich memo;
+dodanie tego hooka TAM obok istniejących wywołań zamontowałoby `useHabits()` (własny
+AsyncStorage fetch) PO RAZ DRUGI w tym samym drzewie komponentów — zbędne podwojenie pracy na
+najbardziej czułym na wydajność ekranie appki (CLAUDE.md, ANR). Hook czeka nieużywany w tej
+fazie — pierwszym konsumentem będzie płótno z Fazy 15, na ekranach które jeszcze NIE montują
+tych hooków (zero ryzyka duplikacji tam).
+
+**Dlaczego dwie fazy, nie jedna**: ekstrakcja komponentu to ryzykowny refaktor już istniejącego,
+intensywnie używanego kodu (10 wcześniejszych faz Kreatora go dotykały) — zasługuje na własny,
+łatwy do zweryfikowania commit/PR (tsc+jest+brak zmiany zachowania), ZANIM dołoży się nowy,
+nigdy wcześniej nietestowany kod (gesty/płótno/picker) na wierzchu.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów (bez nowych —
+czysto refaktor, zero nowej logiki do przetestowania).
+
+**Priorytet testu na urządzeniu — WYSOKI (regresja)**: otwórz dashboard, sprawdź że "Twoje
+serie" wygląda i działa IDENTYCZNIE jak przed tą zmianą we WSZYSTKICH 4 stylach (przełącz w
+kreatorze kafelków), łącznie z tapnięciem (nawigacja do kalendarza/historii) i progresem paska.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
