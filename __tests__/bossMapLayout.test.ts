@@ -1,4 +1,4 @@
-import { layoutBossMap, applyLayoutOverrides, catmullRomPath } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY } from '@/utils/bossMapLayout';
 
 describe('bossMapLayout — layoutBossMap', () => {
   test('count 0 → brak węzłów', () => {
@@ -134,5 +134,47 @@ describe('bossMapLayout — catmullRomPath (wygładzona ścieżka, §322)', () =
   test('deterministyczna — te same punkty zawsze dają tę samą ścieżkę', () => {
     const pts = [{ x: 1, y: 2 }, { x: 3, y: 9 }, { x: 7, y: 4 }];
     expect(catmullRomPath(pts)).toBe(catmullRomPath(pts));
+  });
+});
+
+// BUG #6 (2026-10-16, user: "wgle nie da się klikać w nich teraz... nie widzę zupełnie bossa
+// aktualnego... jest poza ekranem") — wyekstrahowana z CampaignMap.tsx czysta funkcja licząca
+// GDZIE kamera powinna wylądować, żeby węzeł `idx` był wycentrowany. Sposób DOSTARCZENIA tej
+// wartości do natywnego ScrollView (contentOffset+key, patrz komentarz w CampaignMap.tsx) nie
+// jest testowalny w jest (zależy od natywnego cyklu montażu) — ale sama liczba jest, i to ona
+// była punktem odniesienia dla całej naprawy.
+describe('bossMapLayout — centerScrollY (kamera na aktualnym bossie, §340 BUG #6)', () => {
+  test('brak węzłów albo zerowy viewport → 0, nie NaN/Infinity', () => {
+    expect(centerScrollY([], 0, 800)).toBe(0);
+    expect(centerScrollY([{ x: 0, y: 500 }], 0, 0)).toBe(0);
+  });
+
+  test('centruje węzeł w viewporcie — y węzła minus pół wysokości viewportu', () => {
+    const nodes = [{ x: 0, y: 100 }, { x: 0, y: 900 }];
+    expect(centerScrollY(nodes, 1, 800)).toBe(900 - 400);
+  });
+
+  test('klamrowane do 0 — węzeł blisko góry nie daje ujemnego scrolla', () => {
+    const nodes = [{ x: 0, y: 50 }];
+    expect(centerScrollY(nodes, 0, 800)).toBe(0);
+  });
+
+  test('indeks poza zakresem klamrowany do ostatniego/pierwszego węzła (nie crashuje)', () => {
+    const nodes = [{ x: 0, y: 100 }, { x: 0, y: 900 }, { x: 0, y: 1700 }];
+    expect(centerScrollY(nodes, 99, 800)).toBe(centerScrollY(nodes, 2, 800));
+    expect(centerScrollY(nodes, -5, 800)).toBe(centerScrollY(nodes, 0, 800));
+  });
+
+  test('dokładnie odtwarza zgłoszony scenariusz — aktualny boss daleko na liście, mały viewport', () => {
+    // 22 bossów, ROW_GAP=170 (patrz layoutBossMap) — aktualny (indeks 15) byłby DALEKO poza
+    // ekranem (y≈2550) gdyby kamera została na pozycji 0, dokładnie zgłoszony objaw ("część
+    // bosów ucina", "nie widzę zupełnie bossa aktualnego").
+    const { nodes } = layoutBossMap(22, 340);
+    const idx = 15;
+    const viewportH = 700;
+    const y = centerScrollY(nodes, idx, viewportH);
+    expect(y).toBeGreaterThan(0); // kamera faktycznie się przesuwa, nie zostaje na 0
+    // węzeł wypada w połowie viewportu (±1px zaokrąglenia)
+    expect(Math.abs((nodes[idx].y - y) - viewportH / 2)).toBeLessThanOrEqual(1);
   });
 });
