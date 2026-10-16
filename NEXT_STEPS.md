@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 16: edycja stylu per-instancja (2026-10-16, §342)
+
+Zamyka jedyny poważny gap z Fazy 15 — kafel na płótnie miał tylko domyślny wygląd, bez UI do
+zmiany. Przycisk "Styl" (🎨, obok "Usuń" w trybie edycji) otwiera pełny edytor: Styl kafelka
+(4 presety)/Kształt/Tło i warstwy/Pozycja i warstwy (klasyczny)/Paleta progów — identyczna
+treść co zakładka "Twoje serie" w kreatorze, ale edytowana na żywo (bez draft/wdróż, bo
+instancja jest jedna). Dodatkowo: picker metryki ma teraz opcję "Brak (wyczyść)", i tryb
+edycji ma krótką podpowiedź tekstową (mechanizm drag/resize/tap jest zupełnie nowy, bez tego
+nie do odgadnięcia). **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §342.
+
+**Otwarte, dalej odłożone**: przepinanie nawigacji per-instancja (wybór wody/roku dla
+podpiętych nawyków, jak §330 na dashboardzie), więcej typów komponentów do kopiowania, więcej
+ekranów docelowych, grupowanie.
+
 ## 🆕 System kopiowania komponentów — Faza 15: wolne płótno, ekran Jedzenia (2026-10-16, §341)
 
 Pełny, działający mechanizm — Jedzenie ma teraz sekcję "Twoje komponenty" (na dole ekranu) z

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Move, Trash2 } from 'lucide-react-native';
+import { Move, Trash2, Palette } from 'lucide-react-native';
 import { StreakTile } from '@/components/dashboard/StreakTile';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { CanvasItem } from '@/store/canvasComponentsStore';
@@ -24,7 +24,7 @@ const MIN_HEIGHT = 64;
 // dokłada: uchwyt przeciągania (CAŁY obszar kafla — tapnięcie bez ruchu otwiera picker metryki,
 // patrz `Gesture.Race` niżej), uchwyt zmiany rozmiaru (róg), przycisk usuń.
 export default function CanvasPlacedItem({
-  item, displayItem, tileStyle, editing, canvasWidth, onTap, onDelete, onMove, onResize,
+  item, displayItem, tileStyle, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle,
 }: {
   item: CanvasItem;
   displayItem: StreakItem;
@@ -35,6 +35,7 @@ export default function CanvasPlacedItem({
   onDelete: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
+  onStyle: () => void;
 }) {
   const c = useColors();
   const tx = useSharedValue(item.x);
@@ -97,6 +98,9 @@ export default function CanvasPlacedItem({
         <Move size={10} color="#fff" />
       </View>
       <View style={s.topBtns}>
+        <TouchableOpacity onPress={() => { haptic.tap(); onStyle(); }} style={[s.smallBtn, { backgroundColor: c.accent.blue }]} hitSlop={8}>
+          <Palette size={12} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => { haptic.medium(); onDelete(); }} style={[s.smallBtn, { backgroundColor: c.accent.red }]} hitSlop={8}>
           <Trash2 size={12} color="#fff" />
         </TouchableOpacity>

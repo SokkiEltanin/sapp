@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Minus, Plus, Maximize2, RotateCcw, Check } from 'lucide-react-native';
+import { X, Maximize2, RotateCcw, Check } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import Stepper from '@/components/ui/Stepper';
 import { useHabits } from '@/hooks/useHabits';
 import { useCounters, autoDaysWithout, isOver, daysUntil, isDuringEvent, daysSince } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -20,7 +21,7 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { shiftClockRange } from '@/utils/workEvents';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { buildRecords } from '@/utils/personalRecords';
-import { STREAK_TIERS } from '@/utils/streakTiers';
+import { STREAK_TIERS, TIER_COLOR_PRESETS } from '@/utils/streakTiers';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
@@ -52,7 +53,6 @@ const CARD_PREVIEW_TITLES: Record<CardKey, string> = {
   gcal: 'Google Kalendarz',
 };
 const RECORD_COLOR_PRESETS = ['#FBBF24', '#60A5FA', '#F472B6', '#34D399', '#F87171', '#C084FC'];
-const TIER_COLOR_PRESETS = ['#9A3444', '#DC2626', '#F97316', '#EC4899', '#9465C8', '#3B82F6', '#636FF6', '#8B5CF6'];
 
 // Kreator dashboardu — FAZA 1 (2026-10-15, ARCHITECTURE.md §327). User: "zrobisz mi prawdziwy
 // kreator w ustawieniach ze wszystkim w aplikacji... ja będę sobie robił edytował kreował
@@ -315,32 +315,32 @@ export default function DashboardTileCreator() {
         {activeCard === 'countdowns' ? (
           <View style={s.card}>
             <Stepper label="Zaokrąglenie rogów" value={countdownsDraft.cornerRadius} min={0} max={32} step={2}
-              onChange={v => setCountdownsDraft({ cornerRadius: v })} c={c} s={s} />
+              onChange={v => setCountdownsDraft({ cornerRadius: v })} />
             <View style={s.divider} />
             <Stepper label="Rozmiar pierścienia" value={countdownsDraft.ringSize} min={40} max={88} step={4}
-              onChange={v => setCountdownsDraft({ ringSize: v })} c={c} s={s} />
+              onChange={v => setCountdownsDraft({ ringSize: v })} />
             <View style={s.divider} />
             <Stepper label="Grubość pierścienia" value={countdownsDraft.ringStrokeWidth} min={2} max={12} step={1}
-              onChange={v => setCountdownsDraft({ ringStrokeWidth: v })} c={c} s={s} />
+              onChange={v => setCountdownsDraft({ ringStrokeWidth: v })} />
             <View style={s.divider} />
             <Stepper label="Widocznych pozycji" value={countdownsDraft.maxVisible} min={1} max={6} step={1}
-              onChange={v => setCountdownsDraft({ maxVisible: v })} c={c} s={s} />
+              onChange={v => setCountdownsDraft({ maxVisible: v })} />
           </View>
         ) : activeCard === 'since' ? (
           <View style={s.card}>
             <Stepper label="Zaokrąglenie wiersza" value={sinceDraft.rowRadius} min={0} max={28} step={2}
-              onChange={v => setSinceDraft({ rowRadius: v })} c={c} s={s} />
+              onChange={v => setSinceDraft({ rowRadius: v })} />
             <View style={s.divider} />
             <Stepper label="Skala liczby" value={sinceDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
-              onChange={v => setSinceDraft({ numberScale: v })} c={c} s={s} />
+              onChange={v => setSinceDraft({ numberScale: v })} />
             <View style={s.divider} />
             <Stepper label="Widocznych pozycji" value={sinceDraft.maxVisible} min={1} max={10} step={1}
-              onChange={v => setSinceDraft({ maxVisible: v })} c={c} s={s} />
+              onChange={v => setSinceDraft({ maxVisible: v })} />
           </View>
         ) : activeCard === 'notes' ? (
           <View style={s.card}>
             <Stepper label="Widocznych notatek" value={notesDraft.maxVisible} min={1} max={8} step={1}
-              onChange={v => setNotesDraft({ maxVisible: v })} c={c} s={s} />
+              onChange={v => setNotesDraft({ maxVisible: v })} />
             <View style={s.divider} />
             <View style={s.row}>
               <Text style={s.rowLabel}>Podgląd treści</Text>
@@ -357,7 +357,7 @@ export default function DashboardTileCreator() {
         ) : activeCard === 'gcal' ? (
           <View style={s.card}>
             <Stepper label="Widocznych na sekcję" value={gcalDraft.maxVisible} min={1} max={10} step={1}
-              onChange={v => setGcalDraft({ maxVisible: v })} c={c} s={s} />
+              onChange={v => setGcalDraft({ maxVisible: v })} />
             <View style={s.divider} />
             <View style={s.row}>
               <Text style={s.rowLabel}>Godzina</Text>
@@ -375,11 +375,11 @@ export default function DashboardTileCreator() {
           <View style={s.card}>
             <Stepper label="Zaokrąglenie rogów"
               value={activeCard === 'streaks' ? streaksDraft.cornerRadius : recordsDraft.cornerRadius} min={0} max={32} step={2}
-              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ cornerRadius: v }) : setRecordsDraft({ cornerRadius: v })} c={c} s={s} />
+              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ cornerRadius: v }) : setRecordsDraft({ cornerRadius: v })} />
             <View style={s.divider} />
             <Stepper label="Proporcje kafelka"
               value={activeCard === 'streaks' ? streaksDraft.aspectRatio : recordsDraft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
-              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} c={c} s={s} />
+              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} />
             {/* Skala liczby nie ma odpowiednika w stylu "Pierścień" — RingCountdown rysuje
                 liczbę dni sam, w swojej własnej skali (patrz §334). */}
             {!(activeCard === 'streaks' && streaksDraft.layoutPreset === 'ring') && (
@@ -387,14 +387,14 @@ export default function DashboardTileCreator() {
                 <View style={s.divider} />
                 <Stepper label="Skala liczby"
                   value={activeCard === 'streaks' ? streaksDraft.numberScale : recordsDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
-                  onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} c={c} s={s} />
+                  onChange={v => activeCard === 'streaks' ? setStreaksDraft({ numberScale: v }) : setRecordsDraft({ numberScale: v })} />
               </>
             )}
             {activeCard === 'streaks' && (
               <>
                 <View style={s.divider} />
                 <Stepper label="Odstęp między kafelkami" value={streaksDraft.tileGap} min={0} max={20} step={2}
-                  onChange={v => setStreaksDraft({ tileGap: v })} c={c} s={s} />
+                  onChange={v => setStreaksDraft({ tileGap: v })} />
               </>
             )}
           </View>
@@ -621,31 +621,6 @@ export default function DashboardTileCreator() {
   );
 }
 
-function Stepper({ label, value, min, max, step, decimals = 0, onChange, c, s }: {
-  label: string; value: number; min: number; max: number; step: number; decimals?: number;
-  onChange: (v: number) => void; c: any; s: any;
-}) {
-  const dec = (delta: number) => {
-    haptic.tap();
-    const next = Math.min(max, Math.max(min, Math.round((value + delta) * 100) / 100));
-    onChange(next);
-  };
-  return (
-    <View style={s.row}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <View style={s.stepperRow}>
-        <TouchableOpacity onPress={() => dec(-step)} style={s.stepBtn} disabled={value <= min}>
-          <Minus size={14} color={value <= min ? c.text.muted : c.text.primary} />
-        </TouchableOpacity>
-        <Text style={s.stepVal}>{value.toFixed(decimals)}</Text>
-        <TouchableOpacity onPress={() => dec(step)} style={s.stepBtn} disabled={value >= max}>
-          <Plus size={14} color={value >= max ? c.text.muted : c.text.primary} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
@@ -686,10 +661,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[2] },
   rowLabel: { fontSize: 13, fontWeight: '600', color: c.text.primary, flex: 1 },
   divider: { height: 1, backgroundColor: c.border.subtle },
-
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center' },
-  stepVal: { fontSize: 13, fontWeight: '800', color: c.text.primary, minWidth: 34, textAlign: 'center', fontVariant: ['tabular-nums'] },
 
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },

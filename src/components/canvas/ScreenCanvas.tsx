@@ -9,8 +9,10 @@ import { useAllStreakItems } from '@/hooks/useAllStreakItems';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { navigateForStreakItem } from '@/components/dashboard/StreakTile';
 import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
+import { DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import CanvasPlacedItem from './CanvasPlacedItem';
 import MetricPickerModal from './MetricPickerModal';
+import CanvasStreakStyleModal from './CanvasStreakStyleModal';
 
 const MIN_CANVAS_HEIGHT = 140;
 const EDIT_BOTTOM_PAD = 76; // miejsce na przycisk "Dodaj" pod najniższą instancją
@@ -36,6 +38,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const [editing, setEditing] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(320);
   const [pickerForId, setPickerForId] = useState<string | null>(null);
+  const [styleForId, setStyleForId] = useState<string | null>(null);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
@@ -45,6 +48,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
   const allStreakItems = useAllStreakItems();
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
+  const styleItem = myItems.find(i => i.id === styleForId) ?? null;
 
   const canvasHeight = Math.max(
     MIN_CANVAS_HEIGHT,
@@ -73,7 +77,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       </View>
 
       {myItems.length === 0 && !editing && (
-        <Text style={s.emptyHint}>
+        <Text style={s.hintText}>
           Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii z inną metryką —
           np. ten sam kafel co na dashboardzie, przepięty na inny nawyk albo licznik.
         </Text>
@@ -99,16 +103,26 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
               onDelete={() => removeItem(item.id)}
               onMove={(x, y) => updateItem(item.id, { x, y })}
               onResize={(width, height) => updateItem(item.id, { width, height })}
+              onStyle={() => setStyleForId(item.id)}
             />
           );
         })}
       </View>
 
       {editing && (
-        <TouchableOpacity onPress={onAdd} style={[s.addBtn, { backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
-          <Plus size={15} color="#fff" />
-          <Text style={s.addTxt}>Dodaj kafel serii</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity onPress={onAdd} style={[s.addBtn, { backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+            <Plus size={15} color="#fff" />
+            <Text style={s.addTxt}>Dodaj kafel serii</Text>
+          </TouchableOpacity>
+          {/* Podpowiedź (2026-10-16, Faza 16) — mechanizm (przeciąganie/zmiana rozmiaru w rogu/
+              tapnięcie/dwa małe przyciski) jest zupełnie nowy w appce, bez tego user nie ma
+              żadnego sposobu się domyślić co robić z kaflem po jego dodaniu. */}
+          <Text style={s.hintText}>
+            Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar · tapnięcie
+            wybiera metrykę · 🎨 styl, 🗑 usuń.
+          </Text>
+        </>
       )}
 
       <MetricPickerModal
@@ -117,6 +131,19 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
         currentKey={pickerItem?.bindingKey ?? null}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
+      />
+
+      <CanvasStreakStyleModal
+        visible={!!styleItem}
+        style={styleItem?.style ?? DEFAULT_STREAK_TILE_STYLE}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
+        onSetTierColor={(i, color) => {
+          if (!styleItem) return;
+          const next = { ...styleItem.style.tierColorOverrides };
+          if (color) next[i] = color; else delete next[i];
+          updateItem(styleItem.id, { style: { ...styleItem.style, tierColorOverrides: next } });
+        }}
+        onClose={() => setStyleForId(null)}
       />
     </View>
   );
@@ -131,7 +158,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
   },
   editTxt: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary },
-  emptyHint: { fontSize: 11.5, color: c.text.muted, lineHeight: 16 },
+  hintText: { fontSize: 11.5, color: c.text.muted, lineHeight: 16 },
   canvas: { borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', position: 'relative', overflow: 'visible' },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,

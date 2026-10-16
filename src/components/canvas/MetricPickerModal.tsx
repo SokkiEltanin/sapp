@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
-import { X, Flame, Check } from 'lucide-react-native';
+import { X, Flame, Check, Ban } from 'lucide-react-native';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -15,7 +15,7 @@ interface Props {
   visible: boolean;
   options: StreakItem[];
   currentKey: string | null;
-  onSelect: (key: string) => void;
+  onSelect: (key: string | null) => void;
   onClose: () => void;
 }
 
@@ -37,6 +37,14 @@ export default function MetricPickerModal({ visible, options, currentKey, onSele
             <Text style={s.empty}>Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.</Text>
           ) : (
             <ScrollView style={s.list} contentContainerStyle={{ gap: spacing[1] }}>
+              {/* "Brak (wyczyść)" (2026-10-16, Faza 16) — bez tego raz podpięty kafel nie mógł
+                  już wrócić do stanu "niepodpięty", tylko przeskoczyć na INNĄ metrykę z listy. */}
+              {currentKey != null && (
+                <TouchableOpacity style={s.row} onPress={() => { haptic.tap(); onSelect(null); }} activeOpacity={0.75}>
+                  <Ban size={15} color={c.text.muted} />
+                  <Text style={[s.rowName, { color: c.text.muted, flex: 1 }]}>Brak (wyczyść)</Text>
+                </TouchableOpacity>
+              )}
               {sorted.map(item => {
                 const on = item.key === currentKey;
                 return (
