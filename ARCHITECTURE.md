@@ -18650,6 +18650,53 @@ niebieski przycisk "Styl" → sprawdź wszystkie 4 style kafelka, zaokrąglenie/
 (klasyczny) tło/płomień/pozycję, i paletę 8 progów. Sprawdź że zmiany widać NA ŻYWO na kaflu
 pod modalem po zamknięciu.
 
+## 343. Mapa bossów — BUG #6: kamera nie trafiała na aktualnego bossa, strukturalna naprawa (2026-10-16)
+
+User (po Fazie 16 kreatora): "wgle nie da się klikać w nich teraz" — doprecyzowane przez
+AskUserQuestion: dotyk REAGOWAŁ (haptic/scale się odpalały), ale aktualny boss "się nie
+renderuje albo jest niewidzialny albo jest poza ekranem (jak część bosów ucina)". Nie bug
+dotyku — bug KAMERY (gdzie wylądował scroll po wejściu na ekran).
+
+**Root cause**: §325/§326 (BUG #4/#5) próbowały naprawić centrowanie kamery serią odroczonych
+powtórzeń imperatywnego `scrollRef.current?.scrollTo({y, animated:false})` (0/60/250/600ms od
+montażu) — założenie: jedno z powtórzeń trafi w moment gdy natywny scroll-responder jest już
+podłączony po animacji przejścia ekranu (expo-router/react-native-screens). To ZOSTAJE wyścigiem,
+nie naprawą: na wolniejszym urządzeniu/dłuższej animacji WSZYSTKIE powtórzenia mogą wylądować
+przed podłączeniem i zostać po cichu zgubione (bez błędu, bez warninga) — kamera zostaje na
+pozycji (0,0), czyli widać tylko najwcześniejsze (dawno pokonane) węzły, a aktualny — zwykle
+dalej na liście — całkowicie poza widokiem. Dokładnie zgłoszony objaw.
+
+**Naprawa strukturalna** (`CampaignMap.tsx`):
+- `ScrollView` renderowany dopiero gdy `viewport.w/h > 0` (po pierwszym `onLayout`) — jeden
+  pominięty frame (samo tło) jest tańszy niż montowanie z `contentOffset` liczonym z zerowego
+  viewportu.
+- `contentOffset={{x:0, y: targetY}}` ustawia pozycję scrolla PRZY MONTAŻU, na poziomie
+  natywnym — zero wyścigu z animacją przejścia, bo to część tworzenia widoku, nie komenda
+  wysyłana PO fakcie (jak `scrollTo`).
+- `key={`${viewport.w}x${viewport.h}`}` wymusza REMOUNT gdy zmierzony rozmiar faktycznie się
+  zmieni (`contentOffset` RN czytany TYLKO przy montażu — update propu na żywym ScrollView nic
+  by nie zrobił). To naprawia TĘ SAMĄ klasę problemu co BUG #4 (RN/Android dostarcza `onLayout`
+  wielokrotnie przy starcie, pierwszy przebieg bywa tymczasowy) bez ręcznego strażnika do
+  pomylenia — każdy nowy rozmiar dostaje świeży, poprawnie wycelowany montaż.
+- Oddzielny, węższy efekt (`mountedCurrentId` ref) obsługuje zmianę `currentId` PO TYM jak
+  ekran jest już zamontowany i widoczny (wygrana walka, powrót na mapę) — tam NIE MA wyścigu
+  z animacją przejścia (ekran już stoi), więc zwykły animowany `scrollTo` jest bezpieczny.
+
+**`centerScrollY()` wyekstrahowana jako czysta funkcja** (`bossMapLayout.ts`) — sama liczba
+("gdzie kamera powinna wylądować, żeby węzeł X był wycentrowany") była zawsze poprawna, tylko
+SPOSÓB dostarczenia jej do natywnego widoku był wadliwy. Wyniesienie pozwoliło napisać
+rzeczywisty test regresji (`bossMapLayout.test.ts` — w tym scenariusz 1:1 odtwarzający zgłoszenie:
+22 bossów, aktualny daleko na liście, mały viewport, dawniej kamera zostałaby na 0).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1394 testów (+5 nowych dla
+`centerScrollY`). Sam mechanizm dostarczenia (`contentOffset`/`key`/natywny cykl montażu) NIE
+jest testowalny w jest — zależy od prawdziwego silnika layoutu/scrolla.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, to zgłoszony bug**: otwórz Bossy → Kampania, z
+kontem które ma pokonanych kilku bossów (aktualny NIE pierwszy na liście) — kamera powinna od
+razu (bez przewijania) pokazywać aktualnego bossa wycentrowanego, z widocznym pierścieniem.
+Pokonaj walkę i wróć na mapę — kamera powinna PŁYNNIE przewinąć się do nowego aktualnego bossa.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

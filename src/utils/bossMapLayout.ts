@@ -107,3 +107,17 @@ export function catmullRomPath(points: MapNode[]): string {
   }
   return d;
 }
+
+// Pozycja scrolla żeby węzeł `idx` wylądował wycentrowany w viewporcie o wysokości
+// `viewportH` (2026-10-16, BUG #6 — "nie widzę zupełnie bossa aktualnego... jest poza
+// ekranem"). Wyniesione jako czysta funkcja z `CampaignMap.tsx` właśnie żeby dało się ją
+// przetestować w jest — sama LICZBA była zawsze poprawna (zweryfikowane tu), problem był
+// wyłącznie w SPOSOBIE dostarczenia jej do natywnego ScrollView (patrz komentarz przy
+// `contentOffset`/`key` w CampaignMap.tsx — to już nie jest testowalne w jest, bo zależy od
+// natywnego cyklu montażu). Klamrowane do 0 z dołu — ujemny scroll nie istnieje; górne
+// klamrowanie (koniec treści) zostaje natywnemu ScrollView, tak jak przy zwykłym `scrollTo`.
+export function centerScrollY(nodes: MapNode[], idx: number, viewportH: number): number {
+  if (nodes.length === 0 || viewportH <= 0) return 0;
+  const clampedIdx = Math.max(0, Math.min(idx, nodes.length - 1));
+  return Math.max(0, nodes[clampedIdx].y - viewportH / 2);
+}

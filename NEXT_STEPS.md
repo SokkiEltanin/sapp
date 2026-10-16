@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 Mapa bossów — BUG #6: kamera nie trafiała na aktualnego bossa (2026-10-16, §343)
+
+**Zgłoszony przez usera bug**, nie zaplanowana faza. "Wgle nie da się klikać w nich teraz" →
+doprecyzowane: dotyk działał, ale kamera po wejściu na ekran zostawała na pozycji (0,0) zamiast
+centrować się na aktualnym bossie — widać tylko najwcześniejsze pokonane węzły, aktualny (zwykle
+dalej na liście) poza ekranem. Root cause: poprzednia naprawa (§325/§326) próbowała serią
+odroczonych `scrollTo` (0/60/250/600ms) trafić w moment gdy natywny scroll-responder jest gotowy
+po animacji przejścia ekranu — na wolniejszym urządzeniu WSZYSTKIE powtórzenia mogły się nie
+zdążyć. Naprawa strukturalna: `contentOffset`+`key`-remount na `ScrollView` (zero wyścigu z
+animacją, bo ustawiane przy montażu, nie komendą po fakcie). **Priorytet testu KRYTYCZNY** —
+to zgłoszony bug, nie nowa funkcja — checklist w ARCHITECTURE.md §343.
+
 ## 🆕 System kopiowania komponentów — Faza 16: edycja stylu per-instancja (2026-10-16, §342)
 
 Zamyka jedyny poważny gap z Fazy 15 — kafel na płótnie miał tylko domyślny wygląd, bez UI do

@@ -7,7 +7,7 @@ import BossArt from './BossArt';
 import PressableScale from '@/components/ui/PressableScale';
 import { Boss, mysteryBossName, fmtEnergyCountdown } from '@/utils/bosses';
 import { baseBossId } from '@/utils/madBosses';
-import { layoutBossMap, applyLayoutOverrides, catmullRomPath } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY } from '@/utils/bossMapLayout';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
 import { useCampaignMapStyleStore, CampaignMapStyle } from '@/store/campaignMapStyleStore';
 import { spacing, radius } from '@/theme';
@@ -96,54 +96,42 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
     setViewport({ w: width, h: height });
   };
 
-  // Kamera "wskakuje" (jump, nie animowany scroll) na aktualnego bossa — user: "domyślnie
-  // popakuje sie pozycja bosa aktualnego do pokonania". Re-triggeruje się przy KAŻDEJ zmianie
-  // `currentId` (nie tylko raz przy pierwszym layoucie — `centeredOn` pamięta NA CO kamera
-  // jest aktualnie wycentrowana) — łapie zarówno spóźnioną hydratację store'u jak i normalną
-  // zmianę po wygranej walce. Natywny `scrollTo` SAM przycina do granic treści (RN), więc nie
-  // ma tu żadnej ręcznej matematyki klamrowania do pomylenia.
+  // Kamera na aktualnym bossie — user: "domyślnie popakuje sie pozycja bosa aktualnego do
+  // pokonania". BUG #6 (2026-10-16, user: "wgle nie da się klikać w nich teraz... nie widzę
+  // zupełnie bossa aktualnego albo się nie renderuje albo jest poza ekranem (jak część bosów
+  // ucina)") — dotyk DZIAŁAŁ (haptic/scale się odpalały), problem był wyłącznie w tym GDZIE
+  // kamera wylądowała. BUG #4/#5 (historia niżej w komentarzach usuniętych stąd, patrz git
+  // blame) próbowały naprawić to serią odroczonych powtórzeń imperatywnego
+  // `scrollTo({animated:false})` (0/60/250/600ms) — ZAŁOŻENIE: jeden z powtórzeń trafi w
+  // moment, gdy natywny scroll-responder jest już podłączony. To wciąż WYŚCIG, nie naprawa:
+  // na wolniejszym urządzeniu/dłuższej animacji przejścia ekranu WSZYSTKIE powtórzenia mogą
+  // wylądować przed podłączeniem responder'a i zostać po cichu zgubione (bez błędu) —
+  // kamera zostaje na pozycji (0,0), czyli widać tylko najwcześniejsze (dawno pokonane) węzły,
+  // a aktualny — zwykle dalej na liście — jest całkowicie poza widokiem. Dokładnie zgłoszony
+  // objaw.
   //
-  // BUG #4 (user, 2026-10-15, po §321: "bossy sa rozjebane po mapie poza ekranem nie widac
-  // aktualnego") — klucz `centeredOn` pamiętał TYLKO `currentId`, nie `viewport.h`. RN
-  // (zwłaszcza Android) potrafi dostarczyć `onLayout` WIELOKROTNIE przy starcie ekranu, gdy
-  // layout się "ustatecznia" (np. pierwszy przebieg zanim pasek zakładek/safe-area się
-  // domknie, kolejny z już docelowym rozmiarem) — każde wywołanie TO ten sam `currentId`, więc
-  // stary strażnik "już wycentrowane na to id" blokował jakikolwiek PONOWNY `scrollTo`, nawet
-  // gdy drugi `onLayout` przyniósł zupełnie inną, docelową wysokość viewportu. Efekt: kamera
-  // zostawała wycentrowana względem PIERWSZEGO, tymczasowego rozmiaru ekranu — na realnym
-  // urządzeniu (gdzie layout faktycznie ma wiele przebiegów) to dawało widoczny offset, czego
-  // nie dało się złapać w testach jest (brak prawdziwego, wieloprzebiegowego silnika layoutu).
-  // Naprawa: klucz strażnika to teraz TRÓJKA `currentId`+`viewport.w`+`viewport.h` — każda
-  // GENUINE zmiana zmierzonego rozmiaru (szerokość też, bo wpływa na pozycje torów zygzaka —
-  // patrz `nodes` wyżej) re-centruje kamerę na tym samym bossie, nie tylko zmiana bossa.
-  //
-  // BUG #5 (user, 2026-10-15, zrzut WYKONANY NA ŻĄDANIE "zaraz po wejściu, nie po przewinięciu"
-  // — nadal widać TYLKO wczesne pokonane węzły + pierwszy zablokowany, zero śladu pierścienia
-  // aktualnego). §325 nie wystarczyło: wysokość płótna (`canvasH`) praktycznie NIE zależy od
-  // `viewport.h` (ROW_GAP/PAD_Y są stałe, liczba bossów też) — więc nawet JEDNO poprawne
-  // wywołanie `onLayout` już dawało prawidłowy `targetY`, teoria "wielu przebiegów layoutu"
-  // nie wyjaśnia dalszego błędu. Realny podejrzany: `scrollTo({animated:false})` wołane
-  // SYNCHRONICZNIE w efekcie, w momencie gdy ekran WŁAŚNIE wjeżdża (natywna animacja przejścia
-  // expo-router/react-native-screens) — to znany przypadek na Androidzie, gdzie natywny
-  // scroll-responder jeszcze nie jest podłączony/gotowy i komenda scrollTo jest PO CICHU
-  // gubiona (bez błędu, bez warninga) — a żaden kolejny `onLayout` już nie przyjdzie, bo
-  // wymiary się po animacji nie zmieniają, więc nic już tego nie naprawia. Naprawa: nie tylko
-  // jedno wywołanie, ale KILKA odroczonych powtórzeń tego samego `scrollTo` (0 / 60 / 250 / 600
-  // ms) — łapie moment, w którym natywny responder faktycznie już przyjmuje komendy, niezależnie
-  // od tego jak długo akurat trwała animacja przejścia na danym urządzeniu.
-  const centeredOn = useRef<string>('');
+  // Naprawa strukturalna, nie kolejna łatka czasowa: `contentOffset` na `ScrollView` ustawia
+  // pozycję scrolla PRZY MONTAŻU, na poziomie natywnym — nie ma tu ŻADNEGO wyścigu z animacją
+  // przejścia, bo wartość jest częścią tworzenia widoku, nie komendą wysyłaną PO fakcie.
+  // `key={viewport.w x viewport.h}` wymusza REMOUNT (nie tylko update propu — `contentOffset`
+  // czytany jest tylko przy montażu, update na żywym ScrollView nic by nie zrobił) gdy
+  // zmierzony rozmiar faktycznie się zmieni — to jest naprawa TEJ SAMEJ klasy problemu co
+  // BUG #4 (RN/Android dostarcza `onLayout` wielokrotnie przy starcie, pierwszy przebieg bywa
+  // tymczasowy), ale bez ręcznego strażnika do pomylenia: każdy NOWY rozmiar dostaje świeży,
+  // poprawnie wycelowany montaż.
+  const idxForCenter = currentId ? currentIdx : nodes.length - 1;
+  const targetY = centerScrollY(nodes, idxForCenter, viewport.h);
+
+  // Dla zmiany `currentId` PO TYM jak ekran jest już zamontowany i widoczny (np. wygrana walka,
+  // powrót na mapę) — tu nie ma wyścigu z animacją przejścia (ekran już stoi), więc zwykły
+  // animowany `scrollTo` jest bezpieczny i daje ładny, widoczny ruch kamery do nowego celu.
+  const mountedCurrentId = useRef(currentId);
   useEffect(() => {
-    if (!viewport.h || !viewport.w || nodes.length === 0) return;
-    const key = `${currentId ?? ''}:${viewport.w}:${viewport.h}`;
-    if (centeredOn.current === key) return;
-    centeredOn.current = key;
-    const idx = Math.max(0, Math.min(currentIdx, nodes.length - 1));
-    const targetY = Math.max(0, nodes[idx].y - viewport.h / 2);
-    const jump = () => scrollRef.current?.scrollTo({ y: targetY, animated: false });
-    jump();
-    const timers = [60, 250, 600].map(ms => setTimeout(jump, ms));
-    return () => timers.forEach(clearTimeout);
-  }, [currentId, currentIdx, nodes, viewport.w, viewport.h]);
+    if (mountedCurrentId.current === currentId) return;
+    mountedCurrentId.current = currentId;
+    if (!viewport.h || nodes.length === 0) return;
+    scrollRef.current?.scrollTo({ y: targetY, animated: true });
+  }, [currentId]);
 
   // Pełna trasa — zawsze rysowana prawie czarnym, ledwo widocznym kolorem ("mgła" — user:
   // "te Ścieżki dalej mają byc czarno mgła zasłonięte"), + osobny, krótszy odcinek TYLKO do
@@ -162,10 +150,19 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
 
   return (
     <View style={st.wrap} onLayout={onLayoutViewport}>
+      {/* `viewport.w/h` dopiero po pierwszym `onLayout` — jeden pominięty frame (samo tło
+          `wrap`, bez treści) jest tańszy i bezpieczniejszy niż montowanie ScrollView z
+          `contentOffset` liczonym z zerowego viewportu, które i tak trzeba by było potem
+          poprawiać. `key` wymusza remount (nie sam update propu — `contentOffset` RN czyta
+          TYLKO przy montażu) gdy zmierzony rozmiar się zmieni, patrz komentarz przy BUG #6
+          wyżej. */}
+      {viewport.w > 0 && viewport.h > 0 && (
       <ScrollView
+        key={`${viewport.w}x${viewport.h}`}
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ width: canvasW, height: canvasH }}
+        contentOffset={{ x: 0, y: targetY }}
       >
         {/* Tło WEKTOROWE (user: "laguje... zrób wektorem, żeby nie lagowało") — siatka
             punktów w tym samym `Svg` co ścieżka, czysta geometria, bez kosztownej
@@ -238,6 +235,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           return <View key={b.id}>{node}</View>;
         })}
       </ScrollView>
+      )}
 
       {popup && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
