@@ -18538,6 +18538,77 @@ czysto refaktor, zero nowej logiki do przetestowania).
 serie" wygląda i działa IDENTYCZNIE jak przed tą zmianą we WSZYSTKICH 4 stylach (przełącz w
 kreatorze kafelków), łącznie z tapnięciem (nawigacja do kalendarza/historii) i progresem paska.
 
+## 341. System kopiowania komponentów — Faza 15: wolne płótno, pierwszy ekran (2026-10-16)
+
+Po fundamencie z Fazy 14 (§340, ekstrakcja `StreakTile`) — pełny, działający wolny canvas na
+PIERWSZYM ekranie poza dashboardem. Dokładnie przykład usera: "dodaje streak wody na
+dashbordzie i dodaje streak słodyczy w jedzeniu" — Jedzenie (`app/(tabs)/food.tsx`) dostaje
+własną sekcję "Twoje komponenty" z płótnem, na którym da się postawić kafel serii przepięty na
+DOWOLNY nawyk/licznik/ćwiczenia, niezależnie od tego co jest na dashboardzie.
+
+**`src/store/canvasComponentsStore.ts`** (nowy) — `CanvasItem { id, screenKey, componentType,
+x, y, width, height, bindingKey, style }`. `screenKey` rozdziela instancje PER EKRAN (Jedzenie
+nie widzi niczego dodanego gdzie indziej, i vice versa). `bindingKey` to KLUCZ Z
+`useAllStreakItems()` (`h:<id>`/`c:<id>`/`ex:exercises`) — ten sam format co `StreakItem.key`
+używany już w `StreakWallCard`/kreatorze, zero nowego słownika identyfikatorów. `style` to
+PEŁNA kopia `StreakTileStyle` (domyślnie `DEFAULT_STREAK_TILE_STYLE`) — per-instancja, edycja
+jednej nie dotyka innych ani globalnego store'u Kreatora. `componentType` tylko `'streakTile'`
+na razie (discriminated union, gotowy na więcej bez migracji). Nowa instancja ląduje POD
+najniżej leżącą na tym ekranie (nie w (0,0) na oślep), żeby nie nakładać się domyślnie —
+nakładanie jest dozwolone, ale tylko gdy user sam tak przeciągnie.
+
+**`src/components/canvas/CanvasPlacedItem.tsx`** (nowy) — przeciąganie/zmiana rozmiaru, TEN
+SAM wzorzec gestów co `DashEditRow.tsx` (`Gesture.Pan()`+`useSharedValue`+`runOnJS`
+commitujący do store'u TYLKO na `onEnd`), ale ruch WOLNY 2D (nie 1D-snap-do-wiersza jak tam) —
+user: "wolne płótno jak Figma/Canva". Dwie gałęzie: `editing=false` to statyczny `View` (zero
+Reanimated — taniej na ekranie głównie do PATRZENIA); `editing=true` dokłada przezroczysty
+overlay (`GestureDetector` + `Gesture.Race(pan, tap)`) NAD kaflem z `pointerEvents="none"` —
+rozdzielenie świadome: kafel (własny `TouchableOpacity`) i overlay (gesture-handler) to DWA
+NIEZALEŻNE systemy dotyku, które konkurowałyby o to samo dotknięcie bez tego rozdzielenia.
+Uchwyt zmiany rozmiaru (róg, osobny `Gesture.Pan()`) i przycisk usuń (zwykły `TouchableOpacity`,
+nad overlayem w z-order, więc wygrywa na swoim małym obszarze).
+
+**`src/components/canvas/MetricPickerModal.tsx`** (nowy) — picker "do czego przypiąć kafel",
+wzorzec modala 1:1 z `ClassLinkPicker.tsx` (overlay+karta+przewijana lista). Lista = WSZYSTKIE
+`StreakItem`y z `useAllStreakItems()` (hook z Fazy 14, pierwszy realny konsument) — user wybiera
+z czegoś już znanego (to samo co "Twoje serie" pokazuje), nie nowego słownika.
+
+**`src/components/canvas/ScreenCanvas.tsx`** (nowy) — składa powyższe w jedną sekcję z
+nagłówkiem + przełącznikiem Edytuj/Gotowe + (w edycji) przyciskiem "Dodaj kafel serii". Tryb
+podglądu: tapnięcie nawiguje jak na dashboardzie (`navigateForStreakItem`, wyniesione do
+`StreakTile.tsx` właśnie żeby UNIKNĄĆ trzeciej kopii tej logiki routingu — pierwsza w
+`StreakWallCard`, teraz współdzielona). Tryb edycji: tapnięcie (bez przeciągnięcia) otwiera
+`MetricPickerModal`.
+
+**Wpięcie**: `app/(tabs)/food.tsx` — `<ScreenCanvas screenKey="food" />` na końcu scrolla, po
+"Dodaj kolejny posiłek". Jedyne miejsce poza dashboardem z tym mechanizmem na razie.
+
+**Jak "kopiowanie między ekranami" działa NAPRAWDĘ**: NIE przenosi literalnie obiektu z
+dashboardu (dashboard nie ma własnych instancji płótna — jego "Twoje serie" to wciąż osobny,
+sztywny `StreakWallCard`) — daje TEN SAM komponent (`StreakTile`) i TĘ SAMĄ listę metryk do
+wyboru na obu miejscach. Efekt dla usera identyczny (kafel wody wygląda i działa tak samo
+gdziekolwiek go postawi) bez potrzeby osobnego mechanizmu "wklejania" skopiowanego node'a —
+prościej i bez ryzyka rozjazdu dwóch kopii tego samego stylu.
+
+**Świadomie odłożone, NIE zbudowane w tej fazie** (żeby nie robić wszystkiego w jednym PR —
+patrz NEXT_STEPS.md): edycja stylu per-instancja (nowa instancja ma `DEFAULT_STREAK_TILE_STYLE`,
+bez UI do zmiany — reużycie kodu z `dashboard-tile-creator.tsx`'s "Kształt"/"Paleta progów"
+per-instancja to naturalne następstwo, ale osobna, spora porcja UI), więcej typów komponentów
+do kopiowania (Rekordy/Odliczania/Notatki/Kalendarz), więcej ekranów docelowych, grupowanie
+komponentów w jedną jednostkę do przesuwania.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów (bez nowych — logika
+gestów wymaga prawdziwego urządzenia, nie da się sensownie zunitestować interakcji dotykowej).
+
+**Priorytet testu na urządzeniu — WYSOKI, zupełnie nowy mechanizm, nigdy wcześniej
+niewidziany**: Jedzenie → przewiń na dół → "Twoje komponenty" → Edytuj → Dodaj kafel serii →
+wybierz metrykę w pickerze → sprawdź przeciąganie (cały kafel), zmianę rozmiaru (uchwyt w
+rogu), usuwanie, i że po "Gotowe" kafel wygląda statycznie i tapnięcie nawiguje poprawnie
+(do `/habit-year`/`/water-calendar`/`/exercises-history` zależnie od typu). Zwróć szczególną
+uwagę na przycisk usuń w trybie edycji — leży NAD przezroczystym overlayem przeciągania, w
+teorii powinien wygrywać na swoim małym obszarze, ale to pierwsza okazja by to zweryfikować
+na prawdziwym dotyku.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

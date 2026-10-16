@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { Flame } from 'lucide-react-native';
 import { StreakTileStyle, FlameCorner } from '@/store/streakTileStyleStore';
 import { useColors } from '@/theme/useColors';
@@ -8,7 +9,27 @@ import { spacing, radius, fonts } from '@/theme';
 import { StreakFlameGlow, streakTier, streakColor } from '@/components/counters/StreakFlame';
 import RingCountdown from '@/components/counters/RingCountdown';
 import DisplayText from '@/components/ui/DisplayText';
+import { haptic } from '@/utils/haptics';
 import { StreakItem } from './StreakWallCard';
+
+// Dokąd prowadzi tapnięcie kafla serii — WSPÓLNA reguła, bo trafia teraz w DWA miejsca:
+// `StreakWallCard`'s `onTile` (prawdziwy dashboard) i `ScreenCanvas`'s tryb podglądu (system
+// kopiowania komponentów, §341 — instancja na innym ekranie, poza edycją, zachowuje się jak
+// prawdziwa kopia: tapnięcie prowadzi TAM GDZIE prowadziłoby na dashboardzie, nie nigdzie).
+// Wyekstrahowane tutaj (nie duplikowane po raz trzeci) — `habitCalendarOverrides` z
+// `tileStyle` działa identycznie w obu miejscach, bo to ten sam typ `StreakTileStyle`
+// (per-instancja na płótnie, globalny na dashboardzie — rozróżnienie nieistotne dla routingu).
+export function navigateForStreakItem(item: StreakItem, tileStyle: StreakTileStyle) {
+  haptic.tap();
+  if (item.key.startsWith('h:')) {
+    const habitId = item.key.slice(2);
+    const navStyle = tileStyle.habitCalendarOverrides[habitId] ?? (item.kind === 'water' ? 'water' : 'year');
+    router.push((navStyle === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
+  }
+  else if (item.key.startsWith('c:')) router.push(`/habit-year?counter=${item.key.slice(2)}` as any);
+  else if (item.key.startsWith('ex:')) router.push('/exercises-history' as any);
+  else router.push('/counters' as any);
+}
 
 // Second gradient stop for a tile — same hue, mixed toward black for depth.
 function darken(hex: string, amt: number): string {
