@@ -31,6 +31,11 @@ export const STREAK_TIERS: { min: number; color: string; name: string }[] = [
   { min: 100, color: '#8B5CF6', name: 'Legenda' },
 ];
 
+// Prezety koloru progu w kreatorach (dashboard-tile-creator.tsx, CanvasStreakStyleModal.tsx) —
+// POCHODNA `STREAK_TIERS` (nie osobna, ręcznie zsynchronizowana kopia), żeby zmiana kolorów
+// domyślnych progów automatycznie zaktualizowała też prezety do wyboru.
+export const TIER_COLOR_PRESETS = STREAK_TIERS.map(t => t.color);
+
 export function streakTier(days: number): StreakTier {
   let i = 0;
   for (let k = 0; k < STREAK_TIERS.length; k++) if (days >= STREAK_TIERS[k].min) i = k;

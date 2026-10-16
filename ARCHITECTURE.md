@@ -18609,6 +18609,47 @@ uwagę na przycisk usuń w trybie edycji — leży NAD przezroczystym overlayem 
 teorii powinien wygrywać na swoim małym obszarze, ale to pierwsza okazja by to zweryfikować
 na prawdziwym dotyku.
 
+## 342. System kopiowania komponentów — Faza 16: edycja stylu per-instancja (2026-10-16)
+
+Faza 15 (§341) dała działające płótno, ale nowa instancja miała tylko `DEFAULT_STREAK_TILE_STYLE`
+bez ŻADNEGO UI do zmiany — jedyny poważny gap zostawiony otwarcie w NEXT_STEPS.md. Ta faza go
+zamyka: przycisk "Styl" (ikona `Palette`, obok "Usuń" w trybie edycji) otwiera pełny edytor
+wyglądu TEJ JEDNEJ instancji.
+
+**`src/components/ui/Stepper.tsx`** (nowy, wyniesiony z `dashboard-tile-creator.tsx`) —
+samodzielny komponent (własny `useColors()`/`themedStyles`, nie przyjmuje `c`/`s` od
+wołającego jak oryginał) — drugi konsument (ten moduł) uczynił z lokalnej funkcji-pomocnika
+kandydata do współdzielenia. `dashboard-tile-creator.tsx` zaktualizowany żeby go importować
+(13 wywołań, usunięte `c={c} s={s}` — teraz Stepper sam sobie bierze kolory/style), lokalna
+definicja i martwe klucze stylów (`stepperRow`/`stepBtn`/`stepVal`) usunięte.
+
+**`TIER_COLOR_PRESETS` przeniesiony do `streakTiers.ts`** — był lokalną, ręcznie zsynchronizowaną
+kopią `STREAK_TIERS.map(t=>t.color)` w `dashboard-tile-creator.tsx`; teraz POCHODNA w jednym
+miejscu, drugi konsument (nowy modal) importuje tę samą stałą.
+
+**`src/components/canvas/CanvasStreakStyleModal.tsx`** (nowy) — treść 1:1 z zakładki "Twoje
+serie" kreatora (Styl kafelka/Kształt/Tło i warstwy/Pozycja i warstwy/Paleta progów), ale BEZ
+draft/live — instancja na płótnie jest JEDNA, edytowana na żywo (`onChange`/`onSetTierColor`
+mutują store bezpośrednio przez `ScreenCanvas`), nie ma czego "wdrażać" jak na globalnym stylu
+całego dashboardu. ŚWIADOMIE bez "Odstęp między kafelkami" (pojęcie siatki, nie pojedynczej
+instancji) i bez "Cel po kliknięciu" (przepinanie nawigacji per-instancja — patrz
+NEXT_STEPS.md, osobno odłożone).
+
+**`CanvasPlacedItem.tsx`** — nowy prop `onStyle`, drugi mały przycisk (niebieski, ikona
+`Palette`) w `topBtns`, obok `Trash2`.
+
+**`ScreenCanvas.tsx`** — stan `styleForId`, renderuje `CanvasStreakStyleModal` ZAWSZE
+(`visible={!!styleItem}`, ten sam wzorzec co `MetricPickerModal` — płynna animacja zamykania,
+modal nie odmontowuje się twardo przy `onClose`).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1389 testów (bez nowych —
+czysto UI).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Jedzenie → Edytuj → na istniejącym kaflu tapnij
+niebieski przycisk "Styl" → sprawdź wszystkie 4 style kafelka, zaokrąglenie/proporcje/skalę,
+(klasyczny) tło/płomień/pozycję, i paletę 8 progów. Sprawdź że zmiany widać NA ŻYWO na kaflu
+pod modalem po zamknięciu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
