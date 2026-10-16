@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kreator dashboardu — Faza 13: szósta karta, "Kalendarz" (2026-10-15, §339)
+
+Kreator kafelków ma teraz 6 zakładek. "Kalendarz" (`GCalCard`) — ostatni kandydat z
+pierwotnej listy §327, KOMPLET osiągnięty (StreakWall/Records/Countdowns/SinceCounters/
+PinnedNotes/GCal). **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §339.
+
+**Otwarte — co dalej, lista kandydatów §327 wyczerpana**: albo nowe karty poza pierwotną listą
+(np. `MonthWrappedCard`, pogoda-chip, odznaki), albo powrót do wcześniej odłożonych wątków:
+(1) kolejny ekran poza dashboardem — §332's lista: boss-fight.tsx/Pupil/Ćwiczenia (user chciał
+TEN SAM mechanizm na więcej ekranów, dotąd tylko mapa bossów); (2) wielka wizja z Fazy 7 (§333)
+— kopiowanie/przepinanie komponentów między ekranami z rejestrem/generycznym data-bindingiem,
+dalej jawnie odłożona, nie zapomniana. Nie zgadywać który — zapytać usera przy najbliższej
+okazji, zgodnie z ustaloną zasadą w §332 (teraz że pierwotna, "bezpieczna" lista kart się
+skończyła, dalsze kroki mają więcej architektonicznych rozstrzygnięć do podjęcia).
+
 ## 🆕 Kreator dashboardu — Faza 12: piąta karta, "Notatki" (2026-10-15, §338)
 
 Kreator kafelków ma teraz 5 zakładek (zakładki przeniesione na przewijany poziomo pasek — nie
