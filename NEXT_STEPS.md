@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 14: fundament, zero zmiany zachowania (2026-10-16, §340)
+
+User doprecyzował wielką wizję z §333: to NIE kolejny ekran-ustawień, to WOLNE PŁÓTNO
+(Figma/Canva-style — swobodna pozycja/rozmiar, nakładanie) z tapnięciem-na-kafel otwierającym
+picker metryki (nie drag-źródła-na-kafel). `StreakTile.tsx` wyekstrahowany z `StreakWallCard`
+jako samodzielny, przenośny komponent; nowy hook `useAllStreakItems()` (nieużywany jeszcze —
+czeka na Fazę 15). **Priorytet testu WYSOKI (regresja)** — checklist w ARCHITECTURE.md §340.
+
+**Następna faza (15, zaplanowana, nie zaczęta jeszcze w tym PR)**: `canvasComponentsStore.ts`
+(pozycja/rozmiar/podpięcie per ekran, per-instancja `StreakTileStyle`), gesty
+drag/resize (`Gesture.Pan()`+reanimated, wzorzec z `DashEditRow.tsx`), picker metryki (modal
+jak `ClassLinkPicker.tsx`), wpięcie na ekranie Jedzenia (`app/(tabs)/food.tsx`) jako pierwszy
+cel — dokładnie przykład usera (woda z dashboardu → słodycze w Jedzeniu).
+
+**Świadomie odłożone w Fazie 15** (żeby nie robić wszystkiego w jednym PR): głęboka edycja
+stylu per-instancja (paleta/gradient/warstwy — nowa instancja dostaje `DEFAULT_STREAK_TILE_STYLE`,
+bez UI do zmiany na razie), więcej typów komponentów do kopiowania (Rekordy/Odliczania/
+Notatki/Kalendarz — na razie TYLKO kafel serii, najbogatszy i to dokładnie przykład usera),
+więcej ekranów docelowych, grupowanie komponentów.
+
 ## 🆕 Kreator dashboardu — Faza 13: szósta karta, "Kalendarz" (2026-10-15, §339)
 
 Kreator kafelków ma teraz 6 zakładek. "Kalendarz" (`GCalCard`) — ostatni kandydat z
