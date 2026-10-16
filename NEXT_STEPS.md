@@ -3,6 +3,38 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 15: wolne płótno, ekran Jedzenia (2026-10-16, §341)
+
+Pełny, działający mechanizm — Jedzenie ma teraz sekcję "Twoje komponenty" (na dole ekranu) z
+wolnym płótnem: Edytuj → Dodaj kafel serii → wybierz metrykę w pickerze → przeciągaj/zmieniaj
+rozmiar/usuwaj. Dokładnie przykład usera (kafel wody z dashboardu, ale przepięty na słodycze,
+postawiony w Jedzeniu). **Priorytet testu BARDZO WYSOKI — zupełnie nowy, nigdy wcześniej
+niewidziany mechanizm (gesty, płótno)** — pełny checklist w ARCHITECTURE.md §341.
+
+**Szczególnie do sprawdzenia** (ryzyka nazwane explicite w §341, nieweryfikowalne bez
+urządzenia): czy przycisk usuń (nad przezroczystym overlayem przeciągania) faktycznie wygrywa
+dotyk na swoim małym obszarze zamiast zacząć przeciąganie; czy przeciąganie/zmiana rozmiaru są
+płynne na słabszym Androidzie (reanimated powinien to zapewnić, ale to pierwsza okazja); czy
+picker metryki i tapnięcie-nawigacja w trybie podglądu działają jak oczekiwane.
+
+**Otwarte, jawnie odłożone na kolejne fazy** (żeby nie zbudować wszystkiego w jednym PR):
+1. Edycja stylu per-instancja (kolor/gradient/warstwy/paleta progów) — nowa instancja ma
+   `DEFAULT_STREAK_TILE_STYLE` bez UI do zmiany. Naturalne następstwo: reużyć kod z
+   `dashboard-tile-creator.tsx`'s sekcji "Kształt"/"Paleta progów" per-instancja (otworzyć
+   modal/panel ze stepperami przy dłuższym przytrzymaniu kafla albo osobny przycisk "Styl").
+2. Więcej typów komponentów do kopiowania — na razie TYLKO kafel serii (`'streakTile'`,
+   najbogatszy, dokładnie przykład usera). Rekordy/Odliczania/Notatki/Kalendarz jako kolejne
+   `CanvasComponentType` to ten sam wzorzec (`CanvasPlacedItem`/`ScreenCanvas` już generyczne
+   po `componentType`, trzeba dodać gałąź renderu per typ — podobnie do presetów w Kreatorze).
+3. Więcej ekranów docelowych — `<ScreenCanvas screenKey="..." />` to jedna linijka do wpięcia
+   gdziekolwiek (food.tsx jako pierwszy, bo to dokładny przykład usera) — kandydaci: Nawyki,
+   Ćwiczenia, Pupil. Nie zgadywać który następny bez pytania, zgodnie z zasadą z §332.
+4. Grupowanie komponentów w jedną przesuwalną jednostkę — user wprost to opisał w §333, nie
+   zaczynane, czeka aż podstawowy mechanizm (pojedyncze instancje) się sprawdzi w użyciu.
+5. Płótno na SAMYM dashboardzie (dziś tylko docelowy ekran dla "innych" ekranów) — dashboard ma
+   już `CustomTile`/sekcje w stałym porządku; dodanie TEŻ wolnego płótna tam wymaga przemyślenia
+   jak te dwa mechanizmy współistnieją, nie robione teraz.
+
 ## 🆕 System kopiowania komponentów — Faza 14: fundament, zero zmiany zachowania (2026-10-16, §340)
 
 User doprecyzował wielką wizję z §333: to NIE kolejny ekran-ustawień, to WOLNE PŁÓTNO

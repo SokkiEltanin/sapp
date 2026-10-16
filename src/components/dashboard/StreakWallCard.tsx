@@ -11,7 +11,7 @@ import { spacing, radius, fonts } from '@/theme';
 import { streakTier } from '@/components/counters/StreakFlame';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
-import { StreakTile } from './StreakTile';
+import { StreakTile, navigateForStreakItem } from './StreakTile';
 
 // `kind` (2026-10-13, user: "woda jak wchodzę ze streaka jest inna [zakładka] niż na
 // zdrowiu... ujednolicić") — jedyny powód tego pola: odróżnić nawyk "Woda" (ma WŁASNY,
@@ -97,34 +97,18 @@ function StreakWallCard({ streaks, cardBg, styleOverride }: { streaks: StreakIte
 
       {/* SIATKA — WSZYSTKIE serie jako jednolite kwadraty, 2 na rząd (jak w Duolingo).
           Wygląd każdego kafla wyekstrahowany do `StreakTile.tsx` (system kopiowania
-          komponentów, §340+) — `onTile` (nawigacja) zostaje TUTAJ, bo to zachowanie
-          specyficzne dla PRAWDZIWEGO dashboardu; `ScreenCanvas` na innych ekranach
-          przekazuje `StreakTile` inny `onPress` (otwarcie pickera metryki). */}
+          komponentów, §340+); `navigateForStreakItem` (TEŻ w `StreakTile.tsx`, §341) — ten
+          sam routing używany przez `ScreenCanvas`'s tryb podglądu na innych ekranach. W
+          trybie EDYCJI płótna `ScreenCanvas` przekazuje `StreakTile` INNY `onPress`
+          (otwarcie pickera metryki), nie ten routing. */}
       <View style={[s.grid, { gap: tileStyle.tileGap }]}>
         {rows.map(r => (
-          <StreakTile key={r.key} item={r} tileStyle={tileStyle} onPress={() => onTile(r)}
+          <StreakTile key={r.key} item={r} tileStyle={tileStyle} onPress={() => navigateForStreakItem(r, tileStyle)}
             sizeStyle={[s.gridTileTouch, { aspectRatio: tileStyle.aspectRatio }]} />
         ))}
       </View>
     </TouchableOpacity>
   );
-
-  function onTile(r: StreakItem) {
-    haptic.tap();
-    if (r.key.startsWith('h:')) {
-      const habitId = r.key.slice(2);
-      // Nadpisanie z kreatora (§330) wygrywa z domyślnym `kind==='water'` — brak wpisu w
-      // mapie (zwykły przypadek) zachowuje się DOKŁADNIE jak przed §330.
-      const style = tileStyle.habitCalendarOverrides[habitId] ?? (r.kind === 'water' ? 'water' : 'year');
-      router.push((style === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
-    }
-    else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
-    // `ex:` — wpis "Ćwiczenia" (2026-10-15, złożony tu z dawnego osobnego kafla
-    // `exercise-streak`/`ExerciseStreakCard.tsx`, patrz app/(tabs)/index.tsx) — własna,
-    // bogatsza historia (`/exercises-history`), nie generyczny `/habit-year`.
-    else if (r.key.startsWith('ex:')) router.push('/exercises-history' as any);
-    else router.push('/counters' as any);
-  }
 }
 
 const makeS = themedStyles((c: any) => StyleSheet.create({

@@ -17,6 +17,7 @@ import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const todayStr = () => {
@@ -566,6 +567,11 @@ export default function Food() {
             <Plus size={16} color={ACCENT} /><Text style={[s.addMoreTxt, { color: ACCENT }]}>Dodaj kolejny posiłek</Text>
           </TouchableOpacity>
         )}
+
+        {/* Wolne płótno — system kopiowania komponentów (Faza 15, §341). Pierwszy ekran poza
+            dashboardem z tym mechanizmem; user: "dodaje streak wody na dashbordzie i dodaje
+            streak słodyczy w jedzeniu" — dokładnie to miejsce. */}
+        <ScreenCanvas screenKey="food" title="Twoje komponenty" />
       </ScrollView>
 
       {/* Profil ciała → BMR (zapotrzebowanie spoczynkowe) */}
