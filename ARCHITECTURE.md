@@ -18904,6 +18904,61 @@ Bossy → ✏️ (lewy dolny róg) → przeciągnięcie DOWOLNEGO bossa powinno 
 razem z palcem (BEZ "ucieczki" w scroll ekranu w trakcie gestu) i ścieżka powinna żywo
 podążać za nową pozycją.
 
+## 349. System kopiowania komponentów — Faza 20: grupowanie (2026-10-17)
+
+User, dawno temu w §333: "grupowanie komponentów" — ostatni z dużych, odłożonych kierunków dla
+wolnego płótna (po Fazach 14-19: ekstrakcja kafli, canvas MVP, styl per-instancja, drugi typ
+komponentu, trzy ekrany docelowe). Zakres v1, świadomie zawężony: grupa synchronizuje TYLKO
+wspólne przesuwanie (przeciągnięcie jednego membera porusza wszystkich o ten sam delta) —
+rozmiar/styl/podpięcie zostają w pełni per-instancja nawet wewnątrz grupy. Bez tego zawężenia
+"grupowe resize" wymagałoby przeliczania proporcji wszystkich członków względem wspólnego
+bounding-boxa — osobna, duża decyzja projektowa, odłożona (patrz NEXT_STEPS.md).
+
+**`canvasComponentsStore.ts`** — `CanvasItem.groupId: string | null` (dzielony string = ta sama
+grupa; `null` = poza grupą). ŚWIADOMIE bez osobnej encji/tabeli grup — grupa nie ma własnego
+stanu do pilnowania w synchronizacji z członkami, "znika" sama gdy ostatni member traci
+`groupId`. Trzy nowe akcje: `groupItems(screenKey, ids)` (wymaga ≥2 id z TEGO `screenKey` —
+ignoruje id spoza niego, obrona przed pomyłką wołającego; zwraca nowy `groupId` albo `null` gdy
+<2 trafień), `ungroupItems(groupId)` (czyści `groupId` u wszystkich członków), `moveGroupBy
+(screenKey, groupId, dx, dy, canvasWidth)` (przesuwa WSZYSTKICH członków o ten sam delta, każdy
+KLAMROWANY OSOBNO do granic płótna — grupa blisko krawędzi nie "rozjeżdża się", człon przy
+krawędzi po prostu przestaje iść dalej w tym kierunku, reszta grupy dalej jedzie). Przy okazji
+naprawione: `addItem`'s `id`/`groupItems`'s `groupId` generowane WYŁĄCZNIE z `Date.now()` mogły
+kolidować przy dwóch wywołaniach w TEJ SAMEJ milisekundzie (wykryte przy pisaniu testu — trzy
+`addItem()` pod rząd w pętli realnie kolidowały) — dociągnięty losowy suffix do obu.
+
+**`CanvasPlacedItem.tsx`** — nowa, CAŁKOWICIE osobna gałąź renderu: `selectMode` (bez
+przeciągania/resize/stylu/usuwania — user zaznacza WIELE itemów szybko po sobie, żadna z tych
+akcji nie ma tu sensu). Sam tap przełącza `selected` (callback `onToggleSelect`), fioletowa
+plomba z checkiem w rogu pokazuje stan. Poza trybem zaznaczania: `grouped` zmienia kolor ramki/
+uchwytów na fioletowy (`c.accent.purple`) i dokłada trzeci mały przycisk "Rozgrupuj" (`Link2Off`)
+obok Styl/Usuń.
+
+**`ScreenCanvas.tsx`** — `selectMode`/`selectedIds` state, przycisk "Grupuj komponenty"
+(widoczny tylko gdy ≥2 itemy na ekranie — zero sensu przy jednym/zero) przełącza w tryb
+zaznaczania, który podmienia pasek "Dodaj" na "Anuluj"/"Grupuj (N)" (wyłączony <2). `onMove`
+rozgałęziony: item z `groupId` woła `moveGroupBy` (delta liczony jako `x - item.x`/`y - item.y`
+z finalnej pozycji po puszczeniu palca, TEN SAM wzorzec commit-on-end co pojedynczy drag), item
+bez grupy — stary `updateItem`. Wyłączenie edycji ("Gotowe") zawsze czyści `selectMode`/
+zaznaczenie — nie zostaje w locie między sesjami edycji.
+
+**Przy okazji** — `CountdownTileStyle`/`DEFAULT_COUNTDOWN_TILE_STYLE` wyniesione z
+`CountdownTile.tsx` (komponent, importuje `'react-native'`) do nowego
+`src/store/countdownTileStyleDefaults.ts` (czysty TS, bez RN) — pierwszy test wołający
+`canvasComponentsStore.ts` bezpośrednio (ten store importował te dwa symbole z komponentu)
+wykrył, że CAŁY import łańcuch wywalał się w jest (`testEnvironment: 'node'` nie transpiluje
+`react-native`). `CountdownTile.tsx` re-eksportuje oba symbole dla wstecznej zgodności — zero
+zmiany dla istniejących konsumentów.
+
+**Testy**: nowy `__tests__/canvasComponentsStore.test.ts` (7 testów: `groupItems`/
+`ungroupItems`/`moveGroupBy`, w tym osobne klamrowanie per-member i obrona przed cross-
+screenKey). `tsc --noEmit` czyste, `jest --silent` 108/108 suite, 1404 testów (+7 nowych).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z włączonym płótnem (Jedzenie/
+Ćwiczenia/Finanse) → Edytuj → dodaj 2+ komponenty → "Grupuj komponenty" → zaznacz dwa → "Grupuj"
+→ przeciągnięcie JEDNEGO powinno przesunąć OBA o ten sam offset, przycisk 🔗 na każdym z nich
+powinien je rozgrupować niezależnie.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

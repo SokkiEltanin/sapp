@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
-import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/components/dashboard/CountdownTile';
+import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -33,6 +33,13 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty.
   bindingKey: string | null;
   style: StreakTileStyle | CountdownTileStyle;  // per-instancja, kopia
+  // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
+  // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
+  // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
+  // usuwa się SAMA gdy ostatni member traci `groupId`/zostaje skasowany). Grupa wpływa TYLKO
+  // na WSPÓLNE przesuwanie (patrz `moveGroupBy` niżej) — rozmiar/styl/podpięcie zostają w pełni
+  // per-instancja nawet wewnątrz grupy (świadomie uproszczone na v1, patrz NEXT_STEPS.md).
+  groupId: string | null;
 }
 
 const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number }> = {
@@ -50,6 +57,18 @@ interface CanvasComponentsState {
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
   updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
   removeItem: (id: string) => void;
+  // Grupowanie (§349) — `groupItems` ignoruje id'ki spoza `screenKey` (obrona przed pomyłką
+  // wołającego, nie powinno się zdarzyć bo `ScreenCanvas` zaznacza tylko WŁASNE itemy) i
+  // zwraca nowy `groupId`, żeby wołający mógł np. od razu wyczyścić zaznaczenie. Grupa z <2
+  // członkami nie ma sensu (nic by nie synchronizowała) — `groupItems` wymaga co najmniej 2 id.
+  groupItems: (screenKey: string, ids: string[]) => string | null;
+  ungroupItems: (groupId: string) => void;
+  // Przesuwa WSZYSTKICH członków grupy o ten sam delta (wywoływane z `onMove` jednego
+  // przeciąganego itemu w `ScreenCanvas.tsx`) — każdy member klamrowany OSOBNO do granic płótna
+  // (ten sam wzorzec klamrowania co pojedynczy drag w `CanvasPlacedItem.tsx`), więc grupa blisko
+  // krawędzi nie "rozjeżdża się" nierówno, tylko człon przy krawędzi po prostu przestaje się
+  // dalej przesuwać w tym kierunku.
+  moveGroupBy: (screenKey: string, groupId: string, dx: number, dy: number, canvasWidth: number) => void;
 }
 
 export const useCanvasComponentsStore = create<CanvasComponentsState>()(
@@ -62,7 +81,12 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
       // oślep) — żeby domyślnie NIE nakładała się na istniejące, mimo że nakładanie jest
       // dozwolone, jeśli user sam tak przeciągnie. Pierwsza instancja na ekranie: (12, 12).
       addItem: (screenKey, componentType) => {
-        const id = `canvas:${Date.now()}`;
+        // Losowy suffix (nie tylko `Date.now()`) — dwa `addItem()` w tej samej milisekundzie
+        // (np. szybkie dwa tapnięcia "Dodaj", wykryte przy pisaniu testu grupowania §349, gdzie
+        // trzy wywołania pod rząd w jednej pętli realnie kolidowały) dawały identyczne id, co po
+        // cichu myliło dwie RÓŻNE instancje w każdym miejscu liczącym po `id` (w tym `groupItems`
+        // niżej).
+        const id = `canvas:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const existing = get().items.filter(i => i.screenKey === screenKey);
         const maxBottom = existing.reduce((m, i) => Math.max(m, i.y + i.height), 0);
         const y = existing.length === 0 ? 12 : maxBottom + 12;
@@ -71,6 +95,7 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
           id, screenKey, componentType, x: 12, y, width, height,
           bindingKey: null,
           style: DEFAULT_STYLE[componentType],
+          groupId: null,
         };
         set((s) => ({ items: [...s.items, item] }));
         return id;
@@ -81,6 +106,27 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
       })),
 
       removeItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
+
+      groupItems: (screenKey, ids) => {
+        const idSet = new Set(get().items.filter(i => i.screenKey === screenKey && ids.includes(i.id)).map(i => i.id));
+        if (idSet.size < 2) return null;
+        const groupId = `group:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        set((s) => ({ items: s.items.map(i => idSet.has(i.id) ? { ...i, groupId } : i) }));
+        return groupId;
+      },
+
+      ungroupItems: (groupId) => set((s) => ({
+        items: s.items.map(i => i.groupId === groupId ? { ...i, groupId: null } : i),
+      })),
+
+      moveGroupBy: (screenKey, groupId, dx, dy, canvasWidth) => set((s) => ({
+        items: s.items.map(i => {
+          if (i.screenKey !== screenKey || i.groupId !== groupId) return i;
+          const x = Math.max(0, Math.min(Math.max(0, canvasWidth - i.width), i.x + dx));
+          const y = Math.max(0, i.y + dy);
+          return { ...i, x, y };
+        }),
+      })),
     }),
     {
       name: 'canvas-components-v1',

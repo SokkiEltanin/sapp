@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 20: grupowanie (2026-10-17, §349)
+
+User, dawno w §333: "grupowanie komponentów" — zaimplementowane. v1 ŚWIADOMIE zawężony:
+grupa synchronizuje TYLKO wspólne przesuwanie (drag jednego membera = wszyscy jadą o ten sam
+delta, każdy klamrowany osobno do granic płótna), NIE rozmiar/styl/podpięcie — te zostają
+w pełni per-instancja nawet w grupie. **Priorytet testu WYSOKI** — checklist w
+ARCHITECTURE.md §349.
+
+**Otwarte, jeśli user będzie chciał więcej**: grupowy resize (przeliczanie proporcji
+wszystkich członków względem wspólnego bounding-boxa — osobna decyzja projektowa, nie
+plumbing); wizualne obramowanie całej grupy na płótnie (dziś widać tylko fioletową ramkę na
+KAŻDYM członku osobno, nie wspólny prostokąt wokół całej grupy); zagnieżdżone grupy (grupa
+grup) — żadne z tych NIE zostało poproszone wprost, nie budować bez sygnału.
+
 ## 🔴 Edytor mapy bossów — gest przeciągania naprawiony (2026-10-17, §348) — DO WERYFIKACJI
 
 User: "jak edytuje mapę bossow to tam nic praktycznie nie mogę zrobic muszę miec mozliwosc
