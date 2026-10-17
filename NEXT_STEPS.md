@@ -26,33 +26,22 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
-## 🆕 Dashboard jako wolne płótno (2026-10-17, potwierdzone AskUserQuestion, jeszcze NIE zaczęte)
+## 🆕 Dashboard jako wolne płótno (2026-10-17, §356) — DO WERYFIKACJI
 
-User potwierdził wprost: "projektowanie całego ekranu" = zastosowanie WOLNEGO PŁÓTNA (system
-z §340+, dziś na Jedzeniu/Ćwiczeniach/Finansach) do PRAWDZIWEGO dashboardu (`index.tsx`), nie
-tylko lżejsza zmiana kolejności/widoczności kart.
+User potwierdził wprost (AskUserQuestion): "projektowanie całego ekranu" = zastosowanie WOLNEGO
+PŁÓTNA (system z §340+, już na Jedzeniu/Ćwiczeniach/Finansach) do PRAWDZIWEGO dashboardu
+(`index.tsx`). Zrobione: `ScreenCanvas` rozdzielony na `ScreenCanvasBase` (props-driven, zero
+własnych hooków fetchujących) + `ScreenCanvas` (cienki wrapper, bez zmian dla 3 istniejących
+ekranów) — `index.tsx` importuje `ScreenCanvasBase` i wstrzykuje WŁASNE już wyliczone dane
+(`streakWall`, nowy tani memo `allCountdownItemsForCanvas` bez filtra `onDashboard`, istniejące
+`allNotes`) — zero drugiego montowania `useHabits()`. Nowa sekcja `'custom-canvas'` podpięta do
+ISTNIEJĄCEGO systemu reorder/hide (`dashboardLayout.ts`) — przesuwalna/chowalna w edytorze
+dashboardu bez nowego UI. Checklist w ARCHITECTURE.md §356.
 
-**Znana przeszkoda architektoniczna** (już udokumentowana w `useAllStreakItems.ts`): dashboard
-JUŻ montuje `useHabits()` (własny AsyncStorage fetch) dla swojej stałej treści —
-`<ScreenCanvas>` wewnętrznie też woła `useHabits()` (przez `useAllStreakItems()`), więc
-podpięcie 1:1 jak na innych ekranach PODWOIŁOBY fetch na najbardziej czułym na wydajność
-ekranie appki.
-
-**Plan rozwiązania (zaprojektowany, NIE zaimplementowany)**: rozdzielić `ScreenCanvas` na
-`ScreenCanvasBase` (czysto props-driven — przyjmuje `allStreakItems`/`allCountdownItems`/
-`allNotesItems` jako propsy, ŻADNYCH własnych hooków fetchujących dane) + istniejący
-`ScreenCanvas` jako cienki wrapper (woła 3 hooki jak dziś, używany przez Jedzenie/Ćwiczenia/
-Finanse bez zmian). `index.tsx` importuje `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE
-już wyliczone dane (`streakWall` 1:1 jako `allStreakItems` — zero dodatkowego kodu; `counters`
-już w pamięci dla `allCountdownItems` — tani dodatkowy `.filter()`, nie fetch; notatki —
-rozszerzyć istniejący efekt `index.tsx` ładujący notatki do przypiętych, żeby trzymał WSZYSTKIE
-notatki, `pinnedNotes` jako pochodna `.filter()`). To NIE dotyka samego `useHabits()` (duży,
-ryzykowny refaktor na Zustand, świadomie odrzucony na rzecz mniejszej, chirurgicznej zmiany).
-
-**Dodatkowo do przemyślenia przy implementacji**: gdzie fizycznie wstawić sekcję płótna w
-~5400-liniowym `index.tsx` (osobna, wyraźnie oddzielona strefa, nie wmieszana między istniejące
-sztywne karty) i czy domyślne pozycje nowych itemów powinny jakoś uwzględniać że ekran już jest
-pełen innej, stałej treści nad/pod płótnem.
+**Otwarte, nie zaczęte**: `screenKey="dashboard"` to osobna, niezależna przestrzeń komponentów
+(nie dzieli itemów z Jedzeniem/Ćwiczeniami/Finansami) — jeśli user zechce PRZENOSIĆ gotowe
+kafle między ekranami (np. skopiowany na Jedzeniu kafel na dashboard), to osobny fix (obecnie
+trzeba dodać od zera na każdym ekranie).
 
 ## 🔴 Fix: edytor mapy bossów — boss poza ekranem (2026-10-17, §352) — DO WERYFIKACJI
 
