@@ -4,6 +4,10 @@ import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
 import { NotesTileStyle, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
+import {
+  RectShapeStyle, EllipseShapeStyle, LineShapeStyle, TextShapeStyle,
+  DEFAULT_RECT_SHAPE_STYLE, DEFAULT_ELLIPSE_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE, DEFAULT_TEXT_SHAPE_STYLE,
+} from '@/store/shapeStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -27,7 +31,13 @@ import { NotesTileStyle, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyle
 // odwzorowuje to na TĘ SAMĄ `PickerOption[]` abstrakcję co `useAllStreakItems()`/
 // `useAllCountdownItems()` — generyczność pickera (§341 komentarz w `MetricPickerModal.tsx`)
 // faktycznie wytrzymała TRZECI, strukturalnie inny kształt danych bez zmian.
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile';
+// Faza 26 (2026-10-17, §357) — cztery nowe typy BEZ podpięcia danych (`rectShape`/`ellipseShape`/
+// `lineShape`/`textShape`, patrz `shapeStyleDefaults.ts`) — gołe kształty-primitywy, user: "na
+// pewno pełny edytor z dodawaniem kształtów od zera... jak Figma". `bindingKey` dla nich ZOSTAJE
+// `null` na zawsze — nie mają z czym się podpiąć, same SĄ swoją treścią (kolor/obrys/tekst, nie
+// metryka z apki). `isShapeType()` (tam) odróżnia je od trzech "widgetów z danymi" wszędzie, gdzie
+// to jest istotne (ScreenCanvas.tsx: brak metric-pickera, brak nawigacji po tapnięciu).
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
 
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
@@ -37,9 +47,10 @@ export interface CanvasItem {
   width: number; height: number;
   // Klucz z `useAllStreakItems()`/`useAllCountdownItems()` (zależnie od `componentType`) — TEN
   // SAM format co klucze używane już w odpowiadających kartach dashboardu/kreatorze, zero
-  // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty.
+  // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
+  // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -53,11 +64,23 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   streakTile: { width: 150, height: 92 },
   countdownTile: { width: 230, height: 76 },
   notesTile: { width: 220, height: 80 },
+  rectShape: { width: 140, height: 90 },
+  ellipseShape: { width: 120, height: 120 },
+  // Linia (Faza 26) domyślnie blisko-pozioma (wysokość 4) — rysowana PO PRZEKĄTNEJ swojego boxa
+  // (patrz `ShapeTile.tsx`), więc "pozioma" to po prostu bardzo płaski box. Resize uchwytu w
+  // rogu zmienia KĄT linii (pionowa = bardzo wąski box, ukośna = box o zbliżonych w/h) — to samo
+  // zachowanie co zmiana rozmiaru linii w Figmie (ciągnięcie za punkt końcowy).
+  lineShape: { width: 160, height: 4 },
+  textShape: { width: 160, height: 40 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
+  rectShape: DEFAULT_RECT_SHAPE_STYLE,
+  ellipseShape: DEFAULT_ELLIPSE_SHAPE_STYLE,
+  lineShape: DEFAULT_LINE_SHAPE_STYLE,
+  textShape: DEFAULT_TEXT_SHAPE_STYLE,
 };
 
 interface CanvasComponentsState {

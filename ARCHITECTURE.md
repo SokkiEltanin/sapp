@@ -19260,6 +19260,72 @@ odliczania/notatki powinno działać identycznie jak na innych ekranach (przeci�
 styl, grupowanie). Sekcja "Twoje komponenty (wolne płótno)" powinna być widoczna i przesuwalna w
 edytorze dashboardu (Ustawienia → Personalizacja → Edytuj dashboard).
 
+## 357. Kształty-primitywy na wolnym płótnie (2026-10-17)
+
+User, po mojej szczerej odpowiedzi że dotychczasowy system to "ułóż i ostyluj gotowe widgety",
+nie prawdziwy Figma-like edytor: "na pewno pełny edytor z dodawaniem kształtów od zera... żeby
+było jak Figma... grupowanie i wgle potem podpisanie danych itp itd" + "rób po kolei i nie
+przerywaj dopóki nie skończysz". To PIERWSZA faza wielofazowej przebudowy w kierunku
+pełnoprawnego edytora (kolejne, zaplanowane: generyczny data-binding do dowolnych danych apki,
+panel właściwości/warstwy/rozszerzone grupowanie — patrz NEXT_STEPS.md).
+
+**Problem**: dotychczasowe 3 `componentType` (`streakTile`/`countdownTile`/`notesTile`) to
+gotowe WIDGETY z treścią Z APKI — żaden nie pozwalał postawić gołego prostokąta/kółka/linii/
+podpisu. "Projektowanie od zera" wymaga PRIMITYWÓW graficznych, nie tylko więcej presetów
+istniejących widgetów.
+
+**4 nowe `componentType`** (`rectShape`/`ellipseShape`/`lineShape`/`textShape`,
+`shapeStyleDefaults.ts`, pure TS z tego samego powodu co `countdownTileStyleDefaults.ts`/
+`notesTileStyleDefaults.ts` — testowalność `canvasComponentsStore.ts` w jest) — **BEZ podpięcia
+danych**: `bindingKey` zawsze `null` (`isShapeType()` odróżnia je wszędzie gdzie to istotne —
+`ScreenCanvas.tsx`: zero metric-pickera po dodaniu, tapnięcie nie robi nic, w przeciwieństwie do
+3 "widgetów z danymi"). Kształt JEST swoją treścią (kolor/obrys/tekst), nie reprezentuje czegoś
+z apki.
+
+**Render** (`ShapeTile.tsx`, siostrzany `StreakTile`/`CountdownTile`/`NotesTile` — ta sama
+sygnatura `(…, onPress, sizeStyle)`, `CanvasPlacedItem`'s render-prop obsługuje go bez zmian) —
+SVG (`react-native-svg`, już zależność appki — `RingCountdown.tsx` już go używa) w
+znormalizowanej przestrzeni `viewBox="0 0 100 100"` + `preserveAspectRatio="none"`: SVG rozciąga
+się 1:1 z `sizeStyle` (flex 100%/100%, TA SAMA mechanika co pozostałe 3 typy), żywa animacja
+podczas przeciągania uchwytu resize bez `onLayout`/pomiaru. `lineShape` renderowana jako
+przekątna swojego bounding-boxa (x1=0,y1=0 → x2=100,y2=100) — pozioma/pionowa/ukośna linia to po
+prostu płaski/wąski/kwadratowy box, uchwyt resize w rogu działa jak przeciąganie punktu
+końcowego linii w Figmie.
+
+**Świadomie uproszczone**: `strokeWidth`/`cornerRadius` są względne do rozmiaru kształtu
+(jednostki viewBox 0-100), NIE stałą liczbą pikseli jak w prawdziwej Figmie — przy bardzo
+małych/dużych instancjach grubość obrysu/zaokrąglenie będą się skalować z boxem, a przy bardzo
+niekwadratowym boxie zaokrąglenie rogów prostokąta będzie wizualnie nierówne (X vs Y
+rozciągnięte inaczej przez `preserveAspectRatio="none"`). Jeśli user zgłosi że to przeszkadza,
+v2 przejdzie na pomiar `onLayout` + piksele absolutne. `textShape` edytuje treść przez pole
+tekstowe W MODALU stylu (nie przez podwójne tapnięcie na płótnie jak w prawdziwej Figmie) —
+bezpieczniejsze niż nowy, trzeci system gestów konkurujący z przeciąganiem/tap-do-pickera na tym
+samym elemencie.
+
+**`CanvasShapeStyleModal.tsx`** — JEDEN adaptacyjny modal dla 4 typów (branch wg `kind`
+wewnątrz, ten sam wzorzec co `CountdownTile.tsx`'s branching per `layoutPreset`), nie 4 osobne
+pliki — rect/ellipse dzielą wypełnienie (`ColorSwatchPicker`)+obrys+przezroczystość, rect
+dodatkowo zaokrąglenie, line ma kolor+grubość, text ma treść (pole tekstowe)+kolor+wyrównanie+
+rozmiar czcionki+pogrubienie. `onChange` przyjmuje `Record<string, unknown>` (nie generyk per
+typ) — ta sama, już udokumentowana pułapka TS co w §355 (spread nad unią 4 różnych interfejsów z
+polami o różnych nazwach/typach dystrybuuje się źle) — bezpieczeństwo typów żyje w samym modalu
+(branch wg `kind` PRZED użyciem pól), `ScreenCanvas.tsx`'s `onChange` merge-uje przez `as any`.
+
+**Podpięte**: nowy wiersz przycisków "Kształty" (szary/obrysowy, wizualnie odróżniony od
+niebieskich "komponenty z danymi") pod istniejącymi 3 przyciskami Dodaj w `ScreenCanvas.tsx` —
+działa identycznie na WSZYSTKICH 4 ekranach z płótnem (Jedzenie/Ćwiczenia/Finanse/Dashboard, bez
+zmiany w ich kodzie, bo cała logika żyje w `ScreenCanvasBase`).
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +2 testy (domyślny styl/rozmiar
+`rectShape`/`lineShape`, `bindingKey` zawsze `null`). `tsc --noEmit` czyste, `jest --silent`
+109/109 suite, 1409 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → Edytuj → wiersz "Kształty"
+→ dodanie prostokąta/elipsy/linii/tekstu powinno działać jak reszta (przeciąganie, resize, 🎨
+styl, 🗑 usuń, grupowanie z innymi kaflami) BEZ otwierania metric-pickera. 🎨 na kształcie
+powinno pokazywać właściwy panel (kolor/obrys/zaokrąglenie dla prostokąta, kolor/grubość dla
+linii, treść/kolor/wyrównanie/rozmiar dla tekstu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
