@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
 import { X, Palette } from 'lucide-react-native';
-import { CountdownTileStyle } from '@/components/dashboard/CountdownTile';
+import { CountdownTileStyle, CountdownLayoutPreset } from '@/components/dashboard/CountdownTile';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
+import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
 
-// Edycja stylu PER-INSTANCJA odliczania na płótnie (Faza 17, 2026-10-17) — dużo prostsza niż
-// `CanvasStreakStyleModal` (§342), bo `CountdownTileStyle` ma tylko 3 pola, zero presetów
-// layoutu/palety progów — kafel odliczania ma JEDEN kształt (pierścień+tekst w rzędzie), nie 4
-// alternatywne jak seria.
+// Edycja stylu PER-INSTANCJA odliczania na płótnie (Faza 17, 2026-10-17) — rozszerzone w
+// Fazie 24 (§355, user: "nie ma możliwości wyboru własnego kształtu od zera") o 4 warianty
+// kształtu (`CountdownLayoutPreset`), ten sam wzorzec segmented-control co "Styl kafelka" w
+// `CanvasStreakStyleModal`. `ringSize`/`ringStrokeWidth` mają sens TYLKO dla `'ring'`,
+// `numberScale` TYLKO dla `'hero'` — pokazywane warunkowo.
 export default function CanvasCountdownStyleModal({ visible, style, onChange, onClose }: {
   visible: boolean;
   style: CountdownTileStyle;
@@ -29,15 +31,40 @@ export default function CanvasCountdownStyleModal({ visible, style, onChange, on
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ gap: spacing[2] }}>
+            <Text style={s.sectionLabel}>Styl</Text>
+            <View style={s.segmented}>
+              {([['ring', 'Pierścień'], ['bar', 'Pasek'], ['compact', 'Kompaktowy'], ['hero', 'Duża liczba']] as [CountdownLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = style.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); onChange({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={s.sectionLabel}>Kształt</Text>
             <View style={s.innerCard}>
               <Stepper label="Zaokrąglenie rogów" value={style.cornerRadius} min={0} max={32} step={2}
                 onChange={v => onChange({ cornerRadius: v })} />
-              <View style={s.divider} />
-              <Stepper label="Rozmiar pierścienia" value={style.ringSize} min={36} max={84} step={4}
-                onChange={v => onChange({ ringSize: v })} />
-              <View style={s.divider} />
-              <Stepper label="Grubość pierścienia" value={style.ringStrokeWidth} min={2} max={12} step={1}
-                onChange={v => onChange({ ringStrokeWidth: v })} />
+              {style.layoutPreset === 'ring' && (
+                <>
+                  <View style={s.divider} />
+                  <Stepper label="Rozmiar pierścienia" value={style.ringSize} min={36} max={84} step={4}
+                    onChange={v => onChange({ ringSize: v })} />
+                  <View style={s.divider} />
+                  <Stepper label="Grubość pierścienia" value={style.ringStrokeWidth} min={2} max={12} step={1}
+                    onChange={v => onChange({ ringStrokeWidth: v })} />
+                </>
+              )}
+              {style.layoutPreset === 'hero' && (
+                <>
+                  <View style={s.divider} />
+                  <Stepper label="Skala liczby" value={style.numberScale} min={0.7} max={1.8} step={0.1} decimals={1}
+                    onChange={v => onChange({ numberScale: v })} />
+                </>
+              )}
             </View>
           </ScrollView>
         </Pressable>
@@ -54,6 +81,10 @@ const makeS = (c: any) => StyleSheet.create({
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { flex: 1, fontSize: 15, fontWeight: '800', color: c.text.primary },
+  sectionLabel: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing[2] },
   innerCard: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.card, padding: spacing[3] },
   divider: { height: 1, backgroundColor: c.border.subtle },
+  segmented: { flexDirection: 'row', gap: 6 },
+  segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
+  segTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
 });

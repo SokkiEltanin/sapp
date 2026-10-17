@@ -16,13 +16,15 @@ Pierwszy z trzech zgłoszonych braków zrobiony — `ColorSwatchPicker` (presety
 biblioteka + dodawanie custom hex) podpięty w 3 miejscach (paleta progów serii w kreatorze i
 na płótnie, akcent Rekordów). **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §354.
 
-## 🆕 Kreator kafelków — więcej wariantów kształtu (2026-10-17, jeszcze NIE zaczęte)
+## 🆕 Kreator kafelków — warianty kształtu Odliczań zrobione (2026-10-17, §355) — DO WERYFIKACJI
 
-Drugi z trzech zgłoszonych braków. "Twoje serie" ma 4 presety (klasyczny/pierścień/pasek/
-kompaktowy), ale Rekordy/Odliczania/Liczniki/Notatki mają TYLKO suwaki liczbowe (zaokrąglenie/
-rozmiar), zero alternatywnych układów. Dociągnąć podobny wybór tam gdzie ma to sens (NIE
-kopiować 1:1 presetów serii — każdy typ ma inny kształt treści, trzeba przemyśleć osobno co
-"inny wariant" znaczy dla pierścienia odliczania / wiersza licznika / notatki).
+Odliczania dostały 4 warianty kształtu (pierścień/pasek/kompaktowy/duża liczba), ten sam
+wzorzec co "Twoje serie". **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §355.
+
+**Otwarte — Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki liczbowe**, zero alternatywnych
+układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba przemyśleć OSOBNO co
+"inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
+niż pierścień odliczania, nie kopiować 1:1).
 
 ## 🆕 Dashboard jako wolne płótno (2026-10-17, potwierdzone AskUserQuestion, jeszcze NIE zaczęte)
 

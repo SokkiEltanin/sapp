@@ -2,11 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { mergeTileStyleState } from './tileStyleMerge';
+import { CountdownLayoutPreset } from './countdownTileStyleDefaults';
 
 export interface CountdownsTileStyle {
+  layoutPreset: CountdownLayoutPreset;
   cornerRadius: number;
   ringSize: number;
   ringStrokeWidth: number;
+  numberScale: number;
   maxVisible: number;
 }
 
@@ -15,9 +18,11 @@ export interface CountdownsTileStyle {
 // TU jest inny, nie kopiowany 1:1 z poprzednich stores), `RingCountdown` domyślne
 // `size=64`/`strokeWidth=6`, zawsze 3 widoczne pozycje (`.slice(0,3)` w oryginalnym kodzie).
 export const DEFAULT_COUNTDOWNS_TILE_STYLE: CountdownsTileStyle = {
+  layoutPreset: 'ring',
   cornerRadius: 24,
   ringSize: 64,
   ringStrokeWidth: 6,
+  numberScale: 1,
   maxVisible: 3,
 };
 

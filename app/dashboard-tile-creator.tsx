@@ -32,6 +32,7 @@ import GCalCard from '@/components/dashboard/GCalCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
+import { CountdownLayoutPreset } from '@/store/countdownTileStyleDefaults';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE } from '@/store/sinceCountersTileStyleStore';
 import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
 import { useGCalTileStyleStore, DEFAULT_GCAL_TILE_STYLE } from '@/store/gcalTileStyleStore';
@@ -293,8 +294,10 @@ export default function DashboardTileCreator() {
         </TouchableOpacity>
 
         {/* Styl kafelka (§334) — "zmiana ZUPEŁNA kafelków", nie parametr istniejącego wyglądu.
-            Tylko "Twoje serie" na razie — Rekordy/Odliczania mają już swój ustalony, inny
-            kształt treści (hero+siatka / lista+pierścień), nie ten sam wybór tu miałby sens. */}
+            Rekordy/Liczniki/Notatki dalej mają swój ustalony, inny kształt treści bez wyboru —
+            Odliczania dociągnięte w Fazie 24 (§355, user: "nie ma możliwości wyboru własnego
+            kształtu od zera"), ten sam wzorzec co Twoje serie, inny zestaw wariantów (pierścień/
+            pasek/kompaktowy/duża liczba zamiast klasyczny/pierścień/pasek/kompaktowy). */}
         {activeCard === 'streaks' && (
           <>
             <Text style={s.sectionLabel}>Styl kafelka</Text>
@@ -311,18 +314,45 @@ export default function DashboardTileCreator() {
             </View>
           </>
         )}
+        {activeCard === 'countdowns' && (
+          <>
+            <Text style={s.sectionLabel}>Styl kafelka</Text>
+            <View style={s.segmented}>
+              {([['ring', 'Pierścień'], ['bar', 'Pasek'], ['compact', 'Kompaktowy'], ['hero', 'Duża liczba']] as [CountdownLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = countdownsDraft.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setCountdownsDraft({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         <Text style={s.sectionLabel}>Kształt</Text>
         {activeCard === 'countdowns' ? (
           <View style={s.card}>
             <Stepper label="Zaokrąglenie rogów" value={countdownsDraft.cornerRadius} min={0} max={32} step={2}
               onChange={v => setCountdownsDraft({ cornerRadius: v })} />
-            <View style={s.divider} />
-            <Stepper label="Rozmiar pierścienia" value={countdownsDraft.ringSize} min={40} max={88} step={4}
-              onChange={v => setCountdownsDraft({ ringSize: v })} />
-            <View style={s.divider} />
-            <Stepper label="Grubość pierścienia" value={countdownsDraft.ringStrokeWidth} min={2} max={12} step={1}
-              onChange={v => setCountdownsDraft({ ringStrokeWidth: v })} />
+            {countdownsDraft.layoutPreset === 'ring' && (
+              <>
+                <View style={s.divider} />
+                <Stepper label="Rozmiar pierścienia" value={countdownsDraft.ringSize} min={40} max={88} step={4}
+                  onChange={v => setCountdownsDraft({ ringSize: v })} />
+                <View style={s.divider} />
+                <Stepper label="Grubość pierścienia" value={countdownsDraft.ringStrokeWidth} min={2} max={12} step={1}
+                  onChange={v => setCountdownsDraft({ ringStrokeWidth: v })} />
+              </>
+            )}
+            {countdownsDraft.layoutPreset === 'hero' && (
+              <>
+                <View style={s.divider} />
+                <Stepper label="Skala liczby" value={countdownsDraft.numberScale} min={0.7} max={1.8} step={0.1} decimals={1}
+                  onChange={v => setCountdownsDraft({ numberScale: v })} />
+              </>
+            )}
             <View style={s.divider} />
             <Stepper label="Widocznych pozycji" value={countdownsDraft.maxVisible} min={1} max={6} step={1}
               onChange={v => setCountdownsDraft({ maxVisible: v })} />
