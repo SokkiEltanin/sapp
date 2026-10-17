@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 21: trzeci typ komponentu, "Notatka" (2026-10-17, §350)
+
+Trzeci `componentType` (`'notesTile'`) — wiąże się z JEDNĄ, konkretną notatką po `Note.id`
+(dowolną, nie tylko przypiętą). **Priorytet testu WYSOKI, plus regresja PinnedNotesCard** —
+checklist w ARCHITECTURE.md §350.
+
+**Otwarte — Rekordy/Kalendarz jako kolejne typy, jeśli user będzie chciał więcej**: "Rekordy
+życiowe" NIE mają analogicznego pojedynczego id — to wyliczone fakty z agregacji
+(`buildRecords()`), nie lista dyskretnych bytów jak notatki/nawyki/liczniki; "Kalendarz" ma inny
+problem — "następny event" to ruchomy cel w czasie, nie stały wybór jak notatka/odliczanie.
+Oba wymagają osobnej decyzji projektowej co właściwie miałoby się tu "bindować", nie są
+plumbingiem jak `notesTile` okazał się być.
+
 ## 🆕 System kopiowania komponentów — Faza 20: grupowanie (2026-10-17, §349)
 
 User, dawno w §333: "grupowanie komponentów" — zaimplementowane. v1 ŚWIADOMIE zawężony:

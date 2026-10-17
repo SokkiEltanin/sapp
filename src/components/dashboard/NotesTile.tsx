@@ -1,0 +1,71 @@
+import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import { FileText } from 'lucide-react-native';
+import { Note } from '@/utils/notesStorage';
+import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
+import { spacing, radius, fonts } from '@/theme';
+import { NotesTileStyle, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
+
+export type { NotesTileStyle };
+export { DEFAULT_NOTES_TILE_STYLE };
+
+// Wyekstrahowane z `PinnedNotesCard.tsx`'s per-wiersz renderu (system kopiowania komponentów,
+// trzeci `componentType`, Faza 21, 2026-10-17, §350) — ten sam zabieg co `CountdownTile` z
+// `CountdownsCard` (§344). Różnica od serii/odliczań: dashboard pokazuje LISTĘ przypiętych
+// notatek naraz, kafel na płótnie wiąże się z JEDNĄ, konkretną notatką po `id` (dowolną, nie
+// tylko przypiętą — user może chcieć "skopiować" dowolną notatkę jako osobny widget, nie tylko
+// te oznaczone pinezką na dashboardzie). `item: null` — ten sam wzorzec co `CountdownTile`
+// (zamiast fabrykować sztuczną `Note`).
+export function NotesTile({ note, tileStyle, accentColor, onPress, sizeStyle, boxed = false }: {
+  note: Note | null;
+  tileStyle: NotesTileStyle;
+  accentColor: string;
+  onPress: () => void;
+  sizeStyle?: StyleProp<ViewStyle>;
+  boxed?: boolean;
+}) {
+  const c = useColors();
+  const s = makeS(c);
+
+  if (!note) {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.placeholder, { borderRadius: tileStyle.cornerRadius }]}>
+          <FileText size={16} color={c.text.muted} />
+          <Text style={s.placeholderTxt}>Wybierz notatkę</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+      <View style={[s.row, boxed && [s.boxed, { borderRadius: tileStyle.cornerRadius }]]}>
+        <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={s.title} numberOfLines={1}>{note.title || 'Bez tytułu'}</Text>
+          {tileStyle.showBody && !!note.body?.trim() && (
+            <Text style={s.body} numberOfLines={2}>{note.body.trim()}</Text>
+          )}
+          {tileStyle.showTags && (note.tags ?? []).length > 0 && (
+            <Text style={s.tags} numberOfLines={1}>{note.tags.map(t => `#${t}`).join(' ')}</Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const makeS = themedStyles((c: any) => StyleSheet.create({
+  row: { flex: 1, flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start' },
+  boxed: { backgroundColor: c.bg.elevated, padding: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
+  title: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  body: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
+  tags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
+
+  placeholder: {
+    flex: 1, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle,
+    backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  placeholderTxt: { fontFamily: fonts.label, fontSize: 10, fontWeight: '700', color: c.text.muted },
+}));

@@ -1,10 +1,25 @@
 import { useCanvasComponentsStore, CanvasItem } from '@/store/canvasComponentsStore';
+import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 
 // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
 // Testowane bezpośrednio na store (ten sam wzorzec co battleLayoutDraftStore.test.ts) —
 // AsyncStorage zmockowane globalnie w jest.setup.js.
 beforeEach(() => {
   useCanvasComponentsStore.setState({ items: [] });
+});
+
+describe('canvasComponentsStore — addItem (trzeci typ, notesTile, §350)', () => {
+  test('nowa instancja notesTile dostaje poprawny domyślny rozmiar/styl/groupId', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('food', 'notesTile');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.componentType).toBe('notesTile');
+    expect(item.style).toEqual(DEFAULT_NOTES_TILE_STYLE);
+    expect(item.width).toBeGreaterThan(0);
+    expect(item.height).toBeGreaterThan(0);
+    expect(item.bindingKey).toBeNull();
+    expect(item.groupId).toBeNull();
+  });
 });
 
 function addThree(screenKey = 'food') {
