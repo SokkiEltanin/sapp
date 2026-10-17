@@ -41,7 +41,7 @@ function PinnedNotesCard({ notes, cardBg, accentColor, styleOverride }: PinnedNo
         <NotesTile
           key={n.id}
           note={n}
-          tileStyle={{ cornerRadius: 0, showBody: tileStyle.showBody, showTags: tileStyle.showTags }}
+          tileStyle={{ layoutPreset: tileStyle.layoutPreset, cornerRadius: 0, showBody: tileStyle.showBody, showTags: tileStyle.showTags }}
           accentColor={accentColor}
           onPress={() => { haptic.tap(); router.navigate(`/notes?noteId=${n.id}` as any); }}
           sizeStyle={s.pinNoteRow}

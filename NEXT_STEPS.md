@@ -26,12 +26,17 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Kreator kafelków — warianty kształtu Notatek (2026-10-17, §363) — DO WERYFIKACJI
+
+Drugi z trzech. Notatki dostały 3 warianty (wiersz/kompaktowy/karta) — WSPÓLNE dla płótna i
+`PinnedNotesCard` (jeden komponent, `NotesTile`, renderuje oba miejsca). Checklist w
+ARCHITECTURE.md §363. **Pozostało**: Rekordy — w toku.
+
 ## 🆕 Kreator kafelków — warianty kształtu Liczników (2026-10-17, §362) — DO WERYFIKACJI
 
 Pierwszy z trzech ("Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki liczbowe", flagowane od
 §355). Liczniki dostały 4 warianty (wiersz/pasek progu/kompaktowy/minimalny) — treść unikalna
-(próg serii), nie kopiowane z odliczań/serii. Checklist w ARCHITECTURE.md §362. **Pozostałe 2 z
-listy**: Notatki, Rekordy — w toku.
+(próg serii), nie kopiowane z odliczań/serii. Checklist w ARCHITECTURE.md §362.
 
 ## 🆕 Audyt błędów systemu płótna — kolejne 2 fixy (2026-10-17, §361) — DO WERYFIKACJI
 

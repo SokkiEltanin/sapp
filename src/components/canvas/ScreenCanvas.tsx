@@ -449,7 +449,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
       <CanvasNotesStyleModal
         visible={!!styleItem && styleItem.componentType === 'notesTile'}
         style={(styleItem && styleItem.componentType === 'notesTile' ? styleItem.style : DEFAULT_NOTES_TILE_STYLE) as NotesTileStyle}
-        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as NotesTileStyle), ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
 

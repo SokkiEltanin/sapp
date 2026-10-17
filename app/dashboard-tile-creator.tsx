@@ -35,6 +35,7 @@ import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/st
 import { CountdownLayoutPreset } from '@/store/countdownTileStyleDefaults';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE, SinceCounterLayoutPreset } from '@/store/sinceCountersTileStyleStore';
 import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
+import { NotesLayoutPreset } from '@/store/notesTileStyleDefaults';
 import { useGCalTileStyleStore, DEFAULT_GCAL_TILE_STYLE } from '@/store/gcalTileStyleStore';
 
 type CardKey = 'streaks' | 'records' | 'countdowns' | 'since' | 'notes' | 'gcal';
@@ -322,6 +323,23 @@ export default function DashboardTileCreator() {
                 const on = countdownsDraft.layoutPreset === m;
                 return (
                   <TouchableOpacity key={m} onPress={() => { haptic.tap(); setCountdownsDraft({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+        {/* Warianty kształtu Notatek (§363) — treść unikalna (tytuł+treść+tagi). */}
+        {activeCard === 'notes' && (
+          <>
+            <Text style={s.sectionLabel}>Styl kafelka</Text>
+            <View style={s.segmented}>
+              {([['row', 'Wiersz'], ['compact', 'Kompaktowy'], ['card', 'Karta']] as [NotesLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = notesDraft.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setNotesDraft({ layoutPreset: m }); }}
                     style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
                     <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
                   </TouchableOpacity>

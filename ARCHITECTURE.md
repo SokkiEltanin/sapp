@@ -19542,6 +19542,39 @@ skaluje przez to pole — `'minimal'` ma własną, mniejszą liczbę).
 kafelka" powinna pokazywać 4 opcje, przełączanie zmienia podgląd na żywo, "Wiersz" (default)
 wygląda DOKŁADNIE jak dotychczas.
 
+## 363. Kreator kafelków — warianty kształtu Notatek (2026-10-17)
+
+Drugi z trzech ("Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki liczbowe", §355/§362). W
+przeciwieństwie do Liczników (§362, dwa OSOBNE typy bez wspólnego komponentu), `NotesTile` jest
+JUŻ WSPÓLNY dla płótna I `PinnedNotesCard` (dashboard) — jeden typ (`NotesLayoutPreset`,
+`notesTileStyleDefaults.ts`) i jedna zmiana w JEDNYM komponencie renderującym obsługuje OBA
+miejsca na raz.
+
+**`NotesLayoutPreset = 'row' | 'compact' | 'card'`** — dopasowane do kształtu notatki (tytuł+
+treść+tagi, nie liczba+próg jak liczniki/odliczania): `'row'` = dokładny dotychczasowy wygląd
+(default, ikona+kolumna tekstu). `'compact'` = jedna linijka "Tytuł — podgląd treści", bez
+ikony. `'card'` = większy tytuł + dłuższy podgląd treści (4 linijki, nie 2) + tagi pod spodem,
+bez ikony — myślany pod SAMOTNĄ instancję na płótnie (wygląda jak osobna "karta notatki"), nie
+wiersz w liście.
+
+**`PinnedNotesTileStyle`** (dashboard) DUBLUJE `layoutPreset: NotesLayoutPreset` — ten sam
+wzorzec co `CountdownsTileStyle` dublujące `CountdownLayoutPreset` w §355 (`maxVisible` nie ma
+sensu dla pojedynczej instancji na płótnie, stąd OSOBNE typy stylu, WSPÓLNY tylko
+`NotesLayoutPreset` i komponent renderujący `NotesTile`).
+
+**Pułapka TS (RECYDYWA z §355)**: `layoutPreset` teraz istnieje w TRZECH typach stylu
+(`StreakTileStyle`/`CountdownTileStyle`/`NotesTileStyle`) z TRZEMA różnymi literal-unionami —
+`ScreenCanvas.tsx`'s notatkowy `onChange` (dotąd bez castu, bo `NotesTileStyle` nie miało
+konfliktującego pola) teraz TEŻ potrzebuje `as NotesTileStyle` — naprawione proaktywnie PRZED
+`tsc` (nie czekając, aż wywali błąd), bo wzorzec był już znany z §355.
+
+**Testy**: czysto UI-wiring (jak §355/§362) — `tsc --noEmit` czyste, `jest --silent` 109/109
+suite, 1423 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kreator kafelków → "Notatki" → "Styl kafelka" (3
+opcje) + dowolny ekran z płótnem → kafel notatki → 🎨 styl → to samo. "Wiersz" (default)
+wygląda DOKŁADNIE jak dotychczas w OBU miejscach.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
