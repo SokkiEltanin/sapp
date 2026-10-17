@@ -19512,6 +19512,36 @@ czyste, `jest --silent` 109/109 suite, 1423 testów.
 usuń jeden → drugi powinien wrócić do normalnego (niebieskiego) wyglądu, bez "Rozgrupuj" w
 panelu właściwości.
 
+## 362. Kreator kafelków — warianty kształtu Liczników (2026-10-17)
+
+Kontynuacja listy "doszlifowania" (user: "zrób listę na kilka godzin... dawaj bez przerwy").
+NEXT_STEPS.md flagowało od §355: "Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki liczbowe".
+`SinceCountersCard` ("Liczniki" — "ile dni temu X") NIE ma odpowiednika na wolnym płótnie (żaden
+`CanvasComponentType` dla liczników nie istnieje) — zmiana żyje WYŁĄCZNIE w dashboardowej karcie
++ Kreatorze, nie dotyka systemu płótna.
+
+**`SinceCounterLayoutPreset`** (nowy typ, `sinceCountersTileStyleStore.ts` — już pure TS, zero
+potrzeby ekstrakcji jak `CountdownLayoutPreset`) — 4 WŁASNE warianty dopasowane do treści
+licznika (próg SERII, nie data/postęp jak odliczania — świadomie NIE kopiowane 1:1): `'row'` =
+dokładny dotychczasowy wygląd (default, zero zmiany). `'bar'` = pasek postępu DO NASTĘPNEGO
+PROGU serii (`(days - tier.min) / (tier.next - tier.min)`, pełny pasek gdy `tier.next === null`
+— najwyższy próg) — treść UNIKALNA dla tego typu, odliczania mają postęp do daty, serie nie mają
+nic podobnego. `'compact'` = jedna linijka. `'minimal'` = goła duża liczba + nazwa, bez
+poświaty/meta.
+
+**`SinceCountersCard.tsx`** — 4 nowe gałęzie renderu per wiersz (branch wg `tileStyle.
+layoutPreset ?? 'row'`, ten sam wzorzec co `CountdownTile.tsx`). **`dashboard-tile-creator.tsx`**
+— nowy segmented "Styl kafelka" dla zakładki "Liczniki"; sekcja "Kształt" warunkowo chowa
+"Zaokrąglenie wiersza" (tylko `'row'`/`'bar'` mają tło wiersza) i "Skala liczby" (tylko `'row'`
+skaluje przez to pole — `'minimal'` ma własną, mniejszą liczbę).
+
+**Testy**: czysto UI-wiring (jak §355) — `tsc --noEmit` czyste, `jest --silent` 109/109 suite,
+1423 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kreator kafelków → "Liczniki" → sekcja "Styl
+kafelka" powinna pokazywać 4 opcje, przełączanie zmienia podgląd na żywo, "Wiersz" (default)
+wygląda DOKŁADNIE jak dotychczas.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
