@@ -10,24 +10,19 @@ usunięta całkowicie wraz z zależnościami (`pillFlashStore`/`pillAnim`). Zare
 (50px) na 7 ekranach zmniejszony do zwykłego oddechu (12px). **Priorytet testu WYSOKI** —
 checklist w ARCHITECTURE.md §353.
 
-## 🆕 Kreator kafelków — user zgłosił braki (2026-10-17, jeszcze NIE zaczęte)
+## 🆕 Kreator kafelków — biblioteka kolorów + własny kolor (2026-10-17, §354) — DO WERYFIKACJI
 
-User, zrzutem ekranu Kreatora (zakładka "Odliczania"): "nie ma możliwości wyboru własnego
-kształtu od zera w projektorze... ani możliwości customowego koloru. ORAZ dodaj bibliotekę
-kolorów gdzie moge dodawac kolory zeby miec do nich dostęp projektując inne kafelki". Trzy
-oddzielne, duże braki do zrobienia w kolejnych fazach:
+Pierwszy z trzech zgłoszonych braków zrobiony — `ColorSwatchPicker` (presety + wspólna
+biblioteka + dodawanie custom hex) podpięty w 3 miejscach (paleta progów serii w kreatorze i
+na płótnie, akcent Rekordów). **Priorytet testu WYSOKI** — checklist w ARCHITECTURE.md §354.
 
-1. **Własny kolor (custom)** — dziś WSZĘDZIE tylko gotowe presety (paleta progów serii,
-   kolor akcentu Rekordów) — brak dowolnego hex/color-pickera.
-2. **Biblioteka kolorów** — nowy, WSPÓLNY store zapisanych kolorów usera (dodaj/nazwij/usuń),
-   dostępny z KAŻDEGO miejsca z wyborem koloru w kreatorze (nie osobna paleta per typ kafla).
-3. **Więcej wariantów kształtu dla typów BEZ wyboru** — "Twoje serie" ma 4 presety (klasyczny/
-   pierścień/pasek/kompaktowy), ale Rekordy/Odliczania/Liczniki/Notatki mają TYLKO suwaki
-   liczbowe (zaokrąglenie/rozmiar), zero alternatywnych układów. Dociągnąć podobny wybór tam
-   gdzie ma to sens (nie kopiować 1:1 presetów serii — każdy typ ma inny kształt treści).
+## 🆕 Kreator kafelków — więcej wariantów kształtu (2026-10-17, jeszcze NIE zaczęte)
 
-Logiczna kolejność: biblioteka kolorów + custom kolor NAJPIERW (fundament, reużywany wszędzie),
-potem warianty kształtu per typ.
+Drugi z trzech zgłoszonych braków. "Twoje serie" ma 4 presety (klasyczny/pierścień/pasek/
+kompaktowy), ale Rekordy/Odliczania/Liczniki/Notatki mają TYLKO suwaki liczbowe (zaokrąglenie/
+rozmiar), zero alternatywnych układów. Dociągnąć podobny wybór tam gdzie ma to sens (NIE
+kopiować 1:1 presetów serii — każdy typ ma inny kształt treści, trzeba przemyśleć osobno co
+"inny wariant" znaczy dla pierścienia odliczania / wiersza licznika / notatki).
 
 ## 🆕 Dashboard jako wolne płótno (2026-10-17, potwierdzone AskUserQuestion, jeszcze NIE zaczęte)
 

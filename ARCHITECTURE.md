@@ -19111,6 +19111,57 @@ Finanse/Zdrowie/Jedzenie/Nastrój) powinna wyglądać identycznie poza BRAKIEM p
 reszta treści zaczyna się bliżej góry ekranu (mniej pustej przestrzeni niż wcześniej, bo
 rezerwacja 50px zniknęła), nic nie powinno wyglądać na "obcięte" ani nachodzić na pasek stanu.
 
+## 354. Kreator kafelków — biblioteka kolorów + własny kolor (2026-10-17)
+
+User, zrzutem ekranu Kreatora: "nie ma możliwości wyboru... ani możliwości customowego koloru.
+ORAZ dodaj bibliotekę kolorów gdzie moge dodawac kolory zeby miec do nich dostęp projektując
+inne kafelki". Pierwsza z trzech zgłoszonych braków (patrz NEXT_STEPS.md dla pozostałych dwóch:
+więcej wariantów kształtu, dashboard jako płótno).
+
+**`src/utils/color.ts`** (nowy, czysty TS) — `normalizeHex(input): string | null` (akceptuje
+z/bez `#`, wielkość liter, białe znaki wokół; odrzuca złą długość/niehex znaki). Wydzielone z
+komponentu dla testowalności w jest (ta sama lekcja co `countdownTileStyleDefaults.ts`/
+`notesTileStyleDefaults.ts`, §349/§350).
+
+**`src/store/colorLibraryStore.ts`** (nowy) — `LibraryColor { id, hex, name? }`,
+`addColor`/`removeColor`/`renameColor`. JEDEN, WSPÓLNY store dla WSZYSTKICH miejsc z wyborem
+koloru w całej appce — kolor dodany przy stylowaniu jednego typu kafla jest OD RAZU dostępny
+przy stylowaniu każdego innego (dokładnie to o co user prosił — "zeby miec do nich dostęp
+projektując INNE kafelki"). Świadomie BEZ deduplikacji po hex — user może dodać ten sam kolor
+dwa razy pod inną nazwą, to jego wybór.
+
+**`src/components/ui/ColorSwatchPicker.tsx`** (nowy) — DROP-IN zamiennik dotychczasowego,
+zaszytego na sztywno wiersza samych presetów. Bierze `presets: string[]`/`current`/`onSelect`/
+opcjonalny `onReset` (TA SAMA sygnatura co stary wzorzec, więc podmiana istniejącego wiersza na
+ten komponent to była JEDNA zmiana na miejsce wołania, nie przepisywanie). Renderuje: presety →
+separator → kolory z biblioteki (długie przytrzymanie DOWOLNEGO wchodzi w "tryb zarządzania" —
+mały 🗑 na każdym, tap usuwa TEN kolor, ten sam wzorzec co tryb zaznaczania na płótnie, §349) →
+przycisk "+" (rozwija pole hex: podgląd+input+"zastosuj"+"zapisz do biblioteki") → opcjonalny
+reset. Presety ZOSTAJĄ osobne per typ kafla (świadome, przemyślane domyślne palety) — biblioteka
+jest ponad nimi, nie zamiast nich.
+
+**Podpięte w 3 miejscach** (wszystkie dotychczasowe wiersze wyboru koloru w kreatorze):
+`dashboard-tile-creator.tsx`'s paleta progów serii + kolor akcentu Rekordów,
+`CanvasStreakStyleModal.tsx`'s paleta progów serii (instancja na płótnie). Layout zmieniony z
+wiersza (etykieta|swatche) na kolumnę (etykieta nad swatchami) — nowy, bogatszy picker (presety+
+biblioteka+dodawanie) potrzebuje więcej szerokości niż wcześniejszy, ciasny prawostronny wiersz.
+Dead code po podmianie usunięty (`swatch`/`swatchOn`/`swatchRow`/`swatchReset` style, nieużywane
+już `RotateCcw` w `CanvasStreakStyleModal.tsx`).
+
+**Świadomie NIE zrobione**: koło/suwaki HSB — hex-input to prostszy, mniej ryzykowny wybór (bez
+custom gestów rysowania koła) w zamian za nieco mniej płynne UX niż natywny color-picker. Jeśli
+user po teście będzie chciał bogatszy input, to osobny, większy fix.
+
+**Testy**: `__tests__/color.test.ts` (4 testy normalizeHex), `__tests__/colorLibraryStore.test.
+ts` (5 testów store'a). `tsc --noEmit` czyste, `jest --silent` 109/109 suite, 1407 testów
+(+5 od §353).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kreator kafelków → "Twoje serie"/"Rekordy" →
+sprawdź że presety działają jak dawniej, "+" otwiera pole hex, wpisanie poprawnego hex
+pokazuje żywy podgląd, "zastosuj"/"zapisz do biblioteki" działają, kolor z biblioteki
+pojawia się natychmiast w DRUGIM miejscu (np. dodany przy Rekordach widoczny przy paletach
+progów serii) — i to samo na płótnie (dowolny ekran → kafel serii → 🎨 styl).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
