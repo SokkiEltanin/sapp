@@ -26,6 +26,13 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Fix: panel właściwości nie klamrował X (2026-10-17, §360) — DO WERYFIKACJI
+
+Znaleziony przy audycie §359: zwiększenie Szerokości w panelu właściwości mogło wypchnąć item
+poza płótno (jedyne miejsce zmiany pozycji bez klamrowania, w przeciwieństwie do gestu drag/
+resize). Naprawione + wydzielona wspólna `clampItemX()` (było duplikowane w `moveGroupBy`/
+`resizeGroupBy`). Checklist w ARCHITECTURE.md §360.
+
 ## 🆕 Panel właściwości + warstwy + resize grupy (2026-10-17, §359) — DO WERYFIKACJI, FAZA 3/3 edytora — ZAKOŃCZONA
 
 Ostatnia z trzech zaplanowanych faz przebudowy w kierunku pełnego edytora (§357 kształty, §358

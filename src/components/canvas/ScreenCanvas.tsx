@@ -16,7 +16,7 @@ import { StreakTile, navigateForStreakItem } from '@/components/dashboard/Streak
 import { CountdownTile, DEFAULT_COUNTDOWN_TILE_STYLE, CountdownTileStyle } from '@/components/dashboard/CountdownTile';
 import { NotesTile, DEFAULT_NOTES_TILE_STYLE, NotesTileStyle } from '@/components/dashboard/NotesTile';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
-import { useCanvasComponentsStore, CanvasComponentType, MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
+import { useCanvasComponentsStore, CanvasComponentType, MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT, clampItemX } from '@/store/canvasComponentsStore';
 import { DEFAULT_STREAK_TILE_STYLE, StreakTileStyle } from '@/store/streakTileStyleStore';
 import {
   ShapeComponentType, ShapeStyle, isShapeType,
@@ -481,7 +481,19 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         height={propsItem?.height ?? MIN_ITEM_HEIGHT}
         canvasWidth={canvasWidth}
         grouped={propsItem?.groupId != null}
-        onChange={(patch) => { if (propsItem) updateItem(propsItem.id, patch); }}
+        onChange={(patch) => {
+          if (!propsItem) return;
+          // Klamrowanie (§360, fix) — `patch` z panelu to JEDNO pole na raz (Stepper woła
+          // `onChange` per pole), ale X i Szerokość są WSPÓŁZALEŻNE: zwiększenie Szerokości bez
+          // ruszania X mogło wypchnąć prawą krawędź poza płótno (gest drag/resize zawsze klamruje
+          // razem, patrz `CanvasPlacedItem.tsx`/`moveGroupBy`/`resizeGroupBy` — panel właściwości
+          // był JEDYNYM miejscem, które tego nie robiło). Przeliczone z WYNIKOWEGO stanu (po
+          // merge patcha), nie tylko z pojedynczego pola, żeby działało identycznie czy user
+          // zmienia X czy Szerokość.
+          const nextWidth = Math.min('width' in patch ? patch.width! : propsItem.width, canvasWidth);
+          const nextX = clampItemX('x' in patch ? patch.x! : propsItem.x, nextWidth, canvasWidth);
+          updateItem(propsItem.id, { ...patch, x: nextX, width: nextWidth });
+        }}
         onBringToFront={() => { if (propsItem) bringToFront(propsItem.id); }}
         onSendToBack={() => { if (propsItem) sendToBack(propsItem.id); }}
         onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
