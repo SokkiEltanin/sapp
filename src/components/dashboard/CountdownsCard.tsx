@@ -2,13 +2,13 @@ import { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CalendarClock } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { Counter, isDuringEvent, daysUntil, daysUntilEnd, eventProgress, untilProgress, untilProgressStepped } from '@/store/countersStore';
-import RingCountdown from '@/components/counters/RingCountdown';
+import { Counter } from '@/store/countersStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { useCountdownsTileStyleStore, CountdownsTileStyle } from '@/store/countdownsTileStyleStore';
+import { CountdownTile } from './CountdownTile';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['countdowns']` (2026-08-25, kolejny mały
 // krok rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i historii).
@@ -46,28 +46,10 @@ function CountdownsCard({ countdowns, cardBg, accentColor, styleOverride }: Coun
         </TouchableOpacity>
       </View>
       <View style={{ gap: spacing[3], marginTop: spacing[2] }}>
-        {countdowns.slice(0, tileStyle.maxVisible).map(cn => {
-          const during = isDuringEvent(cn);
-          const left = daysUntil(cn);
-          const endLeft = daysUntilEnd(cn);
-          const label = during
-            ? (endLeft <= 0 ? 'ostatni dzień!' : endLeft === 1 ? 'koniec jutro' : `koniec za ${endLeft} dni`)
-            : (left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`);
-          const ringColor = during ? '#2AC68F' : (cn.barColor || accentColor);
-          const progress = during ? eventProgress(cn) : (cn.fillStyle === 'stepped' ? untilProgressStepped(cn) : untilProgress(cn));
-          const ringDays = Math.max(0, during ? endLeft : left);
-          const dateShort = cn.date.slice(5).split('-').reverse().join('.');
-          return (
-            <TouchableOpacity key={cn.id} style={s.cdRow} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
-              <RingCountdown progress={progress} color={ringColor} days={ringDays} size={tileStyle.ringSize} strokeWidth={tileStyle.ringStrokeWidth} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
-                <Text style={[s.cdStatus, { color: ringColor }]} numberOfLines={1}>{label}</Text>
-                <Text style={s.cdMeta} numberOfLines={1}>cel {dateShort}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        {countdowns.slice(0, tileStyle.maxVisible).map(cn => (
+          <CountdownTile key={cn.id} item={cn} tileStyle={tileStyle} accentColor={accentColor}
+            onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} />
+        ))}
       </View>
     </View>
   );
@@ -85,10 +67,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
   workToggleText: { fontSize: 10, fontWeight: '700' },
-  cdRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  cdName: { fontSize: 14, fontWeight: '700', color: c.text.primary },
-  cdStatus: { fontSize: 13, fontWeight: '800', marginTop: 2 },
-  cdMeta: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 1 },
 }));
 
 export default memo(CountdownsCard);
