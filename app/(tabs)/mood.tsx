@@ -898,7 +898,7 @@ export default function MoodScreen() {
         title="Nastrój"
         subtitle="Twoje samopoczucie"
         accentColor={P.accent}
-        style={{ paddingTop: insets.top + 50 }}
+        style={{ paddingTop: insets.top + spacing[3] }}
         rightSlot={
           <PressableScale onPress={() => { haptic.tap(); openCheckin(null); }} style={styles.addBtn}>
             <Plus size={17} color={colors.bg.primary} />

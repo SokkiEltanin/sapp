@@ -597,8 +597,8 @@ export default function HealthScreen() {
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 50 }]}
-        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncHealthConnect} tintColor={T.accent} colors={[T.accent]} progressViewOffset={insets.top + 50} />}>
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing[3] }]}
+        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncHealthConnect} tintColor={T.accent} colors={[T.accent]} progressViewOffset={insets.top + spacing[3]} />}>
 
         <View style={{ marginHorizontal: -spacing[4], marginTop: -spacing[4], marginBottom: spacing[2] }}>
           <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }}

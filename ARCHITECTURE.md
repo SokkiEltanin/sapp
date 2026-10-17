@@ -19076,6 +19076,41 @@ wycentrowany na aktualnym bosie (nie na górze listy) → tapnięcie dowolnego n
 pasku powinno płynnie przewinąć kamerę do tego bossa → przeciągnięcie powinno teraz działać
 dla KAŻDEGO bossa, nie tylko tych widocznych od razu po otwarciu.
 
+## 353. Usunięcie TopPill (2026-10-17)
+
+User: "i chcę nie mieć PILLa którego mamy wywalamy go zupełnie ja sobie zrobię kafelek który
+na dashbordzie będzie pełnił te funkcje" — pływająca "dynamic island"-owa pigułka u góry
+wszystkich zakładek (`TopPill.tsx`, 716 linii — pomodoro/praca/zadania/budżet/GCal/nawyki/
+pupil/plan lekcji/misje, priorytetyzowane i rotowane) usunięta CAŁKOWICIE. User zbuduje sobie
+zamiennik jako kafel na płótnie kopiowania komponentów (§340+) zamiast wbudowanej, sztywnej
+pigułki.
+
+**Usunięte pliki**: `src/components/ui/TopPill.tsx`, `src/store/pillFlashStore.ts` (drugi kanał
+powiadomień TYLKO dla pigułki — oba miejsca które go wołały już miały równoległy
+`toast.success(...)`, więc usunięcie nie traci żadnej notyfikacji, tylko drugą, zbędną teraz
+prezentację), `src/utils/pillAnim.ts` + jego test (czysta logika animacji, używana WYŁĄCZNIE
+przez `TopPill.tsx`).
+
+**`app/(tabs)/_layout.tsx`** — usunięty `<TopPill/>` overlay + jego `pillOverlay` style +
+nieużywany już `useSafeAreaInsets()`/`insets` (był wołany TYLKO dla pozycji pigułki).
+
+**7 ekranów z zakładek** (`index.tsx`/`stats.tsx`/`food.tsx`/`health.tsx`/`tasks.tsx`/
+`finances.tsx`/`mood.tsx`) — `paddingTop: insets.top + 50` (50px zarezerwowane na wysokość
+pigułki) zmienione na `insets.top + spacing[3]` (12px, zwykły oddech od góry, bez
+zarezerwowanej pustej przestrzeni na coś czego już nie ma).
+
+**`index.tsx`/`bankAutoProcess.ts`** — usunięte wywołania `usePillFlash.getState().show(...)`
+(seria logowań / auto-dodana płatność z banku) — `toast.success(...)` obok nich ZOSTAJE, więc
+user dalej dostaje te powiadomienia, tylko jednym kanałem zamiast dwoma.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite (-1, usunięty
+`pillAnim.test.ts`), 1399 testów (-6, testy usuniętego `pillAnim.ts`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: każda zakładka (Dashboard/Zadania/Statystyki/
+Finanse/Zdrowie/Jedzenie/Nastrój) powinna wyglądać identycznie poza BRAKIEM pigułki u góry —
+reszta treści zaczyna się bliżej góry ekranu (mniej pustej przestrzeni niż wcześniej, bo
+rezerwacja 50px zniknęła), nic nie powinno wyglądać na "obcięte" ani nachodzić na pasek stanu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

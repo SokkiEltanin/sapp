@@ -159,7 +159,6 @@ import { Debt, PaymentMethod } from '@/types';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { usePillFlash } from '@/store/pillFlashStore';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1787,10 +1786,6 @@ export default function DashboardScreen() {
       haptic.success();
       const msg = `Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} ${plPlural(g.coins, 'moneta', 'monety', 'monet')}`;
       toast.success(msg);
-      // Też w TopPill (2026-09-13, user: "niech moze tam sie pokazuja te powiadomienia...
-      // seria logowan") — toast znika po ~2.6s i łatwo go przegapić, pill jest bardziej
-      // "na oku" (żyje w tab-barze), patrz pillFlashStore.ts.
-      usePillFlash.getState().show(msg, { badge: `${g.streak}🔥`, color: '#F59E0B' });
     }
   }, [petHydrated, registerLogin]);
   const petState = useMemo(() => {
@@ -2572,8 +2567,8 @@ export default function DashboardScreen() {
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[s.scroll, { paddingTop: insets.top + 50 }]}
-            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />}
+            contentContainerStyle={[s.scroll, { paddingTop: insets.top + spacing[3] }]}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} progressViewOffset={insets.top + spacing[3]} />}
           >
 
             {/* ══ HEADER — date + weather + tab shortcuts (Humor / Liczniki / Gablota) */}

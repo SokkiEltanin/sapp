@@ -702,9 +702,9 @@ export default function TasksScreen() {
               />
             );
           }}
-          contentContainerStyle={[s.list, { paddingTop: insets.top + 50 }]}
+          contentContainerStyle={[s.list, { paddingTop: insets.top + spacing[3] }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={G.accent} progressViewOffset={insets.top + 50} />}
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={G.accent} progressViewOffset={insets.top + spacing[3]} />}
           ListHeaderComponent={
             <View style={{ marginHorizontal: -spacing[4], marginBottom: spacing[2] }}>
               <View style={s.header}>

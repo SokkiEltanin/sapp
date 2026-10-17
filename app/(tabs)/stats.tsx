@@ -510,8 +510,8 @@ export default function CalendarTabScreen() {
       <View style={{ flex: 1 }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />}
-          contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 180 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} progressViewOffset={insets.top + spacing[3]} />}
+          contentContainerStyle={{ paddingTop: insets.top + spacing[3], paddingBottom: 180 }}
         >
           <ScreenHeader
             title="Kalendarz"

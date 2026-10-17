@@ -324,7 +324,7 @@ export default function Food() {
 
   return (
     <SafeAreaView style={s.container} edges={[]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 50 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingTop: insets.top + spacing[3] }]}>
 
         {/* ── Date navigator ────────────────────────────────────────── */}
         <View style={s.dateNav}>
