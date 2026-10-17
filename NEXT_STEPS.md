@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 18: drugi ekran, Ćwiczenia (2026-10-17, §345)
+
+`<ScreenCanvas>` wpięte na Ćwiczeniach (`screenKey="exercises"`) — dowód że "jedna linijka do
+wpięcia gdziekolwiek" to prawda. **WAŻNE ODKRYCIE**: Nawyki i Pupil są WYKLUCZONE jako cele —
+oba już montują `useHabits()` dla własnej treści, drugie wywołanie przez `useAllStreakItems()`
+zdublowałoby fetch z AsyncStorage. Sprawdzaj `grep -n "useHabits(" <plik>` PRZED wpięciem
+płótna na KOLEJNYM ekranie, nie tylko przy dashboardzie. **Priorytet testu WYSOKI** — checklist
+w ARCHITECTURE.md §345.
+
+**Kandydaci na kolejne ekrany (zweryfikować `useHabits()` PRZED wyborem)**: Praca, Finanse,
+Zdrowie — nie zgadywać bez sprawdzenia, zgodnie z zasadą wyżej.
+
 ## 🆕 System kopiowania komponentów — Faza 17: drugi typ komponentu, "Odliczanie" (2026-10-17, §344)
 
 User: "miał być pełen edytor zajebisty ze wszystkim" — dowód że mechanizm z Faz 14-16

@@ -18761,6 +18761,35 @@ odliczanie w pickerze → sprawdź pierścień/postęp/tekst identyczne jak na d
 dla kafla serii, bo chrome jest współdzielony. Sprawdź REGRESJĘ: "Odliczania" na dashboardzie
 wygląda identycznie jak przed tą fazą (ekstrakcja `CountdownTile` z `boxed=false`).
 
+## 345. System kopiowania komponentów — Faza 18: drugi ekran, Ćwiczenia (2026-10-17)
+
+User: "miał być pełen edytor zajebisty ze wszystkim" — `<ScreenCanvas>` wpięte na DRUGIM
+ekranie poza dashboardem (`app/exercises.tsx`, `screenKey="exercises"`), dowód że "jedna
+linijka do wpięcia gdziekolwiek" z §341 jest prawdą, nie tylko życzeniem.
+
+**Istotne odkrycie PRZED wpięciem**: `habits.tsx` i `pet.tsx` — pierwsi, najbardziej "oczywiści"
+kandydaci (kafle serii TO w końcu nawyki) — są ŚWIADOMIE WYKLUCZONE. Oba ekrany już montują
+`useHabits()` dla WŁASNEJ treści (lista nawyków / pupil); `useAllStreakItems()` (hook pod
+płótnem) WEWNĘTRZNIE też woła `useHabits()` — dodanie `<ScreenCanvas>` tam zamontowałoby TEN
+SAM hook (własny fetch z AsyncStorage) PO RAZ DRUGI w jednym drzewie komponentów. Dokładnie ta
+sama pułapka, którą §340 już omijał przy `index.tsx`/kreatorze — teraz potwierdzona jako
+OGÓLNA REGUŁA, nie jednorazowy wyjątek: `grep -n "useHabits(" <plik>` PRZED wpięciem płótna
+gdziekolwiek, nie tylko przy pierwszym dodaniu. Ostrzeżenie dopisane do komentarza w
+`useAllStreakItems.ts`, żeby nie trzeba było odkrywać tego po raz trzeci.
+
+**`exercises.tsx`** wybrane jako bezpieczny drugi cel — nie montuje `useHabits()` (używa
+`useExerciseLogging()`, inny hook), zero ryzyka duplikacji. Wpięte identycznie jak w
+`food.tsx` (§341): `<ScreenCanvas screenKey="exercises" title="Twoje komponenty" />` na końcu
+scrolla.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1394 testów (bez nowych —
+czyste wpięcie, zero nowej logiki).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ćwiczenia → przewiń na dół → "Twoje komponenty" →
+sprawdź że działa identycznie jak w Jedzeniu (dodawanie/przeciąganie/styl/usuwanie obu typów
+kafli), i że instancje na obu ekranach są NIEZALEŻNE (dodane w Ćwiczeniach nie pojawiają się
+w Jedzeniu, i odwrotnie — `screenKey` faktycznie rozdziela).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
