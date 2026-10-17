@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Pin, FileText } from 'lucide-react-native';
+import { Pin } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Note } from '@/utils/notesStorage';
 import { useColors } from '@/theme/useColors';
@@ -8,6 +8,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { usePinnedNotesTileStyleStore, PinnedNotesTileStyle } from '@/store/pinnedNotesTileStyleStore';
+import { NotesTile } from './NotesTile';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['pinned-notes']` (2026-08-25, pierwszy,
 // celowo mały krok w stronę rozbicia ~5400-liniowego dashboardu na mniejsze komponenty — patrz
@@ -37,21 +38,14 @@ function PinnedNotesCard({ notes, cardBg, accentColor, styleOverride }: PinnedNo
         <Text style={s.cardTitle}>Przypięte notatki</Text>
       </View>
       {notes.slice(0, tileStyle.maxVisible).map(n => (
-        <TouchableOpacity
+        <NotesTile
           key={n.id}
-          style={s.pinNoteRow}
+          note={n}
+          tileStyle={{ cornerRadius: 0, showBody: tileStyle.showBody, showTags: tileStyle.showTags }}
+          accentColor={accentColor}
           onPress={() => { haptic.tap(); router.navigate(`/notes?noteId=${n.id}` as any); }}
-          activeOpacity={0.8}
-        >
-          <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.pinNoteTitle} numberOfLines={1}>{n.title || 'Bez tytułu'}</Text>
-            {tileStyle.showBody && !!n.body?.trim() && <Text style={s.pinNoteBody} numberOfLines={2}>{n.body.trim()}</Text>}
-            {tileStyle.showTags && (n.tags ?? []).length > 0 && (
-              <Text style={s.pinNoteTags} numberOfLines={1}>{n.tags.map(t => `#${t}`).join(' ')}</Text>
-            )}
-          </View>
-        </TouchableOpacity>
+          sizeStyle={s.pinNoteRow}
+        />
       ))}
       <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/notes' as any); }} activeOpacity={0.7}>
         <Text style={[s.pinNoteMore, { color: accentColor }]}>Wszystkie notatki →</Text>
@@ -71,10 +65,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
-  pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
-  pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
-  pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
-  pinNoteTags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
+  pinNoteRow: { paddingVertical: 4 },
   pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
 }));
 

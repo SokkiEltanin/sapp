@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
+import { NotesTileStyle, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -20,7 +21,13 @@ import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countd
 // konsumenci tego pola (`ScreenCanvas.tsx`/`CanvasPlacedItem.tsx`/modale stylu) i tak zawężają
 // przez `item.componentType` PRZED użyciem `style`, więc realne bezpieczeństwo typów żyje tam,
 // nie w samym store'cie.
-export type CanvasComponentType = 'streakTile' | 'countdownTile';
+// Faza 21 (2026-10-17, §350) — trzeci `componentType` (`'notesTile'`), pierwszy który wiąże
+// się z czymś BEZ świeżo wyliczonej metryki (dni/data) — notatka to statyczny tekst po `id`
+// z AsyncStorage (`notesStorage.ts`), nie Zustand store. `useAllNotesItems()` (nowy hook)
+// odwzorowuje to na TĘ SAMĄ `PickerOption[]` abstrakcję co `useAllStreakItems()`/
+// `useAllCountdownItems()` — generyczność pickera (§341 komentarz w `MetricPickerModal.tsx`)
+// faktycznie wytrzymała TRZECI, strukturalnie inny kształt danych bez zmian.
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile';
 
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
@@ -32,7 +39,7 @@ export interface CanvasItem {
   // SAM format co klucze używane już w odpowiadających kartach dashboardu/kreatorze, zero
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty.
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -45,10 +52,12 @@ export interface CanvasItem {
 const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number }> = {
   streakTile: { width: 150, height: 92 },
   countdownTile: { width: 230, height: 76 },
+  notesTile: { width: 220, height: 80 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
+  notesTile: DEFAULT_NOTES_TILE_STYLE,
 };
 
 interface CanvasComponentsState {

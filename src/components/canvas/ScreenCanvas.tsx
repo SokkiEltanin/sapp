@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, Group, X } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { useAllStreakItems } from '@/hooks/useAllStreakItems';
 import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
+import { useAllNotesItems } from '@/hooks/useAllNotesItems';
 import { daysUntil, isDuringEvent } from '@/store/countersStore';
 import { StreakTile, navigateForStreakItem } from '@/components/dashboard/StreakTile';
 import { CountdownTile, DEFAULT_COUNTDOWN_TILE_STYLE, CountdownTileStyle } from '@/components/dashboard/CountdownTile';
+import { NotesTile, DEFAULT_NOTES_TILE_STYLE, NotesTileStyle } from '@/components/dashboard/NotesTile';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { useCanvasComponentsStore, CanvasComponentType } from '@/store/canvasComponentsStore';
 import { DEFAULT_STREAK_TILE_STYLE, StreakTileStyle } from '@/store/streakTileStyleStore';
@@ -18,6 +20,7 @@ import CanvasPlacedItem from './CanvasPlacedItem';
 import MetricPickerModal, { PickerOption } from './MetricPickerModal';
 import CanvasStreakStyleModal from './CanvasStreakStyleModal';
 import CanvasCountdownStyleModal from './CanvasCountdownStyleModal';
+import CanvasNotesStyleModal from './CanvasNotesStyleModal';
 
 const MIN_CANVAS_HEIGHT = 140;
 const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą instancją
@@ -62,6 +65,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
   const allStreakItems = useAllStreakItems();
   const allCountdownItems = useAllCountdownItems();
+  const allNotesItems = useAllNotesItems();
   const { color: timeAccentColor } = useTimeAccent();
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
   const styleItem = myItems.find(i => i.id === styleForId) ?? null;
@@ -76,6 +80,16 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       meta: isDuringEvent(cn) ? 'w trakcie' : `za ${daysUntil(cn)} ${daysUntil(cn) === 1 ? 'dzień' : 'dni'}`,
     })),
     [allCountdownItems],
+  );
+  // Trzeci typ (§350) — `meta` tu to podgląd treści (nie liczba jak serie/odliczania), skrócony
+  // do jednej linijki; brak treści → liczba tagów jako zamiennik, zupełnie pusta notatka →
+  // "bez treści" (pusty string wyglądałby jak błąd renderu pickera, nie jak świadomy stan).
+  const notesOptions: PickerOption[] = useMemo(
+    () => allNotesItems.map(n => ({
+      key: n.id, label: n.title || 'Bez tytułu',
+      meta: n.body?.trim() ? n.body.trim().slice(0, 40) : ((n.tags ?? []).length > 0 ? `${n.tags.length} ${n.tags.length === 1 ? 'tag' : 'tagi'}` : 'bez treści'),
+    })),
+    [allNotesItems],
   );
 
   const canvasHeight = Math.max(
@@ -127,16 +141,22 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       <View onLayout={onLayout} style={[s.canvas, { height: canvasHeight, borderColor: editing ? c.accent.blue + '55' : c.border.subtle }]}>
         {myItems.map(item => {
           const isStreak = item.componentType === 'streakTile';
+          const isCountdown = item.componentType === 'countdownTile';
+          const isNote = item.componentType === 'notesTile';
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
-          const boundCountdown = !isStreak && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
+          const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
+          const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
 
           const onTap = () => {
             if (editing) { setPickerForId(item.id); return; }
             if (isStreak) {
               if (boundStreak) navigateForStreakItem(boundStreak, item.style as StreakTileStyle);
               else setPickerForId(item.id);
-            } else {
+            } else if (isCountdown) {
               if (boundCountdown) { haptic.tap(); router.push(`/counters/${boundCountdown.id}` as any); }
+              else setPickerForId(item.id);
+            } else {
+              if (boundNote) { haptic.tap(); router.navigate(`/notes?noteId=${boundNote.id}` as any); }
               else setPickerForId(item.id);
             }
           };
@@ -170,10 +190,19 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
-              ) : (
+              ) : isCountdown ? (
                 <CountdownTile
                   item={boundCountdown}
                   tileStyle={item.style as CountdownTileStyle}
+                  accentColor={timeAccentColor}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                  boxed
+                />
+              ) : (
+                <NotesTile
+                  note={boundNote}
+                  tileStyle={item.style as NotesTileStyle}
                   accentColor={timeAccentColor}
                   onPress={onPress}
                   sizeStyle={sizeStyle}
@@ -204,14 +233,21 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
       {editing && !selectMode && (
         <>
-          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-            <TouchableOpacity onPress={() => onAdd('streakTile')} style={[s.addBtn, { flex: 1, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+          {/* `flexWrap` (§350, trzeci przycisk "Notatka") — trzy `flex:1` kafle z ikoną+tekstem
+              są ciasne na wąskich telefonach, zawijanie do dwóch rzędów bezpieczniejsze niż
+              ścieśnianie tekstu do nieczytelności. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+            <TouchableOpacity onPress={() => onAdd('streakTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
               <Plus size={15} color="#fff" />
               <Text style={s.addTxt}>Kafel serii</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onAdd('countdownTile')} style={[s.addBtn, { flex: 1, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => onAdd('countdownTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
               <Plus size={15} color="#fff" />
               <Text style={s.addTxt}>Odliczanie</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('notesTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" />
+              <Text style={s.addTxt}>Notatka</Text>
             </TouchableOpacity>
           </View>
           {/* Grupowanie (§349) — osobny przycisk, nie trzeci "Dodaj" (to nie dodaje nowej
@@ -235,12 +271,14 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
+          : pickerItem?.componentType === 'notesTile'
+          ? 'Brak notatek na koncie — dodaj jedną w Notatkach.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
@@ -262,6 +300,13 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       <CanvasCountdownStyleModal
         visible={!!styleItem && styleItem.componentType === 'countdownTile'}
         style={(styleItem && styleItem.componentType === 'countdownTile' ? styleItem.style : DEFAULT_COUNTDOWN_TILE_STYLE) as CountdownTileStyle}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
+        onClose={() => setStyleForId(null)}
+      />
+
+      <CanvasNotesStyleModal
+        visible={!!styleItem && styleItem.componentType === 'notesTile'}
+        style={(styleItem && styleItem.componentType === 'notesTile' ? styleItem.style : DEFAULT_NOTES_TILE_STYLE) as NotesTileStyle}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />

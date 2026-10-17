@@ -18959,6 +18959,57 @@ screenKey). `tsc --noEmit` czyste, `jest --silent` 108/108 suite, 1404 testów (
 → przeciągnięcie JEDNEGO powinno przesunąć OBA o ten sam offset, przycisk 🔗 na każdym z nich
 powinien je rozgrupować niezależnie.
 
+## 350. System kopiowania komponentów — Faza 21: trzeci typ komponentu, "Notatka" (2026-10-17)
+
+Trzeci `componentType` (`'notesTile'`, po `'streakTile'`/`'countdownTile'`) — NEXT_STEPS.md
+flagował to jako "trudniejsze" (Rekordy/Notatki/Kalendarz nie mają oczywistego jednego id do
+bindowania jak nawyk/licznik/odliczanie). Rozwiązanie dla notatek okazało się proste: `Note.id`
+z `notesStorage.ts` JEST stabilnym, naturalnym kluczem — instancja na płótnie wiąże się z JEDNĄ,
+KONKRETNĄ notatką (dowolną, nie tylko przypiętą — user kopiujący notatkę jako osobny widget może
+chcieć dowolną, nie tylko tę z pinezką na dashboardzie). Rekordy/Kalendarz zostają otwarte —
+tamte NIE mają analogicznego pojedynczego id (Rekordy to WYLICZONE fakty z agregacji, Kalendarz
+ma inny problem: "następny event" to ruchomy cel, nie stały wybór).
+
+**`NotesTile.tsx`** (nowy) — wyekstrahowane z `PinnedNotesCard.tsx`'s per-wiersz renderu, TEN
+SAM zabieg co `CountdownTile`/`StreakTile` (§344/§340). `note: Note | null` (jak `CountdownTile`'s
+`item: null` — czystszy niż fabrykowanie sztucznej `Note` z wymyślonym `createdAt`/`updatedAt`).
+`PinnedNotesCard.tsx` teraz UŻYWA tego komponentu (zero duplikacji, zero zmiany wyglądu —
+`sizeStyle={s.pinNoteRow}` niesie `paddingVertical:4`, layoutowe `flexDirection+gap` przeniesione
+do `NotesTile`'s własnego `s.row`).
+
+**`notesTileStyleDefaults.ts`** (nowy, czysty TS) — `NotesTileStyle`/`DEFAULT_NOTES_TILE_STYLE`
+od razu WYDZIELONE do osobnego pliku bez RN-importów (ta sama lekcja co §349's
+`countdownTileStyleDefaults.ts`, zaaplikowana PROAKTYWNIE tym razem zamiast odkrywana po fakcie)
+— `canvasComponentsStore.ts` importuje stąd bezpośrednio, `NotesTile.tsx` re-eksportuje dla
+wygody konsumentów komponentu. Osobny typ od `PinnedNotesTileStyle` (dashboard) — tamten ma
+`maxVisible` (lista wielu notatek), tu jedna instancja = jedna notatka, `maxVisible` nie ma
+zastosowania.
+
+**`useAllNotesItems.ts`** (nowy hook) — `getAllNotes()` (AsyncStorage, nie Zustand) owinięte w
+`useState`+`useEffect`, ładowane raz przy montażu (ten sam kompromis co
+`dashboard-tile-creator.tsx`'s `realPinnedNotes` — brak taniego live-refresh jak dashboard).
+Zweryfikowane: `food.tsx`/`exercises.tsx`/`finances.tsx` (trzy ekrany z `<ScreenCanvas>`) NIE
+ładują notatek same, więc zero ryzyka podwójnego fetchu (inna klasa ryzyka niż `useHabits()`
+z §340/§345 — `getAllNotes()` to zwykła funkcja async, nie hook z własnym montowanym stanem,
+ale zasada "sprawdź przed wpięciem" ta sama).
+
+**`canvasComponentsStore.ts`/`ScreenCanvas.tsx`** — `CanvasComponentType` trzeci wariant,
+`DEFAULT_SIZE`/`DEFAULT_STYLE` dociągnięte. `isStreak`/`isCountdown`/`isNote` trójstronne
+rozgałęzienie (`onTap`/`renderTile`/picker) w miejscu dawnego boolowskiego `isStreak` — dowód że
+generyczność `PickerOption[]`/render-prop (§341 komentarz w `MetricPickerModal.tsx`) wytrzymała
+TRZECI, strukturalnie inny kształt danych (statyczny tekst po id, nie wyliczona metryka
+dni/data) bez zmian w samym mechanizmie. `notesOptions`'s `meta` = podgląd treści (ucięty do
+40 znaków) albo liczba tagów albo "bez treści" — pierwszy picker gdzie `meta` NIE jest liczbą.
+
+**Testy**: nowy test w `canvasComponentsStore.test.ts` (domyślny rozmiar/styl/groupId dla
+`notesTile`). `tsc --noEmit` czyste, `jest --silent` 108/108 suite, 1405 testów (+1).
+
+**Priorytet testu na urządzeniu — WYSOKI, plus regresja PinnedNotesCard**: (1) dowolny ekran z
+płótnem → Edytuj → "Notatka" → wybierz notatkę → sprawdź że wygląda/nawiguje poprawnie,
+niezależnie od innych instancji; (2) prawdziwy dashboard → "Przypięte notatki" powinno wyglądać
+DOKŁADNIE jak przed tą zmianą (ekstrakcja `NotesTile` z `PinnedNotesCard` — zero zamierzonej
+różnicy wizualnej).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
