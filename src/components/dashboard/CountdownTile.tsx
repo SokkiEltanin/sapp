@@ -2,15 +2,16 @@ import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from '
 import { CalendarClock } from 'lucide-react-native';
 import { Counter, isDuringEvent, daysUntil, daysUntilEnd, eventProgress, untilProgress, untilProgressStepped } from '@/store/countersStore';
 import RingCountdown from '@/components/counters/RingCountdown';
+import DisplayText from '@/components/ui/DisplayText';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
-import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
+import { CountdownTileStyle, CountdownLayoutPreset, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
 
 // Re-eksport dla wstecznej zgodności — `CanvasCountdownStyleModal.tsx`/`ScreenCanvas.tsx` dalej
 // importują oba symbole STĄD. Prawdziwa definicja żyje w `countdownTileStyleDefaults.ts`
 // (patrz komentarz tam — powód: testowalność `canvasComponentsStore.ts` w jest).
-export type { CountdownTileStyle };
+export type { CountdownTileStyle, CountdownLayoutPreset };
 export { DEFAULT_COUNTDOWN_TILE_STYLE };
 
 // Wyekstrahowane z `CountdownsCard.tsx`'s per-wiersz renderu (system kopiowania komponentów,
@@ -63,6 +64,50 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
   const progress = during ? eventProgress(item) : (item.fillStyle === 'stepped' ? untilProgressStepped(item) : untilProgress(item));
   const ringDays = Math.max(0, during ? endLeft : left);
   const dateShort = item.date.slice(5).split('-').reverse().join('.');
+  const preset: CountdownLayoutPreset = tileStyle.layoutPreset ?? 'ring';
+
+  if (preset === 'bar') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.barTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+          <View style={s.barHeadRow}>
+            <Text style={s.name} numberOfLines={1}>{item.name}</Text>
+            <Text style={[s.status, { color: ringColor, marginTop: 0 }]} numberOfLines={1}>{label}</Text>
+          </View>
+          <View style={s.barTrack}>
+            <View style={[s.barFill, { width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`, backgroundColor: ringColor }]} />
+          </View>
+          <Text style={s.meta} numberOfLines={1}>cel {dateShort}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (preset === 'compact') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.compactTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+          <CalendarClock size={14} color={ringColor} />
+          <Text style={s.compactTxt} numberOfLines={1}>
+            <Text style={s.compactName}>{item.name}</Text>
+            <Text style={[s.compactStatus, { color: ringColor }]}> — {label}</Text>
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (preset === 'hero') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.heroTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+          <DisplayText style={[s.heroNum, { color: ringColor, fontSize: 28 * tileStyle.numberScale, lineHeight: 30 * tileStyle.numberScale }]}>{ringDays}</DisplayText>
+          <Text style={s.heroLabel} numberOfLines={1}>{during ? 'dni do końca' : 'dni'}</Text>
+          <Text style={s.name} numberOfLines={1}>{item.name}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
@@ -89,4 +134,22 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   name: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   status: { fontSize: 13, fontWeight: '800', marginTop: 2 },
   meta: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 1 },
+
+  // 'bar' (§355) — pasek postępu zamiast pierścienia, kolumna zamiast rzędu (nie trzeba
+  // rezerwować miejsca na okrągły pierścień z boku).
+  barTile: { flex: 1, justifyContent: 'center', gap: 5 },
+  barHeadRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing[2] },
+  barTrack: { height: 6, borderRadius: radius.full, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: radius.full },
+
+  // 'compact' (§355) — jedna linijka, zero grafiki postępu, najgęstszy wariant.
+  compactTile: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  compactTxt: { flex: 1, fontSize: 12.5 },
+  compactName: { fontWeight: '800', color: c.text.primary },
+  compactStatus: { fontWeight: '800' },
+
+  // 'hero' (§355) — duża liczba dni jako GŁÓWNY element, etykieta+nazwa pod spodem.
+  heroTile: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1 },
+  heroNum: { fontWeight: '900', letterSpacing: -0.5 },
+  heroLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
 }));

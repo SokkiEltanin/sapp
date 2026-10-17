@@ -11,14 +11,29 @@
 // suite przy samym `import`. `CountdownTile.tsx` importuje stąd i re-eksportuje oba symbole —
 // zero zmiany dla istniejących konsumentów (`CanvasCountdownStyleModal.tsx`/`ScreenCanvas.tsx`
 // dalej importują z `CountdownTile.tsx` jak dotąd).
+// Warianty kształtu (Faza 24, 2026-10-17, §355) — user, zrzutem ekranu zakładki "Odliczania"
+// w Kreatorze: "nie ma możliwości wyboru własnego kształtu od zera". Do tej pory Odliczania
+// miały JEDEN, stały układ (pierścień+tekst w rzędzie) — tylko liczbowe suwaki (rozmiar/
+// grubość pierścienia). `'ring'` = dokładnie dotychczasowy wygląd (default, zero zmiany dla
+// nikogo kto nie dotknie nowego wyboru). `'bar'` = pasek postępu zamiast pierścienia (lepszy
+// przy szerokich, niskich kaflach — pierścień marnuje tam pionową przestrzeń). `'compact'` =
+// jedna linijka tekstu, zero grafiki postępu (najgęstszy, do małych instancji na płótnie).
+// `'hero'` = duża liczba dni na środku (jak klasyczny styl serii) — dni jako GŁÓWNY element
+// wizualny, nie dodatek przy pierścieniu.
+export type CountdownLayoutPreset = 'ring' | 'bar' | 'compact' | 'hero';
+
 export interface CountdownTileStyle {
+  layoutPreset: CountdownLayoutPreset;
   cornerRadius: number;
   ringSize: number;
   ringStrokeWidth: number;
+  numberScale: number; // tylko 'hero' — rozmiar dużej liczby dni
 }
 
 export const DEFAULT_COUNTDOWN_TILE_STYLE: CountdownTileStyle = {
+  layoutPreset: 'ring',
   cornerRadius: 16,
   ringSize: 56,
   ringStrokeWidth: 6,
+  numberScale: 1,
 };

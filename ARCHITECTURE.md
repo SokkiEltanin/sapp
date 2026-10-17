@@ -19162,6 +19162,50 @@ pokazuje żywy podgląd, "zastosuj"/"zapisz do biblioteki" działają, kolor z b
 pojawia się natychmiast w DRUGIM miejscu (np. dodany przy Rekordach widoczny przy paletach
 progów serii) — i to samo na płótnie (dowolny ekran → kafel serii → 🎨 styl).
 
+## 355. Kreator kafelków — warianty kształtu Odliczań (2026-10-17)
+
+Drugi z trzech zgłoszonych braków (§354 zrobiło bibliotekę kolorów). "Twoje serie" miało 4
+presety kształtu od Fazy 8 (§334), Odliczania miały JEDEN, stały układ — tylko liczbowe suwaki.
+Dociągnięty TEN SAM wzorzec (segmented "Styl kafelka" + warunkowe suwaki), 4 WŁASNE warianty
+dopasowane do kształtu treści odliczania (nie kopiowane 1:1 z serii — inny kształt treści, patrz
+komentarz w `countdownTileStyleDefaults.ts`).
+
+**`countdownTileStyleDefaults.ts`** — nowy `CountdownLayoutPreset = 'ring' | 'bar' | 'compact' |
+'hero'` + pola `layoutPreset`/`numberScale` na `CountdownTileStyle`. `'ring'` = dokładnie
+dotychczasowy wygląd (default, zero zmiany bez dotknięcia nowego wyboru). `'bar'` = pasek
+postępu zamiast pierścienia (kolumna, nie rząd — nie trzeba miejsca na okrągły kształt z boku).
+`'compact'` = jedna linijka tekstu, zero grafiki postępu. `'hero'` = duża liczba dni na środku
+(ten sam akcent wizualny co klasyczny styl serii), etykieta+nazwa pod spodem.
+
+**WAŻNE ODKRYCIE przy implementacji**: `CountdownTile.tsx` (komponent) jest współdzielony przez
+DWA OSOBNE style — `CountdownTileStyle` (płótno, pojedyncza instancja, `countdownTileStyleDefaults.
+ts`) i `CountdownsTileStyle` (prawdziwy dashboard, lista odliczań + `maxVisible`,
+`countdownsTileStyleStore.ts`). Nowe pola dociągnięte do OBU (inaczej dashboard-owa karta
+"Odliczania" w ogóle nie miałaby jak wybrać nowego stylu, mimo że sam komponent by go
+obsługiwał) — `CountdownLayoutPreset` zdefiniowany RAZ w `countdownTileStyleDefaults.ts`,
+`countdownsTileStyleStore.ts` go importuje zamiast duplikować unię stringów.
+
+**Pułapka TS odkryta przy okazji**: `{ ...styleItem.style, ...patch }` w `ScreenCanvas.tsx`
+(generyczne `onChange` dla modali stylu) przestało się kompilować, gdy `layoutPreset` zaczęło
+istnieć w DWÓCH typach z RÓŻNYMI literal-union wartościami (`StreakLayoutPreset` vs
+`CountdownLayoutPreset`) — spread nad `StreakTileStyle | CountdownTileStyle | NotesTileStyle`
+źle się dystrybuuje (ten sam, już udokumentowany powód czemu `CanvasItem.style` nie jest
+discriminated union, §341 komentarz w `canvasComponentsStore.ts` — teraz uderzył konkretnie).
+Fix: jawny cast `as StreakTileStyle`/`as CountdownTileStyle` w każdym z dwóch `onChange`
+handlerów (bezpieczny — `visible` modala już gwarantuje `componentType` w tym miejscu).
+
+**Podpięte w 2 miejscach**: `dashboard-tile-creator.tsx`'s zakładka "Odliczania" (DOKŁADNIE ten
+ekran z zgłoszenia — zrzut usera pokazywał TYLKO suwaki liczbowe tam), `CanvasCountdownStyleModal.
+tsx` (instancja na płótnie).
+
+**Testy**: czysto typy/UI-wiring — `tsc --noEmit` czyste, `jest --silent` 109/109 suite, 1407
+testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kreator kafelków → "Odliczania" → sekcja "Styl
+kafelka" powinna teraz pokazywać 4 opcje, przełączanie między nimi powinno wizualnie zmieniać
+podgląd na żywo, "Pierścień" (default) powinien wyglądać DOKŁADNIE jak dotychczas. To samo
+dla instancji odliczania na płótnie (dowolny ekran → kafel odliczania → 🎨 styl).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

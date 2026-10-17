@@ -293,7 +293,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
         visible={!!styleItem && styleItem.componentType === 'streakTile'}
         style={(styleItem && styleItem.componentType === 'streakTile' ? styleItem.style : DEFAULT_STREAK_TILE_STYLE) as StreakTileStyle}
         boundItem={styleBoundStreak}
-        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as StreakTileStyle), ...patch } }); }}
         onSetTierColor={(i, color) => {
           if (!styleItem || styleItem.componentType !== 'streakTile') return;
           const next = { ...(styleItem.style as StreakTileStyle).tierColorOverrides };
@@ -311,7 +311,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       <CanvasCountdownStyleModal
         visible={!!styleItem && styleItem.componentType === 'countdownTile'}
         style={(styleItem && styleItem.componentType === 'countdownTile' ? styleItem.style : DEFAULT_COUNTDOWN_TILE_STYLE) as CountdownTileStyle}
-        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as CountdownTileStyle), ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
 
