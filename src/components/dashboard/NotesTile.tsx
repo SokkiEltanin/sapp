@@ -4,9 +4,9 @@ import { Note } from '@/utils/notesStorage';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
-import { NotesTileStyle, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
+import { NotesTileStyle, NotesLayoutPreset, DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 
-export type { NotesTileStyle };
+export type { NotesTileStyle, NotesLayoutPreset };
 export { DEFAULT_NOTES_TILE_STYLE };
 
 // Wyekstrahowane z `PinnedNotesCard.tsx`'s per-wiersz renderu (system kopiowania komponentów,
@@ -38,6 +38,37 @@ export function NotesTile({ note, tileStyle, accentColor, onPress, sizeStyle, bo
     );
   }
 
+  const preset: NotesLayoutPreset = tileStyle.layoutPreset ?? 'row';
+
+  if (preset === 'compact') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.compactRow, boxed && [s.boxed, { borderRadius: tileStyle.cornerRadius }]]}>
+          <Text numberOfLines={1} style={s.compactTxt}>
+            <Text style={s.compactTitle}>{note.title || 'Bez tytułu'}</Text>
+            {tileStyle.showBody && !!note.body?.trim() && <Text style={s.compactBody}> — {note.body.trim()}</Text>}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (preset === 'card') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <View style={[s.cardRow, boxed && [s.boxed, { borderRadius: tileStyle.cornerRadius }]]}>
+          <Text style={s.cardTitle} numberOfLines={1}>{note.title || 'Bez tytułu'}</Text>
+          {tileStyle.showBody && !!note.body?.trim() && (
+            <Text style={s.cardBody} numberOfLines={4}>{note.body.trim()}</Text>
+          )}
+          {tileStyle.showTags && (note.tags ?? []).length > 0 && (
+            <Text style={s.tags} numberOfLines={1}>{note.tags.map(t => `#${t}`).join(' ')}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
       <View style={[s.row, boxed && [s.boxed, { borderRadius: tileStyle.cornerRadius }]]}>
@@ -62,6 +93,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   title: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   body: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
   tags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
+
+  // 'compact' (§363) — jedna linijka, zero ikony.
+  compactRow: { flex: 1, justifyContent: 'center' },
+  compactTxt: { fontSize: 12.5 },
+  compactTitle: { fontWeight: '800', color: c.text.primary },
+  compactBody: { color: c.text.secondary },
+
+  // 'card' (§363) — większy tytuł + dłuższy podgląd, myślane pod samotną instancję na płótnie.
+  cardRow: { flex: 1, gap: 4, justifyContent: 'center' },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  cardBody: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17 },
 
   placeholder: {
     flex: 1, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle,
