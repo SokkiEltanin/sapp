@@ -16,7 +16,7 @@ import { StreakTile, navigateForStreakItem } from '@/components/dashboard/Streak
 import { CountdownTile, DEFAULT_COUNTDOWN_TILE_STYLE, CountdownTileStyle } from '@/components/dashboard/CountdownTile';
 import { NotesTile, DEFAULT_NOTES_TILE_STYLE, NotesTileStyle } from '@/components/dashboard/NotesTile';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
-import { useCanvasComponentsStore, CanvasComponentType } from '@/store/canvasComponentsStore';
+import { useCanvasComponentsStore, CanvasComponentType, MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
 import { DEFAULT_STREAK_TILE_STYLE, StreakTileStyle } from '@/store/streakTileStyleStore';
 import {
   ShapeComponentType, ShapeStyle, isShapeType,
@@ -33,6 +33,7 @@ import { useDataFieldRegistry, DataFieldValue } from '@/hooks/useDataFieldRegist
 import { DataFieldTile } from './DataFieldTile';
 import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
+import CanvasPropertiesModal from './CanvasPropertiesModal';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -89,6 +90,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const [canvasWidth, setCanvasWidth] = useState(320);
   const [pickerForId, setPickerForId] = useState<string | null>(null);
   const [styleForId, setStyleForId] = useState<string | null>(null);
+  // Panel właściwości (§359) — X/Y/W/H + warstwy + rozgrupuj, osobny od `styleForId` (który
+  // steruje modalami stylu PER-TYP) — ten panel jest UNIWERSALNY dla wszystkich typów.
+  const [propsForId, setPropsForId] = useState<string | null>(null);
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
   // `selectMode` zamienia CAŁE płótno w tryb "tapnij żeby zaznaczyć" (osobna gałąź renderu w
   // `CanvasPlacedItem`, patrz komentarz tam) — oddzielny od normalnej edycji, nie da się
@@ -103,11 +107,20 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const groupItems = useCanvasComponentsStore(st => st.groupItems);
   const ungroupItems = useCanvasComponentsStore(st => st.ungroupItems);
   const moveGroupBy = useCanvasComponentsStore(st => st.moveGroupBy);
+  const bringToFront = useCanvasComponentsStore(st => st.bringToFront);
+  const sendToBack = useCanvasComponentsStore(st => st.sendToBack);
+  const resizeGroupBy = useCanvasComponentsStore(st => st.resizeGroupBy);
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
+  // Warstwy (§359) — porządek RENDEROWANIA (który decyduje co jest "na wierzchu" wizualnie w
+  // RN) sortowany po `zIndex`, NIE po kolejności w tablicy `items` (ta odzwierciedla kolejność
+  // DODANIA, nie bieżącą warstwę po ewentualnym "na wierzch"/"na spód"). `?? 0` — patrz komentarz
+  // przy `CanvasItem.zIndex` w `canvasComponentsStore.ts`.
+  const orderedItems = useMemo(() => [...myItems].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)), [myItems]);
 
   const timeAccentColor = accentColor;
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
   const styleItem = myItems.find(i => i.id === styleForId) ?? null;
+  const propsItem = myItems.find(i => i.id === propsForId) ?? null;
   // "Cel po kliknięciu" (§351) — tylko `CanvasStreakStyleModal` go potrzebuje, tylko żeby
   // wiedzieć KTÓRY nawyk (jeśli w ogóle) jest aktualnie podpięty pod edytowaną instancję.
   const styleBoundStreak = styleItem?.componentType === 'streakTile' && styleItem.bindingKey
@@ -192,7 +205,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
       )}
 
       <View onLayout={onLayout} style={[s.canvas, { height: canvasHeight, borderColor: editing ? c.accent.blue + '55' : c.border.subtle }]}>
-        {myItems.map(item => {
+        {orderedItems.map(item => {
           const isStreak = item.componentType === 'streakTile';
           const isCountdown = item.componentType === 'countdownTile';
           const isNote = item.componentType === 'notesTile';
@@ -240,13 +253,25 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                 if (item.groupId) moveGroupBy(screenKey, item.groupId, x - item.x, y - item.y, canvasWidth);
                 else updateItem(item.id, { x, y });
               }}
-              onResize={(width, height) => updateItem(item.id, { width, height })}
+              onResize={(width, height) => {
+                // Resize całej grupy jako jednej jednostki (§359) — współczynnik skali z
+                // WŁASNEGO starego/nowego rozmiaru PRZECIĄGANEGO itemu (matematycznie: jego
+                // własny rozmiar po przeskalowaniu wychodzi DOKŁADNIE na `width`/`height`, patrz
+                // komentarz w `resizeGroupBy`).
+                if (item.groupId) {
+                  const scaleX = width / item.width;
+                  const scaleY = height / item.height;
+                  resizeGroupBy(screenKey, item.groupId, scaleX, scaleY, canvasWidth);
+                } else {
+                  updateItem(item.id, { width, height });
+                }
+              }}
               onStyle={() => setStyleForId(item.id)}
+              onProperties={() => setPropsForId(item.id)}
               selectMode={selectMode}
               selected={selectedIds.includes(item.id)}
               onToggleSelect={() => toggleSelect(item.id)}
               grouped={item.groupId != null}
-              onUngroup={() => { if (item.groupId) { haptic.tap(); ungroupItems(item.groupId); } }}
               renderTile={(sizeStyle, onPress) => isStreak ? (
                 <StreakTile
                   item={boundStreak ?? { key: item.id, name: 'Wybierz metrykę', days: 0 }}
@@ -370,9 +395,10 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               tapnięcie/dwa małe przyciski) jest zupełnie nowy w appce, bez tego user nie ma
               żadnego sposobu się domyślić co robić z kaflem po jego dodaniu. */}
           <Text style={s.hintText}>
-            Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar · tapnięcie
-            wybiera podpięcie (kształty nie mają podpięcia — od razu gotowe) · 🎨 styl, 🗑 usuń
-            {myItems.length >= 2 ? ' · 🔗 rozgrupuj' : ''}.
+            Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar (w grupie:
+            skaluje WSZYSTKICH razem) · tapnięcie wybiera podpięcie (kształty nie mają podpięcia
+            — od razu gotowe) · ⚙ właściwości (pozycja/rozmiar/warstwa/rozgrupuj), 🎨 styl, 🗑
+            usuń.
           </Text>
         </>
       )}
@@ -445,6 +471,21 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         style={(styleItem && styleItem.componentType === 'dataField' ? styleItem.style : DEFAULT_DATA_FIELD_TILE_STYLE) as DataFieldTileStyle}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as DataFieldTileStyle), ...patch } }); }}
         onClose={() => setStyleForId(null)}
+      />
+
+      <CanvasPropertiesModal
+        visible={!!propsItem}
+        x={propsItem?.x ?? 0}
+        y={propsItem?.y ?? 0}
+        width={propsItem?.width ?? MIN_ITEM_WIDTH}
+        height={propsItem?.height ?? MIN_ITEM_HEIGHT}
+        canvasWidth={canvasWidth}
+        grouped={propsItem?.groupId != null}
+        onChange={(patch) => { if (propsItem) updateItem(propsItem.id, patch); }}
+        onBringToFront={() => { if (propsItem) bringToFront(propsItem.id); }}
+        onSendToBack={() => { if (propsItem) sendToBack(propsItem.id); }}
+        onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
+        onClose={() => setPropsForId(null)}
       />
     </View>
   );

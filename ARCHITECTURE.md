@@ -19384,6 +19384,66 @@ data) z żywym podglądem wartości → po wybraniu, wartość powinna się aktu
 się zmienia (np. ukończenie zadania powinno natychmiast zmienić liczbę na kaflu, bez
 odświeżania ekranu).
 
+## 359. Panel właściwości + warstwy + resize grupy jako jednostki (2026-10-17)
+
+Faza 3/3, OSTATNIA zaplanowana faza przebudowy w kierunku pełnego edytora (po §357 kształty,
+§358 data-binding). User: "panel właściwości + warstwy + rozszerzone grupowanie" (z własnego
+planu zbadanego przy §357/§358), "nie przerywaj dopóki nie skończysz".
+
+**`CanvasPropertiesModal.tsx`** (nowy) — JEDEN wspólny panel dla WSZYSTKICH typów komponentów
+(w przeciwieństwie do 🎨 stylu, który jest per-typ — pozycja/rozmiar/warstwa/grupa to
+uniwersalne właściwości układu, nie treść). Steppery X/Y/Szerokość/Wysokość (numeryczna
+alternatywa dla gestu przeciągania/resize — precyzyjne ustawienie bez fiddly dotykania),
+przyciski "Na wierzch"/"Na spód" (warstwy), i — PRZENIESIONE tu z dedykowanego przycisku w
+chrome `CanvasPlacedItem.tsx` — "Rozgrupuj" (tylko gdy item jest w grupie). Powód przeniesienia:
+Czwarty przycisk w rogu kafla (po "Rozgrupuj" dodanym w §349) zaczynał przeciążać wizualnie małe
+kafle — teraz chrome ma STAŁE 3 przyciski (⚙ Właściwości/🎨 Styl/🗑 Usuń) niezależnie od stanu
+grupowania, "Rozgrupuj" żyje wewnątrz panelu właściwości razem z resztą "układowych" akcji.
+
+**Warstwy (`zIndex`)** — nowe pole `CanvasItem.zIndex: number`, domyślnie = kolejność dodania
+(pierwszy=0, każdy następny = max+1 NA TYM `screenKey` — bez dotykania panelu stosy wyglądają
+TAK JAK DOTĄD, dodane później = na wierzchu, zero zmiany zachowania dla istniejących
+użytkowników). `bringToFront(id)`/`sendToBack(id)` (nowe akcje store'a) ustawiają zIndex na
+max+1/min-1 WŚRÓD itemów na TYM SAMYM `screenKey` (zIndex nie jest porównywalny między
+ekranami). Render w `ScreenCanvas.tsx` sortuje `myItems` po `zIndex` (`?? 0` — stare,
+persystowane itemy sprzed tej fazy nie mają tego pola, shallow `persist` merge nie dogania pól
+WEWNĄTRZ elementów tablicy `items`) PRZED mapowaniem na `CanvasPlacedItem` — paint order RN
+zależy od kolejności w JSX, więc to jest JEDYNY mechanizm potrzebny (zero zmiany w samym
+komponencie kafla).
+
+**Resize grupy jako JEDNEJ jednostki** (`resizeGroupBy`, nowa akcja store'a) — dotąd grupa
+synchronizowała WYŁĄCZNIE przesuwanie (`moveGroupBy`, §349); resize był w pełni per-instancja,
+nawet w grupie. Teraz: przeciągnięcie uchwytu resize JEDNEGO członka skaluje WSZYSTKICH razem,
+WZGLĘDEM WSPÓLNEGO bounding-boxa grupy (lewy-górny róg jako kotwica) — współczynnik skali
+liczony z WŁASNEGO starego/nowego rozmiaru przeciąganego itemu (`scaleX = newWidth/oldWidth`),
+więc przeciągnięty member matematycznie wychodzi DOKŁADNIE na rozmiar, na który user go
+faktycznie przeciągnął (`oldWidth * (newWidth/oldWidth) = newWidth`), reszta skaluje się
+proporcjonalnie wokół niego. Każdy member klamrowany OSOBNO do granic płótna i
+`MIN_ITEM_WIDTH`/`MIN_ITEM_HEIGHT` — ten sam wzorzec klamrowania co `moveGroupBy`.
+
+**`MIN_ITEM_WIDTH`/`MIN_ITEM_HEIGHT`** — PRZENIESIONE z prywatnych constów `CanvasPlacedItem.tsx`
+do `canvasComponentsStore.ts` (eksportowane) — `resizeGroupBy` potrzebuje TYCH SAMYCH limitów do
+klamrowania, jedno źródło prawdy zamiast dwóch liczb które mogłyby się rozjechać.
+`CanvasPlacedItem.tsx` teraz importuje stąd.
+
+**Świadomie NIE zrobione**: wizualna, WSPÓLNA ramka wyboru dla całej grupy (jak w Figmie — jeden
+uchwyt resize na rogu CAŁEJ grupy, nie per-member) — per-member uchwyty ZOSTAJĄ, "jednostka" to
+WYNIK matematyczny (skalowanie), nie zmiana UI wyboru/renderu. Lista warstw z przeciąganiem
+(drag-to-reorder jak prawdziwy panel Layers) — "na wierzch"/"na spód" wystarcza na v1, pełna
+lista z podglądem miniaturek to osobny, większy fix jeśli user zgłosi potrzebę.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +7 testów (domyślny zIndex przy addItem,
+bringToFront/sendToBack w tym izolacja per-screenKey, resizeGroupBy skalowanie względem
+bounding-boxa/klamrowanie do minimum/izolacja per-grupa). `tsc --noEmit` czyste, `jest --silent`
+109/109 suite, 1416 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → Edytuj → ⚙ na kaflu →
+panel właściwości, steppery X/Y/W/H powinny poruszać kafel/zmieniać rozmiar na żywo, "Na
+wierzch"/"Na spód" powinny zmieniać który kafel jest widoczny gdy się nakładają. Pogrupuj 2+
+kafle → przeciągnij uchwyt resize JEDNEGO z nich → WSZYSTKIE powinny się przeskalować razem.
+"Rozgrupuj" (widoczne tylko dla grupy) w panelu właściwości powinno działać jak dotychczasowy
+przycisk w rogu kafla.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

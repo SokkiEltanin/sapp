@@ -131,3 +131,91 @@ describe('canvasComponentsStore — moveGroupBy', () => {
     expect(aAfter.x).toBe(12); // addItem domyślne x — nieruszone, bo screenKey się nie zgadza
   });
 });
+
+describe('canvasComponentsStore — warstwy (zIndex, §359)', () => {
+  test('addItem przypisuje kolejne zIndex (pierwszy=0, każdy następny wyżej) na TYM SAMYM screenKey', () => {
+    const [a, b, c] = addThree();
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(za).toBe(0);
+    expect(zb).toBeGreaterThan(za);
+    expect(zc).toBeGreaterThan(zb);
+  });
+
+  test('bringToFront przenosi item na wierzch stosu (wyżej niż wszyscy inni NA TYM screenKey)', () => {
+    const [a, b, c] = addThree();
+    useCanvasComponentsStore.getState().bringToFront(a);
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(za).toBeGreaterThan(zb);
+    expect(za).toBeGreaterThan(zc);
+  });
+
+  test('sendToBack przenosi item na spód stosu (niżej niż wszyscy inni NA TYM screenKey)', () => {
+    const [a, b, c] = addThree();
+    useCanvasComponentsStore.getState().sendToBack(c);
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(zc).toBeLessThan(za);
+    expect(zc).toBeLessThan(zb);
+  });
+
+  test('bringToFront/sendToBack nie widzą itemów z innego screenKey', () => {
+    const [a] = addThree('food');
+    const [x, y] = addThree('exercises');
+    useCanvasComponentsStore.getState().bringToFront(x);
+    // x i y mają własny, niezależny zIndex 0/1+ na 'exercises' — bringToFront(x) nie powinno
+    // dotknąć 'food' w ŻADEN sposób.
+    const aAfter = useCanvasComponentsStore.getState().items.find(i => i.id === a)!;
+    expect(aAfter.zIndex).toBe(0);
+  });
+});
+
+describe('canvasComponentsStore — resizeGroupBy (rozszerzone grupowanie, §359)', () => {
+  test('skaluje x/y/width/height WSZYSTKICH członków względem WSPÓLNEGO lewego-górnego rogu grupy', () => {
+    const [a, b] = addThree();
+    // Ustaw znaną geometrię: a=(0,0,100x100), b=(200,0,100x100) — wspólny bounding-box (0,0)-(300,100).
+    useCanvasComponentsStore.setState((s) => ({
+      items: s.items.map((i): CanvasItem => i.id === a ? { ...i, x: 0, y: 0, width: 100, height: 100 } : i.id === b ? { ...i, x: 200, y: 0, width: 100, height: 100 } : i),
+    }));
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b])!;
+    useCanvasComponentsStore.getState().resizeGroupBy('food', groupId, 2, 1, 1000);
+    const items = useCanvasComponentsStore.getState().items;
+    const aAfter = items.find(i => i.id === a)!;
+    const bAfter = items.find(i => i.id === b)!;
+    // a jest na lewym-górnym rogu grupy (relX=0) — tylko rozmiar się skaluje, pozycja zostaje.
+    expect(aAfter.x).toBe(0);
+    expect(aAfter.width).toBe(200);
+    expect(aAfter.height).toBe(100);
+    // b jest 200px od lewej (relX=200) — przy scaleX=2 jego x przesuwa się na 400 (0 + 200*2).
+    expect(bAfter.x).toBe(400);
+    expect(bAfter.width).toBe(200);
+  });
+
+  test('klamruje każdego członka do MIN_ITEM_WIDTH/HEIGHT, nie pozwala skalować pod minimum', () => {
+    const [a, b] = addThree();
+    useCanvasComponentsStore.setState((s) => ({
+      items: s.items.map((i): CanvasItem => i.id === a ? { ...i, x: 0, y: 0, width: 100, height: 100 } : i.id === b ? { ...i, x: 100, y: 0, width: 100, height: 100 } : i),
+    }));
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b])!;
+    useCanvasComponentsStore.getState().resizeGroupBy('food', groupId, 0.1, 0.1, 1000);
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === a)!.width).toBeGreaterThanOrEqual(90);
+    expect(items.find(i => i.id === a)!.height).toBeGreaterThanOrEqual(64);
+  });
+
+  test('nie rusza itemów z innej grupy/screenKey', () => {
+    const [a, b, c] = addThree('food');
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b])!;
+    const cBefore = useCanvasComponentsStore.getState().items.find(i => i.id === c)!;
+    useCanvasComponentsStore.getState().resizeGroupBy('food', groupId, 3, 3, 1000);
+    const cAfter = useCanvasComponentsStore.getState().items.find(i => i.id === c)!;
+    expect(cAfter.width).toBe(cBefore.width); // c nie jest w grupie — bez zmian
+  });
+});
