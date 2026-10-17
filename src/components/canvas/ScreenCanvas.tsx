@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, Group, X } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -44,11 +44,20 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const [canvasWidth, setCanvasWidth] = useState(320);
   const [pickerForId, setPickerForId] = useState<string | null>(null);
   const [styleForId, setStyleForId] = useState<string | null>(null);
+  // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
+  // `selectMode` zamienia CAŁE płótno w tryb "tapnij żeby zaznaczyć" (osobna gałąź renderu w
+  // `CanvasPlacedItem`, patrz komentarz tam) — oddzielny od normalnej edycji, nie da się
+  // jednocześnie przeciągać/zaznaczać (user by się pogubił które tapnięcie co robi).
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
   const updateItem = useCanvasComponentsStore(st => st.updateItem);
   const removeItem = useCanvasComponentsStore(st => st.removeItem);
+  const groupItems = useCanvasComponentsStore(st => st.groupItems);
+  const ungroupItems = useCanvasComponentsStore(st => st.ungroupItems);
+  const moveGroupBy = useCanvasComponentsStore(st => st.moveGroupBy);
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
 
   const allStreakItems = useAllStreakItems();
@@ -82,13 +91,26 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
     setPickerForId(id);
   };
 
+  const toggleSelect = (id: string) => {
+    haptic.tap();
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const cancelSelect = () => { haptic.tap(); setSelectMode(false); setSelectedIds([]); };
+  const doGroup = () => {
+    if (selectedIds.length < 2) return;
+    haptic.success();
+    groupItems(screenKey, selectedIds);
+    setSelectMode(false);
+    setSelectedIds([]);
+  };
+
   return (
     <View style={s.wrap}>
       <View style={s.header}>
         <LayoutGrid size={13} color={c.text.secondary} />
         <Text style={s.title}>{title ?? 'Twoje komponenty'}</Text>
         <View style={{ flex: 1 }} />
-        <TouchableOpacity onPress={() => { haptic.tap(); setEditing(v => !v); }}
+        <TouchableOpacity onPress={() => { haptic.tap(); setEditing(v => !v); setSelectMode(false); setSelectedIds([]); }}
           style={[s.editBtn, editing && { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' }]}>
           {editing ? <Check size={13} color={c.accent.blue} /> : <Pencil size={13} color={c.text.secondary} />}
           <Text style={[s.editTxt, editing && { color: c.accent.blue }]}>{editing ? 'Gotowe' : 'Edytuj'}</Text>
@@ -127,9 +149,20 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
               canvasWidth={canvasWidth}
               onTap={onTap}
               onDelete={() => removeItem(item.id)}
-              onMove={(x, y) => updateItem(item.id, { x, y })}
+              onMove={(x, y) => {
+                // Grupa (§349) — przesuwa WSZYSTKICH członków o ten sam delta (jeden przeciągany
+                // item komunikuje tylko swoją własną, finalną pozycję, patrz `onEnd` w
+                // `CanvasPlacedItem`), nie tylko siebie.
+                if (item.groupId) moveGroupBy(screenKey, item.groupId, x - item.x, y - item.y, canvasWidth);
+                else updateItem(item.id, { x, y });
+              }}
               onResize={(width, height) => updateItem(item.id, { width, height })}
               onStyle={() => setStyleForId(item.id)}
+              selectMode={selectMode}
+              selected={selectedIds.includes(item.id)}
+              onToggleSelect={() => toggleSelect(item.id)}
+              grouped={item.groupId != null}
+              onUngroup={() => { if (item.groupId) { haptic.tap(); ungroupItems(item.groupId); } }}
               renderTile={(sizeStyle, onPress) => isStreak ? (
                 <StreakTile
                   item={boundStreak ?? { key: item.id, name: 'Wybierz metrykę', days: 0 }}
@@ -152,7 +185,24 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
         })}
       </View>
 
-      {editing && (
+      {editing && selectMode && (
+        <>
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <TouchableOpacity onPress={cancelSelect} style={[s.addBtn, { flex: 1, backgroundColor: c.bg.elevated }]} activeOpacity={0.85}>
+              <X size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Anuluj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={doGroup} disabled={selectedIds.length < 2}
+              style={[s.addBtn, { flex: 1, backgroundColor: c.accent.purple, opacity: selectedIds.length < 2 ? 0.4 : 1 }]} activeOpacity={0.85}>
+              <Group size={15} color="#fff" />
+              <Text style={s.addTxt}>Grupuj ({selectedIds.length})</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={s.hintText}>Zaznacz co najmniej 2 komponenty, które mają poruszać się razem.</Text>
+        </>
+      )}
+
+      {editing && !selectMode && (
         <>
           <View style={{ flexDirection: 'row', gap: spacing[2] }}>
             <TouchableOpacity onPress={() => onAdd('streakTile')} style={[s.addBtn, { flex: 1, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
@@ -164,12 +214,21 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
               <Text style={s.addTxt}>Odliczanie</Text>
             </TouchableOpacity>
           </View>
+          {/* Grupowanie (§349) — osobny przycisk, nie trzeci "Dodaj" (to nie dodaje nowej
+              instancji, tylko zmienia tryb interakcji z istniejącymi) — tylko gdy jest co
+              grupować (2+ itemy na tym ekranie), zero sensu pokazywać przy jednym/zero kaflach. */}
+          {myItems.length >= 2 && (
+            <TouchableOpacity onPress={() => { haptic.tap(); setSelectMode(true); }} style={[s.addBtn, { backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default }]} activeOpacity={0.85}>
+              <Group size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Grupuj komponenty</Text>
+            </TouchableOpacity>
+          )}
           {/* Podpowiedź (2026-10-16, Faza 16) — mechanizm (przeciąganie/zmiana rozmiaru w rogu/
               tapnięcie/dwa małe przyciski) jest zupełnie nowy w appce, bez tego user nie ma
               żadnego sposobu się domyślić co robić z kaflem po jego dodaniu. */}
           <Text style={s.hintText}>
             Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar · tapnięcie
-            wybiera podpięcie · 🎨 styl, 🗑 usuń.
+            wybiera podpięcie · 🎨 styl, 🗑 usuń{myItems.length >= 2 ? ' · 🔗 rozgrupuj' : ''}.
           </Text>
         </>
       )}

@@ -5,18 +5,13 @@ import RingCountdown from '@/components/counters/RingCountdown';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
+import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/store/countdownTileStyleDefaults';
 
-export interface CountdownTileStyle {
-  cornerRadius: number;
-  ringSize: number;
-  ringStrokeWidth: number;
-}
-
-export const DEFAULT_COUNTDOWN_TILE_STYLE: CountdownTileStyle = {
-  cornerRadius: 16,
-  ringSize: 56,
-  ringStrokeWidth: 6,
-};
+// Re-eksport dla wstecznej zgodności — `CanvasCountdownStyleModal.tsx`/`ScreenCanvas.tsx` dalej
+// importują oba symbole STĄD. Prawdziwa definicja żyje w `countdownTileStyleDefaults.ts`
+// (patrz komentarz tam — powód: testowalność `canvasComponentsStore.ts` w jest).
+export type { CountdownTileStyle };
+export { DEFAULT_COUNTDOWN_TILE_STYLE };
 
 // Wyekstrahowane z `CountdownsCard.tsx`'s per-wiersz renderu (system kopiowania komponentów,
 // drugi typ komponentu po `StreakTile`, 2026-10-17) — dowód że `componentType` w
