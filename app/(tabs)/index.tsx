@@ -85,6 +85,7 @@ import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
@@ -560,6 +561,9 @@ export default function DashboardScreen() {
     () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
     [counters, dayKey],
   );
+  // Generyczny data-binding na płótnie (§358) — lekkie Zustand selectory (pupil/zadania), zero
+  // dodatkowego AsyncStorage fetchu — bezpieczne do wołania tutaj RÓWNOLEGLE z resztą dashboardu.
+  const dataFieldRegistry = useDataFieldRegistry();
   // 2026-09-26, audyt dashboardu — `mode==='auto'` liczniki (np. "bez słodyczy") pokazywały
   // się TU *i* w `streakWall`/"Twoje Serie" naraz (streakWall filtruje `mode==='auto'`, ten
   // filtr tego nie wykluczał) — dokładnie ta duplikacja, którą §180/§181 miały wyeliminować
@@ -3111,6 +3115,7 @@ export default function DashboardScreen() {
                 allStreakItems={streakWall}
                 allCountdownItems={allCountdownItemsForCanvas}
                 allNotesItems={allNotes}
+                dataFieldRegistry={dataFieldRegistry}
                 accentColor={accentColor}
               />
             );

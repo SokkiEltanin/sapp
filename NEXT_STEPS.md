@@ -26,21 +26,19 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
-## 🆕 Kształty-primitywy na płótnie (2026-10-17, §357) — DO WERYFIKACJI, FAZA 1/3 edytora
+## 🆕 Generyczny data-binding na płótnie (2026-10-17, §358) — DO WERYFIKACJI, FAZA 2/3 edytora
 
-User, po mojej szczerej odpowiedzi że dotychczasowy system to "ułóż gotowe widgety" nie prawdziwy
-Figma-edytor: chce PEŁNY edytor (kształty od zera + edycja + generyczny dostęp do danych +
-zapisywanie + grupowanie) i kazał robić po kolei bez przerywania. **Zrobione (faza 1/3)**: 4 gołe
-kształty-primitywy (prostokąt/elipsa/linia/tekst) BEZ podpięcia danych, własny
-kolor/obrys/zaokrąglenie/przezroczystość, jeden adaptacyjny modal stylu. Checklist w
-ARCHITECTURE.md §357.
+Kontynuacja §357 (kształty-primitywy, scalone). **Zrobione (faza 2/3)**: nowy typ `'dataField'` —
+podpięcie do rejestru WIELU źródeł naraz (imię/poziom pupila, zadania ukończone dziś, dzisiejsza
+data), ten sam mechanizm pickera co streak/countdown/note. Checklist w ARCHITECTURE.md §358.
 
-**W TOKU, NIE przerywać** — zaplanowane kolejne fazy (user: "nie przerywaj dopóki nie
+**ŚWIADOMIE WYKLUCZONE z v1** (do dodania OSOBNO, ze wspólnym cache'em, nie prostym dopisaniem
+do rejestru — patrz ARCHITECTURE.md §358): kroki dzisiaj, saldo, nastrój pupila — wszystkie
+wymagają kosztownego hooka (AsyncStorage/Health Connect/agregacja wielu źródeł), montowanie per
+instancja na płótnie byłoby double-fetch hazardem.
+
+**W TOKU, NIE przerywać** — zaplanowana ostatnia faza (user: "nie przerywaj dopóki nie
 skończysz"):
-- **Faza 2**: generyczny data-binding — rejestr dowolnych pól z apki (saldo, kroki dziś, nazwa
-  pupila itp.), nowy typ komponentu który wyświetla etykietę+live-wartość podpiętego pola. Bez
-  tego "dostęp do danych" nadal ograniczony do 3 zahardkodowanych źródeł (nawyk/licznik/
-  notatka).
 - **Faza 3**: panel właściwości (numeryczne X/Y/W/H, nie tylko gest), warstwy (z-index,
   kolejność nakładania), rozszerzone grupowanie (resize całej grupy jako jednej jednostki, nie
   tylko wspólne przesuwanie jak dziś).
