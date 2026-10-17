@@ -19040,6 +19040,42 @@ pod nawyk → 🎨 styl → sekcja "Cel po kliknięciu" powinna się pojawić TY
 liczników/ćwiczeń) → przełączenie Wody/Roku → tapnięcie kafla (poza edycją) powinno nawigować do
 wybranego kalendarza.
 
+## 352. Fix: edytor mapy bossów — boss poza ekranem nie do złapania (2026-10-17)
+
+User, zaraz po fixie gestu (§348): "jak nie widac bosa i wystaje za ekran to jak mam fo
+przeciągnąć" — gest DZIAŁA teraz poprawnie (§348), ale edytor zawsze otwierał się
+przewinięty na samą GÓRĘ płótna, bez żadnego sposobu dotrzeć do bossa dalej na liście poza
+ręcznym przewijaniem na oślep. Przy 20+ bossach i `ROW_GAP=170` (patrz `bossMapLayout.ts`)
+płótno łatwo robi się dłuższe niż kilka ekranów — boss którego user CHCE przeciągnąć mógł być
+w ogóle poza aktualnie widocznym fragmentem, więc nie dało się go nawet dotknąć, nie mówiąc o
+przeciągnięciu.
+
+**Fix — dwuwarstwowy, `app/boss-map-editor.tsx`**:
+1. Edytor teraz otwiera się WYCENTROWANY na aktualnym (następnym do pokonania) bossie, nie na
+   pozycji (0,0) — ten sam `centerScrollY`+`contentOffset`+`key`-remount mechanizm co BUG #6 w
+   `CampaignMap.tsx` (§343), teraz użyty w DRUGIM miejscu (jedna definicja "jak wycentrować
+   kamerę na węźle", nie druga kopia tej samej logiki).
+2. Nowy poziomy pasek numerków-chipów nad płótnem ("skocz do bossa") — tapnięcie numeru N
+   centruje kamerę (animowany `scrollTo`) na bosie N, NIEZALEŻNIE jak daleko jest na płótnie.
+   To rozwiązuje realny problem strukturalnie: user nie musi już WIDZIEĆ bossa żeby go
+   znaleźć — najpierw skacze do niego numerem, POTEM przeciąga.
+
+**Świadomie NIE zrobione**: auto-scroll w trakcie przeciągania gdy palec zbliża się do
+krawędzi ekranu (typowy drag-and-drop UX) — real, ale większe ryzyko (ciągła koordynacja
+`scrollTo` z aktywnym `PanResponder`em, `scrollEnabled={false}` podczas gestu). Lista "skocz do
+bossa" rozwiązuje GŁÓWNY zgłoszony problem (dotarcie do bossa PRZED złapaniem) bez tego ryzyka;
+jeśli user po teście dalej będzie chciał płynne auto-scrollowanie W TRAKCIE przeciągania, to
+osobny, większy fix.
+
+**Testy**: czysto UI-wiring, reużywa już przetestowanego `centerScrollY` (`bossMapLayout.
+test.ts`, §343) — nowej logiki matematycznej nie ma. `tsc --noEmit` czyste, `jest --silent`
+108/108 suite, 1405 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: Bossy → ✏️ → edytor powinien otworzyć się już
+wycentrowany na aktualnym bosie (nie na górze listy) → tapnięcie dowolnego numerka w górnym
+pasku powinno płynnie przewinąć kamerę do tego bossa → przeciągnięcie powinno teraz działać
+dla KAŻDEGO bossa, nie tylko tych widocznych od razu po otwarciu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

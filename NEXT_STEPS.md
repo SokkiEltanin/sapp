@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 Fix: edytor mapy bossów — boss poza ekranem (2026-10-17, §352) — DO WERYFIKACJI
+
+User zaraz po fixie gestu (§348): "jak nie widac bosa i wystaje za ekran to jak mam go
+przeciągnąć". Edytor teraz: (1) otwiera się wycentrowany na aktualnym bosie, nie na górze
+płótna, (2) ma pasek numerków-chipów nad płótnem — tapnięcie skacze kamerą do tego bossa
+niezależnie jak daleko jest. **Priorytet testu KRYTYCZNY** — checklist w ARCHITECTURE.md §352.
+
+**Świadomie NIE zrobione**: auto-scroll w trakcie samego przeciągania (palec blisko krawędzi
+ekranu przewija widok) — większe ryzyko, lista "skocz do bossa" rozwiązuje główny problem
+(dotarcie do bossa PRZED złapaniem) bez tego. Jeśli user dalej będzie chciał płynne
+auto-scrollowanie W TRAKCIE gestu, to osobny fix.
+
 ## 🆕 System kopiowania komponentów — Faza 22: przepinanie nawigacji per-instancja (2026-10-17, §351)
 
 Ostatni mały odłożony gap z Fazy 16 (§342) domknięty — "Cel po kliknięciu" (Wody/Roku) teraz
