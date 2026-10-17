@@ -1,37 +1,42 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
-import { Pencil, Check, Plus, LayoutGrid } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { useAllStreakItems } from '@/hooks/useAllStreakItems';
-import { StreakItem } from '@/components/dashboard/StreakWallCard';
-import { navigateForStreakItem } from '@/components/dashboard/StreakTile';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import { DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
+import { daysUntil, isDuringEvent } from '@/store/countersStore';
+import { StreakTile, navigateForStreakItem } from '@/components/dashboard/StreakTile';
+import { CountdownTile, DEFAULT_COUNTDOWN_TILE_STYLE, CountdownTileStyle } from '@/components/dashboard/CountdownTile';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
+import { useCanvasComponentsStore, CanvasComponentType } from '@/store/canvasComponentsStore';
+import { DEFAULT_STREAK_TILE_STYLE, StreakTileStyle } from '@/store/streakTileStyleStore';
 import CanvasPlacedItem from './CanvasPlacedItem';
-import MetricPickerModal from './MetricPickerModal';
+import MetricPickerModal, { PickerOption } from './MetricPickerModal';
 import CanvasStreakStyleModal from './CanvasStreakStyleModal';
+import CanvasCountdownStyleModal from './CanvasCountdownStyleModal';
 
 const MIN_CANVAS_HEIGHT = 140;
-const EDIT_BOTTOM_PAD = 76; // miejsce na przycisk "Dodaj" pod najniższą instancją
+const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą instancją
 
 // Wolne płótno (system kopiowania komponentów, Faza 15, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: Figma/Canva-style (swobodna
-// pozycja/rozmiar, nakładanie dozwolone), tapnięcie na kafel otwiera picker metryki. Jeden
+// pozycja/rozmiar, nakładanie dozwolone), tapnięcie na kafel otwiera picker podpięcia. Jeden
 // ekran = jeden `screenKey` (np. `'food'`) — każdy ekran dostaje WŁASNĄ, niezależną listę
 // instancji; kopiowanie "między ekranami" (user: "woda z dashboardu → słodycze w Jedzeniu")
 // nie przenosi literalnie obiektu z dashboardu (dashboard nie ma tu swoich instancji — jego
-// "Twoje serie" to wciąż osobny, sztywny `StreakWallCard`), tylko daje TEN SAM komponent
-// (`StreakTile`) i TĘ SAMĄ listę metryk do wyboru — efekt dla usera identyczny (kafel wody
-// wygląda i działa tak samo gdziekolwiek go postawi), bez potrzeby osobnego mechanizmu
+// "Twoje serie" to wciąż osobny, sztywny `StreakWallCard`), tylko daje TEN SAM komponent i TĘ
+// SAMĄ listę do wyboru — efekt dla usera identyczny, bez potrzeby osobnego mechanizmu
 // "wklejania" skopiowanego node'a.
 //
-// Tryb podglądu (editing=false): statyczne kafle, tapnięcie nawiguje jak na dashboardzie
-// (`navigateForStreakItem`, współdzielone z `StreakWallCard`). Tryb edycji: przeciąganie/
-// zmiana rozmiaru/usuwanie (`CanvasPlacedItem`), przycisk "Dodaj", tapnięcie otwiera picker
-// metryki. Jeden typ komponentu na razie (`'streakTile'`) — patrz `canvasComponentsStore.ts`.
+// Faza 17 (2026-10-17) — drugi `componentType` (`'countdownTile'`, po `'streakTile'`), dowód
+// że mechanizm faktycznie generalizuje. `CanvasPlacedItem` nie wie NIC o konkretnych typach
+// kafli (render-prop, §341 komentarz tam) — CAŁA logika "co to za typ, jak go wyświetlić, gdzie
+// szukać podpięcia" żyje TUTAJ, w jednym miejscu, żeby dodanie TRZECIEGO typu w przyszłości
+// było jedną kolejną gałęzią tych samych kilku `if`ów, nie rozrzuconą zmianą w wielu plikach.
 export default function ScreenCanvas({ screenKey, title }: { screenKey: string; title?: string }) {
   const c = useColors();
   const s = makeS(c);
@@ -47,8 +52,22 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
 
   const allStreakItems = useAllStreakItems();
+  const allCountdownItems = useAllCountdownItems();
+  const { color: timeAccentColor } = useTimeAccent();
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
   const styleItem = myItems.find(i => i.id === styleForId) ?? null;
+
+  const streakOptions: PickerOption[] = useMemo(
+    () => allStreakItems.map(i => ({ key: i.key, label: i.name, meta: `${i.days} ${i.days === 1 ? 'dzień' : 'dni'}` })),
+    [allStreakItems],
+  );
+  const countdownOptions: PickerOption[] = useMemo(
+    () => allCountdownItems.map(cn => ({
+      key: cn.id, label: cn.name,
+      meta: isDuringEvent(cn) ? 'w trakcie' : `za ${daysUntil(cn)} ${daysUntil(cn) === 1 ? 'dzień' : 'dni'}`,
+    })),
+    [allCountdownItems],
+  );
 
   const canvasHeight = Math.max(
     MIN_CANVAS_HEIGHT,
@@ -57,9 +76,9 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
   const onLayout = (e: LayoutChangeEvent) => setCanvasWidth(e.nativeEvent.layout.width);
 
-  const onAdd = () => {
+  const onAdd = (type: CanvasComponentType) => {
     haptic.tap();
-    const id = addItem(screenKey, 'streakTile');
+    const id = addItem(screenKey, type);
     setPickerForId(id);
   };
 
@@ -78,32 +97,56 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
       {myItems.length === 0 && !editing && (
         <Text style={s.hintText}>
-          Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii z inną metryką —
-          np. ten sam kafel co na dashboardzie, przepięty na inny nawyk albo licznik.
+          Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii albo odliczania
+          z inną metryką — np. ten sam kafel co na dashboardzie, przepięty na inny nawyk/licznik.
         </Text>
       )}
 
       <View onLayout={onLayout} style={[s.canvas, { height: canvasHeight, borderColor: editing ? c.accent.blue + '55' : c.border.subtle }]}>
         {myItems.map(item => {
-          const bound = item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
-          const displayItem: StreakItem = bound ?? { key: item.id, name: 'Wybierz metrykę', days: 0 };
+          const isStreak = item.componentType === 'streakTile';
+          const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
+          const boundCountdown = !isStreak && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
+
+          const onTap = () => {
+            if (editing) { setPickerForId(item.id); return; }
+            if (isStreak) {
+              if (boundStreak) navigateForStreakItem(boundStreak, item.style as StreakTileStyle);
+              else setPickerForId(item.id);
+            } else {
+              if (boundCountdown) { haptic.tap(); router.push(`/counters/${boundCountdown.id}` as any); }
+              else setPickerForId(item.id);
+            }
+          };
+
           return (
             <CanvasPlacedItem
               key={item.id}
               item={item}
-              displayItem={displayItem}
-              tileStyle={item.style}
               editing={editing}
               canvasWidth={canvasWidth}
-              onTap={() => {
-                if (editing) { setPickerForId(item.id); return; }
-                if (bound) navigateForStreakItem(bound, item.style);
-                else setPickerForId(item.id);
-              }}
+              onTap={onTap}
               onDelete={() => removeItem(item.id)}
               onMove={(x, y) => updateItem(item.id, { x, y })}
               onResize={(width, height) => updateItem(item.id, { width, height })}
               onStyle={() => setStyleForId(item.id)}
+              renderTile={(sizeStyle, onPress) => isStreak ? (
+                <StreakTile
+                  item={boundStreak ?? { key: item.id, name: 'Wybierz metrykę', days: 0 }}
+                  tileStyle={item.style as StreakTileStyle}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                />
+              ) : (
+                <CountdownTile
+                  item={boundCountdown}
+                  tileStyle={item.style as CountdownTileStyle}
+                  accentColor={timeAccentColor}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                  boxed
+                />
+              )}
             />
           );
         })}
@@ -111,38 +154,56 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
       {editing && (
         <>
-          <TouchableOpacity onPress={onAdd} style={[s.addBtn, { backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
-            <Plus size={15} color="#fff" />
-            <Text style={s.addTxt}>Dodaj kafel serii</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <TouchableOpacity onPress={() => onAdd('streakTile')} style={[s.addBtn, { flex: 1, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" />
+              <Text style={s.addTxt}>Kafel serii</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('countdownTile')} style={[s.addBtn, { flex: 1, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" />
+              <Text style={s.addTxt}>Odliczanie</Text>
+            </TouchableOpacity>
+          </View>
           {/* Podpowiedź (2026-10-16, Faza 16) — mechanizm (przeciąganie/zmiana rozmiaru w rogu/
               tapnięcie/dwa małe przyciski) jest zupełnie nowy w appce, bez tego user nie ma
               żadnego sposobu się domyślić co robić z kaflem po jego dodaniu. */}
           <Text style={s.hintText}>
             Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar · tapnięcie
-            wybiera metrykę · 🎨 styl, 🗑 usuń.
+            wybiera podpięcie · 🎨 styl, 🗑 usuń.
           </Text>
         </>
       )}
 
       <MetricPickerModal
         visible={!!pickerItem}
-        options={allStreakItems}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
+        emptyHint={pickerItem?.componentType === 'countdownTile'
+          ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
+          : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
       />
 
       <CanvasStreakStyleModal
-        visible={!!styleItem}
-        style={styleItem?.style ?? DEFAULT_STREAK_TILE_STYLE}
+        visible={!!styleItem && styleItem.componentType === 'streakTile'}
+        style={(styleItem && styleItem.componentType === 'streakTile' ? styleItem.style : DEFAULT_STREAK_TILE_STYLE) as StreakTileStyle}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
         onSetTierColor={(i, color) => {
-          if (!styleItem) return;
-          const next = { ...styleItem.style.tierColorOverrides };
+          if (!styleItem || styleItem.componentType !== 'streakTile') return;
+          const next = { ...(styleItem.style as StreakTileStyle).tierColorOverrides };
           if (color) next[i] = color; else delete next[i];
           updateItem(styleItem.id, { style: { ...styleItem.style, tierColorOverrides: next } });
         }}
+        onClose={() => setStyleForId(null)}
+      />
+
+      <CanvasCountdownStyleModal
+        visible={!!styleItem && styleItem.componentType === 'countdownTile'}
+        style={(styleItem && styleItem.componentType === 'countdownTile' ? styleItem.style : DEFAULT_COUNTDOWN_TILE_STYLE) as CountdownTileStyle}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
     </View>

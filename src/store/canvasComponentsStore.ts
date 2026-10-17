@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
+import { CountdownTileStyle, DEFAULT_COUNTDOWN_TILE_STYLE } from '@/components/dashboard/CountdownTile';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -11,11 +12,15 @@ import { StreakTileStyle, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileSt
 // (łącznie z tym samym `componentType` gdzie indziej), i niezależna od globalnych store'ów
 // Kreatora (`streakTileStyleStore` itd.) — kopia naprawdę jest kopią, nie linkiem.
 //
-// `componentType` tylko `'streakTile'` na razie — kafel serii jest najbogatszy stylistycznie
-// (4 layoutPresety, Fazy 8-10) i to dokładnie przykład usera (woda z dashboardu → słodycze w
-// Jedzeniu). Więcej typów (Rekordy/Odliczania/Notatki/Kalendarz jako kopiowalne) to kolejna,
-// osobna faza — typ jest już discriminated union żeby dojście tam nie wymagało migracji.
-export type CanvasComponentType = 'streakTile';
+// Faza 17 (2026-10-17) — drugi `componentType` (`'countdownTile'`, po `'streakTile'`),
+// dowód że mechanizm faktycznie generalizuje się, nie jest zaszyty pod jeden kształt treści.
+// `style: StreakTileStyle | CountdownTileStyle` (nie discriminated union z osobnym polem per
+// wariant) — ŚWIADOMIE uproszczone: TS-owe `Omit`/`Partial` nad discriminated union z różnym
+// `style` per wariant dystrybuują się źle (`keyof` unii dają tylko WSPÓLNE klucze), a jedyni
+// konsumenci tego pola (`ScreenCanvas.tsx`/`CanvasPlacedItem.tsx`/modale stylu) i tak zawężają
+// przez `item.componentType` PRZED użyciem `style`, więc realne bezpieczeństwo typów żyje tam,
+// nie w samym store'cie.
+export type CanvasComponentType = 'streakTile' | 'countdownTile';
 
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
@@ -23,21 +28,27 @@ export interface CanvasItem {
   componentType: CanvasComponentType;
   x: number; y: number;
   width: number; height: number;
-  // Klucz z `useAllStreakItems()` (`h:<habitId>` | `c:<counterId>` | `ex:exercises`) — TEN SAM
-  // format co `StreakItem.key` używany już w StreakWallCard/kreatorze, zero nowego słownika
-  // identyfikatorów. `null` = jeszcze nieprzepięty (nowo dodany, czeka na wybór w pickerze).
+  // Klucz z `useAllStreakItems()`/`useAllCountdownItems()` (zależnie od `componentType`) — TEN
+  // SAM format co klucze używane już w odpowiadających kartach dashboardu/kreatorze, zero
+  // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty.
   bindingKey: string | null;
-  style: StreakTileStyle;  // per-instancja, kopia — edycja jednej instancji NIE dotyka innych
+  style: StreakTileStyle | CountdownTileStyle;  // per-instancja, kopia
 }
 
-const DEFAULT_WIDTH = 150;
-const DEFAULT_HEIGHT = 92;
+const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number }> = {
+  streakTile: { width: 150, height: 92 },
+  countdownTile: { width: 230, height: 76 },
+};
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle> = {
+  streakTile: DEFAULT_STREAK_TILE_STYLE,
+  countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
+};
 
 interface CanvasComponentsState {
   items: CanvasItem[];
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
-  updateItem: (id: string, patch: Partial<Omit<CanvasItem, 'id' | 'screenKey' | 'componentType'>>) => void;
+  updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
   removeItem: (id: string) => void;
 }
 
@@ -55,11 +66,11 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         const existing = get().items.filter(i => i.screenKey === screenKey);
         const maxBottom = existing.reduce((m, i) => Math.max(m, i.y + i.height), 0);
         const y = existing.length === 0 ? 12 : maxBottom + 12;
+        const { width, height } = DEFAULT_SIZE[componentType];
         const item: CanvasItem = {
-          id, screenKey, componentType, x: 12, y,
-          width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT,
+          id, screenKey, componentType, x: 12, y, width, height,
           bindingKey: null,
-          style: DEFAULT_STREAK_TILE_STYLE,
+          style: DEFAULT_STYLE[componentType],
         };
         set((s) => ({ items: [...s.items, item] }));
         return id;

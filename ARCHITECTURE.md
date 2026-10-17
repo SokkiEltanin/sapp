@@ -18697,6 +18697,70 @@ kontem które ma pokonanych kilku bossów (aktualny NIE pierwszy na liście) —
 razu (bez przewijania) pokazywać aktualnego bossa wycentrowanego, z widocznym pierścieniem.
 Pokonaj walkę i wróć na mapę — kamera powinna PŁYNNIE przewinąć się do nowego aktualnego bossa.
 
+## 344. System kopiowania komponentów — Faza 17: drugi typ komponentu, "Odliczanie" (2026-10-17)
+
+User: "miał być pełen edytor zajebisty ze wszystkim, dawaj dalej" — po Fazach 14-16 (fundament/
+płótno/styl per-instancja, wszystko dla JEDNEGO typu — `'streakTile'`) ta faza dowodzi, że
+mechanizm faktycznie GENERALIZUJE się, nie jest zaszyty pod kafel serii. Drugi `componentType`:
+`'countdownTile'` — pierścień+tekst w rzędzie (inny kształt niż kwadratowy kafel serii),
+bindowany do liczników typu `until`.
+
+**Refaktor konieczny PRZED dodaniem drugiego typu** (nie kosmetyczny — bez tego nie dałoby się
+uczciwie dodać drugiego typu bez kopiowania całego `ScreenCanvas`/`CanvasPlacedItem`):
+- **`CanvasPlacedItem.tsx`** — `displayItem`/`tileStyle` (specyficzne dla `StreakTile`) zamienione
+  na `renderTile: (sizeStyle, onPress) => ReactNode` — render-prop. Komponent teraz NIE WIE nic o
+  `StreakTile`/`CountdownTile`, tylko o geście/pozycji/rozmiarze/chrome (uchwyty, przyciski styl/
+  usuń). Cała logika "jaki to typ, jak go wyświetlić" przeniesiona do `ScreenCanvas.tsx`.
+- **`MetricPickerModal.tsx`** — `options: StreakItem[]` zamienione na generyczny
+  `PickerOption[] { key, label, meta }` (meta = już sformatowany tekst drugiej linii, liczony
+  przez wołającego, bo `StreakItem` ma `.days`, `Counter` ma `.date`/`daysUntil()` — różne sposoby
+  liczenia tej samej "drugiej linijki"). `title`/`icon`/`emptyHint` jako propy — "metryka"/"seria"
+  i "odliczanie" to różne słowa mimo identycznego mechanizmu wyboru.
+- **`canvasComponentsStore.ts`** — `CanvasItem.style: StreakTileStyle | CountdownTileStyle`
+  (nie discriminated union z osobnym polem per wariant — TS-owe `Omit`/`Partial` nad unią z
+  różnym `style` per wariant dystrybuują się źle, `keyof` unii dają tylko WSPÓLNE klucze;
+  realne bezpieczeństwo typów żyje w konsumentach, które zawężają przez `item.componentType`
+  PRZED użyciem `style`). `DEFAULT_SIZE`/`DEFAULT_STYLE` jako lookupy per `componentType` w
+  `addItem`.
+
+**Nowe pliki**:
+- **`CountdownTile.tsx`** — wyekstrahowane z `CountdownsCard.tsx`'s per-wiersz renderu (ten sam
+  zabieg co `StreakTile` z `StreakWallCard`, §340). `item: Counter | null` (nie fabrykowany
+  placeholder jak `StreakTile` — `Counter` ma wymagane pola `startDate`/`createdAt`, więc
+  osobna, jawna gałąź "brak" jest poprawniejsza niż zgadywane dane przepuszczone przez prawdziwą
+  logikę `daysUntil`/`untilProgress`). `boxed` prop (domyślnie `false`) — `CountdownsCard`
+  renderuje wiersze BEZ tła/paddingu (gołe rzędy w jednej karcie), płótno potrzebuje WIDOCZNEGO
+  pudełka (samotna instancja bez otaczającej karty) — jeden komponent, dwa konteksty wizualne,
+  zero zmiany wyglądu dashboardu.
+- **`src/hooks/useAllCountdownItems.ts`** — lista "do czego przypiąć kafel odliczania"
+  (`counters.filter(kind==='until' && !isOver && (daysUntil>=0 || isDuringEvent))`). ŚWIADOMIE
+  bez filtra `onDashboard!==false` (ten filtr na dashboardzie chowa WIDGET, płótno jest osobnym
+  miejscem umieszczenia — schowanie z dashboardu nie powinno automatycznie chować z listy
+  wyboru tutaj). `useCounters()` to Zustand store (współdzielony singleton) — bezpieczne wołanie
+  z dowolnego miejsca, w przeciwieństwie do `useAllStreakItems()`'s `useHabits()` (patrz §340).
+- **`CanvasCountdownStyleModal.tsx`** — prostszy niż `CanvasStreakStyleModal` (§342): 3 pola
+  (zaokrąglenie/rozmiar/grubość pierścienia), zero presetów layoutu/palety progów — kafel
+  odliczania ma JEDEN kształt.
+
+**`ScreenCanvas.tsx`** — teraz jedyne miejsce ze świadomością obu typów: konstruuje
+`PickerOption[]` per typ, resolvuje `displayItem`/routing po tapnięciu, renderuje odpowiedni
+`renderTile`, montuje OBA modale stylu naraz (`visible` filtrowany po `componentType`, ten sam
+wzorzec co dotychczas dla płynnej animacji zamykania). Dwa przyciski "Dodaj" (Kafel serii /
+Odliczanie) zamiast jednego — wybór typu jest teraz jawny, nie domyślny.
+
+**Świadomie odłożone, kolejna faza**: trzeci typ komponentu (Rekordy/Notatki/Kalendarz jako
+kopiowalne — każdy wymaga własnej decyzji jak wygląda "lista do wyboru" dla tego typu, nie
+automatyczne), więcej ekranów docelowych, grupowanie.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1394 testów (bez nowych —
+czysto UI/refaktor, logika `daysUntil`/`untilProgress` już testowana gdzie indziej).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Jedzenie → Edytuj → "Odliczanie" → wybierz
+odliczanie w pickerze → sprawdź pierścień/postęp/tekst identyczne jak na dashboardzie, styl
+(zaokrąglenie/rozmiar/grubość pierścienia), przeciąganie/zmianę rozmiaru/usuwanie — te same co
+dla kafla serii, bo chrome jest współdzielony. Sprawdź REGRESJĘ: "Odliczania" na dashboardzie
+wygląda identycznie jak przed tą fazą (ekstrakcja `CountdownTile` z `boxed=false`).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, ReactNode } from 'react';
+import { View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Move, Trash2, Palette } from 'lucide-react-native';
-import { StreakTile } from '@/components/dashboard/StreakTile';
-import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { CanvasItem } from '@/store/canvasComponentsStore';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -19,16 +17,20 @@ const MIN_HEIGHT = 64;
 // 1-wymiarowy i snapuje do siatki wierszy (reorder listy); tutaj ruch jest WOLNY 2D (user:
 // "wolne płótno jak Figma/Canva" — żadnego snapowania, elementy mogą się nakładać).
 //
+// `renderTile` (Faza 17, 2026-10-17, drugi `componentType`) — TEN komponent nie wie NIC o
+// `StreakTile`/`CountdownTile`/przyszłych typach, tylko o geście/pozycji/rozmiarze/chrome
+// (uchwyty, przyciski). Caller (`ScreenCanvas.tsx`) decyduje CO narysować w środku, w zależności
+// od `item.componentType` — dokładnie ten sam powód co `onPress`/`sizeStyle` jako propy w
+// `StreakTile` samym (§340): jeden komponent gestów/chrome, wymienna treść.
+//
 // Dwie gałęzie renderu: `editing=false` to zwykły, statyczny `View` (zero Reanimated/gestów —
 // taniej na ekranie, który user odwiedza głównie żeby PATRZEĆ, nie edytować). `editing=true`
 // dokłada: uchwyt przeciągania (CAŁY obszar kafla — tapnięcie bez ruchu otwiera picker metryki,
-// patrz `Gesture.Race` niżej), uchwyt zmiany rozmiaru (róg), przycisk usuń.
+// patrz `Gesture.Race` niżej), uchwyt zmiany rozmiaru (róg), przyciski styl/usuń.
 export default function CanvasPlacedItem({
-  item, displayItem, tileStyle, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle,
+  item, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle, renderTile,
 }: {
   item: CanvasItem;
-  displayItem: StreakItem;
-  tileStyle: CanvasItem['style'];
   editing: boolean;
   canvasWidth: number;
   onTap: () => void;
@@ -36,6 +38,7 @@ export default function CanvasPlacedItem({
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
   onStyle: () => void;
+  renderTile: (sizeStyle: StyleProp<ViewStyle>, onPress: () => void) => ReactNode;
 }) {
   const c = useColors();
   const tx = useSharedValue(item.x);
@@ -76,20 +79,20 @@ export default function CanvasPlacedItem({
   if (!editing) {
     return (
       <View style={{ position: 'absolute', left: item.x, top: item.y, width: item.width, height: item.height }}>
-        <StreakTile item={displayItem} tileStyle={tileStyle} onPress={onTap} sizeStyle={{ width: '100%', height: '100%' }} />
+        {renderTile({ width: '100%', height: '100%' }, onTap)}
       </View>
     );
   }
 
-  // `pointerEvents="none"` na kaflu (2026-10-16) — w trybie edycji StreakTile jest TYLKO
-  // wizualny, cały dotyk łapie przezroczysty overlay z `GestureDetector` poniżej. Bez tego
-  // wewnętrzny `TouchableOpacity` kafla (własny responder dotyku RN) konkurowałby z
-  // `Gesture.Race` o to samo dotknięcie — dwa niezależne systemy obsługi gestów na tym samym
-  // elemencie, realne źródło "czasem łapie, czasem nie" na urządzeniu.
+  // `pointerEvents="none"` na kaflu (2026-10-16) — w trybie edycji treść jest TYLKO wizualna,
+  // cały dotyk łapie przezroczysty overlay z `GestureDetector` poniżej. Bez tego wewnętrzny
+  // `TouchableOpacity` kafla (własny responder dotyku RN) konkurowałby z `Gesture.Race` o to
+  // samo dotknięcie — dwa niezależne systemy obsługi gestów na tym samym elemencie, realne
+  // źródło "czasem łapie, czasem nie" na urządzeniu.
   return (
     <Reanimated.View style={[boxStyle, s.editingWrap, { borderColor: c.accent.blue }]}>
       <View pointerEvents="none" style={{ flex: 1 }}>
-        <StreakTile item={displayItem} tileStyle={tileStyle} onPress={() => {}} sizeStyle={{ width: '100%', height: '100%' }} />
+        {renderTile({ width: '100%', height: '100%' }, () => {})}
       </View>
       <GestureDetector gesture={moveOrTap}>
         <View style={StyleSheet.absoluteFill} />

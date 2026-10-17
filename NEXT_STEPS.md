@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 17: drugi typ komponentu, "Odliczanie" (2026-10-17, §344)
+
+User: "miał być pełen edytor zajebisty ze wszystkim" — dowód że mechanizm z Faz 14-16
+generalizuje się: drugi `componentType` (`'countdownTile'`, pierścień+tekst, inny kształt niż
+kwadratowy kafel serii). Wymagało refaktoru `CanvasPlacedItem`/`MetricPickerModal` na generyczne
+(render-prop / `PickerOption[]`) — teraz dodanie TRZECIEGO typu to jedna kolejna gałąź w
+`ScreenCanvas.tsx`, nie rozrzucona zmiana w wielu plikach. **Priorytet testu WYSOKI, plus
+regresja na dashboardzie** (ekstrakcja `CountdownTile` z `CountdownsCard`) — checklist w
+ARCHITECTURE.md §344.
+
+**Otwarte, kolejna faza**: trzeci typ komponentu (Rekordy/Notatki/Kalendarz — każdy wymaga
+własnej decyzji jak wygląda "lista do wyboru" dla tego typu, Rekordy np. nie mają jednego
+oczywistego "id" do bindowania jak nawyk/licznik), więcej ekranów docelowych (nie zgadywać który,
+zapytać — §332), grupowanie komponentów (user, §333, dalej nie zaczynane).
+
 ## 🔴 Mapa bossów — BUG #6: kamera nie trafiała na aktualnego bossa (2026-10-16, §343)
 
 **Zgłoszony przez usera bug**, nie zaplanowana faza. "Wgle nie da się klikać w nich teraz" →
