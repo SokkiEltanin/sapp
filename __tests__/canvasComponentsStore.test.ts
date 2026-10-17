@@ -1,5 +1,6 @@
 import { useCanvasComponentsStore, CanvasItem } from '@/store/canvasComponentsStore';
 import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
+import { DEFAULT_RECT_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE } from '@/store/shapeStyleDefaults';
 
 // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
 // Testowane bezpośrednio na store (ten sam wzorzec co battleLayoutDraftStore.test.ts) —
@@ -19,6 +20,24 @@ describe('canvasComponentsStore — addItem (trzeci typ, notesTile, §350)', () 
     expect(item.height).toBeGreaterThan(0);
     expect(item.bindingKey).toBeNull();
     expect(item.groupId).toBeNull();
+  });
+});
+
+describe('canvasComponentsStore — addItem (kształty-primitywy, §357)', () => {
+  test('rectShape dostaje domyślny styl wypełnienia i bindingKey=null (kształty nie mają podpięcia)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('food', 'rectShape');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.style).toEqual(DEFAULT_RECT_SHAPE_STYLE);
+    expect(item.bindingKey).toBeNull();
+  });
+
+  test('lineShape dostaje spłaszczony domyślny rozmiar (blisko-pozioma linia)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('food', 'lineShape');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.style).toEqual(DEFAULT_LINE_SHAPE_STYLE);
+    expect(item.height).toBeLessThan(item.width);
   });
 });
 

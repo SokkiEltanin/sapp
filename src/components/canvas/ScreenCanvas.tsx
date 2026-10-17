@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -18,11 +18,27 @@ import { NotesTile, DEFAULT_NOTES_TILE_STYLE, NotesTileStyle } from '@/component
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { useCanvasComponentsStore, CanvasComponentType } from '@/store/canvasComponentsStore';
 import { DEFAULT_STREAK_TILE_STYLE, StreakTileStyle } from '@/store/streakTileStyleStore';
+import {
+  ShapeComponentType, ShapeStyle, isShapeType,
+  DEFAULT_RECT_SHAPE_STYLE, DEFAULT_ELLIPSE_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE, DEFAULT_TEXT_SHAPE_STYLE,
+} from '@/store/shapeStyleDefaults';
 import CanvasPlacedItem from './CanvasPlacedItem';
 import MetricPickerModal, { PickerOption } from './MetricPickerModal';
 import CanvasStreakStyleModal from './CanvasStreakStyleModal';
 import CanvasCountdownStyleModal from './CanvasCountdownStyleModal';
 import CanvasNotesStyleModal from './CanvasNotesStyleModal';
+import { ShapeTile } from './ShapeTile';
+import CanvasShapeStyleModal from './CanvasShapeStyleModal';
+
+// Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
+// `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
+// `visible={false}`, bo React renderuje drzewo niezależnie od `visible` w `<Modal>`).
+const SHAPE_DEFAULT_BY_KIND: Record<ShapeComponentType, ShapeStyle> = {
+  rectShape: DEFAULT_RECT_SHAPE_STYLE,
+  ellipseShape: DEFAULT_ELLIPSE_SHAPE_STYLE,
+  lineShape: DEFAULT_LINE_SHAPE_STYLE,
+  textShape: DEFAULT_TEXT_SHAPE_STYLE,
+};
 
 const MIN_CANVAS_HEIGHT = 140;
 const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą instancją
@@ -125,7 +141,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const onAdd = (type: CanvasComponentType) => {
     haptic.tap();
     const id = addItem(screenKey, type);
-    setPickerForId(id);
+    // Kształty (§357) nie mają podpięcia danych — nie otwieraj metric-pickera po dodaniu, item
+    // od razu widoczny ze stylem domyślnym, gotowy do przeciągania/stylowania.
+    if (!isShapeType(type)) setPickerForId(id);
   };
 
   const toggleSelect = (id: string) => {
@@ -166,11 +184,16 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const isStreak = item.componentType === 'streakTile';
           const isCountdown = item.componentType === 'countdownTile';
           const isNote = item.componentType === 'notesTile';
+          // Kształty-primitywy (§357) — BEZ podpięcia danych, tapnięcie nie robi nic (ani
+          // metric-picker, ani nawigacja) — interakcja idzie WYŁĄCZNIE przez chrome
+          // `CanvasPlacedItem` (przeciąganie/resize/przycisk 🎨 stylu).
+          const isShape = isShapeType(item.componentType);
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
 
           const onTap = () => {
+            if (isShape) return;
             if (editing) { setPickerForId(item.id); return; }
             if (isStreak) {
               if (boundStreak) navigateForStreakItem(boundStreak, item.style as StreakTileStyle);
@@ -222,7 +245,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   sizeStyle={sizeStyle}
                   boxed
                 />
-              ) : (
+              ) : isNote ? (
                 <NotesTile
                   note={boundNote}
                   tileStyle={item.style as NotesTileStyle}
@@ -230,6 +253,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                   boxed
+                />
+              ) : (
+                <ShapeTile
+                  kind={item.componentType as ShapeComponentType}
+                  style={item.style as ShapeStyle}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
                 />
               )}
             />
@@ -273,6 +303,28 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               <Text style={s.addTxt}>Notatka</Text>
             </TouchableOpacity>
           </View>
+          {/* Kształty-primitywy (§357) — osobny, wizualnie oddzielony wiersz (szary, nie
+              niebieski jak "komponenty z danymi" wyżej) — inna kategoria: BEZ podpięcia,
+              czysto wizualne elementy do budowania własnego układu. */}
+          <Text style={[s.sectionLabel, { marginTop: 2 }]}>Kształty</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+            <TouchableOpacity onPress={() => onAdd('rectShape')} style={[s.addBtn, s.shapeAddBtn, { flex: 1, minWidth: 80 }]} activeOpacity={0.85}>
+              <Square size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Prostokąt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('ellipseShape')} style={[s.addBtn, s.shapeAddBtn, { flex: 1, minWidth: 80 }]} activeOpacity={0.85}>
+              <Circle size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Elipsa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('lineShape')} style={[s.addBtn, s.shapeAddBtn, { flex: 1, minWidth: 80 }]} activeOpacity={0.85}>
+              <Minus size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Linia</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('textShape')} style={[s.addBtn, s.shapeAddBtn, { flex: 1, minWidth: 80 }]} activeOpacity={0.85}>
+              <Type size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Tekst</Text>
+            </TouchableOpacity>
+          </View>
           {/* Grupowanie (§349) — osobny przycisk, nie trzeci "Dodaj" (to nie dodaje nowej
               instancji, tylko zmienia tryb interakcji z istniejącymi) — tylko gdy jest co
               grupować (2+ itemy na tym ekranie), zero sensu pokazywać przy jednym/zero kaflach. */}
@@ -287,7 +339,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               żadnego sposobu się domyślić co robić z kaflem po jego dodaniu. */}
           <Text style={s.hintText}>
             Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar · tapnięcie
-            wybiera podpięcie · 🎨 styl, 🗑 usuń{myItems.length >= 2 ? ' · 🔗 rozgrupuj' : ''}.
+            wybiera podpięcie (kształty nie mają podpięcia — od razu gotowe) · 🎨 styl, 🗑 usuń
+            {myItems.length >= 2 ? ' · 🔗 rozgrupuj' : ''}.
           </Text>
         </>
       )}
@@ -339,6 +392,19 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
+
+      <CanvasShapeStyleModal
+        visible={!!styleItem && isShapeType(styleItem.componentType)}
+        kind={(styleItem && isShapeType(styleItem.componentType) ? styleItem.componentType : 'rectShape') as ShapeComponentType}
+        style={styleItem && isShapeType(styleItem.componentType) ? (styleItem.style as ShapeStyle) : SHAPE_DEFAULT_BY_KIND.rectShape}
+        // `as any` (dokumentowana pułapka, §355) — `patch` jest generycznie typowany
+        // (`Record<string, unknown>`) w `CanvasShapeStyleModal`, bo pola różnią się MIĘDZY 4
+        // typami kształtu (np. `cornerRadius` istnieje tylko w `RectShapeStyle`) — spread nad
+        // `ShapeStyle` (unia 4 różnych interfejsów) z takim patchem dystrybuuje się źle w TS.
+        // Bezpieczeństwo typów żyje w samym modalu (branch wg `kind` PRZED użyciem pól).
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as any), ...patch } }); }}
+        onClose={() => setStyleForId(null)}
+      />
     </View>
   );
 }
@@ -379,4 +445,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingVertical: 10, borderRadius: radius.md,
   },
   addTxt: { fontSize: 12.5, fontWeight: '700', color: '#fff' },
+  // Kształty-primitywy (§357) — szary/obrysowy, nie pełny niebieski jak "komponenty z danymi",
+  // żeby wizualnie od razu było widać inną kategorię bez czytania etykiet.
+  shapeAddBtn: { backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  sectionLabel: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
 }));
