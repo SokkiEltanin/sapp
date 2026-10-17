@@ -11,14 +11,20 @@ import { StreakItem } from '@/components/dashboard/StreakWallCard';
 // Ta sama logika co `app/(tabs)/index.tsx`'s `streakWall` i `app/dashboard-tile-creator.tsx`'s
 // `realStreaks` (habity + auto-liczniki "dni bez" + ćwiczenia → `StreakItem[]`), wyciągnięta
 // jako OSOBNY hook dla systemu kopiowania komponentów (§340+, 2026-10-16) — kanwa na kolejnych
-// ekranach (np. `food.tsx`) potrzebuje tej samej listy "do czego da się przypiąć kafel serii",
-// a te ekrany NIE mają jeszcze żadnego z `useHabits()`/`useCounters()`/itd. zamontowanego, więc
-// zero ryzyka duplikacji. ŚWIADOMIE NIE podpięte do `index.tsx`/kreatora — oba JUŻ wołają te
-// hooki osobno dla innych memo na tym samym ekranie (records/countdowns/since/gcal); dodanie
-// tego hooka TAM obok istniejących wywołań zamontowałoby `useHabits()` (własny AsyncStorage
-// fetch) PO RAZ DRUGI w tym samym drzewie komponentów — podwójna, zbędna praca na
-// najbardziej czułym na wydajność ekranie w appce (patrz CLAUDE.md o ANR). Czysty DRY tu nie
-// jest wart tego kosztu — duplikacja tych ~8 linijek logiki zostaje w `index.tsx`/kreatorze.
+// ekranach (np. `food.tsx`, `exercises.tsx`) potrzebuje tej samej listy "do czego da się
+// przypiąć kafel serii", a te ekrany NIE mają jeszcze żadnego z `useHabits()`/`useCounters()`/
+// itd. zamontowanego, więc zero ryzyka duplikacji. ŚWIADOMIE NIE podpięte do `index.tsx`/
+// kreatora — oba JUŻ wołają te hooki osobno dla innych memo na tym samym ekranie (records/
+// countdowns/since/gcal); dodanie tego hooka TAM obok istniejących wywołań zamontowałoby
+// `useHabits()` (własny AsyncStorage fetch) PO RAZ DRUGI w tym samym drzewie komponentów —
+// podwójna, zbędna praca na najbardziej czułym na wydajność ekranie w appce (patrz CLAUDE.md
+// o ANR). Czysty DRY tu nie jest wart tego kosztu — duplikacja tych ~8 linijek logiki zostaje
+// w `index.tsx`/kreatorze.
+//
+// UWAGA przy wpinaniu `<ScreenCanvas>` (zawiera ten hook) na KOLEJNYM ekranie — sprawdź najpierw
+// `grep -n "useHabits(" <plik>`. `habits.tsx` i `pet.tsx` JUŻ montują `useHabits()` dla
+// własnej treści (nawyki/pupil), więc nie są bezpiecznym celem bez zmiany architektury tego
+// hooka — dokładnie ta sama pułapka co `index.tsx`/kreator opisana wyżej, inny ekran.
 export function useAllStreakItems(): StreakItem[] {
   const { habits, getStreak } = useHabits();
   const counters = useCounters(st => st.counters);

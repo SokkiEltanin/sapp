@@ -16,6 +16,7 @@ import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 
 // Ikony per-ekran (lucide fallbacki, `EXERCISE_META` — exerciseMeta.ts — trzyma tylko label/
 // jednostkę/cel, współdzielone z builderem planów i hookiem nagród).
@@ -163,6 +164,13 @@ export default function ExercisesScreen() {
             Monety/XP za trening na razie dalej czekają w Pupil → Zadania.
           </Text>
         </View>
+
+        {/* Wolne płótno — system kopiowania komponentów, Faza 18 (2026-10-17). Drugi ekran
+            poza Jedzeniem; świadomie NIE Nawyki/Pupil (oba już montują `useHabits()` dla
+            własnej treści — drugie wywołanie przez `useAllStreakItems()` zdublowałoby jego
+            własny fetch z AsyncStorage, patrz komentarz w `useAllStreakItems.ts`). Ćwiczenia
+            nie montują `useHabits()`, zero ryzyka duplikacji. */}
+        <ScreenCanvas screenKey="exercises" title="Twoje komponenty" />
       </ScrollView>
     </SafeAreaView>
   );
