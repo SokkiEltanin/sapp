@@ -19206,6 +19206,60 @@ kafelka" powinna teraz pokazywać 4 opcje, przełączanie między nimi powinno w
 podgląd na żywo, "Pierścień" (default) powinien wyglądać DOKŁADNIE jak dotychczas. To samo
 dla instancji odliczania na płótnie (dowolny ekran → kafel odliczania → 🎨 styl).
 
+## 356. Dashboard jako wolne płótno (2026-10-17)
+
+Trzeci z zgłoszonych braków — user, po AskUserQuestion, wybrał explicite "Dashboard jako wolne
+płótno": TA SAMA mechanika co już działa na Jedzeniu/Ćwiczeniach/Finansach (§341/§345/komentarz
+wyżej), ale na PRAWDZIWYM dashboardzie (`app/(tabs)/index.tsx`), nie osobnym lżejszym mechanizmie
+reorder/show-hide (ten już istnieje — `dashboardLayout.ts` — i ZOSTAJE, patrz niżej).
+
+**Problem do obejścia**: `ScreenCanvas` (dotąd) sam wołał `useAllStreakItems()`/
+`useAllCountdownItems()`/`useAllNotesItems()`/`useTimeAccent()` wewnątrz. Dashboard ma TE SAME
+dane JUŻ w pamięci (`streakWall`, liczniki, `allNotes`) — drugie wywołanie tych hooków na
+dashboardzie zduplikowałoby fetch/subskrypcje (ten sam klasa problemu co ostrzeżenie w
+`useAllStreakItems.ts` dot. `useHabits()`, §345).
+
+**Fix — rozdział komponentu na props-driven bazę + hook-wrapper** (`ScreenCanvas.tsx`):
+- `ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems,
+  accentColor })` — cała dotychczasowa logika canvasu, ZERO wewnętrznych hooków fetch'ujących
+  dane. Przyjmuje wszystko przez propsy.
+- `ScreenCanvas({ screenKey, title })` (default export, bez zmiany sygnatury) — cienki wrapper:
+  woła te 4 hooki i przekazuje wynik do `ScreenCanvasBase`. Jedzenie/Ćwiczenia/Finanse dalej
+  importują `ScreenCanvas` bez ŻADNEJ zmiany.
+
+**`app/(tabs)/index.tsx`** — importuje `ScreenCanvasBase` (NIE `ScreenCanvas` — unika drugiego
+montowania `useHabits()`/liczników/notatek). Nowy memo `allCountdownItemsForCanvas` (obok
+`activeCountdowns`) — TA SAMA logika filtrowania (`kind==='until' && !isOver && …`), ale BEZ
+`onDashboard !== false`: komponenty-odliczania na płótnie mają być dostępne niezależnie od
+checkboxa "pokaż na dashboardzie" (ten checkbox steruje wyłącznie starą kartą `CountdownsCard`,
+nie ma i nie powinien mieć wpływu na płótno — identyczny powód co `streakWall`/`allNotes` już
+nie potrzebowały żadnego nowego fetchu, były gotowe). Nowy node:
+```
+nodes['custom-canvas'] = <ScreenCanvasBase screenKey="dashboard" title="Twoje komponenty"
+  allStreakItems={streakWall} allCountdownItems={allCountdownItemsForCanvas}
+  allNotesItems={allNotes} accentColor={accentColor} />;
+```
+
+**Podpięcie do istniejącego systemu reorder/hide** (`dashboardLayout.ts`) — ZAMIAST budować nowy
+mechanizm zarządzania pozycją, `'custom-canvas'` dodany jako normalny id do
+`DEFAULT_DASHBOARD_SECTIONS` (+ `SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP`, grupa "Inne" —
+obok `pinned-notes`/`gcal`/`pet`). Edytor dashboardu (drag-reorder, pokaż/skryj) obsługuje to
+automatycznie, zero nowego UI.
+
+**Świadomie NIE zrobione**: `screenKey="dashboard"` to NOWA, osobna przestrzeń komponentów na
+płótnie (nie dzieli się z Jedzeniem/Ćwiczeniami/Finansami — `canvasComponentsStore.ts` trzyma
+itemy per `screenKey`) — zgodne z tym jak działają już 3 pozostałe ekrany (każdy ma własną,
+niezależną przestrzeń).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 109/109 suite, 1407 testów (bez zmian — czysty
+props-split + wiring, zero nowej logiki do testowania jednostkowo).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Dashboard → przycisk "Dodaj komponent" (ten sam co na
+Jedzeniu/Ćwiczeniach/Finansach) powinien się teraz pojawić NA DASHBOARDZIE; dodanie kafla serii/
+odliczania/notatki powinno działać identycznie jak na innych ekranach (przeciąganie, resize,
+styl, grupowanie). Sekcja "Twoje komponenty (wolne płótno)" powinna być widoczna i przesuwalna w
+edytorze dashboardu (Ustawienia → Personalizacja → Edytuj dashboard).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

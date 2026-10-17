@@ -9,7 +9,9 @@ import { haptic } from '@/utils/haptics';
 import { useAllStreakItems } from '@/hooks/useAllStreakItems';
 import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
 import { useAllNotesItems } from '@/hooks/useAllNotesItems';
-import { daysUntil, isDuringEvent } from '@/store/countersStore';
+import { StreakItem } from '@/components/dashboard/StreakWallCard';
+import { Counter, daysUntil, isDuringEvent } from '@/store/countersStore';
+import { Note } from '@/utils/notesStorage';
 import { StreakTile, navigateForStreakItem } from '@/components/dashboard/StreakTile';
 import { CountdownTile, DEFAULT_COUNTDOWN_TILE_STYLE, CountdownTileStyle } from '@/components/dashboard/CountdownTile';
 import { NotesTile, DEFAULT_NOTES_TILE_STYLE, NotesTileStyle } from '@/components/dashboard/NotesTile';
@@ -29,18 +31,37 @@ const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą inst
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: Figma/Canva-style (swobodna
 // pozycja/rozmiar, nakładanie dozwolone), tapnięcie na kafel otwiera picker podpięcia. Jeden
 // ekran = jeden `screenKey` (np. `'food'`) — każdy ekran dostaje WŁASNĄ, niezależną listę
-// instancji; kopiowanie "między ekranami" (user: "woda z dashboardu → słodycze w Jedzeniu")
-// nie przenosi literalnie obiektu z dashboardu (dashboard nie ma tu swoich instancji — jego
-// "Twoje serie" to wciąż osobny, sztywny `StreakWallCard`), tylko daje TEN SAM komponent i TĘ
-// SAMĄ listę do wyboru — efekt dla usera identyczny, bez potrzeby osobnego mechanizmu
-// "wklejania" skopiowanego node'a.
+// instancji.
 //
 // Faza 17 (2026-10-17) — drugi `componentType` (`'countdownTile'`, po `'streakTile'`), dowód
 // że mechanizm faktycznie generalizuje. `CanvasPlacedItem` nie wie NIC o konkretnych typach
 // kafli (render-prop, §341 komentarz tam) — CAŁA logika "co to za typ, jak go wyświetlić, gdzie
 // szukać podpięcia" żyje TUTAJ, w jednym miejscu, żeby dodanie TRZECIEGO typu w przyszłości
 // było jedną kolejną gałęzią tych samych kilku `if`ów, nie rozrzuconą zmianą w wielu plikach.
-export default function ScreenCanvas({ screenKey, title }: { screenKey: string; title?: string }) {
+//
+// `ScreenCanvasBase`/`ScreenCanvas` (Faza 25, 2026-10-17, §356) — user potwierdził wprost
+// (AskUserQuestion): "projektowanie całego ekranu" = zastosowanie TEGO płótna do PRAWDZIWEGO
+// dashboardu, nie tylko lżejsza zmiana kolejności kart. Przeszkoda: dashboard JUŻ montuje
+// `useHabits()` dla swojej stałej treści (`streakWall` itd.) — gdyby `ScreenCanvas` jak dotąd
+// wołał `useAllStreakItems()` SAM (co wewnętrznie też woła `useHabits()`), dashboard dostałby
+// DRUGI, zbędny fetch na najbardziej czułym na wydajność ekranie appki (ta sama pułapka co
+// opisana w `useAllStreakItems.ts`). Rozwiązanie: `ScreenCanvasBase` (eksport NAZWANY, nie
+// domyślny) jest CZYSTO props-driven — przyjmuje `allStreakItems`/`allCountdownItems`/
+// `allNotesItems` jako propsy, ŻADNYCH własnych hooków fetchujących dane, więc wołający w pełni
+// kontroluje skąd te dane przychodzą. `ScreenCanvas` (eksport DOMYŚLNY, jak dotąd) to cienki
+// wrapper wołający 3 hooki i przekazujący wynik do `ScreenCanvasBase` — Jedzenie/Ćwiczenia/
+// Finanse dalej importują `ScreenCanvas` BEZ ŻADNEJ zmiany. `index.tsx` importuje
+// `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE już wyliczone dane (`streakWall` 1:1 jako
+// `allStreakItems` — zero dodatkowego kodu, `counters`/`allNotes` już w pamięci dla pozostałych
+// dwóch — tani dodatkowy `.filter()`, NIE drugi fetch).
+export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, accentColor }: {
+  screenKey: string;
+  title?: string;
+  allStreakItems: StreakItem[];
+  allCountdownItems: Counter[];
+  allNotesItems: Note[];
+  accentColor: string;
+}) {
   const c = useColors();
   const s = makeS(c);
   const [editing, setEditing] = useState(false);
@@ -63,10 +84,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const moveGroupBy = useCanvasComponentsStore(st => st.moveGroupBy);
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
 
-  const allStreakItems = useAllStreakItems();
-  const allCountdownItems = useAllCountdownItems();
-  const allNotesItems = useAllNotesItems();
-  const { color: timeAccentColor } = useTimeAccent();
+  const timeAccentColor = accentColor;
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
   const styleItem = myItems.find(i => i.id === styleForId) ?? null;
   // "Cel po kliknięciu" (§351) — tylko `CanvasStreakStyleModal` go potrzebuje, tylko żeby
@@ -322,6 +340,26 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
         onClose={() => setStyleForId(null)}
       />
     </View>
+  );
+}
+
+// Cienki wrapper (§356) — wołający 3 hooki (AsyncStorage/Zustand) SAM, jak `ScreenCanvasBase`
+// robiło dotąd wprost. Jedzenie/Ćwiczenia/Finanse importują TEN komponent (domyślny eksport),
+// bez żadnej zmiany w ich własnym kodzie — ta sama nazwa, te same propsy `screenKey`/`title`.
+export default function ScreenCanvas({ screenKey, title }: { screenKey: string; title?: string }) {
+  const allStreakItems = useAllStreakItems();
+  const allCountdownItems = useAllCountdownItems();
+  const allNotesItems = useAllNotesItems();
+  const { color: accentColor } = useTimeAccent();
+  return (
+    <ScreenCanvasBase
+      screenKey={screenKey}
+      title={title}
+      allStreakItems={allStreakItems}
+      allCountdownItems={allCountdownItems}
+      allNotesItems={allNotesItems}
+      accentColor={accentColor}
+    />
   );
 }
 

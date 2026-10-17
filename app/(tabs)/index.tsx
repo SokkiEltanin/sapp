@@ -84,6 +84,7 @@ import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
+import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
@@ -552,6 +553,13 @@ export default function DashboardScreen() {
     [counters, dayKey],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
+  // Dla płótna dashboardu (§356) — TA SAMA logika co `activeCountdowns`, ale BEZ filtra
+  // `onDashboard`: komponenty-odliczania na płótnie mają być dostępne niezależnie od checkboxa
+  // "pokaż na dashboardzie" (który steruje starą, osobną kartą `CountdownsCard`, nie płótnem).
+  const allCountdownItemsForCanvas = useMemo(
+    () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
+    [counters, dayKey],
+  );
   // 2026-09-26, audyt dashboardu — `mode==='auto'` liczniki (np. "bez słodyczy") pokazywały
   // się TU *i* w `streakWall`/"Twoje Serie" naraz (streakWall filtruje `mode==='auto'`, ten
   // filtr tego nie wykluczał) — dokładnie ta duplikacja, którą §180/§181 miały wyeliminować
@@ -3092,6 +3100,20 @@ export default function DashboardScreen() {
             // widgety") — ten sam streak teraz jako pozycja WEWNĄTRZ tej karty.
             nodes['streak-wall'] = streakWall.length > 0 && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
+            // Dashboard jako wolne płótno (§356, user: "Dashboard jako wolne płótno") — TA SAMA
+            // mechanika co na Food/Exercises/Finances (`ScreenCanvas`), ale tutaj przez
+            // `ScreenCanvasBase` żeby NIE montować drugi raz `useHabits()`/liczników/notatek —
+            // dashboard ma je już w pamięci (`streakWall`, `allCountdownItemsForCanvas`, `allNotes`).
+            nodes['custom-canvas'] = (
+              <ScreenCanvasBase
+                screenKey="dashboard"
+                title="Twoje komponenty"
+                allStreakItems={streakWall}
+                allCountdownItems={allCountdownItemsForCanvas}
+                allNotesItems={allNotes}
+                accentColor={accentColor}
+              />
+            );
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
 
