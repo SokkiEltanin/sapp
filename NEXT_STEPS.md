@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 22: przepinanie nawigacji per-instancja (2026-10-17, §351)
+
+Ostatni mały odłożony gap z Fazy 16 (§342) domknięty — "Cel po kliknięciu" (Wody/Roku) teraz
+edytowalne per-instancja nawyku na płótnie, nie tylko na prawdziwym dashboardzie. **Priorytet
+testu ŚREDNI** — checklist w ARCHITECTURE.md §351.
+
+**System kopiowania komponentów — stan na koniec Fazy 22**: wszystkie duże, wcześniej odłożone
+kierunki z tej listy (grupowanie §349, trzeci typ komponentu §350, przepinanie nawigacji §351)
+są zrobione. To co zostaje otwarte to już świadome wybory, nie zaległości: grupowy resize,
+wizualne obramowanie całej grupy, Rekordy/Kalendarz jako kolejne typy (patrz uzasadnienie w
+historii §349/§350 wyżej) — żadne z nich nie budować bez nowego sygnału od usera, to już nie
+"plumbing", tylko realne decyzje projektowe.
+
 ## 🆕 System kopiowania komponentów — Faza 21: trzeci typ komponentu, "Notatka" (2026-10-17, §350)
 
 Trzeci `componentType` (`'notesTile'`) — wiąże się z JEDNĄ, konkretną notatką po `Note.id`

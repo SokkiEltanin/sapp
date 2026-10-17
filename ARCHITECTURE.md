@@ -19010,6 +19010,36 @@ niezależnie od innych instancji; (2) prawdziwy dashboard → "Przypięte notatk
 DOKŁADNIE jak przed tą zmianą (ekstrakcja `NotesTile` z `PinnedNotesCard` — zero zamierzonej
 różnicy wizualnej).
 
+## 351. System kopiowania komponentów — Faza 22: przepinanie nawigacji per-instancja (2026-10-17)
+
+Dociągnięte z deferred stanu — Faza 16 (§342) świadomie pominęła "Cel po kliknięciu" dla
+instancji na płótnie ("przepinanie nawigacji pozostaje odłożone"). Dane ZAWSZE to wspierały
+(`StreakTileStyle.habitCalendarOverrides`, czytane przez `navigateForStreakItem` w
+`StreakTile.tsx` niezależnie od tego czy `tileStyle` pochodzi z dashboardu czy z płótna) — brakowało
+tylko UI do USTAWIENIA tego per-instancja, nie nowej logiki.
+
+**`CanvasStreakStyleModal.tsx`** — nowy prop `boundItem: StreakItem | null` (żeby wiedzieć KTÓRY
+nawyk, jeśli w ogóle, jest podpięty) i `onSetHabitCalendar`. Sekcja "Cel po kliknięciu" (segmented
+Wody/Roku, 1:1 wizualnie z analogiczną sekcją w `dashboard-tile-creator.tsx`) renderuje się TYLKO
+gdy `boundItem?.key` zaczyna się `h:` (nawyk) — liczniki/ćwiczenia mają jeden, stały cel
+nawigacji, nic tu do wyboru. Jedna instancja wiąże się z JEDNYM nawykiem (nie listą jak w
+kreatorze dashboardu), więc sekcja pokazuje tylko TEN jeden wiersz, nie całą listę nawyków usera.
+
+**`ScreenCanvas.tsx`** — `styleBoundStreak` (rozwiązywany tak samo jak per-item `boundStreak` w
+pętli renderu, ale dla `styleItem`, osobno — modal stylu jest zamontowany RAZ poza pętlą).
+`onSetHabitCalendar` zapisuje do `styleItem.style.habitCalendarOverrides[habitId]` przez zwykłe
+`updateItem` — bez nowej akcji store'a, to ten sam ogólny `updateItem({style: ...})` co każda
+inna zmiana stylu per-instancja.
+
+**Testy**: czysto UI-wiring (jak analogiczna sekcja w kreatorze dashboardu, też bez dedykowanego
+testu) — `tsc --noEmit` czyste, `jest --silent` 108/108 suite, 1405 testów (bez zmian, zero nowej
+logiki do testowania).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: dowolny ekran z płótnem → dodaj kafel serii, podepnij
+pod nawyk → 🎨 styl → sekcja "Cel po kliknięciu" powinna się pojawić TYLKO dla nawyków (nie dla
+liczników/ćwiczeń) → przełączenie Wody/Roku → tapnięcie kafla (poza edycją) powinno nawigować do
+wybranego kalendarza.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

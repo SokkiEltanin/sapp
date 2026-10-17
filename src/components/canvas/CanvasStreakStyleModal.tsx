@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView, Switch } from 'react-native';
 import { X, Palette, RotateCcw } from 'lucide-react-native';
-import { StreakTileStyle, FlameCorner, StreakLayoutPreset } from '@/store/streakTileStyleStore';
+import { StreakTileStyle, FlameCorner, StreakLayoutPreset, HabitCalendarStyle } from '@/store/streakTileStyleStore';
 import { STREAK_TIERS, TIER_COLOR_PRESETS } from '@/utils/streakTiers';
+import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
@@ -14,14 +15,20 @@ import Stepper from '@/components/ui/Stepper';
 // `dashboard-tile-creator.tsx` (Styl kafelka/Kształt/Tło i warstwy/Pozycja i warstwy/Paleta
 // progów) — ten sam zestaw kontrolek, tylko bez draft/live (instancja na płótnie jest
 // JEDNA, edytowana na żywo, nie globalnym stylem całego dashboardu — nie ma czego "wdrażać").
-// ŚWIADOMIE bez "Odstęp między kafelkami" (pojęcie siatki, nie pojedynczej instancji) i bez
-// "Cel po kliknięciu" (przepinanie nawigacji pozostaje odłożone dla instancji na płótnie —
-// patrz NEXT_STEPS.md).
-export default function CanvasStreakStyleModal({ visible, style, onChange, onSetTierColor, onClose }: {
+// ŚWIADOMIE bez "Odstęp między kafelkami" (pojęcie siatki, nie pojedynczej instancji).
+//
+// "Cel po kliknięciu" (Faza 22, 2026-10-17, §351) — dociągnięte z deferred stanu (NEXT_STEPS.md,
+// odłożone od Fazy 16). Tylko gdy `boundItem` to nawyk (`key` zaczyna się `h:`) — to JEDYNY
+// kształt danych z dwoma sensownymi celami nawigacji (bogaty kalendarz wody / generyczny rok),
+// patrz ten sam wybór w `dashboard-tile-creator.tsx` i oryginalny komentarz w
+// `streakTileStyleStore.ts`. Liczniki/ćwiczenia mają jeden, stały cel — nic tu do wyboru.
+export default function CanvasStreakStyleModal({ visible, style, boundItem, onChange, onSetTierColor, onSetHabitCalendar, onClose }: {
   visible: boolean;
   style: StreakTileStyle;
+  boundItem: StreakItem | null;
   onChange: (patch: Partial<StreakTileStyle>) => void;
   onSetTierColor: (tierIndex: number, color: string | null) => void;
+  onSetHabitCalendar: (habitId: string, navStyle: HabitCalendarStyle) => void;
   onClose: () => void;
 }) {
   const c = useColors();
@@ -163,6 +170,30 @@ export default function CanvasStreakStyleModal({ visible, style, onChange, onSet
                 );
               })}
             </View>
+
+            {boundItem && boundItem.key.startsWith('h:') && (
+              <>
+                <Text style={s.sectionLabel}>Cel po kliknięciu</Text>
+                <View style={s.innerCard}>
+                  <View style={[s.row, { alignItems: 'flex-start' }]}>
+                    <Text style={s.rowLabel} numberOfLines={1}>{boundItem.name}</Text>
+                    <View style={s.segmented}>
+                      {([['water', 'Wody'], ['year', 'Roku']] as [HabitCalendarStyle, string][]).map(([m, lbl]) => {
+                        const current = style.habitCalendarOverrides?.[boundItem.key.slice(2)]
+                          ?? (boundItem.kind === 'water' ? 'water' : 'year');
+                        const on = current === m;
+                        return (
+                          <TouchableOpacity key={m} onPress={() => { haptic.tap(); onSetHabitCalendar(boundItem.key.slice(2), m); }}
+                            style={[s.segBtn, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                            <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>
