@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 System kopiowania komponentów — Faza 19: trzeci ekran, Finanse (2026-10-17, §346)
+
+`<ScreenCanvas>` wpięte na Finansach (`screenKey="finances"`) — przez `ListFooterComponent`
+`SectionList`a (inny szkielet ekranu niż poprzednie dwa, `ScrollView`). Trzy ekrany poza
+dashboardem teraz: Jedzenie/Ćwiczenia/Finanse. **Priorytet testu WYSOKI** — ARCHITECTURE.md §346.
+
+**Mechanizm uznany za wystarczająco udowodniony na wielu ekranach** — kolejne wpięcia (Zdrowie/
+Zadania/Nastrój [z wykluczeniem `useHabits()`]) to już powtórka tego samego wzorca, niska
+wartość krańcowa. Następny krok w tym kierunku: trzeci typ komponentu (trudniejszy — Rekordy/
+Notatki/Kalendarz nie mają oczywistego "jednego id" do bindowania jak nawyk/licznik/odliczanie)
+albo grupowanie (user, §333, duża, nowa porcja gestów).
+
 ## 🆕 System kopiowania komponentów — Faza 18: drugi ekran, Ćwiczenia (2026-10-17, §345)
 
 `<ScreenCanvas>` wpięte na Ćwiczeniach (`screenKey="exercises"`) — dowód że "jedna linijka do

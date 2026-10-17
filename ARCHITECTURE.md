@@ -18790,6 +18790,24 @@ sprawdź że działa identycznie jak w Jedzeniu (dodawanie/przeciąganie/styl/us
 kafli), i że instancje na obu ekranach są NIEZALEŻNE (dodane w Ćwiczeniach nie pojawiają się
 w Jedzeniu, i odwrotnie — `screenKey` faktycznie rozdziela).
 
+## 346. System kopiowania komponentów — Faza 19: trzeci ekran, Finanse (2026-10-17)
+
+Trzeci ekran z `<ScreenCanvas>` (po Jedzeniu §341, Ćwiczeniach §345) — `app/(tabs)/finances.tsx`,
+`screenKey="finances"`. Ten ekran ma INNY szkielet niż poprzednie dwa (`SectionList`, nie
+`ScrollView`) — wpięte przez `ListFooterComponent` (owinięte w `<>...</>`, bo dotąd renderował
+TYLKO warunkowy przycisk "Pokaż starsze transakcje", teraz też zawsze-obecne płótno pod nim).
+
+`useExpensesStore()` jest już montowany na tym ekranie dla własnej treści — bezpiecznie,
+bo to store Zustand (współdzielony singleton), nie hook z własnym fetchem jak `useHabits()`
+(patrz ostrzeżenie w `useAllStreakItems.ts`, §345) — drugie wywołanie przez
+`useAllStreakItems()` nic nie duplikuje.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1394 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Finanse → przewiń SectionList na dół (poza
+wszystkie transakcje) → "Twoje komponenty" powinno się pojawić jako stopka listy, działać
+identycznie jak na innych ekranach, z WŁASNYMI, niezależnymi instancjami.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

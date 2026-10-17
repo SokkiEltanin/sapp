@@ -22,6 +22,7 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import DisplayText from '@/components/ui/DisplayText';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -657,11 +658,19 @@ export default function FinancesScreen() {
             ) : null
           }
           ListFooterComponent={
-            activeFilterCount === 0 && hasOlderTx ? (
-              <PressableScale onPress={() => { haptic.tap(); setShowAllTx(v => !v); }} style={st.loadOlderBtn}>
-                <Text style={st.loadOlderTxt}>{showAllTx ? 'Pokaż tylko ostatni miesiąc' : 'Pokaż starsze transakcje'}</Text>
-              </PressableScale>
-            ) : null
+            <>
+              {activeFilterCount === 0 && hasOlderTx && (
+                <PressableScale onPress={() => { haptic.tap(); setShowAllTx(v => !v); }} style={st.loadOlderBtn}>
+                  <Text style={st.loadOlderTxt}>{showAllTx ? 'Pokaż tylko ostatni miesiąc' : 'Pokaż starsze transakcje'}</Text>
+                </PressableScale>
+              )}
+              {/* Wolne płótno — system kopiowania komponentów, Faza 19 (2026-10-17). Trzeci
+                  ekran poza dashboardem — `useExpensesStore()` już montowany tu wcześniej dla
+                  własnej treści, ale to Zustand store (współdzielony singleton), nie hook z
+                  własnym fetchem jak `useHabits()` — drugie wywołanie jest bezpieczne, patrz
+                  ostrzeżenie w `useAllStreakItems.ts`. */}
+              <ScreenCanvas screenKey="finances" title="Twoje komponenty" />
+            </>
           }
           contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 200 }}
           stickySectionHeadersEnabled={false}
