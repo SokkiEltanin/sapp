@@ -18808,6 +18808,59 @@ bo to store Zustand (współdzielony singleton), nie hook z własnym fetchem jak
 wszystkie transakcje) → "Twoje komponenty" powinno się pojawić jako stopka listy, działać
 identycznie jak na innych ekranach, z WŁASNYMI, niezależnymi instancjami.
 
+## 347. Fix: crash na dashboardzie i w Kreatorze kafelków — stary `persist` merge gubił nowe pola (2026-10-17)
+
+User zrzutami ekranu: "Coś się wykrzaczyło" przy KAŻDYM wejściu na dashboard (crash w
+`StreakTile`) i w Kreatorze kafelków (crash w `DashboardTileCreator`, wewnątrz `.map()` sekcji
+"Paleta progów") — `TypeError: Cannot convert undefined value to object`. Aplikacja była
+faktycznie niemożliwa do użycia (dashboard to ekran startowy).
+
+**Przyczyna**: `tileStyle.tierColorOverrides[i]`/`tileStyle.habitCalendarOverrides[habitId]` w 5
+miejscach (`StreakTile.tsx` ×2, `dashboard-tile-creator.tsx` ×2, `CanvasStreakStyleModal.tsx` ×1)
+indeksowały te pola BEZ osłony na to, że samo pole może być `undefined`. Pole mogło być
+`undefined` mimo że `DEFAULT_STREAK_TILE_STYLE` w aktualnym kodzie ZAWSZE je ustawia — bo
+ŻADEN z 6 draft/live store'ów kreatora (`streakTileStyleStore` + 5 sióstr, patrz §327-§339) nie
+miał własnego `merge` w konfiguracji `persist`. Domyślny merge zustand to płytki
+`{ ...currentState, ...persistedState }` na poziomie CAŁEGO stanu store'a — skoro telefon usera
+miał zapisany `live`/`draft` sprzed dodania `tierColorOverrides`/`habitCalendarOverrides` do
+`StreakTileStyle` (pola dodane w Fazie 7/8 §333/§334, TEJ SAMEJ wielodniowej sesji — user otwierał
+dashboard między fazami), persystowany obiekt PODMIENIAŁ cały świeży default zamiast scalić się
+z nim pole-po-polu. Nowe pole zostawało `undefined` na stałe, aż do wyczyszczenia danych appki.
+Ta sama pułapka czeka na KAŻDY z 6 store'ów przy KAŻDYM kolejnym nowym polu w przyszłości —
+kreator ciągle rośnie (§327→§346), to się powtórzy.
+
+**Fix (dwuwarstwowy)**:
+1. **`src/store/tileStyleMerge.ts`** (nowy) — `mergeTileStyleState(persisted, current)`, WSPÓLNY
+   `merge` dla WSZYSTKICH 6 store'ów: scala `live`/`draft` z `persisted` POLE-PO-POLU na default z
+   `current` (świeży kod), zamiast podmieniać cały obiekt. Podpięty jako `merge:
+   mergeTileStyleState` w `persist(...)` configu `streakTileStyleStore.ts`,
+   `recordsTileStyleStore.ts`, `countdownsTileStyleStore.ts`, `sinceCountersTileStyleStore.ts`,
+   `pinnedNotesTileStyleStore.ts`, `gcalTileStyleStore.ts` — naprawia KLASĘ buga, nie tylko te
+   dwa pola, i każde przyszłe nowe pole w którymkolwiek z 6 store'ów dostaje tę samą ochronę za
+   darmo.
+2. **`?.` na 5 niebezpiecznych miejscach indeksowania** (`StreakTile.tsx`, `dashboard-tile-
+   creator.tsx`, `CanvasStreakStyleModal.tsx`) — druga linia obrony, gdyby `StreakTileStyle` kiedyś
+   dotarł z INNEGO źródła niż ten store z niepełnym kształtem (np. `CanvasItem.style` na płótnie
+   kopiowania komponentów, §340+ — nie naprawione tu, bo nie jest przyczyną TEGO crasha, ale ten
+   sam kształt ryzyka pozostaje, patrz NEXT_STEPS.md).
+
+**Weryfikacja**: odtworzone w izolowanym jest-expo renderze `StreakTile` (react-test-renderer +
+error boundary, `act()` do flushnięcia `Immediate`-schedulowanego initial render) — z
+`tierColorOverrides` ręcznie usuniętym z obiektu stylu render RZECZYWIŚCIE rzucał (`Cannot read
+properties of undefined (reading '1')` w sandboxie Node/V8 — Hermes na urządzeniu formułuje ten
+sam błąd inaczej, stąd inny dokładny tekst w zrzucie usera), po poprawce — nie rzuca. Nowy test
+`__tests__/tileStyleMerge.test.ts` pilnuje samej funkcji merge (backfill brakujących pól,
+zachowanie persystowanych wartości, pełny fallback gdy nic nie było zapisane).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite, 1397 testów (+3 nowe).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: to był total-blocker (dashboard = ekran
+startowy). User powinien zweryfikować, że wejście na dashboard i do Kreatora kafelków już nie
+crashuje. Jeśli user ma JUŻ uszkodzony `tierColorOverrides`/`habitCalendarOverrides` zapisany w
+AsyncStorage (crash już się zdarzył, więc raczej tak) — fix działa i BEZ czyszczenia danych appki,
+bo `mergeTileStyleState` backfilluje brakujące pole przy KAŻDYM starcie appki, nie tylko
+jednorazowo przy migracji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

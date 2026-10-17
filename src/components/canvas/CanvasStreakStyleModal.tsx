@@ -143,7 +143,7 @@ export default function CanvasStreakStyleModal({ visible, style, onChange, onSet
             <Text style={s.sectionLabel}>Paleta progów</Text>
             <View style={s.innerCard}>
               {STREAK_TIERS.map((tier, i) => {
-                const current = style.tierColorOverrides[i] ?? tier.color;
+                const current = style.tierColorOverrides?.[i] ?? tier.color;
                 return (
                   <View key={tier.name}>
                     {i > 0 && <View style={s.divider} />}

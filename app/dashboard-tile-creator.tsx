@@ -484,7 +484,7 @@ export default function DashboardTileCreator() {
             <Text style={s.sectionLabel}>Paleta progów</Text>
             <View style={s.card}>
               {STREAK_TIERS.map((tier, i) => {
-                const current = streaksDraft.tierColorOverrides[i] ?? tier.color;
+                const current = streaksDraft.tierColorOverrides?.[i] ?? tier.color;
                 return (
                   <View key={tier.name}>
                     {i > 0 && <View style={s.divider} />}
@@ -514,7 +514,7 @@ export default function DashboardTileCreator() {
                 <View style={s.card}>
                   {habitStreaks.map((h, i) => {
                     const habitId = h.key.slice(2);
-                    const current = streaksDraft.habitCalendarOverrides[habitId] ?? (h.kind === 'water' ? 'water' : 'year');
+                    const current = streaksDraft.habitCalendarOverrides?.[habitId] ?? (h.kind === 'water' ? 'water' : 'year');
                     return (
                       <View key={h.key}>
                         {i > 0 && <View style={s.divider} />}

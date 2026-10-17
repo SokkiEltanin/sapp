@@ -3,6 +3,38 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 Mapa kampanii bossów — user chce PEŁEN edytor (zgłoszone 2026-10-17, jeszcze NIE zaczęte)
+
+User, po naprawie BUG #6 (§343, kamera): "jak edytuje mapę bossow to tam nic praktycznie nie
+mogę zrobic muszę miec mozliwosc ustawienia każdego bosa osobno narysowania lini między nimi
+itp" — istniejący "kreator mapy kampanii" (wspomniany wcześniej, user: "nigdy tam nie
+wchodziłem") NIE wystarcza. Trzeba sprawdzić co ten kreator dziś faktycznie umożliwia (zobaczyć
+`CampaignMap.tsx`/`bossMapLayout.ts` i ewentualny istniejący creator screen) i rozbudować o:
+pozycjonowanie KAŻDEGO bossa z osobna (nie tylko automatyczny layout), i rysowanie/edycję linii
+połączeń między węzłami (dziś `catmullRomPath` chyba generuje ścieżkę automatycznie z kolejności
+węzłów, nie z ręcznie zadanych połączeń). To NIE jest mały fix — osobna faza, zacząć od
+researchu obecnego stanu creator-screena zanim cokolwiek się zacznie dopisywać.
+
+## 🔴 Fix: crash na dashboardzie i w Kreatorze kafelków (2026-10-17, §347) — NAPRAWIONE
+
+User zrzutami: "Coś się wykrzaczyło" przy KAŻDYM wejściu na dashboard + w Kreatorze kafelków —
+`Cannot convert undefined value to object`. Total-blocker (dashboard = ekran startowy).
+Przyczyna: żaden z 6 draft/live store'ów kreatora dashboardu nie miał własnego `persist` merge,
+więc stary, niepełny `live`/`draft` zapisany na telefonie usera (sprzed dodania
+`tierColorOverrides`/`habitCalendarOverrides` do `StreakTileStyle`) PODMIENIAŁ cały świeży
+default zamiast scalić się pole-po-polu. Fix: `src/store/tileStyleMerge.ts` (wspólny `merge`
+dla wszystkich 6 store'ów, naprawia KLASĘ buga na przyszłość) + `?.` jako druga linia obrony w
+5 miejscach indeksowania. **Priorytet testu na urządzeniu — KRYTYCZNY, ale user miał JUŻ
+uszkodzone dane — fix działa bez czyszczenia appki** (backfill przy każdym starcie). Szczegóły:
+ARCHITECTURE.md §347.
+
+**Znany pozostały gap tej samej klasy (NIE naprawiony, niski priorytet na razie)**: `CanvasItem.
+style` na płótnie kopiowania komponentów (§340+) ma ten sam kształt ryzyka — jeśli
+`StreakTileStyle`/`CountdownTileStyle` zyska kiedyś nowe pole, stare persystowane `CanvasItem`y
+będą go mieć `undefined` (migracja/merge na poziomie pojedynczego itemu w tablicy, nie całego
+stanu store'a — bardziej złożone niż fix §347). `?.` guardy w `StreakTile.tsx` już chronią przed
+crashem, więc to nie jest pilne, ale warto pamiętać przy następnym nowym polu w tych typach.
+
 ## 🆕 System kopiowania komponentów — Faza 19: trzeci ekran, Finanse (2026-10-17, §346)
 
 `<ScreenCanvas>` wpięte na Finansach (`screenKey="finances"`) — przez `ListFooterComponent`
