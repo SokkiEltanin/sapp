@@ -8,6 +8,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
+import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
 import { useHabits } from '@/hooks/useHabits';
 import { useCounters, autoDaysWithout, isOver, daysUntil, isDuringEvent, daysSince } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -488,16 +489,15 @@ export default function DashboardTileCreator() {
                 return (
                   <View key={tier.name}>
                     {i > 0 && <View style={s.divider} />}
-                    <View style={[s.row, { alignItems: 'flex-start' }]}>
+                    <View style={{ paddingVertical: spacing[1] }}>
                       <Text style={s.rowLabel}>{tier.name} <Text style={{ color: c.text.muted, fontWeight: '400' }}>od {tier.min} dni</Text></Text>
-                      <View style={s.swatchRow}>
-                        {TIER_COLOR_PRESETS.map(hex => (
-                          <TouchableOpacity key={hex} onPress={() => { haptic.tap(); setTierColor(i, hex); }}
-                            style={[s.swatch, { backgroundColor: hex }, current === hex && s.swatchOn]} />
-                        ))}
-                        <TouchableOpacity onPress={() => { haptic.tap(); setTierColor(i, null); }} style={s.swatchReset}>
-                          <RotateCcw size={12} color={c.text.secondary} />
-                        </TouchableOpacity>
+                      <View style={{ marginTop: 6 }}>
+                        <ColorSwatchPicker
+                          presets={TIER_COLOR_PRESETS}
+                          current={current}
+                          onSelect={(hex) => setTierColor(i, hex)}
+                          onReset={() => setTierColor(i, null)}
+                        />
                       </View>
                     </View>
                   </View>
@@ -543,16 +543,14 @@ export default function DashboardTileCreator() {
           <>
             <Text style={s.sectionLabel}>Kolor i warstwy</Text>
             <View style={s.card}>
-              <View style={[s.row, { alignItems: 'flex-start' }]}>
+              <View style={{ paddingVertical: spacing[1] }}>
                 <Text style={s.rowLabel}>Kolor akcentu</Text>
-                <View style={s.swatchRow}>
-                  {RECORD_COLOR_PRESETS.map(hex => {
-                    const on = recordsDraft.accentColor === hex;
-                    return (
-                      <TouchableOpacity key={hex} onPress={() => { haptic.tap(); setRecordsDraft({ accentColor: hex }); }}
-                        style={[s.swatch, { backgroundColor: hex }, on && s.swatchOn]} />
-                    );
-                  })}
+                <View style={{ marginTop: 6 }}>
+                  <ColorSwatchPicker
+                    presets={RECORD_COLOR_PRESETS}
+                    current={recordsDraft.accentColor}
+                    onSelect={(hex) => setRecordsDraft({ accentColor: hex })}
+                  />
                 </View>
               </View>
               <View style={s.divider} />
@@ -638,11 +636,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
   tabBtn: { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   tabTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
-
-  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1, justifyContent: 'flex-end' },
-  swatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: 'transparent' },
-  swatchOn: { borderColor: c.text.primary },
-  swatchReset: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.elevated },
 
   scroll: { paddingHorizontal: spacing[4], paddingBottom: spacing[6], gap: spacing[2] },
   sectionLabel: {

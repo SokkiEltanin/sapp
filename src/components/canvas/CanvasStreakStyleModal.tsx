@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView, Switch } from 'react-native';
-import { X, Palette, RotateCcw } from 'lucide-react-native';
+import { X, Palette } from 'lucide-react-native';
 import { StreakTileStyle, FlameCorner, StreakLayoutPreset, HabitCalendarStyle } from '@/store/streakTileStyleStore';
 import { STREAK_TIERS, TIER_COLOR_PRESETS } from '@/utils/streakTiers';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
@@ -8,6 +8,7 @@ import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
+import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
 
 // Edycja stylu PER-INSTANCJA na wolnym płótnie (system kopiowania komponentów, Faza 16,
 // §342) — dotychczas (Faza 15) nowa instancja miała tylko `DEFAULT_STREAK_TILE_STYLE`, bez
@@ -154,16 +155,15 @@ export default function CanvasStreakStyleModal({ visible, style, boundItem, onCh
                 return (
                   <View key={tier.name}>
                     {i > 0 && <View style={s.divider} />}
-                    <View style={[s.row, { alignItems: 'flex-start' }]}>
+                    <View style={{ paddingVertical: spacing[1] }}>
                       <Text style={s.rowLabel}>{tier.name} <Text style={{ color: c.text.muted, fontWeight: '400' }}>od {tier.min} dni</Text></Text>
-                      <View style={s.swatchRow}>
-                        {TIER_COLOR_PRESETS.map(hex => (
-                          <TouchableOpacity key={hex} onPress={() => { haptic.tap(); onSetTierColor(i, hex); }}
-                            style={[s.swatch, { backgroundColor: hex }, current === hex && s.swatchOn]} />
-                        ))}
-                        <TouchableOpacity onPress={() => { haptic.tap(); onSetTierColor(i, null); }} style={s.swatchReset}>
-                          <RotateCcw size={12} color={c.text.secondary} />
-                        </TouchableOpacity>
+                      <View style={{ marginTop: 6 }}>
+                        <ColorSwatchPicker
+                          presets={TIER_COLOR_PRESETS}
+                          current={current}
+                          onSelect={(hex) => onSetTierColor(i, hex)}
+                          onReset={() => onSetTierColor(i, null)}
+                        />
                       </View>
                     </View>
                   </View>
@@ -219,8 +219,4 @@ const makeS = (c: any) => StyleSheet.create({
   segTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
   cornerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: 76, justifyContent: 'flex-end' },
   cornerBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
-  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, flex: 1, justifyContent: 'flex-end' },
-  swatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: 'transparent' },
-  swatchOn: { borderColor: c.text.primary },
-  swatchReset: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.elevated },
 });
