@@ -53,6 +53,19 @@ export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' |
 export const MIN_ITEM_WIDTH = 90;
 export const MIN_ITEM_HEIGHT = 64;
 
+// Klamrowanie X do granic płótna (Faza 29, 2026-10-17, §360) — WSPÓLNA formuła wydzielona z
+// `moveGroupBy`/`resizeGroupBy` niżej (dotąd liczyły to samo osobno) + nowy fix w panelu
+// właściwości (`ScreenCanvas.tsx` — tam BRAKOWAŁO tego klamrowania całkowicie: zwiększenie
+// Szerokości suwakiem mogło wypchnąć item poza prawą krawędź, bo panel był JEDYNYM miejscem
+// zmiany x/width, które nie klamrowało). Świadomie NIE użyte w geście przeciągania/resize
+// (`CanvasPlacedItem.tsx`) — tam klamrowanie liczy się WEWNĄTRZ Reanimated workletu na UI
+// threadzie, a wywołanie zaimportowanej funkcji z innego modułu wymagałoby poprawnego
+// "workletyzowania" przez babel plugin Reanimated (niesprawdzone, realne ryzyko cichej regresji
+// widocznej TYLKO na urządzeniu) — zero korzyści za tym ryzykiem, inline formuła tam zostaje.
+export function clampItemX(x: number, width: number, canvasWidth: number): number {
+  return Math.max(0, Math.min(Math.max(0, canvasWidth - width), x));
+}
+
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
   screenKey: string;       // np. 'food' — które miejsce w appce renderuje tę instancję
@@ -198,7 +211,7 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
       moveGroupBy: (screenKey, groupId, dx, dy, canvasWidth) => set((s) => ({
         items: s.items.map(i => {
           if (i.screenKey !== screenKey || i.groupId !== groupId) return i;
-          const x = Math.max(0, Math.min(Math.max(0, canvasWidth - i.width), i.x + dx));
+          const x = clampItemX(i.x + dx, i.width, canvasWidth);
           const y = Math.max(0, i.y + dy);
           return { ...i, x, y };
         }),
@@ -232,7 +245,7 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
             const height = Math.max(MIN_ITEM_HEIGHT, Math.round(i.height * scaleY));
             const relX = i.x - minX;
             const relY = i.y - minY;
-            const x = Math.max(0, Math.min(Math.max(0, canvasWidth - width), Math.round(minX + relX * scaleX)));
+            const x = clampItemX(Math.round(minX + relX * scaleX), width, canvasWidth);
             const y = Math.max(0, Math.round(minY + relY * scaleY));
             return { ...i, x, y, width, height };
           }),

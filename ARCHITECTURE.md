@@ -19444,6 +19444,37 @@ kafle → przeciągnij uchwyt resize JEDNEGO z nich → WSZYSTKIE powinny się p
 "Rozgrupuj" (widoczne tylko dla grupy) w panelu właściwości powinno działać jak dotychczasowy
 przycisk w rogu kafla.
 
+## 360. Fix: panel właściwości nie klamrował X przy zmianie Szerokości (2026-10-17)
+
+User: "pracuj dalej, zrób listę na kilka godzin doszlifowania, dodawania, edycji, weryfikacji
+błędów". Pierwszy, konkretny bug znaleziony przy audycie świeżo zbudowanego §359: gest
+przeciągania/resize (`CanvasPlacedItem.tsx`) i `moveGroupBy`/`resizeGroupBy` (store) ZAWSZE
+klamrują x+width do granic płótna — `CanvasPropertiesModal`'s `onChange` w `ScreenCanvas.tsx` był
+JEDYNYM miejscem zmiany pozycji/rozmiaru, które tego NIE robiło. Zwiększenie Szerokości suwakiem
+(bez ruszania X) mogło wypchnąć prawą krawędź itemu poza płótno — niewidoczne/nieintuicyjne, bo
+gest drag/resize nigdy nie pozwalał na taki stan.
+
+**Fix**: `onChange` przelicza x/width razem z WYNIKOWEGO stanu (po merge patcha z aktualnym
+itemem), nie tylko z pojedynczego zmienianego pola — identyczne zachowanie czy user zmienia X czy
+Szerokość.
+
+**`clampItemX(x, width, canvasWidth)`** (nowa, eksportowana funkcja pure w
+`canvasComponentsStore.ts`) — WSPÓLNA formuła wydzielona z `moveGroupBy`/`resizeGroupBy` (dotąd
+liczyły to samo osobno, duplikacja) + nowy fix. Świadomie NIE użyta w samym geście przeciągania/
+resize (`CanvasPlacedItem.tsx`) — tam klamrowanie liczy się WEWNĄTRZ Reanimated workletu na UI
+threadzie, a wywołanie zaimportowanej funkcji z innego modułu wymagałoby poprawnego
+"workletyzowania" przez babel plugin Reanimated (niesprawdzone na tym etapie, realne ryzyko
+cichej regresji widocznej TYLKO na urządzeniu, nie w `tsc`/jest) — zero korzyści za tym ryzykiem,
+inline formuła tam zostaje bez zmian.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +4 testy (`clampItemX` bezpośrednio — w
+granicach/ujemne/za krawędzią/szerszy niż płótno). `tsc --noEmit` czyste, `jest --silent`
+109/109 suite, 1420 testów.
+
+**Priorytet testu na urządzeniu — ŚREDNI** (fix defensywny, nie crash): dowolny ekran z płótnem →
+Edytuj → ⚙ na kaflu blisko prawej krawędzi → zwiększ Szerokość suwakiem → item powinien zostać
+CAŁY widoczny (X powinien się automatycznie zmniejszyć, nie wyjechać poza płótno).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

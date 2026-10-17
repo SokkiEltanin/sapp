@@ -1,4 +1,4 @@
-import { useCanvasComponentsStore, CanvasItem } from '@/store/canvasComponentsStore';
+import { useCanvasComponentsStore, CanvasItem, clampItemX } from '@/store/canvasComponentsStore';
 import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 import { DEFAULT_RECT_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE } from '@/store/shapeStyleDefaults';
 
@@ -129,6 +129,21 @@ describe('canvasComponentsStore — moveGroupBy', () => {
     const items = useCanvasComponentsStore.getState().items;
     const aAfter = items.find(i => i.id === a)!;
     expect(aAfter.x).toBe(12); // addItem domyślne x — nieruszone, bo screenKey się nie zgadza
+  });
+});
+
+describe('clampItemX (§360)', () => {
+  test('nie zmienia x, które już mieści się w granicach płótna', () => {
+    expect(clampItemX(50, 100, 500)).toBe(50);
+  });
+  test('klamruje do 0, gdy x jest ujemne', () => {
+    expect(clampItemX(-30, 100, 500)).toBe(0);
+  });
+  test('klamruje do canvasWidth - width, gdy x+width wychodzi za prawą krawędź', () => {
+    expect(clampItemX(450, 100, 500)).toBe(400);
+  });
+  test('gdy width > canvasWidth, klamruje do 0 (brak ujemnego miejsca)', () => {
+    expect(clampItemX(50, 600, 500)).toBe(0);
   });
 });
 
