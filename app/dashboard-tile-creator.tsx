@@ -33,7 +33,7 @@ import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorn
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 import { CountdownLayoutPreset } from '@/store/countdownTileStyleDefaults';
-import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE } from '@/store/sinceCountersTileStyleStore';
+import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE, SinceCounterLayoutPreset } from '@/store/sinceCountersTileStyleStore';
 import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
 import { useGCalTileStyleStore, DEFAULT_GCAL_TILE_STYLE } from '@/store/gcalTileStyleStore';
 
@@ -330,6 +330,23 @@ export default function DashboardTileCreator() {
             </View>
           </>
         )}
+        {/* Warianty kształtu Liczników (§362) — treść unikalna (próg serii, nie data/postęp), */}
+        {activeCard === 'since' && (
+          <>
+            <Text style={s.sectionLabel}>Styl kafelka</Text>
+            <View style={s.segmented}>
+              {([['row', 'Wiersz'], ['bar', 'Pasek progu'], ['compact', 'Kompaktowy'], ['minimal', 'Minimalny']] as [SinceCounterLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = sinceDraft.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setSinceDraft({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         <Text style={s.sectionLabel}>Kształt</Text>
         {activeCard === 'countdowns' ? (
@@ -359,12 +376,23 @@ export default function DashboardTileCreator() {
           </View>
         ) : activeCard === 'since' ? (
           <View style={s.card}>
-            <Stepper label="Zaokrąglenie wiersza" value={sinceDraft.rowRadius} min={0} max={28} step={2}
-              onChange={v => setSinceDraft({ rowRadius: v })} />
-            <View style={s.divider} />
-            <Stepper label="Skala liczby" value={sinceDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
-              onChange={v => setSinceDraft({ numberScale: v })} />
-            <View style={s.divider} />
+            {/* Zaokrąglenie/skala liczby mają sens TYLKO dla wariantów z własnym tłem wiersza/
+                dużą liczbą (§362) — 'compact' nie ma tła, 'minimal' nie skaluje przez to pole
+                (osobna, mniejsza DisplayText). */}
+            {(sinceDraft.layoutPreset === 'row' || sinceDraft.layoutPreset === 'bar') && (
+              <>
+                <Stepper label="Zaokrąglenie wiersza" value={sinceDraft.rowRadius} min={0} max={28} step={2}
+                  onChange={v => setSinceDraft({ rowRadius: v })} />
+                <View style={s.divider} />
+              </>
+            )}
+            {sinceDraft.layoutPreset === 'row' && (
+              <>
+                <Stepper label="Skala liczby" value={sinceDraft.numberScale} min={0.7} max={1.5} step={0.1} decimals={1}
+                  onChange={v => setSinceDraft({ numberScale: v })} />
+                <View style={s.divider} />
+              </>
+            )}
             <Stepper label="Widocznych pozycji" value={sinceDraft.maxVisible} min={1} max={10} step={1}
               onChange={v => setSinceDraft({ maxVisible: v })} />
           </View>

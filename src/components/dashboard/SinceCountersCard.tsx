@@ -11,7 +11,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
-import { useSinceCountersTileStyleStore, SinceCountersTileStyle } from '@/store/sinceCountersTileStyleStore';
+import { useSinceCountersTileStyleStore, SinceCountersTileStyle, SinceCounterLayoutPreset } from '@/store/sinceCountersTileStyleStore';
 
 // Wyciągnięte 1:1 z `app/(tabs)/index.tsx` `nodes['counters-since']` (2026-08-26, kolejny
 // mały krok rozbicia dashboardu — patrz NEXT_STEPS.md/ARCHITECTURE.md §4 dla wzorca i
@@ -77,9 +77,52 @@ function SinceCountersCard({ since, cardBg, accentColor, styleOverride }: SinceC
             : tier.next != null
               ? `${tier.name} · próg za ${tier.next - days} ${plPlural(tier.next - days, 'dzień', 'dni', 'dni')}`
               : `${tier.name} · najwyższy próg`;
+          const onPress = () => { haptic.tap(); router.push(`/counters/${cn.id}` as any); };
+          const preset: SinceCounterLayoutPreset = tileStyle.layoutPreset ?? 'row';
+
+          // 'bar' (§362) — pasek postępu DO NASTĘPNEGO PROGU serii, treść unikalna dla liczników
+          // (odliczania mają postęp do daty, serie nie mają nic takiego) — próg to JEDYNA
+          // "wartość docelowa" jaką licznik faktycznie ma.
+          if (preset === 'bar') {
+            const pct = tier.next != null ? Math.min(100, Math.max(0, Math.round(((days - tier.min) / (tier.next - tier.min)) * 100))) : 100;
+            return (
+              <TouchableOpacity key={cn.id} style={[s.barRow, { borderRadius: tileStyle.rowRadius }]} onPress={onPress} activeOpacity={0.75}>
+                <View style={s.barHeadRow}>
+                  <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
+                  <Text style={[s.sinceMetaStrong, { color: tc }]} numberOfLines={1}>{days} {plPlural(days, 'dzień', 'dni', 'dni')}</Text>
+                </View>
+                <View style={s.barTrack}>
+                  <View style={[s.barFill, { width: `${pct}%`, backgroundColor: tc }]} />
+                </View>
+                <Text style={s.sinceMeta} numberOfLines={1}>{metaTxt}</Text>
+              </TouchableOpacity>
+            );
+          }
+
+          if (preset === 'compact') {
+            return (
+              <TouchableOpacity key={cn.id} style={s.compactRow} onPress={onPress} activeOpacity={0.75}>
+                <Text numberOfLines={1} style={s.compactTxt}>
+                  <Text style={[s.compactNum, { color: tc }]}>{days}</Text>
+                  <Text style={s.compactName}> {label}</Text>
+                  <Text style={s.compactMeta}> — {metaTxt}</Text>
+                </Text>
+              </TouchableOpacity>
+            );
+          }
+
+          if (preset === 'minimal') {
+            return (
+              <TouchableOpacity key={cn.id} style={s.minimalRow} onPress={onPress} activeOpacity={0.75}>
+                <DisplayText style={[s.sinceNum, { color: tc, fontSize: 28 * tileStyle.numberScale, minWidth: 0 }]}>{days}</DisplayText>
+                <Text style={s.sinceName} numberOfLines={1}>{label}</Text>
+              </TouchableOpacity>
+            );
+          }
+
           return (
             <TouchableOpacity key={cn.id} style={[s.sinceRow, { backgroundColor: tc + '0F', borderColor: tc + '26', borderRadius: tileStyle.rowRadius }]}
-              onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.75}>
+              onPress={onPress} activeOpacity={0.75}>
               {tileStyle.showGlow && (
                 <View style={s.sinceGlowWrap} pointerEvents="none">
                   <RadialGlow size={110} color={tc} opacity={0.18} />
@@ -118,6 +161,23 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   sinceNum: { fontSize: 30, letterSpacing: -1, minWidth: 46 },
   sinceName: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   sinceMeta: { fontSize: 11, fontWeight: '600', color: c.text.muted, marginTop: 1 },
+  sinceMetaStrong: { fontSize: 13, fontWeight: '800', marginTop: 0 },
+
+  // 'bar' (§362) — pasek postępu do następnego progu, kolumna zamiast rzędu.
+  barRow: { gap: 5, paddingVertical: spacing[2], paddingHorizontal: spacing[2] },
+  barHeadRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing[2] },
+  barTrack: { height: 6, borderRadius: radius.full, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: radius.full },
+
+  // 'compact' (§362) — jedna linijka, zero grafiki.
+  compactRow: { paddingVertical: 3 },
+  compactTxt: { fontSize: 12.5 },
+  compactNum: { fontWeight: '800' },
+  compactName: { fontWeight: '800', color: c.text.primary },
+  compactMeta: { color: c.text.muted, fontWeight: '600' },
+
+  // 'minimal' (§362) — goła duża liczba + nazwa, bez poświaty/meta.
+  minimalRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[1] },
 }));
 
 export default memo(SinceCountersCard);

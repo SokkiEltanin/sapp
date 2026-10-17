@@ -9,7 +9,21 @@ import { mergeTileStyleState } from './tileStyleMerge';
 // listy wierszy (duża liczba + poświata + nazwa/meta), bliski `CountdownsCard`, więc własne
 // pola odpowiadają TEMU kształtowi — nie kopiuję aspectRatio/gradientMode z kafelków serii
 // (ta karta nie ma siatki kafelków, tylko jedną kolumnę wierszy).
+//
+// Warianty kształtu (Faza 30, 2026-10-17, §362) — NEXT_STEPS.md flagowało od §355: "Rekordy/
+// Liczniki/Notatki dalej mają TYLKO suwaki liczbowe". `SinceCountersCard` NIE ma odpowiednika
+// na wolnym płótnie (żaden `CanvasComponentType` dla liczników nie istnieje) — typ żyje więc
+// WYŁĄCZNIE tutaj, bez ekstrakcji do osobnego pure-TS pliku jak `CountdownLayoutPreset` (ten
+// plik już jest pure TS, zero importu `'react-native'`, zero problemu testowalności). 4 WŁASNE
+// warianty dopasowane do treści licznika — próg SERII (nie data/postęp jak w odliczaniach,
+// świadomie NIE kopiowane 1:1): `'row'` = dokładny dotychczasowy wygląd (default). `'bar'` =
+// pasek postępu DO NASTĘPNEGO PROGU serii (unikalna treść tego typu — odliczania mają postęp do
+// daty, serie nie mają nic takiego, licznik ma próg). `'compact'` = jedna linijka. `'minimal'` =
+// goła duża liczba + nazwa, bez poświaty/meta (najbardziej wyciszony wariant).
+export type SinceCounterLayoutPreset = 'row' | 'bar' | 'compact' | 'minimal';
+
 export interface SinceCountersTileStyle {
+  layoutPreset: SinceCounterLayoutPreset;
   rowRadius: number;
   numberScale: number;
   maxVisible: number;
@@ -17,6 +31,7 @@ export interface SinceCountersTileStyle {
 }
 
 export const DEFAULT_SINCE_COUNTERS_TILE_STYLE: SinceCountersTileStyle = {
+  layoutPreset: 'row',
   rowRadius: 16,
   numberScale: 1,
   maxVisible: 7,
