@@ -2,13 +2,13 @@ import { useEffect, ReactNode } from 'react';
 import { View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Move, Trash2, Palette, Link2Off, CircleCheck } from 'lucide-react-native';
-import { CanvasItem } from '@/store/canvasComponentsStore';
+import { Move, Trash2, Palette, SlidersHorizontal, CircleCheck } from 'lucide-react-native';
+import { CanvasItem, MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-const MIN_WIDTH = 90;
-const MIN_HEIGHT = 64;
+const MIN_WIDTH = MIN_ITEM_WIDTH;
+const MIN_HEIGHT = MIN_ITEM_HEIGHT;
 
 // Przeciąganie/zmiana rozmiaru na wolnym płótnie (system kopiowania komponentów, Faza 15,
 // §341) — ten sam wzorzec gestów co `DashEditRow.tsx` (`Gesture.Pan()` + `useSharedValue` +
@@ -28,8 +28,8 @@ const MIN_HEIGHT = 64;
 // dokłada: uchwyt przeciągania (CAŁY obszar kafla — tapnięcie bez ruchu otwiera picker metryki,
 // patrz `Gesture.Race` niżej), uchwyt zmiany rozmiaru (róg), przyciski styl/usuń.
 export default function CanvasPlacedItem({
-  item, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle, renderTile,
-  selectMode = false, selected = false, onToggleSelect, grouped = false, onUngroup,
+  item, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle, onProperties, renderTile,
+  selectMode = false, selected = false, onToggleSelect, grouped = false,
 }: {
   item: CanvasItem;
   editing: boolean;
@@ -39,16 +39,20 @@ export default function CanvasPlacedItem({
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
   onStyle: () => void;
+  // Panel właściwości (Faza 28, §359, przeniesione z dedykowanego przycisku "Rozgrupuj" —
+  // rozgrupowanie teraz żyje WEWNĄTRZ tego panelu, patrz `CanvasPropertiesModal.tsx`) —
+  // X/Y/W/H numerycznie + warstwy (na wierzch/spód) + rozgrupuj, jeden wspólny panel dla
+  // WSZYSTKICH typów (w przeciwieństwie do 🎨 stylu, który jest per-typ).
+  onProperties: () => void;
   renderTile: (sizeStyle: StyleProp<ViewStyle>, onPress: () => void) => ReactNode;
   // Grupowanie (§349) — `selectMode` zamienia CAŁY tryb edycji na "tapnij żeby zaznaczyć do
   // grupy" (zero przeciągania/resize/stylu/usuwania — zapobiega przypadkowej edycji podczas
-  // zaznaczania wielu itemów naraz). `grouped`/`onUngroup` — normalny tryb edycji, ale item
-  // należy do grupy: inny kolor ramki + trzeci mały przycisk "Rozgrupuj".
+  // zaznaczania wielu itemów naraz). `grouped` — normalny tryb edycji, ale item należy do grupy:
+  // inny kolor ramki (akcja rozgrupuj przeniesiona do panelu właściwości, §359).
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
   grouped?: boolean;
-  onUngroup?: () => void;
 }) {
   const c = useColors();
   const tx = useSharedValue(item.x);
@@ -132,11 +136,9 @@ export default function CanvasPlacedItem({
         <Move size={10} color="#fff" />
       </View>
       <View style={s.topBtns}>
-        {grouped && (
-          <TouchableOpacity onPress={() => { haptic.tap(); onUngroup?.(); }} style={[s.smallBtn, { backgroundColor: c.accent.purple }]} hitSlop={8}>
-            <Link2Off size={12} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={() => { haptic.tap(); onProperties(); }} style={[s.smallBtn, { backgroundColor: grouped ? c.accent.purple : c.bg.elevated, borderWidth: grouped ? 0 : 1, borderColor: c.border.default }]} hitSlop={8}>
+          <SlidersHorizontal size={12} color={grouped ? '#fff' : c.text.secondary} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => { haptic.tap(); onStyle(); }} style={[s.smallBtn, { backgroundColor: c.accent.blue }]} hitSlop={8}>
           <Palette size={12} color="#fff" />
         </TouchableOpacity>

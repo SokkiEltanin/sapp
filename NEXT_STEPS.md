@@ -26,22 +26,25 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
-## 🆕 Generyczny data-binding na płótnie (2026-10-17, §358) — DO WERYFIKACJI, FAZA 2/3 edytora
+## 🆕 Panel właściwości + warstwy + resize grupy (2026-10-17, §359) — DO WERYFIKACJI, FAZA 3/3 edytora — ZAKOŃCZONA
 
-Kontynuacja §357 (kształty-primitywy, scalone). **Zrobione (faza 2/3)**: nowy typ `'dataField'` —
-podpięcie do rejestru WIELU źródeł naraz (imię/poziom pupila, zadania ukończone dziś, dzisiejsza
-data), ten sam mechanizm pickera co streak/countdown/note. Checklist w ARCHITECTURE.md §358.
+Ostatnia z trzech zaplanowanych faz przebudowy w kierunku pełnego edytora (§357 kształty, §358
+data-binding, teraz §359). **Zrobione**: panel właściwości (⚙ na kaflu) z numerycznym X/Y/W/H,
+przyciski "Na wierzch"/"Na spód" (warstwy, pole `zIndex`), resize CAŁEJ grupy jako jednej
+jednostki (przeciągnięcie uchwytu jednego członka skaluje wszystkich razem, nie tylko przesuwa).
+"Rozgrupuj" przeniesione z chrome kafla do tego panelu. Checklist w ARCHITECTURE.md §359.
 
-**ŚWIADOMIE WYKLUCZONE z v1** (do dodania OSOBNO, ze wspólnym cache'em, nie prostym dopisaniem
-do rejestru — patrz ARCHITECTURE.md §358): kroki dzisiaj, saldo, nastrój pupila — wszystkie
-wymagają kosztownego hooka (AsyncStorage/Health Connect/agregacja wielu źródeł), montowanie per
-instancja na płótnie byłoby double-fetch hazardem.
+**Świadomie NIE zrobione** (do dodania OSOBNO, jeśli user zgłosi potrzebę — patrz ARCHITECTURE.
+md §359): wizualna wspólna ramka/uchwyt resize dla CAŁEJ grupy (dziś: per-member uchwyty,
+"jednostka" to wynik matematyczny skalowania, nie zmiana UI wyboru); lista warstw z
+drag-to-reorder i miniaturkami (dziś: tylko "na wierzch"/"na spód").
 
-**W TOKU, NIE przerywać** — zaplanowana ostatnia faza (user: "nie przerywaj dopóki nie
-skończysz"):
-- **Faza 3**: panel właściwości (numeryczne X/Y/W/H, nie tylko gest), warstwy (z-index,
-  kolejność nakładania), rozszerzone grupowanie (resize całej grupy jako jednej jednostki, nie
-  tylko wspólne przesuwanie jak dziś).
+**Tym samym WSZYSTKIE 3 fazy pełnego edytora (user: "kształty od zera + edycja + dostęp do
+danych + zapisywanie + grupowanie, jak Figma") są zrobione i czekają na test na urządzeniu.**
+Kolejne zgłoszone, ale jeszcze nie zaczęte braki (nie urgentne, patrz niżej w tym pliku): Rekordy/
+Liczniki/Notatki wciąż mają tylko numeryczne suwaki Kształtu (bez wariantów jak Odliczania/
+Serie); rozszerzenie rejestru pól danych o kroki/saldo/nastrój pupila (wymaga osobnego,
+wspólnego cache'u, nie prostego dopisania — patrz §358).
 
 ## 🆕 Dashboard jako wolne płótno (2026-10-17, §356) — DO WERYFIKACJI
 

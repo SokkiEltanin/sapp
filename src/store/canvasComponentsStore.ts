@@ -46,6 +46,13 @@ import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataF
 // generalizuje się na CZWARTY kształt danych bez zmiany samego mechanizmu podpięcia.
 export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
 
+// Minimalny rozmiar itemu (Faza 28, 2026-10-17, §359) — PRZENIESIONE z `CanvasPlacedItem.tsx`
+// (gdzie żyły jako prywatne consty tego komponentu) — `resizeGroupBy` niżej potrzebuje TYCH
+// SAMYCH limitów do klamrowania resize całej grupy, więc jedno źródło prawdy zamiast dwóch
+// osobnych liczb, które mogłyby się rozjechać. `CanvasPlacedItem.tsx` importuje stąd.
+export const MIN_ITEM_WIDTH = 90;
+export const MIN_ITEM_HEIGHT = 64;
+
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
   screenKey: string;       // np. 'food' — które miejsce w appce renderuje tę instancję
@@ -65,6 +72,15 @@ export interface CanvasItem {
   // na WSPÓLNE przesuwanie (patrz `moveGroupBy` niżej) — rozmiar/styl/podpięcie zostają w pełni
   // per-instancja nawet wewnątrz grupy (świadomie uproszczone na v1, patrz NEXT_STEPS.md).
   groupId: string | null;
+  // Warstwy (Faza 28, 2026-10-17, §359) — user, po AskUserQuestion o zakres "pełnego edytora":
+  // "...grupowanie i wgle potem podpisanie danych itp itd" + wcześniej zbadane "panel
+  // właściwości + warstwy". Wyższy `zIndex` = renderowany PÓŹNIEJ = wizualnie NA WIERCHU (ten
+  // sam sens co CSS/Figma). Domyślnie = kolejność dodania (patrz `addItem` niżej) — bez dotykania
+  // panelu właściwości stosy wyglądają TAK JAK DOTĄD (dodane później = na wierzchu, jak w całej
+  // appce zanim ten mechanizm istniał). `?? 0` na KAŻDYM miejscu odczytu (sort w `ScreenCanvas.
+  // tsx`, `bringToFront`/`sendToBack` niżej) — stare, persystowane itemy sprzed tej fazy nie mają
+  // tego pola wcale (shallow `persist` merge nie dogania pól WEWNĄTRZ elementów tablicy).
+  zIndex: number;
 }
 
 const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number }> = {
@@ -110,6 +126,21 @@ interface CanvasComponentsState {
   // krawędzi nie "rozjeżdża się" nierówno, tylko człon przy krawędzi po prostu przestaje się
   // dalej przesuwać w tym kierunku.
   moveGroupBy: (screenKey: string, groupId: string, dx: number, dy: number, canvasWidth: number) => void;
+  // Warstwy (§359) — przenosi JEDEN item na wierzch/spód stosu NA JEGO WŁASNYM ekranie (`zIndex`
+  // nie jest porównywalny między ekranami — każdy `screenKey` ma własną, niezależną przestrzeń,
+  // ten sam zakres izolacji co reszta tego store'u). Liczone względem `?? 0` (patrz komentarz w
+  // `CanvasItem`), więc działa poprawnie nawet gdy inne itemy na ekranie nie mają jeszcze pola.
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  // Resize całej grupy jako JEDNEJ jednostki (§359, NEXT_STEPS.md: "rozszerzone grupowanie") —
+  // wołane z `onResize` PRZECIĄGANEGO członka (patrz `ScreenCanvas.tsx`) ze współczynnikiem
+  // skali policzonym z JEGO WŁASNEGO starego/nowego rozmiaru. Skaluje x/y/width/height KAŻDEGO
+  // członka WZGLĘDEM WSPÓLNEGO bounding-boxa grupy (lewy-górny róg jako kotwica) — przeciągnięty
+  // member wychodzi z tego PRECYZYJNIE na rozmiar, na który user go realnie przeciągnął (sam
+  // matematycznie się zgadza: `width * (nowa/stara) = nowa`), reszta skaluje się proporcjonalnie
+  // wokół niego. Każdy member klamrowany OSOBNO do granic płótna i `MIN_ITEM_WIDTH/HEIGHT` — ten
+  // sam wzorzec co `moveGroupBy`.
+  resizeGroupBy: (screenKey: string, groupId: string, scaleX: number, scaleY: number, canvasWidth: number) => void;
 }
 
 export const useCanvasComponentsStore = create<CanvasComponentsState>()(
@@ -132,11 +163,15 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         const maxBottom = existing.reduce((m, i) => Math.max(m, i.y + i.height), 0);
         const y = existing.length === 0 ? 12 : maxBottom + 12;
         const { width, height } = DEFAULT_SIZE[componentType];
+        // Nowy item na wierzchu stosu (§359) — ta sama intuicja co dotychczasowe zachowanie BEZ
+        // jawnego `zIndex` (później dodane = później w tablicy = renderowane na wierzchu).
+        const maxZ = existing.reduce((m, i) => Math.max(m, i.zIndex ?? 0), 0);
         const item: CanvasItem = {
           id, screenKey, componentType, x: 12, y, width, height,
           bindingKey: null,
           style: DEFAULT_STYLE[componentType],
           groupId: null,
+          zIndex: existing.length === 0 ? 0 : maxZ + 1,
         };
         set((s) => ({ items: [...s.items, item] }));
         return id;
@@ -168,6 +203,41 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
           return { ...i, x, y };
         }),
       })),
+
+      bringToFront: (id) => set((s) => {
+        const target = s.items.find(i => i.id === id);
+        if (!target) return s;
+        const siblings = s.items.filter(i => i.screenKey === target.screenKey);
+        const maxZ = siblings.reduce((m, i) => Math.max(m, i.zIndex ?? 0), 0);
+        return { items: s.items.map(i => i.id === id ? { ...i, zIndex: maxZ + 1 } : i) };
+      }),
+
+      sendToBack: (id) => set((s) => {
+        const target = s.items.find(i => i.id === id);
+        if (!target) return s;
+        const siblings = s.items.filter(i => i.screenKey === target.screenKey);
+        const minZ = siblings.reduce((m, i) => Math.min(m, i.zIndex ?? 0), 0);
+        return { items: s.items.map(i => i.id === id ? { ...i, zIndex: minZ - 1 } : i) };
+      }),
+
+      resizeGroupBy: (screenKey, groupId, scaleX, scaleY, canvasWidth) => set((s) => {
+        const members = s.items.filter(i => i.screenKey === screenKey && i.groupId === groupId);
+        if (members.length === 0) return s;
+        const minX = Math.min(...members.map(i => i.x));
+        const minY = Math.min(...members.map(i => i.y));
+        return {
+          items: s.items.map(i => {
+            if (i.screenKey !== screenKey || i.groupId !== groupId) return i;
+            const width = Math.max(MIN_ITEM_WIDTH, Math.round(i.width * scaleX));
+            const height = Math.max(MIN_ITEM_HEIGHT, Math.round(i.height * scaleY));
+            const relX = i.x - minX;
+            const relY = i.y - minY;
+            const x = Math.max(0, Math.min(Math.max(0, canvasWidth - width), Math.round(minX + relX * scaleX)));
+            const y = Math.max(0, Math.round(minY + relY * scaleY));
+            return { ...i, x, y, width, height };
+          }),
+        };
+      }),
     }),
     {
       name: 'canvas-components-v1',
