@@ -19326,6 +19326,64 @@ styl, 🗑 usuń, grupowanie z innymi kaflami) BEZ otwierania metric-pickera. �
 powinno pokazywać właściwy panel (kolor/obrys/zaokrąglenie dla prostokąta, kolor/grubość dla
 linii, treść/kolor/wyrównanie/rozmiar dla tekstu).
 
+## 358. Generyczny data-binding na wolnym płótnie (2026-10-17)
+
+Faza 2/3 przebudowy w kierunku pełnego edytora (po §357 — kształty-primitywy). User: "...potem
+podpisanie danych itp itd". Dotychczas "dane" na płótnie = 3 ZAHARDKODOWANE źródła (nawyk/
+licznik/notatka), każde z własnym `useAllXItems()` hookiem i własnym `componentType`. Ten krok
+dodaje PIĄTY typ, `'dataField'`, podpięty do rejestru WIELU różnych źródeł naraz — pierwszy
+realny dowód że "dowolne pole z apki" jest wykonalne bez przebudowy całej architektury
+podpięcia.
+
+**`useDataFieldRegistry.ts`** (nowy hook, `src/hooks/`) — zwraca `DataFieldValue[]`
+(`{id, label, value}`, `value` to już sformatowany string) scalając kilka DOTYCHCZAS
+NIEZWIĄZANYCH źródeł: `usePetStore` (imię pupila, poziom przez `levelFromXp(xp)`),
+`useCalendarStore` (liczba zadań ukończonych dziś, `useMemo` filtrujący po `status==='done'`+
+`updatedAt`), i czysto obliczana dzisiejsza data (`toLocaleDateString('pl-PL', {...})`, zero
+store'u).
+
+**ŚWIADOMIE MAŁY, startowy zestaw (4 pola)** — WYŁĄCZNIE pola czytane przez lekki, czysty
+selektor Zustand. Zbadane, ale ŚWIADOMIE WYKLUCZONE z v1: kroki dzisiaj (`usePetHealthSync()` —
+kosztowny hook, AsyncStorage + sync z Health Connect), saldo (`accountBalance.ts`'s
+`balanceOffset` — AsyncStorage, nie Zustand), nastrój pupila (`computePetState()` — agreguje
+kroki+sen+nawyki+nastrój). Montowanie KTÓREGOKOLWIEK z nich OSOBNO PER INSTANCJA na płótnie
+(user może dodać wiele kafli tego samego pola) byłoby DOKŁADNIE tym błędem architektonicznym,
+którego ta sesja już dwa razy unikała (`useHabits()` double-fetch hazard, §356) — wymagają
+OSOBNEGO, wspólnego cache'u (jeden fetch dla całego ekranu, nie per-instancja), nie prostego
+dopisania do tej listy. Rozszerzenie rejestru o nowe LEKKIE pola (np. inne liczniki Zustand) to
+jedna linijka w tablicy zwracanej przez hook.
+
+**`dataField` UŻYWA `bindingKey`** (w przeciwieństwie do 4 kształtów z §357, które go NIE
+używają) — ten sam mechanizm metric-pickera co streakTile/countdownTile/notesTile
+(`dataFieldOptions` mapowane z rejestru 1:1 jak `streakOptions`/`countdownOptions`), inny
+rejestr opcji. Dowód że render-prop/generic-picker architektura (§341) generalizuje się na
+CZWARTY "widget z danymi" bez zmiany samego mechanizmu podpięcia. Tapnięcie na `dataField` ZAWSZE
+otwiera picker (bound czy nie, editing czy nie) — w przeciwieństwie do streak/countdown/note, pole
+danych nie ma "strony" do której nawigować, więc rebind na tapnięcie jest jedyną sensowną akcją.
+
+**`DataFieldTile.tsx`**/**`CanvasDataFieldStyleModal.tsx`** — siostrzane `NotesTile`/
+`CanvasNotesStyleModal` (prosty kształt treści: opcjonalna etykieta + wartość, zero presetów
+layoutu). Styl: kolor/rozmiar/pogrubienie/wyrównanie wartości, pokaż/skryj etykietę,
+zaokrąglenie rogów.
+
+**Podpięte**: `index.tsx` (dashboard) woła `useDataFieldRegistry()` SAM i przekazuje jako nowy
+prop `dataFieldRegistry` do `ScreenCanvasBase` (TA SAMA zasada co `streakWall`/
+`allCountdownItemsForCanvas`/`allNotes` — zero drugiego, kosztownego montowania; tu tym bardziej
+bezpieczne, bo to tylko lekkie selektory Zustand, nie AsyncStorage). `ScreenCanvas` (wrapper)
+woła hook sam, Jedzenie/Ćwiczenia/Finanse bez zmiany w kodzie.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 109/109 suite, 1409 testów (bez zmian —
+`useDataFieldRegistry.ts` to hook-wiring nad już przetestowaną logiką store'ów, ten sam
+precedens co `useAllStreakItems.ts`/`useAllCountdownItems.ts`/`useAllNotesItems.ts` — żaden z
+nich nie ma dedykowanego testu jednostkowego, bo wymagałyby renderowania hooków, nie czystej
+logiki).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → Edytuj → "Pole danych" →
+picker powinien pokazać 4 opcje (imię pupila/poziom pupila/zadania ukończone dziś/dzisiejsza
+data) z żywym podglądem wartości → po wybraniu, wartość powinna się aktualizować na żywo gdy
+się zmienia (np. ukończenie zadania powinno natychmiast zmienić liczbę na kaflu, bez
+odświeżania ekranu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

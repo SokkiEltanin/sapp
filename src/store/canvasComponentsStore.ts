@@ -8,6 +8,7 @@ import {
   RectShapeStyle, EllipseShapeStyle, LineShapeStyle, TextShapeStyle,
   DEFAULT_RECT_SHAPE_STYLE, DEFAULT_ELLIPSE_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE, DEFAULT_TEXT_SHAPE_STYLE,
 } from '@/store/shapeStyleDefaults';
+import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -35,9 +36,15 @@ import {
 // `lineShape`/`textShape`, patrz `shapeStyleDefaults.ts`) — gołe kształty-primitywy, user: "na
 // pewno pełny edytor z dodawaniem kształtów od zera... jak Figma". `bindingKey` dla nich ZOSTAJE
 // `null` na zawsze — nie mają z czym się podpiąć, same SĄ swoją treścią (kolor/obrys/tekst, nie
-// metryka z apki). `isShapeType()` (tam) odróżnia je od trzech "widgetów z danymi" wszędzie, gdzie
-// to jest istotne (ScreenCanvas.tsx: brak metric-pickera, brak nawigacji po tapnięciu).
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
+// metryka z apki). `isShapeType()` (tam) odróżnia je od "widgetów z danymi" wszędzie, gdzie to
+// jest istotne (ScreenCanvas.tsx: brak metric-pickera, brak nawigacji po tapnięciu).
+// Faza 27 (2026-10-17, §358) — piąty typ, `'dataField'` — generyczny data-binding, user: "...
+// potem podpisanie danych itp itd". W PRZECIWIEŃSTWIE do kształtów, `dataField` UŻYWA
+// `bindingKey` (klucz z `useDataFieldRegistry()`, np. `'pet.level'`) — ten sam mechanizm
+// podpięcia (metric-picker, placeholder "Wybierz pole danych") co streakTile/countdownTile/
+// notesTile, tylko inny rejestr opcji. Dowód że render-prop/generic-picker architektura (§341)
+// generalizuje się na CZWARTY kształt danych bez zmiany samego mechanizmu podpięcia.
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
 
 export interface CanvasItem {
   id: string;              // 'canvas:<timestamp>'
@@ -50,7 +57,7 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
   // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -64,6 +71,7 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   streakTile: { width: 150, height: 92 },
   countdownTile: { width: 230, height: 76 },
   notesTile: { width: 220, height: 80 },
+  dataField: { width: 160, height: 60 },
   rectShape: { width: 140, height: 90 },
   ellipseShape: { width: 120, height: 120 },
   // Linia (Faza 26) domyślnie blisko-pozioma (wysokość 4) — rysowana PO PRZEKĄTNEJ swojego boxa
@@ -73,10 +81,11 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   lineShape: { width: 160, height: 4 },
   textShape: { width: 160, height: 40 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
+  dataField: DEFAULT_DATA_FIELD_TILE_STYLE,
   rectShape: DEFAULT_RECT_SHAPE_STYLE,
   ellipseShape: DEFAULT_ELLIPSE_SHAPE_STYLE,
   lineShape: DEFAULT_LINE_SHAPE_STYLE,

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -29,6 +29,10 @@ import CanvasCountdownStyleModal from './CanvasCountdownStyleModal';
 import CanvasNotesStyleModal from './CanvasNotesStyleModal';
 import { ShapeTile } from './ShapeTile';
 import CanvasShapeStyleModal from './CanvasShapeStyleModal';
+import { useDataFieldRegistry, DataFieldValue } from '@/hooks/useDataFieldRegistry';
+import { DataFieldTile } from './DataFieldTile';
+import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
+import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -70,12 +74,13 @@ const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą inst
 // `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE już wyliczone dane (`streakWall` 1:1 jako
 // `allStreakItems` — zero dodatkowego kodu, `counters`/`allNotes` już w pamięci dla pozostałych
 // dwóch — tani dodatkowy `.filter()`, NIE drugi fetch).
-export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, accentColor }: {
+export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor }: {
   screenKey: string;
   title?: string;
   allStreakItems: StreakItem[];
   allCountdownItems: Counter[];
   allNotesItems: Note[];
+  dataFieldRegistry: DataFieldValue[];
   accentColor: string;
 }) {
   const c = useColors();
@@ -129,6 +134,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
       meta: n.body?.trim() ? n.body.trim().slice(0, 40) : ((n.tags ?? []).length > 0 ? `${n.tags.length} ${n.tags.length === 1 ? 'tag' : 'tagi'}` : 'bez treści'),
     })),
     [allNotesItems],
+  );
+  // Czwarty "widget z danymi" (§358) — ten sam mechanizm podpięcia co powyżej, inny rejestr.
+  // `meta` to już wyliczona wartość pola (podgląd na żywo w liście pickera, np. "7" dla
+  // "Poziom pupila") — rejestr i tak zwraca gotowe stringi, zero dodatkowego formatowania tutaj.
+  const dataFieldOptions: PickerOption[] = useMemo(
+    () => dataFieldRegistry.map(f => ({ key: f.id, label: f.label, meta: f.value })),
+    [dataFieldRegistry],
   );
 
   const canvasHeight = Math.max(
@@ -184,6 +196,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const isStreak = item.componentType === 'streakTile';
           const isCountdown = item.componentType === 'countdownTile';
           const isNote = item.componentType === 'notesTile';
+          const isDataField = item.componentType === 'dataField';
           // Kształty-primitywy (§357) — BEZ podpięcia danych, tapnięcie nie robi nic (ani
           // metric-picker, ani nawigacja) — interakcja idzie WYŁĄCZNIE przez chrome
           // `CanvasPlacedItem` (przeciąganie/resize/przycisk 🎨 stylu).
@@ -191,6 +204,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
+          const boundDataField = isDataField && item.bindingKey ? dataFieldRegistry.find(f => f.id === item.bindingKey) ?? null : null;
 
           const onTap = () => {
             if (isShape) return;
@@ -201,9 +215,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             } else if (isCountdown) {
               if (boundCountdown) { haptic.tap(); router.push(`/counters/${boundCountdown.id}` as any); }
               else setPickerForId(item.id);
-            } else {
+            } else if (isNote) {
               if (boundNote) { haptic.tap(); router.navigate(`/notes?noteId=${boundNote.id}` as any); }
               else setPickerForId(item.id);
+            } else {
+              // dataField (§358) — statyczna wartość, nie strona: brak miejsca nawigacji.
+              // Tapnięcie ZAWSZE otwiera picker (zmiana podpięcia), podpięte czy nie.
+              setPickerForId(item.id);
             }
           };
 
@@ -250,6 +268,14 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   note={boundNote}
                   tileStyle={item.style as NotesTileStyle}
                   accentColor={timeAccentColor}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                  boxed
+                />
+              ) : isDataField ? (
+                <DataFieldTile
+                  field={boundDataField}
+                  tileStyle={item.style as DataFieldTileStyle}
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                   boxed
@@ -302,6 +328,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               <Plus size={15} color="#fff" />
               <Text style={s.addTxt}>Notatka</Text>
             </TouchableOpacity>
+            {/* Generyczny data-binding (§358) — czwarty "widget z danymi", ten sam niebieski
+                kolor co trzy powyżej (TA SAMA kategoria: podpięcie danych, nie goły kształt). */}
+            <TouchableOpacity onPress={() => onAdd('dataField')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" />
+              <Text style={s.addTxt}>Pole danych</Text>
+            </TouchableOpacity>
           </View>
           {/* Kształty-primitywy (§357) — osobny, wizualnie oddzielony wiersz (szary, nie
               niebieski jak "komponenty z danymi" wyżej) — inna kategoria: BEZ podpięcia,
@@ -347,14 +379,16 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
           : pickerItem?.componentType === 'notesTile'
           ? 'Brak notatek na koncie — dodaj jedną w Notatkach.'
+          : pickerItem?.componentType === 'dataField'
+          ? 'Rejestr pól danych jest pusty — to nie powinno się zdarzyć.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
@@ -405,6 +439,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as any), ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
+
+      <CanvasDataFieldStyleModal
+        visible={!!styleItem && styleItem.componentType === 'dataField'}
+        style={(styleItem && styleItem.componentType === 'dataField' ? styleItem.style : DEFAULT_DATA_FIELD_TILE_STYLE) as DataFieldTileStyle}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as DataFieldTileStyle), ...patch } }); }}
+        onClose={() => setStyleForId(null)}
+      />
     </View>
   );
 }
@@ -416,6 +457,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const allStreakItems = useAllStreakItems();
   const allCountdownItems = useAllCountdownItems();
   const allNotesItems = useAllNotesItems();
+  const dataFieldRegistry = useDataFieldRegistry();
   const { color: accentColor } = useTimeAccent();
   return (
     <ScreenCanvasBase
@@ -424,6 +466,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       allStreakItems={allStreakItems}
       allCountdownItems={allCountdownItems}
       allNotesItems={allNotesItems}
+      dataFieldRegistry={dataFieldRegistry}
       accentColor={accentColor}
     />
   );
