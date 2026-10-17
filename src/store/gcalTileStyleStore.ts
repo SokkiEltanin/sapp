@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { mergeTileStyleState } from './tileStyleMerge';
 
 // Kreator dashboardu, Faza 13 (2026-10-15, §339) — szósta i OSTATNIA karta z pierwotnej listy
 // kandydatów w §327 (StreakWall/Records/Countdowns/SinceCounters/PinnedNotes/GCal). `GCalCard`
@@ -45,6 +46,7 @@ export const useGCalTileStyleStore = create<GCalTileStyleState>()(
     {
       name: 'gcal-tile-style-v1',
       storage: throttledPersistStorage(),
+      merge: mergeTileStyleState,
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

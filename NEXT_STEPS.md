@@ -3,6 +3,59 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 Edytor mapy bossów — gest przeciągania naprawiony (2026-10-17, §348) — DO WERYFIKACJI
+
+User: "jak edytuje mapę bossow to tam nic praktycznie nie mogę zrobic muszę miec mozliwosc
+ustawienia każdego bosa osobno narysowania lini między nimi itp". Research pokazał: TO już
+istnieje — `app/boss-map-editor.tsx` (§322, pencil-ikona lewy-dolny róg na `bosses.tsx`) daje
+dokładnie to (przeciąganie każdego bossa osobno, ścieżka auto-przelicza się Catmull-Rom z
+aktualnych pozycji) — ale gest łamał się o klasyczną pułapkę `PanResponder` w `ScrollView` (bez
+`onPanResponderTerminationRequest`/`onShouldBlockNativeResponder`, scroll przejmował gest w
+trakcie ruchu, zwłaszcza na Androidzie). Naprawione w §348 — BEZ zmiany logiki
+pozycji/ścieżki (ta była zawsze poprawna, ma testy). "Narysowania lini między nimi" ŚWIADOMIE
+NIE zbudowane jako osobna funkcja dowolnego grafu połączeń — kampania jest ściśle sekwencyjna w
+logice gry, więc "linia" = zawsze ścieżka przez węzły w kolejności `BOSSES`, auto-aktualizująca
+się przy przeciąganiu. Jeśli po tej naprawie user DALEJ będzie chciał coś innego niż to (np.
+realnie zmienić KOLEJNOŚĆ walk, nie tylko wizualne rozmieszczenie) — to już zmiana designu gry,
+osobna rozmowa.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: Bossy → ✏️ → przeciągnij dowolnego bossa, powinno
+płynnie podążać za palcem bez "ucieczki" w scroll. Jeśli DALEJ nie działa — to NIE ta sama
+przyczyna (potrzeba realnego zrzutu/opisu z urządzenia, nie dalsze zgadywanie bez dostępu do
+telefonu).
+
+## 🔴 Fix: crash na dashboardzie i w Kreatorze kafelków (2026-10-17, §347) — NAPRAWIONE
+
+User zrzutami: "Coś się wykrzaczyło" przy KAŻDYM wejściu na dashboard + w Kreatorze kafelków —
+`Cannot convert undefined value to object`. Total-blocker (dashboard = ekran startowy).
+Przyczyna: żaden z 6 draft/live store'ów kreatora dashboardu nie miał własnego `persist` merge,
+więc stary, niepełny `live`/`draft` zapisany na telefonie usera (sprzed dodania
+`tierColorOverrides`/`habitCalendarOverrides` do `StreakTileStyle`) PODMIENIAŁ cały świeży
+default zamiast scalić się pole-po-polu. Fix: `src/store/tileStyleMerge.ts` (wspólny `merge`
+dla wszystkich 6 store'ów, naprawia KLASĘ buga na przyszłość) + `?.` jako druga linia obrony w
+5 miejscach indeksowania. **Priorytet testu na urządzeniu — KRYTYCZNY, ale user miał JUŻ
+uszkodzone dane — fix działa bez czyszczenia appki** (backfill przy każdym starcie). Szczegóły:
+ARCHITECTURE.md §347.
+
+**Znany pozostały gap tej samej klasy (NIE naprawiony, niski priorytet na razie)**: `CanvasItem.
+style` na płótnie kopiowania komponentów (§340+) ma ten sam kształt ryzyka — jeśli
+`StreakTileStyle`/`CountdownTileStyle` zyska kiedyś nowe pole, stare persystowane `CanvasItem`y
+będą go mieć `undefined` (migracja/merge na poziomie pojedynczego itemu w tablicy, nie całego
+stanu store'a — bardziej złożone niż fix §347). `?.` guardy w `StreakTile.tsx` już chronią przed
+crashem, więc to nie jest pilne, ale warto pamiętać przy następnym nowym polu w tych typach.
+
+## 🆕 System kopiowania komponentów — Faza 19: trzeci ekran, Finanse (2026-10-17, §346)
+
+`<ScreenCanvas>` wpięte na Finansach (`screenKey="finances"`) — przez `ListFooterComponent`
+`SectionList`a (inny szkielet ekranu niż poprzednie dwa, `ScrollView`). Trzy ekrany poza
+dashboardem teraz: Jedzenie/Ćwiczenia/Finanse. **Priorytet testu WYSOKI** — ARCHITECTURE.md §346.
+
+**Mechanizm uznany za wystarczająco udowodniony na wielu ekranach** — kolejne wpięcia (Zdrowie/
+Zadania/Nastrój [z wykluczeniem `useHabits()`]) to już powtórka tego samego wzorca, niska
+wartość krańcowa. Następny krok w tym kierunku: trzeci typ komponentu (trudniejszy — Rekordy/
+Notatki/Kalendarz nie mają oczywistego "jednego id" do bindowania jak nawyk/licznik/odliczanie)
+albo grupowanie (user, §333, duża, nowa porcja gestów).
+
 ## 🆕 System kopiowania komponentów — Faza 18: drugi ekran, Ćwiczenia (2026-10-17, §345)
 
 `<ScreenCanvas>` wpięte na Ćwiczeniach (`screenKey="exercises"`) — dowód że "jedna linijka do

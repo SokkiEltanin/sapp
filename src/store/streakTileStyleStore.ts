@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { mergeTileStyleState } from './tileStyleMerge';
 
 export type HabitCalendarStyle = 'water' | 'year';
 export type FlameCorner = 'tl' | 'tr' | 'bl' | 'br';
@@ -129,6 +130,7 @@ export const useStreakTileStyleStore = create<StreakTileStyleState>()(
     {
       name: 'streak-tile-style-v1',
       storage: throttledPersistStorage(),
+      merge: mergeTileStyleState,
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

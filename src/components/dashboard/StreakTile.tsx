@@ -23,7 +23,7 @@ export function navigateForStreakItem(item: StreakItem, tileStyle: StreakTileSty
   haptic.tap();
   if (item.key.startsWith('h:')) {
     const habitId = item.key.slice(2);
-    const navStyle = tileStyle.habitCalendarOverrides[habitId] ?? (item.kind === 'water' ? 'water' : 'year');
+    const navStyle = tileStyle.habitCalendarOverrides?.[habitId] ?? (item.kind === 'water' ? 'water' : 'year');
     router.push((navStyle === 'water' ? `/water-calendar?id=${habitId}` : `/habit-year?id=${habitId}`) as any);
   }
   else if (item.key.startsWith('c:')) router.push(`/habit-year?counter=${item.key.slice(2)}` as any);
@@ -70,8 +70,15 @@ export function StreakTile({ item, tileStyle, onPress, sizeStyle }: {
   // streakTier() domyślnie zwraca indeks 0 (Bordo) gdy ŻADEN próg nie jest spełniony — też przy
   // 0 dniach. streakColor() ma osobny, poprawny fallback (szary) dla days<1 — patrz oryginalny
   // komentarz w StreakWallCard.tsx (historia zachowana tam, nie powielana tu po słowie).
+  // `?.` na `tierColorOverrides`/`habitCalendarOverrides` (2026-10-17, user zrzutem: crash na
+  // wejściu na dashboard) — crash u realnego usera, przyczyna: stary `persist` merge w
+  // streakTileStyleStore.ts PODMIENIAŁ cały `live`/`draft` z telefonu zamiast scalać pole-po-polu,
+  // więc user, który otworzył dashboard ZANIM te dwa pola istniały w `StreakTileStyle`, miał je
+  // trwale `undefined` mimo nowszego kodu. Fix właściwy w store'cie (merge, patrz
+  // tileStyleMerge.ts) — `?.` tu to tylko druga linia obrony, gdyby coś INNEGO kiedyś dostarczyło
+  // niepełny `StreakTileStyle` (np. płótno kopiowania komponentów).
   const isZero = item.days < 1;
-  const color = isZero ? streakColor(item.days) : (tileStyle.tierColorOverrides[streakTier(item.days).i] ?? streakColor(item.days));
+  const color = isZero ? streakColor(item.days) : (tileStyle.tierColorOverrides?.[streakTier(item.days).i] ?? streakColor(item.days));
   const tier = streakTier(item.days);
   const tierProgress = !isZero && tier.next != null
     ? Math.min(1, Math.max(0, (item.days - tier.min) / (tier.next - tier.min)))

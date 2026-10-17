@@ -18790,6 +18790,120 @@ sprawdź że działa identycznie jak w Jedzeniu (dodawanie/przeciąganie/styl/us
 kafli), i że instancje na obu ekranach są NIEZALEŻNE (dodane w Ćwiczeniach nie pojawiają się
 w Jedzeniu, i odwrotnie — `screenKey` faktycznie rozdziela).
 
+## 346. System kopiowania komponentów — Faza 19: trzeci ekran, Finanse (2026-10-17)
+
+Trzeci ekran z `<ScreenCanvas>` (po Jedzeniu §341, Ćwiczeniach §345) — `app/(tabs)/finances.tsx`,
+`screenKey="finances"`. Ten ekran ma INNY szkielet niż poprzednie dwa (`SectionList`, nie
+`ScrollView`) — wpięte przez `ListFooterComponent` (owinięte w `<>...</>`, bo dotąd renderował
+TYLKO warunkowy przycisk "Pokaż starsze transakcje", teraz też zawsze-obecne płótno pod nim).
+
+`useExpensesStore()` jest już montowany na tym ekranie dla własnej treści — bezpiecznie,
+bo to store Zustand (współdzielony singleton), nie hook z własnym fetchem jak `useHabits()`
+(patrz ostrzeżenie w `useAllStreakItems.ts`, §345) — drugie wywołanie przez
+`useAllStreakItems()` nic nie duplikuje.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 106/106 suite, 1394 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Finanse → przewiń SectionList na dół (poza
+wszystkie transakcje) → "Twoje komponenty" powinno się pojawić jako stopka listy, działać
+identycznie jak na innych ekranach, z WŁASNYMI, niezależnymi instancjami.
+
+## 347. Fix: crash na dashboardzie i w Kreatorze kafelków — stary `persist` merge gubił nowe pola (2026-10-17)
+
+User zrzutami ekranu: "Coś się wykrzaczyło" przy KAŻDYM wejściu na dashboard (crash w
+`StreakTile`) i w Kreatorze kafelków (crash w `DashboardTileCreator`, wewnątrz `.map()` sekcji
+"Paleta progów") — `TypeError: Cannot convert undefined value to object`. Aplikacja była
+faktycznie niemożliwa do użycia (dashboard to ekran startowy).
+
+**Przyczyna**: `tileStyle.tierColorOverrides[i]`/`tileStyle.habitCalendarOverrides[habitId]` w 5
+miejscach (`StreakTile.tsx` ×2, `dashboard-tile-creator.tsx` ×2, `CanvasStreakStyleModal.tsx` ×1)
+indeksowały te pola BEZ osłony na to, że samo pole może być `undefined`. Pole mogło być
+`undefined` mimo że `DEFAULT_STREAK_TILE_STYLE` w aktualnym kodzie ZAWSZE je ustawia — bo
+ŻADEN z 6 draft/live store'ów kreatora (`streakTileStyleStore` + 5 sióstr, patrz §327-§339) nie
+miał własnego `merge` w konfiguracji `persist`. Domyślny merge zustand to płytki
+`{ ...currentState, ...persistedState }` na poziomie CAŁEGO stanu store'a — skoro telefon usera
+miał zapisany `live`/`draft` sprzed dodania `tierColorOverrides`/`habitCalendarOverrides` do
+`StreakTileStyle` (pola dodane w Fazie 7/8 §333/§334, TEJ SAMEJ wielodniowej sesji — user otwierał
+dashboard między fazami), persystowany obiekt PODMIENIAŁ cały świeży default zamiast scalić się
+z nim pole-po-polu. Nowe pole zostawało `undefined` na stałe, aż do wyczyszczenia danych appki.
+Ta sama pułapka czeka na KAŻDY z 6 store'ów przy KAŻDYM kolejnym nowym polu w przyszłości —
+kreator ciągle rośnie (§327→§346), to się powtórzy.
+
+**Fix (dwuwarstwowy)**:
+1. **`src/store/tileStyleMerge.ts`** (nowy) — `mergeTileStyleState(persisted, current)`, WSPÓLNY
+   `merge` dla WSZYSTKICH 6 store'ów: scala `live`/`draft` z `persisted` POLE-PO-POLU na default z
+   `current` (świeży kod), zamiast podmieniać cały obiekt. Podpięty jako `merge:
+   mergeTileStyleState` w `persist(...)` configu `streakTileStyleStore.ts`,
+   `recordsTileStyleStore.ts`, `countdownsTileStyleStore.ts`, `sinceCountersTileStyleStore.ts`,
+   `pinnedNotesTileStyleStore.ts`, `gcalTileStyleStore.ts` — naprawia KLASĘ buga, nie tylko te
+   dwa pola, i każde przyszłe nowe pole w którymkolwiek z 6 store'ów dostaje tę samą ochronę za
+   darmo.
+2. **`?.` na 5 niebezpiecznych miejscach indeksowania** (`StreakTile.tsx`, `dashboard-tile-
+   creator.tsx`, `CanvasStreakStyleModal.tsx`) — druga linia obrony, gdyby `StreakTileStyle` kiedyś
+   dotarł z INNEGO źródła niż ten store z niepełnym kształtem (np. `CanvasItem.style` na płótnie
+   kopiowania komponentów, §340+ — nie naprawione tu, bo nie jest przyczyną TEGO crasha, ale ten
+   sam kształt ryzyka pozostaje, patrz NEXT_STEPS.md).
+
+**Weryfikacja**: odtworzone w izolowanym jest-expo renderze `StreakTile` (react-test-renderer +
+error boundary, `act()` do flushnięcia `Immediate`-schedulowanego initial render) — z
+`tierColorOverrides` ręcznie usuniętym z obiektu stylu render RZECZYWIŚCIE rzucał (`Cannot read
+properties of undefined (reading '1')` w sandboxie Node/V8 — Hermes na urządzeniu formułuje ten
+sam błąd inaczej, stąd inny dokładny tekst w zrzucie usera), po poprawce — nie rzuca. Nowy test
+`__tests__/tileStyleMerge.test.ts` pilnuje samej funkcji merge (backfill brakujących pól,
+zachowanie persystowanych wartości, pełny fallback gdy nic nie było zapisane).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite, 1397 testów (+3 nowe).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: to był total-blocker (dashboard = ekran
+startowy). User powinien zweryfikować, że wejście na dashboard i do Kreatora kafelków już nie
+crashuje. Jeśli user ma JUŻ uszkodzony `tierColorOverrides`/`habitCalendarOverrides` zapisany w
+AsyncStorage (crash już się zdarzył, więc raczej tak) — fix działa i BEZ czyszczenia danych appki,
+bo `mergeTileStyleState` backfilluje brakujące pole przy KAŻDYM starcie appki, nie tylko
+jednorazowo przy migracji.
+
+## 348. Fix: edytor mapy bossów — ScrollView przejmował gest przeciągania (2026-10-17)
+
+User: "jak edytuje mapę bossow to tam nic praktycznie nie mogę zrobic muszę miec mozliwosc
+ustawienia każdego bosa osobno narysowania lini między nimi itp" — zgłoszone zaraz po BUG #6
+(§343, kamera na prawdziwej mapie). Pierwsze pytanie: czy `boss-map-editor.tsx` (§322) — ekran
+który JUŻ robi dokładnie to, o co prosi user (przeciąganie każdego bossa z osobna, ścieżka
+Catmull-Rom auto-przelicza się z aktualnych pozycji) — w ogóle działa na urządzeniu, skoro
+istnieje od Fazy przed tą sesją. Odpowiedź: strukturalnie TAK (dane/logika poprawne, patrz
+`applyLayoutOverrides`/`catmullRomPath` w `bossMapLayout.ts`), ale gest przeciągania miał
+klasyczną pułapkę `PanResponder` zagnieżdżonego w `ScrollView` — bez
+`onPanResponderTerminationRequest`, domyślne zachowanie RN to ZEZWÓL otaczającemu `ScrollView`
+na przejęcie gestu w trakcie ruchu, gdy wykryje pionowy pan. Na Androidzie (user: paczka
+`com.sokki.sapp` widoczna w zrzutach crasha z §347) dochodzi RÓWNOLEGLE natywny responder
+systemu widoków, który trzeba osobno zablokować (`onShouldBlockNativeResponder`). Objaw:
+`onPanResponderGrant` się odpala (haptic czuć), ale ruch palca nie przesuwa węzła — scroll
+"wygrywa" w trakcie gestu. Dokładnie pasuje do "nic praktycznie nie mogę zrobić".
+
+**Fix**: dopisane `onPanResponderTerminationRequest: () => false` (węzeł raz złapany NIE oddaje
+gestu, niezależnie co robi otaczający scroll) i `onShouldBlockNativeResponder: () => true`
+(blokuje równoległy natywny responder na Androidzie) do `PanResponder.create(...)` w
+`app/boss-map-editor.tsx`. Czysto gestowa naprawa — nie da się jej wyrazić jako czysta funkcja
+do testu w jest (ta sama kategoria co BUG #6's `scrollTo`/`contentOffset`, patrz §343 — logika
+pozycji/ścieżki JEST testowalna i ma testy w `bossMapLayout.test.ts`, SPOSÓB dostarczenia gestu
+do natywnego systemu nie jest).
+
+**"Narysowania lini między nimi"** — NIE zinterpretowane jako prośba o dowolny graf połączeń:
+kampania jest ŚCIŚLE sekwencyjna w logice gry (`current = BOSSES.find(b =>
+!defeatedBosses.includes(b.id))`, patrz `bosses.tsx`/`CampaignMap.tsx`) — nie da się "narysować
+linii" między dowolnymi dwoma bossami bez zmiany samej kolejności walk, co jest decyzją o
+designie gry, nie o edytorze. Ścieżka (`catmullRomPath`) ZAWSZE łączy węzły w kolejności tablicy
+`BOSSES` — to już działa, auto-przelicza się z żywych pozycji podczas przeciągania (`pathD`
+w `boss-map-editor.tsx` liczony z `nodes`, które scalają `dragPos` na żywo). Fix gestu wyżej to
+odblokowuje — user ZOBACZY linię łączącą się automatycznie przy przeciąganiu, bez osobnej
+funkcji do ręcznego rysowania.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite, 1397 testów (bez zmian — czysto
+gestowa poprawka, logika pozycji/ścieżki niezmieniona, ma już pokrycie w `bossMapLayout.test.ts`).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: user zgłosił to jako realny blocker. Sprawdzić:
+Bossy → ✏️ (lewy dolny róg) → przeciągnięcie DOWOLNEGO bossa powinno płynnie przesuwać go
+razem z palcem (BEZ "ucieczki" w scroll ekranu w trakcie gestu) i ścieżka powinna żywo
+podążać za nową pozycją.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

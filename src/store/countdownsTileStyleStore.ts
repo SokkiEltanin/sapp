@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { mergeTileStyleState } from './tileStyleMerge';
 
 export interface CountdownsTileStyle {
   cornerRadius: number;
@@ -48,6 +49,7 @@ export const useCountdownsTileStyleStore = create<CountdownsTileStyleState>()(
     {
       name: 'countdowns-tile-style-v1',
       storage: throttledPersistStorage(),
+      merge: mergeTileStyleState,
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

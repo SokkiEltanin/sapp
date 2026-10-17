@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { mergeTileStyleState } from './tileStyleMerge';
 
 // Kreator dashboardu, Faza 11 (2026-10-15, §337) — czwarta karta w kreatorze, pierwsza od
 // Fazy 3 rozszerzająca mechanizm na NOWY komponent (nie nowy preset na istniejącym). Kandydat
@@ -46,6 +47,7 @@ export const useSinceCountersTileStyleStore = create<SinceCountersTileStyleState
     {
       name: 'since-counters-tile-style-v1',
       storage: throttledPersistStorage(),
+      merge: mergeTileStyleState,
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

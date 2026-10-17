@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
+import { mergeTileStyleState } from './tileStyleMerge';
 
 // Kreator dashboardu, Faza 12 (2026-10-15, §338) — piąta karta, drugi komponent od Fazy 3 z
 // zupełnie nowym kształtem treści (tekst+tagi, nie liczba+próg jak dotychczasowe cztery karty).
@@ -43,6 +44,7 @@ export const usePinnedNotesTileStyleStore = create<PinnedNotesTileStyleState>()(
     {
       name: 'pinned-notes-tile-style-v1',
       storage: throttledPersistStorage(),
+      merge: mergeTileStyleState,
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),
