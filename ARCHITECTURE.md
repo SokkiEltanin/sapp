@@ -19040,6 +19040,77 @@ pod nawyk → 🎨 styl → sekcja "Cel po kliknięciu" powinna się pojawić TY
 liczników/ćwiczeń) → przełączenie Wody/Roku → tapnięcie kafla (poza edycją) powinno nawigować do
 wybranego kalendarza.
 
+## 352. Fix: edytor mapy bossów — boss poza ekranem nie do złapania (2026-10-17)
+
+User, zaraz po fixie gestu (§348): "jak nie widac bosa i wystaje za ekran to jak mam fo
+przeciągnąć" — gest DZIAŁA teraz poprawnie (§348), ale edytor zawsze otwierał się
+przewinięty na samą GÓRĘ płótna, bez żadnego sposobu dotrzeć do bossa dalej na liście poza
+ręcznym przewijaniem na oślep. Przy 20+ bossach i `ROW_GAP=170` (patrz `bossMapLayout.ts`)
+płótno łatwo robi się dłuższe niż kilka ekranów — boss którego user CHCE przeciągnąć mógł być
+w ogóle poza aktualnie widocznym fragmentem, więc nie dało się go nawet dotknąć, nie mówiąc o
+przeciągnięciu.
+
+**Fix — dwuwarstwowy, `app/boss-map-editor.tsx`**:
+1. Edytor teraz otwiera się WYCENTROWANY na aktualnym (następnym do pokonania) bossie, nie na
+   pozycji (0,0) — ten sam `centerScrollY`+`contentOffset`+`key`-remount mechanizm co BUG #6 w
+   `CampaignMap.tsx` (§343), teraz użyty w DRUGIM miejscu (jedna definicja "jak wycentrować
+   kamerę na węźle", nie druga kopia tej samej logiki).
+2. Nowy poziomy pasek numerków-chipów nad płótnem ("skocz do bossa") — tapnięcie numeru N
+   centruje kamerę (animowany `scrollTo`) na bosie N, NIEZALEŻNIE jak daleko jest na płótnie.
+   To rozwiązuje realny problem strukturalnie: user nie musi już WIDZIEĆ bossa żeby go
+   znaleźć — najpierw skacze do niego numerem, POTEM przeciąga.
+
+**Świadomie NIE zrobione**: auto-scroll w trakcie przeciągania gdy palec zbliża się do
+krawędzi ekranu (typowy drag-and-drop UX) — real, ale większe ryzyko (ciągła koordynacja
+`scrollTo` z aktywnym `PanResponder`em, `scrollEnabled={false}` podczas gestu). Lista "skocz do
+bossa" rozwiązuje GŁÓWNY zgłoszony problem (dotarcie do bossa PRZED złapaniem) bez tego ryzyka;
+jeśli user po teście dalej będzie chciał płynne auto-scrollowanie W TRAKCIE przeciągania, to
+osobny, większy fix.
+
+**Testy**: czysto UI-wiring, reużywa już przetestowanego `centerScrollY` (`bossMapLayout.
+test.ts`, §343) — nowej logiki matematycznej nie ma. `tsc --noEmit` czyste, `jest --silent`
+108/108 suite, 1405 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: Bossy → ✏️ → edytor powinien otworzyć się już
+wycentrowany na aktualnym bosie (nie na górze listy) → tapnięcie dowolnego numerka w górnym
+pasku powinno płynnie przewinąć kamerę do tego bossa → przeciągnięcie powinno teraz działać
+dla KAŻDEGO bossa, nie tylko tych widocznych od razu po otwarciu.
+
+## 353. Usunięcie TopPill (2026-10-17)
+
+User: "i chcę nie mieć PILLa którego mamy wywalamy go zupełnie ja sobie zrobię kafelek który
+na dashbordzie będzie pełnił te funkcje" — pływająca "dynamic island"-owa pigułka u góry
+wszystkich zakładek (`TopPill.tsx`, 716 linii — pomodoro/praca/zadania/budżet/GCal/nawyki/
+pupil/plan lekcji/misje, priorytetyzowane i rotowane) usunięta CAŁKOWICIE. User zbuduje sobie
+zamiennik jako kafel na płótnie kopiowania komponentów (§340+) zamiast wbudowanej, sztywnej
+pigułki.
+
+**Usunięte pliki**: `src/components/ui/TopPill.tsx`, `src/store/pillFlashStore.ts` (drugi kanał
+powiadomień TYLKO dla pigułki — oba miejsca które go wołały już miały równoległy
+`toast.success(...)`, więc usunięcie nie traci żadnej notyfikacji, tylko drugą, zbędną teraz
+prezentację), `src/utils/pillAnim.ts` + jego test (czysta logika animacji, używana WYŁĄCZNIE
+przez `TopPill.tsx`).
+
+**`app/(tabs)/_layout.tsx`** — usunięty `<TopPill/>` overlay + jego `pillOverlay` style +
+nieużywany już `useSafeAreaInsets()`/`insets` (był wołany TYLKO dla pozycji pigułki).
+
+**7 ekranów z zakładek** (`index.tsx`/`stats.tsx`/`food.tsx`/`health.tsx`/`tasks.tsx`/
+`finances.tsx`/`mood.tsx`) — `paddingTop: insets.top + 50` (50px zarezerwowane na wysokość
+pigułki) zmienione na `insets.top + spacing[3]` (12px, zwykły oddech od góry, bez
+zarezerwowanej pustej przestrzeni na coś czego już nie ma).
+
+**`index.tsx`/`bankAutoProcess.ts`** — usunięte wywołania `usePillFlash.getState().show(...)`
+(seria logowań / auto-dodana płatność z banku) — `toast.success(...)` obok nich ZOSTAJE, więc
+user dalej dostaje te powiadomienia, tylko jednym kanałem zamiast dwoma.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite (-1, usunięty
+`pillAnim.test.ts`), 1399 testów (-6, testy usuniętego `pillAnim.ts`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: każda zakładka (Dashboard/Zadania/Statystyki/
+Finanse/Zdrowie/Jedzenie/Nastrój) powinna wyglądać identycznie poza BRAKIEM pigułki u góry —
+reszta treści zaczyna się bliżej góry ekranu (mniej pustej przestrzeni niż wcześniej, bo
+rezerwacja 50px zniknęła), nic nie powinno wyglądać na "obcięte" ani nachodzić na pasek stanu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

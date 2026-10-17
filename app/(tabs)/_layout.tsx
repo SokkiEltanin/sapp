@@ -1,13 +1,11 @@
 import { useCallback, useMemo } from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { Tabs, usePathname, router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import TabBar from '@/components/ui/TabBar';
-import TopPill from '@/components/ui/TopPill';
 import { useUiPrefs } from '@/store/uiPrefs';
 
 // expo-router uses this for the whole tab segment — a screen render crash is caught
@@ -25,7 +23,6 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const currentIdx = tabIdx(pathname);
   const c = useColors();
-  const insets = useSafeAreaInsets();
   const { width: W } = useWindowDimensions(); // reactive swipe threshold (updates on resize)
   // Opt-in slide between boards. Safe now because all screens stay mounted
   // (detachInactiveScreens=false + lazy=false), so the destination is already laid
@@ -59,10 +56,6 @@ export default function TabsLayout() {
 
   return (
     <View style={[s.root, { backgroundColor: c.bg.primary }]}>
-      {/* Tab screens fill the FULL height so each screen's own background reaches the
-          top edge — the pill floats OVER them (absolute overlay below), instead of
-          sitting in a separate top band. Screens add their own top padding (safe
-          inset + pill space) so content isn't hidden behind the floating pill. */}
       <GestureDetector gesture={pan}>
         <View style={s.swipeContainer}>
           <Tabs
@@ -91,12 +84,6 @@ export default function TabsLayout() {
         </View>
       </GestureDetector>
 
-      {/* Floating pill — absolute overlay at the top, no background band behind it.
-          box-none so only the pill itself is tappable; the rest passes through. */}
-      <View style={[s.pillOverlay, { top: insets.top }]} pointerEvents="box-none">
-        <TopPill />
-      </View>
-
       {/* Fixed tab bar */}
       <TabBar currentIndex={currentIdx} />
     </View>
@@ -106,5 +93,4 @@ export default function TabsLayout() {
 const s = StyleSheet.create({
   root:           { flex: 1, backgroundColor: colors.bg.primary },
   swipeContainer: { flex: 1, overflow: 'hidden' },
-  pillOverlay:    { position: 'absolute', left: 0, right: 0, zIndex: 50 },
 });

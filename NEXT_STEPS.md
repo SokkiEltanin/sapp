@@ -3,6 +3,72 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Usunięcie TopPill (2026-10-17, §353) — DO WERYFIKACJI
+
+User: "wywalamy go zupełnie, ja sobie zrobię kafelek". Pigułka u góry wszystkich zakładek
+usunięta całkowicie wraz z zależnościami (`pillFlashStore`/`pillAnim`). Zarezerwowany top-padding
+(50px) na 7 ekranach zmniejszony do zwykłego oddechu (12px). **Priorytet testu WYSOKI** —
+checklist w ARCHITECTURE.md §353.
+
+## 🆕 Kreator kafelków — user zgłosił braki (2026-10-17, jeszcze NIE zaczęte)
+
+User, zrzutem ekranu Kreatora (zakładka "Odliczania"): "nie ma możliwości wyboru własnego
+kształtu od zera w projektorze... ani możliwości customowego koloru. ORAZ dodaj bibliotekę
+kolorów gdzie moge dodawac kolory zeby miec do nich dostęp projektując inne kafelki". Trzy
+oddzielne, duże braki do zrobienia w kolejnych fazach:
+
+1. **Własny kolor (custom)** — dziś WSZĘDZIE tylko gotowe presety (paleta progów serii,
+   kolor akcentu Rekordów) — brak dowolnego hex/color-pickera.
+2. **Biblioteka kolorów** — nowy, WSPÓLNY store zapisanych kolorów usera (dodaj/nazwij/usuń),
+   dostępny z KAŻDEGO miejsca z wyborem koloru w kreatorze (nie osobna paleta per typ kafla).
+3. **Więcej wariantów kształtu dla typów BEZ wyboru** — "Twoje serie" ma 4 presety (klasyczny/
+   pierścień/pasek/kompaktowy), ale Rekordy/Odliczania/Liczniki/Notatki mają TYLKO suwaki
+   liczbowe (zaokrąglenie/rozmiar), zero alternatywnych układów. Dociągnąć podobny wybór tam
+   gdzie ma to sens (nie kopiować 1:1 presetów serii — każdy typ ma inny kształt treści).
+
+Logiczna kolejność: biblioteka kolorów + custom kolor NAJPIERW (fundament, reużywany wszędzie),
+potem warianty kształtu per typ.
+
+## 🆕 Dashboard jako wolne płótno (2026-10-17, potwierdzone AskUserQuestion, jeszcze NIE zaczęte)
+
+User potwierdził wprost: "projektowanie całego ekranu" = zastosowanie WOLNEGO PŁÓTNA (system
+z §340+, dziś na Jedzeniu/Ćwiczeniach/Finansach) do PRAWDZIWEGO dashboardu (`index.tsx`), nie
+tylko lżejsza zmiana kolejności/widoczności kart.
+
+**Znana przeszkoda architektoniczna** (już udokumentowana w `useAllStreakItems.ts`): dashboard
+JUŻ montuje `useHabits()` (własny AsyncStorage fetch) dla swojej stałej treści —
+`<ScreenCanvas>` wewnętrznie też woła `useHabits()` (przez `useAllStreakItems()`), więc
+podpięcie 1:1 jak na innych ekranach PODWOIŁOBY fetch na najbardziej czułym na wydajność
+ekranie appki.
+
+**Plan rozwiązania (zaprojektowany, NIE zaimplementowany)**: rozdzielić `ScreenCanvas` na
+`ScreenCanvasBase` (czysto props-driven — przyjmuje `allStreakItems`/`allCountdownItems`/
+`allNotesItems` jako propsy, ŻADNYCH własnych hooków fetchujących dane) + istniejący
+`ScreenCanvas` jako cienki wrapper (woła 3 hooki jak dziś, używany przez Jedzenie/Ćwiczenia/
+Finanse bez zmian). `index.tsx` importuje `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE
+już wyliczone dane (`streakWall` 1:1 jako `allStreakItems` — zero dodatkowego kodu; `counters`
+już w pamięci dla `allCountdownItems` — tani dodatkowy `.filter()`, nie fetch; notatki —
+rozszerzyć istniejący efekt `index.tsx` ładujący notatki do przypiętych, żeby trzymał WSZYSTKIE
+notatki, `pinnedNotes` jako pochodna `.filter()`). To NIE dotyka samego `useHabits()` (duży,
+ryzykowny refaktor na Zustand, świadomie odrzucony na rzecz mniejszej, chirurgicznej zmiany).
+
+**Dodatkowo do przemyślenia przy implementacji**: gdzie fizycznie wstawić sekcję płótna w
+~5400-liniowym `index.tsx` (osobna, wyraźnie oddzielona strefa, nie wmieszana między istniejące
+sztywne karty) i czy domyślne pozycje nowych itemów powinny jakoś uwzględniać że ekran już jest
+pełen innej, stałej treści nad/pod płótnem.
+
+## 🔴 Fix: edytor mapy bossów — boss poza ekranem (2026-10-17, §352) — DO WERYFIKACJI
+
+User zaraz po fixie gestu (§348): "jak nie widac bosa i wystaje za ekran to jak mam go
+przeciągnąć". Edytor teraz: (1) otwiera się wycentrowany na aktualnym bosie, nie na górze
+płótna, (2) ma pasek numerków-chipów nad płótnem — tapnięcie skacze kamerą do tego bossa
+niezależnie jak daleko jest. **Priorytet testu KRYTYCZNY** — checklist w ARCHITECTURE.md §352.
+
+**Świadomie NIE zrobione**: auto-scroll w trakcie samego przeciągania (palec blisko krawędzi
+ekranu przewija widok) — większe ryzyko, lista "skocz do bossa" rozwiązuje główny problem
+(dotarcie do bossa PRZED złapaniem) bez tego. Jeśli user dalej będzie chciał płynne
+auto-scrollowanie W TRAKCIE gestu, to osobny fix.
+
 ## 🆕 System kopiowania komponentów — Faza 22: przepinanie nawigacji per-instancja (2026-10-17, §351)
 
 Ostatni mały odłożony gap z Fazy 16 (§342) domknięty — "Cel po kliknięciu" (Wody/Roku) teraz

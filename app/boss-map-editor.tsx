@@ -9,8 +9,9 @@ import BossArt from '@/components/bosses/BossArt';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { BOSSES } from '@/utils/bosses';
-import { layoutBossMap, applyLayoutOverrides, catmullRomPath, MapNode } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY, MapNode } from '@/utils/bossMapLayout';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
+import { usePetStore } from '@/store/petStore';
 import { spacing, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -39,6 +40,18 @@ export default function BossMapEditorScreen() {
   const resetAll = useBossMapLayoutStore(st => st.resetAll);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [confirmReset, setConfirmReset] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  // Lista "skocz do bossa" (2026-10-17, user: "jak nie widac bosa i wystaje za ekran to jak
+  // mam go przeciągnąć" — przy 20+ bossach i ROW_GAP=170 płótno łatwo robi się dłuższe niż
+  // kilka ekranów, a edytor dotąd zawsze otwierał się na samej górze, bez ŻADNEGO sposobu
+  // dotrzeć do bossa poza bieżącym widokiem poza ręcznym przewijaniem na oślep). Ten sam
+  // `centerScrollY` co BUG #6 w `CampaignMap.tsx` (§343) — jedna definicja "jak wycentrować
+  // kamerę na węźle", teraz używana w DWÓCH miejscach zamiast tylko w prawdziwej mapie.
+  const defeatedBosses = usePetStore(st => st.defeatedBosses);
+  const currentIdx = useMemo(() => {
+    const idx = BOSSES.findIndex(b => !defeatedBosses.includes(b.id));
+    return idx === -1 ? BOSSES.length - 1 : idx;
+  }, [defeatedBosses]);
   // Pozycja PRZECIĄGANEGO węzła podczas gestu — lokalny stan, NIE store (patrz komentarz
   // wyżej). `null` gdy nic nie jest aktualnie przeciągane.
   const [dragPos, setDragPos] = useState<{ idx: number; x: number; y: number } | null>(null);
@@ -55,6 +68,11 @@ export default function BossMapEditorScreen() {
     [baseNodes, dragPos],
   );
   const pathD = useMemo(() => catmullRomPath(nodes), [nodes]);
+  const initialTargetY = centerScrollY(baseNodes, currentIdx, viewport.h);
+  const jumpTo = (idx: number) => {
+    haptic.tap();
+    scrollRef.current?.scrollTo({ y: centerScrollY(baseNodes, idx, viewport.h), animated: true });
+  };
 
   const onLayoutViewport = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -118,8 +136,26 @@ export default function BossMapEditorScreen() {
       </View>
       <Text style={s.hint}>Przeciągnij bossów, żeby ułożyć mapę po swojemu — ścieżka łączy ich automatycznie.</Text>
 
+      {/* Lista "skocz do bossa" — numerki odpowiadają odznace na węźle. Rozwiązuje "nie widzę
+          bossa, jak mam go przeciągnąć": zamiast przewijać na oślep, tapnięcie numeru centruje
+          kamerę na TYM bosie, NIEZALEŻNIE jak daleko jest na płótnie. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.jumpRow} contentContainerStyle={s.jumpRowContent}>
+        {BOSSES.map((b, i) => (
+          <PressableScale key={b.id} onPress={() => jumpTo(i)} style={[s.jumpChip, i === currentIdx && { backgroundColor: '#38BDF8', borderColor: '#38BDF8' }]}>
+            <Text style={[s.jumpChipTxt, i === currentIdx && { color: '#05060A' }]}>{i + 1}</Text>
+          </PressableScale>
+        ))}
+      </ScrollView>
+
       <View style={s.stageWrap} onLayout={onLayoutViewport}>
-        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={!dragPos}>
+        {viewport.w > 0 && viewport.h > 0 && (
+        <ScrollView
+          key={`${viewport.w}x${viewport.h}`}
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!dragPos}
+          contentOffset={{ x: 0, y: initialTargetY }}
+        >
           <View style={{ width: canvasW, height: canvasH }}>
             <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
               <Defs>
@@ -151,6 +187,7 @@ export default function BossMapEditorScreen() {
             })}
           </View>
         </ScrollView>
+        )}
       </View>
 
       <ConfirmDialog
@@ -182,6 +219,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   resetBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   hint: { fontSize: 11.5, color: c.text.muted, textAlign: 'center', paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
+
+  jumpRow: { flexGrow: 0, paddingBottom: spacing[2] },
+  jumpRowContent: { paddingHorizontal: spacing[3], gap: 6 },
+  jumpChip: {
+    width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#12161F', borderWidth: 1, borderColor: '#262c3a',
+  },
+  jumpChipTxt: { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.6)' },
 
   stageWrap: { flex: 1, overflow: 'hidden', backgroundColor: '#05060A' },
   portrait: { width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12161F', borderWidth: 2, borderColor: '#262c3a' },

@@ -416,7 +416,7 @@ export default function FinancesScreen() {
           sections={sections}
           keyExtractor={item => item.id}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />
+            <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} progressViewOffset={insets.top + spacing[3]} />
           }
           ListHeaderComponent={
             <>
@@ -672,7 +672,7 @@ export default function FinancesScreen() {
               <ScreenCanvas screenKey="finances" title="Twoje komponenty" />
             </>
           }
-          contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 200 }}
+          contentContainerStyle={{ paddingTop: insets.top + spacing[3], paddingBottom: 200 }}
           stickySectionHeadersEnabled={false}
         />
 
