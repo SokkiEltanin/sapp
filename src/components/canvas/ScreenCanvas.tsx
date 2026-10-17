@@ -69,6 +69,11 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
   const { color: timeAccentColor } = useTimeAccent();
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
   const styleItem = myItems.find(i => i.id === styleForId) ?? null;
+  // "Cel po kliknięciu" (§351) — tylko `CanvasStreakStyleModal` go potrzebuje, tylko żeby
+  // wiedzieć KTÓRY nawyk (jeśli w ogóle) jest aktualnie podpięty pod edytowaną instancję.
+  const styleBoundStreak = styleItem?.componentType === 'streakTile' && styleItem.bindingKey
+    ? allStreakItems.find(x => x.key === styleItem.bindingKey) ?? null
+    : null;
 
   const streakOptions: PickerOption[] = useMemo(
     () => allStreakItems.map(i => ({ key: i.key, label: i.name, meta: `${i.days} ${i.days === 1 ? 'dzień' : 'dni'}` })),
@@ -287,12 +292,18 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       <CanvasStreakStyleModal
         visible={!!styleItem && styleItem.componentType === 'streakTile'}
         style={(styleItem && styleItem.componentType === 'streakTile' ? styleItem.style : DEFAULT_STREAK_TILE_STYLE) as StreakTileStyle}
+        boundItem={styleBoundStreak}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...styleItem.style, ...patch } }); }}
         onSetTierColor={(i, color) => {
           if (!styleItem || styleItem.componentType !== 'streakTile') return;
           const next = { ...(styleItem.style as StreakTileStyle).tierColorOverrides };
           if (color) next[i] = color; else delete next[i];
           updateItem(styleItem.id, { style: { ...styleItem.style, tierColorOverrides: next } });
+        }}
+        onSetHabitCalendar={(habitId, navStyle) => {
+          if (!styleItem || styleItem.componentType !== 'streakTile') return;
+          const next = { ...(styleItem.style as StreakTileStyle).habitCalendarOverrides, [habitId]: navStyle };
+          updateItem(styleItem.id, { style: { ...styleItem.style, habitCalendarOverrides: next } });
         }}
         onClose={() => setStyleForId(null)}
       />
