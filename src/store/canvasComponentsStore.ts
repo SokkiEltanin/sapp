@@ -194,7 +194,24 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         items: s.items.map(i => i.id === id ? { ...i, ...patch } : i),
       })),
 
-      removeItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
+      // Fix (§360, znalezione przy audycie) — komentarz przy `CanvasItem.groupId` deklarował
+      // "grupa usuwa się SAMA gdy ostatni member traci groupId/zostaje skasowany", ale kod tego
+      // NIE robił: usunięcie jednego z dwóch członków grupy zostawiało drugiego jako "grupę z
+      // 1 osobą" — `grouped=true` (fioletowa ramka, "Rozgrupuj" w panelu właściwości), mimo że
+      // nic już nie ma z czym synchronizować. Teraz: jeśli po usunięciu w grupie zostało <2
+      // członków, czyści `groupId` na tych co zostali — dogania zachowanie, które komentarz już
+      // deklarował.
+      removeItem: (id) => set((s) => {
+        const target = s.items.find(i => i.id === id);
+        let items = s.items.filter(i => i.id !== id);
+        if (target?.groupId) {
+          const remaining = items.filter(i => i.groupId === target.groupId);
+          if (remaining.length < 2) {
+            items = items.map(i => i.groupId === target.groupId ? { ...i, groupId: null } : i);
+          }
+        }
+        return { items };
+      }),
 
       groupItems: (screenKey, ids) => {
         const idSet = new Set(get().items.filter(i => i.screenKey === screenKey && ids.includes(i.id)).map(i => i.id));

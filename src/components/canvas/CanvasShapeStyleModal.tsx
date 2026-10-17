@@ -107,7 +107,7 @@ export default function CanvasShapeStyleModal({ visible, kind, style, onChange, 
                     <TextInput
                       value={st.text} onChangeText={(v) => onChange({ text: v })}
                       placeholder="Wpisz tekst…" placeholderTextColor={c.text.muted}
-                      multiline style={s.textInput}
+                      multiline maxLength={80} style={s.textInput}
                     />
                   </View>
                   <View>

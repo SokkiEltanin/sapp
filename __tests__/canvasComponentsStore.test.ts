@@ -91,6 +91,35 @@ describe('canvasComponentsStore — ungroupItems', () => {
   });
 });
 
+describe('canvasComponentsStore — removeItem a grupy (fix §360)', () => {
+  test('usunięcie jednego z DWÓCH członków grupy rozgrupowuje pozostałego (grupa "z 1 osobą" nie ma sensu)', () => {
+    const [a, b, c] = addThree();
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b])!;
+    useCanvasComponentsStore.getState().removeItem(a);
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === b)!.groupId).toBeNull();
+    expect(items.find(i => i.id === c)).toBeDefined(); // niepowiązany item nietknięty
+  });
+
+  test('usunięcie członka grupy z 3+ osobami NIE rozgrupowuje pozostałych (wciąż ≥2)', () => {
+    const [a, b, c, d] = [...addThree(), useCanvasComponentsStore.getState().addItem('food', 'streakTile')];
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b, c])!;
+    useCanvasComponentsStore.getState().removeItem(a);
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === b)!.groupId).toBe(groupId);
+    expect(items.find(i => i.id === c)!.groupId).toBe(groupId);
+  });
+
+  test('usunięcie itemu BEZ grupy nie rusza żadnych groupId', () => {
+    const [a, b, c] = addThree();
+    const groupId = useCanvasComponentsStore.getState().groupItems('food', [a, b])!;
+    useCanvasComponentsStore.getState().removeItem(c); // c nie jest w grupie
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === a)!.groupId).toBe(groupId);
+    expect(items.find(i => i.id === b)!.groupId).toBe(groupId);
+  });
+});
+
 describe('canvasComponentsStore — moveGroupBy', () => {
   test('przesuwa WSZYSTKICH członków grupy o ten sam delta', () => {
     const [a, b, c] = addThree();

@@ -26,6 +26,14 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Audyt błędów systemu płótna — kolejne 2 fixy (2026-10-17, §361) — DO WERYFIKACJI
+
+Kontynuacja audytu §360. Naprawione: `removeItem` teraz dogrupowywuje osieroconą grupę "z 1
+osobą" (komentarz przy `groupId` od §349 to deklarował, kod tego nie robił do teraz);
+`textShape` dostał `maxLength={80}` (brakowało limitu, w przeciwieństwie do innych pól
+tekstowych w appce). Checklist w ARCHITECTURE.md §361. **Audyt wciąż w toku** — kolejne
+znaleziska (jeśli będą) lądują jako kolejne numerowane fixy.
+
 ## 🆕 Fix: panel właściwości nie klamrował X (2026-10-17, §360) — DO WERYFIKACJI
 
 Znaleziony przy audycie §359: zwiększenie Szerokości w panelu właściwości mogło wypchnąć item
