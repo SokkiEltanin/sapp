@@ -3,17 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🔴 Mapa kampanii bossów — user chce PEŁEN edytor (zgłoszone 2026-10-17, jeszcze NIE zaczęte)
+## 🔴 Edytor mapy bossów — gest przeciągania naprawiony (2026-10-17, §348) — DO WERYFIKACJI
 
-User, po naprawie BUG #6 (§343, kamera): "jak edytuje mapę bossow to tam nic praktycznie nie
-mogę zrobic muszę miec mozliwosc ustawienia każdego bosa osobno narysowania lini między nimi
-itp" — istniejący "kreator mapy kampanii" (wspomniany wcześniej, user: "nigdy tam nie
-wchodziłem") NIE wystarcza. Trzeba sprawdzić co ten kreator dziś faktycznie umożliwia (zobaczyć
-`CampaignMap.tsx`/`bossMapLayout.ts` i ewentualny istniejący creator screen) i rozbudować o:
-pozycjonowanie KAŻDEGO bossa z osobna (nie tylko automatyczny layout), i rysowanie/edycję linii
-połączeń między węzłami (dziś `catmullRomPath` chyba generuje ścieżkę automatycznie z kolejności
-węzłów, nie z ręcznie zadanych połączeń). To NIE jest mały fix — osobna faza, zacząć od
-researchu obecnego stanu creator-screena zanim cokolwiek się zacznie dopisywać.
+User: "jak edytuje mapę bossow to tam nic praktycznie nie mogę zrobic muszę miec mozliwosc
+ustawienia każdego bosa osobno narysowania lini między nimi itp". Research pokazał: TO już
+istnieje — `app/boss-map-editor.tsx` (§322, pencil-ikona lewy-dolny róg na `bosses.tsx`) daje
+dokładnie to (przeciąganie każdego bossa osobno, ścieżka auto-przelicza się Catmull-Rom z
+aktualnych pozycji) — ale gest łamał się o klasyczną pułapkę `PanResponder` w `ScrollView` (bez
+`onPanResponderTerminationRequest`/`onShouldBlockNativeResponder`, scroll przejmował gest w
+trakcie ruchu, zwłaszcza na Androidzie). Naprawione w §348 — BEZ zmiany logiki
+pozycji/ścieżki (ta była zawsze poprawna, ma testy). "Narysowania lini między nimi" ŚWIADOMIE
+NIE zbudowane jako osobna funkcja dowolnego grafu połączeń — kampania jest ściśle sekwencyjna w
+logice gry, więc "linia" = zawsze ścieżka przez węzły w kolejności `BOSSES`, auto-aktualizująca
+się przy przeciąganiu. Jeśli po tej naprawie user DALEJ będzie chciał coś innego niż to (np.
+realnie zmienić KOLEJNOŚĆ walk, nie tylko wizualne rozmieszczenie) — to już zmiana designu gry,
+osobna rozmowa.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: Bossy → ✏️ → przeciągnij dowolnego bossa, powinno
+płynnie podążać za palcem bez "ucieczki" w scroll. Jeśli DALEJ nie działa — to NIE ta sama
+przyczyna (potrzeba realnego zrzutu/opisu z urządzenia, nie dalsze zgadywanie bez dostępu do
+telefonu).
 
 ## 🔴 Fix: crash na dashboardzie i w Kreatorze kafelków (2026-10-17, §347) — NAPRAWIONE
 

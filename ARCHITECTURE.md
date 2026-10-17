@@ -18861,6 +18861,49 @@ AsyncStorage (crash już się zdarzył, więc raczej tak) — fix działa i BEZ 
 bo `mergeTileStyleState` backfilluje brakujące pole przy KAŻDYM starcie appki, nie tylko
 jednorazowo przy migracji.
 
+## 348. Fix: edytor mapy bossów — ScrollView przejmował gest przeciągania (2026-10-17)
+
+User: "jak edytuje mapę bossow to tam nic praktycznie nie mogę zrobic muszę miec mozliwosc
+ustawienia każdego bosa osobno narysowania lini między nimi itp" — zgłoszone zaraz po BUG #6
+(§343, kamera na prawdziwej mapie). Pierwsze pytanie: czy `boss-map-editor.tsx` (§322) — ekran
+który JUŻ robi dokładnie to, o co prosi user (przeciąganie każdego bossa z osobna, ścieżka
+Catmull-Rom auto-przelicza się z aktualnych pozycji) — w ogóle działa na urządzeniu, skoro
+istnieje od Fazy przed tą sesją. Odpowiedź: strukturalnie TAK (dane/logika poprawne, patrz
+`applyLayoutOverrides`/`catmullRomPath` w `bossMapLayout.ts`), ale gest przeciągania miał
+klasyczną pułapkę `PanResponder` zagnieżdżonego w `ScrollView` — bez
+`onPanResponderTerminationRequest`, domyślne zachowanie RN to ZEZWÓL otaczającemu `ScrollView`
+na przejęcie gestu w trakcie ruchu, gdy wykryje pionowy pan. Na Androidzie (user: paczka
+`com.sokki.sapp` widoczna w zrzutach crasha z §347) dochodzi RÓWNOLEGLE natywny responder
+systemu widoków, który trzeba osobno zablokować (`onShouldBlockNativeResponder`). Objaw:
+`onPanResponderGrant` się odpala (haptic czuć), ale ruch palca nie przesuwa węzła — scroll
+"wygrywa" w trakcie gestu. Dokładnie pasuje do "nic praktycznie nie mogę zrobić".
+
+**Fix**: dopisane `onPanResponderTerminationRequest: () => false` (węzeł raz złapany NIE oddaje
+gestu, niezależnie co robi otaczający scroll) i `onShouldBlockNativeResponder: () => true`
+(blokuje równoległy natywny responder na Androidzie) do `PanResponder.create(...)` w
+`app/boss-map-editor.tsx`. Czysto gestowa naprawa — nie da się jej wyrazić jako czysta funkcja
+do testu w jest (ta sama kategoria co BUG #6's `scrollTo`/`contentOffset`, patrz §343 — logika
+pozycji/ścieżki JEST testowalna i ma testy w `bossMapLayout.test.ts`, SPOSÓB dostarczenia gestu
+do natywnego systemu nie jest).
+
+**"Narysowania lini między nimi"** — NIE zinterpretowane jako prośba o dowolny graf połączeń:
+kampania jest ŚCIŚLE sekwencyjna w logice gry (`current = BOSSES.find(b =>
+!defeatedBosses.includes(b.id))`, patrz `bosses.tsx`/`CampaignMap.tsx`) — nie da się "narysować
+linii" między dowolnymi dwoma bossami bez zmiany samej kolejności walk, co jest decyzją o
+designie gry, nie o edytorze. Ścieżka (`catmullRomPath`) ZAWSZE łączy węzły w kolejności tablicy
+`BOSSES` — to już działa, auto-przelicza się z żywych pozycji podczas przeciągania (`pathD`
+w `boss-map-editor.tsx` liczony z `nodes`, które scalają `dragPos` na żywo). Fix gestu wyżej to
+odblokowuje — user ZOBACZY linię łączącą się automatycznie przy przeciąganiu, bez osobnej
+funkcji do ręcznego rysowania.
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 107/107 suite, 1397 testów (bez zmian — czysto
+gestowa poprawka, logika pozycji/ścieżki niezmieniona, ma już pokrycie w `bossMapLayout.test.ts`).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY**: user zgłosił to jako realny blocker. Sprawdzić:
+Bossy → ✏️ (lewy dolny róg) → przeciągnięcie DOWOLNEGO bossa powinno płynnie przesuwać go
+razem z palcem (BEZ "ucieczki" w scroll ekranu w trakcie gestu) i ścieżka powinna żywo
+podążać za nową pozycją.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

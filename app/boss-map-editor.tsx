@@ -94,6 +94,16 @@ export default function BossMapEditorScreen() {
         });
       },
       onPanResponderTerminate: () => setDragPos(null),
+      // Bez tych dwóch węzeł da się złapać (onStartShouldSetPanResponder), ale otaczający
+      // `ScrollView` (ten sam ekran) PRZEJMUJE gest w trakcie ruchu, gdy wykryje pionowy pan —
+      // domyślne zachowanie RN gdy `onPanResponderTerminationRequest` nie jest podane to
+      // ZEZWÓL na przejęcie. Na Androidzie (user testuje na `com.sokki.sapp`) dochodzi do tego
+      // RÓWNOLEGLE natywny responder systemu widoków — `onShouldBlockNativeResponder` blokuje
+      // i jego. User zrzutem: "nic praktycznie nie mogę zrobić [w edytorze]" — to dokładnie
+      // objaw przejętego w locie gestu (haptic na starcie łapania działa, ale ruch palca nie
+      // przesuwa węzła, bo ScrollView już przejął responder zanim palec zdążył się przesunąć).
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     }));
   }
 
