@@ -19475,6 +19475,43 @@ granicach/ujemne/za krawędzią/szerszy niż płótno). `tsc --noEmit` czyste, `
 Edytuj → ⚙ na kaflu blisko prawej krawędzi → zwiększ Szerokość suwakiem → item powinien zostać
 CAŁY widoczny (X powinien się automatycznie zmniejszyć, nie wyjechać poza płótno).
 
+## 361. Audyt błędów systemu płótna (2026-10-17)
+
+Kontynuacja audytu z §360. User: "zrób listę na kilka godzin doszlifowania, dodawania, edycji,
+weryfikacji błędów, i dawaj bez przerwy". Dwa kolejne, konkretne znaleziska:
+
+**Fix: `removeItem` nie dogrupowywał osieroconej grupy "z 1 osobą"** — komentarz przy
+`CanvasItem.groupId` (§349) deklarował wprost: "grupa usuwa się SAMA gdy ostatni member traci
+groupId/zostaje skasowany" — ale kod tego NIE robił. Usunięcie jednego z DWÓCH członków grupy
+zostawiało drugiego z `groupId` wciąż ustawionym: fioletowa ramka, "Rozgrupuj" dostępne w panelu
+właściwości, mimo że nic już nie ma z czym synchronizować (grupa z 1 elementem funkcjonalnie
+nie różni się od braku grupy, ale UI dalej pokazywał stan "grupowy"). **Fix**: `removeItem`
+sprawdza, czy po usunięciu w grupie usuwanego itemu zostało <2 członków — jeśli tak, czyści
+`groupId` na tych co zostali, dogania zachowanie, które komentarz już deklarował.
+
+**Fix: `textShape` bez limitu długości tekstu** — pole tekstowe w `CanvasShapeStyleModal` nie
+miało `maxLength` (w przeciwieństwie do innych pól tekstowych w appce — nazwa pupila 16,
+tytuł/notatka w focus/pomodoro 60-80). Dodane `maxLength={80}` — kafel tekstowy na płótnie to
+etykieta/podpis, nie pełna notatka (do tego już jest `notesTile`), bez limitu wklejenie bardzo
+długiego tekstu mogło rozpychać layout bez ograniczeń.
+
+**Przegląd BEZ znalezionych problemów** (sprawdzone, działa poprawnie): wszystkie odczyty
+`CanvasItem.zIndex` już mają `?? 0` (dodane w §359, zweryfikowane grepem — kompletne);
+`bringToFront`/`sendToBack` na nieistniejącym id bezpiecznie no-opują (`target` undefined →
+early return); `resizeGroupBy` nie ma ryzyka dzielenia przez zero (mianownik `item.width` nigdy
+nie może być 0 — `MIN_ITEM_WIDTH`/`MIN_ITEM_HEIGHT` klamrowane na WSZYSTKICH ścieżkach); kolory
+usunięte z biblioteki (`colorLibraryStore`) nie psują już ustawionych kafli (hex zapisany jako
+wartość, nie referencja); `MetricPickerModal`/style modale bezpiecznie fallbackują gdy brak
+wybranego itemu (`visible={false}`, ale drzewo i tak się renderuje).
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +3 testy (`removeItem` rozgrupowuje przy
+<2 pozostałych, NIE rozgrupowuje przy ≥2, nie rusza niepowiązanych itemów). `tsc --noEmit`
+czyste, `jest --silent` 109/109 suite, 1423 testów.
+
+**Priorytet testu na urządzeniu — NISKI** (oba fixy defensywne, nie crash): pogrupuj 2 kafle →
+usuń jeden → drugi powinien wrócić do normalnego (niebieskiego) wyglądu, bez "Rozgrupuj" w
+panelu właściwości.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
