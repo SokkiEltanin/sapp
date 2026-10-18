@@ -26,6 +26,25 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🔴 Smart guides / snapowanie przy przeciąganiu (2026-10-18, §372) — DO WERYFIKACJI NA URZĄDZENIU (OBOWIĄZKOWE)
+
+User: "dodaj SNAPOWANIE do centrum obiektu... z linijkami... jak w Figmie" — ostatni z 4
+punktów zgłoszonych tej sesji. Przeciąganie kafla na płótnie teraz "przyciąga się" (promień
+~6px) do lewej/środka/prawej krawędzi innych kafli (analogicznie góra/środek/dół), z różową
+linią-wskazówką widoczną na czas przeciągania. **Ten kod (Reanimated gesture-worklet) NIE da
+się zweryfikować inaczej niż na urządzeniu** — `tsc`/`jest` czyste, ale to tylko typecheck,
+zero realnej weryfikacji logiki gestu. **Priorytet testu WYSOKI, OBOWIĄZKOWY** — checklist w
+ARCHITECTURE.md §372.
+
+**Świadomie NIE zrobione (user też o to prosił, scope cut)**: wskaźniki "równych odstępów"
+między kaflami (equal-spacing) — tylko wyrównanie krawędzi/centrum w v1. Snapowanie przy
+RESIZE (uchwyt w rogu) też nie — tylko przy przeciąganiu (drag).
+
+**Tym samym kończy się cała lista 4 punktów zgłoszonych w tej sesji** (korelacja
+bibliotek/style presets §370, typ Ikona §371, snapowanie §372 — plus wcześniejsze płótno-
+wszędzie §368/audyt §369). Jeśli user zechce equal-spacing albo snap przy resize, to osobny,
+następny fix.
+
 ## 🆕 Typ komponentu "Ikona" na płótnie (2026-10-18, §371) — DO WERYFIKACJI
 
 User: "możesz też do edytora pododawać IKONKI... moge je dodawac wtedy bezposrednio

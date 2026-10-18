@@ -19907,6 +19907,69 @@ komponentu) — `ICON_TILE_MAP` sam nie jest testowalny w jest/node (importuje
 sprawdź siatkę 45 ikon w modalu stylu (🎨), zmianę koloru/rozmiaru/wyrównania/tła działają
 na żywo, i że przeciąganie/resize/usuwanie (chrome) działa identycznie jak dla kształtów.
 
+## 372. Smart guides / snapowanie przy przeciąganiu na płótnie (2026-10-18)
+
+User: "dodaj właśnie SNAPOWANIE do centrum obiektu czy coś żebym nie robił krzywo z na
+bieżąco pokazującymi się na chwilkę linijkami żeby było widać że jest równo... jak w
+Figmie" — ostatni z czterech zgłoszonych punktów tej sesji (po §368 płótno-wszędzie, §370
+biblioteka presetów, §371 typ Ikona) i jedyny wymagający zmiany w Reanimated gesture-workletcie
+(`CanvasPlacedItem.tsx`'s `dragGesture`), dotąd świadomie unikany ze względu na ryzyko
+("workletyzacja" importowanych funkcji — patrz `clampItemX` w `canvasComponentsStore.ts`).
+
+**Mechanizm**: `dragGesture.onUpdate` (UI thread) po policzeniu `rawX`/`rawY` (ten sam
+istniejący clamp do granic płótna co dotąd) sprawdza, dla KAŻDEGO sąsiada na tym ekranie
+(`allRects`, przekazane jako prop z `ScreenCanvas.tsx`, zsynchronizowane do `rectsShared`
+shared value TYM SAMYM wzorcem co `tx`/`ty`/`w`/`h`), czy lewa/środek/prawa krawędź
+przeciąganego itemu jest w zasięgu 6px od lewej/środka/prawej krawędzi sąsiada (analogicznie
+góra/środek/dół dla Y) — PIERWSZY dopasowany próg wygrywa (nie najbliższy, prosta reguła).
+Po dopasowaniu: pozycja PRZYCIĄGANA do dokładnego wyrównania (nie tylko wizualnie — realna
+`tx.value`/`ty.value`), re-klamrowana do granic płótna (bezpiecznik — snap do centrum
+szerszego/węższego sąsiada teoretycznie mógłby przesunąć poza granicę o kilka px).
+
+**Linie-wskazówki**: `GuideState` (`{vx, vy1, vy2, hy, hx1, hx2}`) — JEDNA, WSPÓLNA
+`useSharedValue` stworzona w `ScreenCanvas.tsx`, przekazana jako TA SAMA referencja do
+WSZYSTKICH `CanvasPlacedItem` na ekranie (tylko AKTUALNIE przeciągany item do niej pisze,
+reszta tylko dostaje referencję bez pisania — gest handler i tak obsługuje jeden drag na raz).
+Dwie linie o STAŁEJ pozycji w drzewie (`Reanimated.View`, różowy akcent `#EC4899` — wizualnie
+odróżnialny od fioletowej ramki grupy/niebieskiego chrome, ten sam kolor co Figma/Sketch/XD
+używają do linii wyrównania), widoczność/pozycja czytane z `guides.value` przez
+`useAnimatedStyle` — offscreen (`left:-9999`) + `opacity:0` gdy snap nieaktywny, ten sam
+"fixed slot" wzorzec co ramka grupy (§365), nie dynamiczna lista. `onEnd` czyści `guides.value`
+(linie znikają), potem commit pozycji jak dotąd.
+
+**Dlaczego CAŁA logika snapu jest INLINE w worklecie, nie w importowanej funkcji** — ta sama,
+udokumentowana ostrożność co przy `clampItemX` (§360): import + wywołanie funkcji z innego
+modułu W WORKLECIE wymaga poprawnej "workletyzacji" przez babel plugin Reanimated, a
+`babel.config.js` w tym projekcie ma komentarz "`reanimated 4.x with new architecture: plugin
+not needed`" — niejasne na tym etapie, czy cross-file worklet-marking (`'worklet'` directive w
+osobnym pliku) faktycznie się transformuje w tej konfiguracji. Zamiast ryzykować cichą
+regresję widoczną TYLKO na urządzeniu, cała matematyka snapu żyje jako jedna, inline funkcja
+w `.onUpdate()` — dokładnie tam, gdzie już istniejący clamp (`Math.max(0, Math.min(...))`)
+bezpiecznie działa od Fazy 15. **Konsekwencja**: ten kod, jak reszta matematyki gestów w tym
+pliku, NIE jest unit-testowalny w jest/node (`testEnvironment: 'node'`, worklet wymaga
+realnego Reanimated runtime) — weryfikacja wyłącznie na urządzeniu.
+
+**Świadomie NIE zrobione (scope cut, user prosił też o to)**: "równe odstępy" (equal-spacing
+indicators — wykrywanie że odstęp do sąsiada równy odstępowi między innymi dwoma itemami) —
+wymagałoby wykrywania "najbliższego sąsiada w tym samym rzędzie/kolumnie" + łańcucha
+porównań odstępów, więcej matematyki do zweryfikowania bez możliwości testu automatycznego.
+v1 obejmuje wyrównanie (edge/center snap + linie) — najczęstszy, najbardziej wartościowy
+przypadek ("żeby nie robił krzywo"). Equal-spacing jako możliwy v2, jeśli user zgłosi że
+tego potrzebuje. Resize (uchwyt w rogu) też NIE dostaje snapowania w v1 — tylko przeciąganie
+(drag) — zgłoszony use case ("przesuwam kafelki względem siebie") dotyczy ruchu, nie resize.
+
+**Testy**: ŻADNYCH nowych (worklet, nietestowalny w jest/node — patrz wyżej). `tsc --noEmit`
+czyste, `jest --silent` 112/112 suite, 1452 testy (bez zmian — ten commit nie dotyka żadnej
+testowanej, czystej logiki).
+
+**Priorytet testu na urządzeniu — WYSOKI, OBOWIĄZKOWY** (jedyna weryfikacja tego kodu):
+Edytuj płótno z 2+ kaflami → przeciągnij jeden blisko krawędzi/centrum drugiego (w obu
+osiach) → sprawdź że (1) kafel "przyciąga się" do dokładnego wyrównania w promieniu ~6px,
+(2) różowa linia pojawia się na czas przeciągania i znika po puszczeniu, (3) zwykłe
+przeciąganie DALEKO od innych kafli wciąż działa płynnie bez żadnego "szarpania"/lagu, (4)
+przeciąganie w grupie (`groupId`) nie psuje się (snap liczy się tylko dla POJEDYNCZEGO
+przeciąganego itemu, grupa i tak commituje przez `onMove`→`moveGroupBy` jak dotąd).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
