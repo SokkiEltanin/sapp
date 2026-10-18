@@ -221,6 +221,71 @@ describe('canvasComponentsStore — warstwy (zIndex, §359)', () => {
   });
 });
 
+describe('canvasComponentsStore — moveLayer (lista warstw, §365)', () => {
+  test('"up" zamienia item z NAJBLIŻSZYM sąsiadem o WYŻSZYM zIndex', () => {
+    const [a, b, c] = addThree(); // zIndex: a=0, b=1, c=2 (kolejność dodania)
+    useCanvasComponentsStore.getState().moveLayer(b, 'up');
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(zb).toBeGreaterThan(zc); // b przeskoczył c, jest teraz NA WIERZCHU
+    expect(za).toBeLessThan(zc); // a nietknięte, dalej najniżej
+  });
+
+  test('"down" zamienia item z NAJBLIŻSZYM sąsiadem o NIŻSZYM zIndex', () => {
+    const [a, b, c] = addThree();
+    useCanvasComponentsStore.getState().moveLayer(b, 'down');
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(zb).toBeLessThan(za); // b przeskoczył a, jest teraz NA SPODZIE
+    expect(zc).toBeGreaterThan(za); // c nietknięte, dalej na wierzchu
+  });
+
+  test('"up" na już-najwyższym itemie jest no-opem (brak sąsiada powyżej)', () => {
+    const [, , c] = addThree();
+    const before = useCanvasComponentsStore.getState().items;
+    useCanvasComponentsStore.getState().moveLayer(c, 'up');
+    const after = useCanvasComponentsStore.getState().items;
+    expect(after).toEqual(before);
+  });
+
+  test('"down" na już-najniższym itemie jest no-opem (brak sąsiada poniżej)', () => {
+    const [a] = addThree();
+    const before = useCanvasComponentsStore.getState().items;
+    useCanvasComponentsStore.getState().moveLayer(a, 'down');
+    const after = useCanvasComponentsStore.getState().items;
+    expect(after).toEqual(before);
+  });
+
+  // Fix wykryty przy pisaniu tego testu (§365) — stare/migrowane itemy mogą dzielić TEN SAM
+  // fallback zIndex (`?? 0`), więc zamiana dwóch RÓWNYCH wartości byłaby no-opem bez normalizacji.
+  test('zamienia poprawnie NAWET gdy sąsiedzi dzielą ten sam zIndex (legacy/migrowane itemy)', () => {
+    const [a, b, c] = addThree();
+    // Symuluj stan PRZED §359 — wszystkie trzy mają zIndex=0 (fallback), kolejność w tablicy
+    // (a,b,c) jest JEDYNYM sygnałem porządku, dokładnie jak przed dodaniem pola.
+    useCanvasComponentsStore.setState((s) => ({ items: s.items.map((i): CanvasItem => ({ ...i, zIndex: 0 })) }));
+    useCanvasComponentsStore.getState().moveLayer(b, 'up');
+    const items = useCanvasComponentsStore.getState().items;
+    const za = items.find(i => i.id === a)!.zIndex;
+    const zb = items.find(i => i.id === b)!.zIndex;
+    const zc = items.find(i => i.id === c)!.zIndex;
+    expect(zb).toBeGreaterThan(zc); // zamiana FAKTYCZNIE zaszła, nie zignorowana
+    expect(za).toBeLessThan(zc);
+  });
+
+  test('nie widzi itemów z innego screenKey', () => {
+    const [a, b] = addThree('food');
+    const [x] = addThree('exercises');
+    const beforeX = useCanvasComponentsStore.getState().items.find(i => i.id === x)!.zIndex;
+    useCanvasComponentsStore.getState().moveLayer(b, 'up');
+    const afterX = useCanvasComponentsStore.getState().items.find(i => i.id === x)!.zIndex;
+    expect(afterX).toBe(beforeX); // 'exercises' nietknięte przez reorder na 'food'
+  });
+});
+
 describe('canvasComponentsStore — resizeGroupBy (rozszerzone grupowanie, §359)', () => {
   test('skaluje x/y/width/height WSZYSTKICH członków względem WSPÓLNEGO lewego-górnego rogu grupy', () => {
     const [a, b] = addThree();

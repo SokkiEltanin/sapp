@@ -26,7 +26,20 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
-## 🆕 Kreator kafelków — warianty kształtu Rekordów (2026-10-17, §364) — DO WERYFIKACJI — LISTA ZAKOŃCZONA
+## 🆕 Wizualna ramka grupy + lista warstw z reorderem (2026-10-17, §365) — DO WERYFIKACJI — LISTA DOSZLIFOWANIA ZAKOŃCZONA
+
+Ostatni punkt z listy "doszlifowania" (§357-365). §359 odłożyło wspólną ramkę grupy i pełną
+listę warstw jako "osobny fix" — zrobione teraz, w wersji bezpiecznej (bez nowego systemu
+gestów drag-and-drop): fioletowa ramka wokół CAŁEJ grupy (dodatkowo do per-member obrysów),
+nowy przycisk 📚 w nagłówku płótna → lista wszystkich itemów TOP-FIRST z opisowymi etykietami +
+strzałki ↑/↓ do krokowej zamiany. Checklist w ARCHITECTURE.md §365 — w tym fix realnego buga
+znalezionego przy pisaniu testu (zamiana dwóch itemów o identycznym, migrowanym `zIndex ?? 0`
+była no-opem bez normalizacji).
+
+**Świadomie NIE zrobione**: prawdziwy drag-and-drop w liście warstw — jeśli krokowa zamiana
+okaże się zbyt wolna przy wielu warstwach, to osobny, większy fix.
+
+## 🆕 Kreator kafelków — warianty kształtu Rekordów (2026-10-17, §364) — DO WERYFIKACJI
 
 Trzeci i ostatni z listy flagowanej od §355. Rekordy dostały 3 warianty CAŁOKARTowe (hero+siatka
 default / siatka bez hero / lista wierszy). Checklist w ARCHITECTURE.md §364. **Tym samym

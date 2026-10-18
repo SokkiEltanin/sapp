@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -34,6 +34,7 @@ import { DataFieldTile } from './DataFieldTile';
 import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import CanvasPropertiesModal from './CanvasPropertiesModal';
+import CanvasLayersModal, { LayerRow } from './CanvasLayersModal';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -93,6 +94,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // Panel właściwości (§359) — X/Y/W/H + warstwy + rozgrupuj, osobny od `styleForId` (który
   // steruje modalami stylu PER-TYP) — ten panel jest UNIWERSALNY dla wszystkich typów.
   const [propsForId, setPropsForId] = useState<string | null>(null);
+  // Lista warstw (§365) — osobny panel od reszty (nie wiąże się z JEDNYM itemem jak style/
+  // properties, tylko z CAŁYM ekranem naraz).
+  const [layersOpen, setLayersOpen] = useState(false);
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
   // `selectMode` zamienia CAŁE płótno w tryb "tapnij żeby zaznaczyć" (osobna gałąź renderu w
   // `CanvasPlacedItem`, patrz komentarz tam) — oddzielny od normalnej edycji, nie da się
@@ -110,12 +114,53 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const bringToFront = useCanvasComponentsStore(st => st.bringToFront);
   const sendToBack = useCanvasComponentsStore(st => st.sendToBack);
   const resizeGroupBy = useCanvasComponentsStore(st => st.resizeGroupBy);
+  const moveLayer = useCanvasComponentsStore(st => st.moveLayer);
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
   // Warstwy (§359) — porządek RENDEROWANIA (który decyduje co jest "na wierzchu" wizualnie w
   // RN) sortowany po `zIndex`, NIE po kolejności w tablicy `items` (ta odzwierciedla kolejność
   // DODANIA, nie bieżącą warstwę po ewentualnym "na wierzch"/"na spód"). `?? 0` — patrz komentarz
   // przy `CanvasItem.zIndex` w `canvasComponentsStore.ts`.
   const orderedItems = useMemo(() => [...myItems].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)), [myItems]);
+
+  // Opisowa etykieta itemu (§365) — WSPÓLNA dla listy warstw, jedno miejsce rozwiązywania
+  // podpięcia-na-nazwę zamiast powtarzania per-wiersz logiki z głównej pętli renderu niżej.
+  const describeItem = (item: typeof myItems[number]): string => {
+    if (item.componentType === 'streakTile') return item.bindingKey ? (allStreakItems.find(x => x.key === item.bindingKey)?.name ?? 'Seria') : 'Seria (brak podpięcia)';
+    if (item.componentType === 'countdownTile') return item.bindingKey ? (allCountdownItems.find(x => x.id === item.bindingKey)?.name ?? 'Odliczanie') : 'Odliczanie (brak podpięcia)';
+    if (item.componentType === 'notesTile') return item.bindingKey ? (allNotesItems.find(x => x.id === item.bindingKey)?.title || 'Notatka') : 'Notatka (brak podpięcia)';
+    if (item.componentType === 'dataField') return item.bindingKey ? (dataFieldRegistry.find(f => f.id === item.bindingKey)?.label ?? 'Pole danych') : 'Pole danych (brak podpięcia)';
+    if (item.componentType === 'rectShape') return 'Prostokąt';
+    if (item.componentType === 'ellipseShape') return 'Elipsa';
+    if (item.componentType === 'lineShape') return 'Linia';
+    return 'Tekst';
+  };
+  // TOP-FIRST (odwrotność `orderedItems` — user intuicyjnie myśli "co jest na wierzchu" jako
+  // GÓRA listy, nie dół).
+  const layerRows: LayerRow[] = useMemo(
+    () => [...orderedItems].reverse().map(i => ({ id: i.id, label: describeItem(i), grouped: i.groupId != null })),
+    [orderedItems, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry],
+  );
+  // Ramka grupy (§365) — bounding-boxy WSZYSTKICH grup obecnych na ekranie, do narysowania
+  // wspólnej, wizualnej ramki wokół całej grupy w trybie edycji (patrz render niżej). Jeden
+  // `Map<groupId, box>` zamiast liczenia per-item w pętli renderu.
+  const groupBoxes = useMemo(() => {
+    const map = new Map<string, { x: number; y: number; width: number; height: number }>();
+    const byGroup = new Map<string, typeof myItems>();
+    for (const i of myItems) {
+      if (!i.groupId) continue;
+      const arr = byGroup.get(i.groupId) ?? [];
+      arr.push(i);
+      byGroup.set(i.groupId, arr);
+    }
+    for (const [gid, members] of byGroup) {
+      const minX = Math.min(...members.map(i => i.x));
+      const minY = Math.min(...members.map(i => i.y));
+      const maxX = Math.max(...members.map(i => i.x + i.width));
+      const maxY = Math.max(...members.map(i => i.y + i.height));
+      map.set(gid, { x: minX, y: minY, width: maxX - minX, height: maxY - minY });
+    }
+    return map;
+  }, [myItems]);
 
   const timeAccentColor = accentColor;
   const pickerItem = myItems.find(i => i.id === pickerForId) ?? null;
@@ -190,6 +235,11 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         <LayoutGrid size={13} color={c.text.secondary} />
         <Text style={s.title}>{title ?? 'Twoje komponenty'}</Text>
         <View style={{ flex: 1 }} />
+        {editing && myItems.length >= 2 && (
+          <TouchableOpacity onPress={() => { haptic.tap(); setLayersOpen(true); }} style={s.layersBtn}>
+            <Layers size={13} color={c.text.secondary} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => { haptic.tap(); setEditing(v => !v); setSelectMode(false); setSelectedIds([]); }}
           style={[s.editBtn, editing && { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' }]}>
           {editing ? <Check size={13} color={c.accent.blue} /> : <Pencil size={13} color={c.text.secondary} />}
@@ -316,6 +366,16 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             />
           );
         })}
+        {/* Wizualna ramka grupy (§365) — JEDNA wspólna ramka wokół bounding-boxa CAŁEJ grupy,
+            widoczna TYLKO w trybie edycji (poza select-mode, gdzie i tak nic nie jest
+            "pogrupowane" wizualnie w ten sposób) — per-member ramki (fioletowy border w
+            `CanvasPlacedItem`) ZOSTAJĄ, to DODATKOWA, nie zastępująca wizualizacja. `pointerEvents
+            ="none"` — czysto dekoracyjna, nie przechwytuje żadnego dotyku. */}
+        {editing && !selectMode && Array.from(groupBoxes.entries()).map(([gid, box]) => (
+          <View key={gid} pointerEvents="none" style={[s.groupFrame, {
+            left: box.x - 8, top: box.y - 8, width: box.width + 16, height: box.height + 16,
+          }]} />
+        ))}
       </View>
 
       {editing && selectMode && (
@@ -398,7 +458,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             Przeciągnij kafel, żeby go przesunąć · uchwyt w rogu zmienia rozmiar (w grupie:
             skaluje WSZYSTKICH razem) · tapnięcie wybiera podpięcie (kształty nie mają podpięcia
             — od razu gotowe) · ⚙ właściwości (pozycja/rozmiar/warstwa/rozgrupuj), 🎨 styl, 🗑
-            usuń.
+            usuń{myItems.length >= 2 ? ' · 📚 lista warstw w nagłówku' : ''}.
           </Text>
         </>
       )}
@@ -499,6 +559,14 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
         onClose={() => setPropsForId(null)}
       />
+
+      <CanvasLayersModal
+        visible={layersOpen}
+        rows={layerRows}
+        onMoveUp={(id) => moveLayer(id, 'up')}
+        onMoveDown={(id) => moveLayer(id, 'down')}
+        onClose={() => setLayersOpen(false)}
+      />
     </View>
   );
 }
@@ -534,8 +602,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
   },
   editTxt: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary },
+  layersBtn: {
+    width: 28, height: 28, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
   hintText: { fontSize: 11.5, color: c.text.muted, lineHeight: 16 },
   canvas: { borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', position: 'relative', overflow: 'visible' },
+  groupFrame: {
+    position: 'absolute', borderWidth: 2, borderStyle: 'dashed', borderColor: c.accent.purple + '90',
+    borderRadius: radius.lg,
+  },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 10, borderRadius: radius.md,

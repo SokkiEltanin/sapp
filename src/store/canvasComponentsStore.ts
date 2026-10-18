@@ -154,6 +154,14 @@ interface CanvasComponentsState {
   // wokół niego. Każdy member klamrowany OSOBNO do granic płótna i `MIN_ITEM_WIDTH/HEIGHT` — ten
   // sam wzorzec co `moveGroupBy`.
   resizeGroupBy: (screenKey: string, groupId: string, scaleX: number, scaleY: number, canvasWidth: number) => void;
+  // Lista warstw z krokowym reorderem (Faza 33, 2026-10-17, §365) — NEXT_STEPS.md/§359 flagowało
+  // "lista warstw z drag-to-reorder" jako świadomie odłożone ("na wierzch"/"na spód" wystarcza
+  // na v1). `moveLayer` to krok pomiędzy — zamiana z NAJBLIŻSZYM sąsiadem w stosie (nie skok na
+  // sam szczyt/spód jak `bringToFront`/`sendToBack`), bez budowania nowego systemu gestów
+  // drag-and-drop (ryzyko identyczne jak przy `CanvasPlacedItem`'s gestach — niepotrzebne dla
+  // tego, co faktycznie rozwiązuje problem: "lista + do góry/do dołu" pokazuje PEŁNY porządek
+  // warstw, czego "na wierzch"/"na spód" nie dawało).
+  moveLayer: (id: string, direction: 'up' | 'down') => void;
 }
 
 export const useCanvasComponentsStore = create<CanvasComponentsState>()(
@@ -267,6 +275,29 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
             return { ...i, x, y, width, height };
           }),
         };
+      }),
+
+      moveLayer: (id, direction) => set((s) => {
+        const target = s.items.find(i => i.id === id);
+        if (!target) return s;
+        // Posortowani wg zIndex (`?? 0`, ten sam powód co gdzie indziej) — "sąsiad" to
+        // dosłownie następny/poprzedni element w TYM porządku, nie w tablicy `items`.
+        const siblings = [...s.items.filter(i => i.screenKey === target.screenKey)].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+        const idx = siblings.findIndex(i => i.id === id);
+        const otherIdx = direction === 'up' ? idx + 1 : idx - 1;
+        if (otherIdx < 0 || otherIdx >= siblings.length) return s; // już na szczycie/spodzie
+        // Normalizuj WSZYSTKICH siblingów na TYM screenKey do kolejnych, unikalnych zIndex
+        // (0,1,2,…) w ICH BIEŻĄCYM porządku PRZED zamianą — stare, migrowane itemy mogą dzielić
+        // ten sam fallback `?? 0` (kilka naraz), więc zamiana dwóch RÓWNYCH wartości byłaby
+        // no-opem (swap(5,5) nic nie zmienia). Normalizacja zachowuje względny porządek
+        // (stabilne sortowanie wyżej), więc nie psuje nic poza dwiema zamienianymi pozycjami.
+        const zById = new Map(siblings.map((it, i2) => [it.id, i2]));
+        const targetZ = zById.get(target.id)!;
+        const otherId = siblings[otherIdx].id;
+        const otherZ = zById.get(otherId)!;
+        zById.set(target.id, otherZ);
+        zById.set(otherId, targetZ);
+        return { items: s.items.map(i => zById.has(i.id) ? { ...i, zIndex: zById.get(i.id)! } : i) };
       }),
     }),
     {
