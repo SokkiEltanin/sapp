@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, Pressable, AppState } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Zap, Swords, Trophy, Pencil } from 'lucide-react-native';
 
@@ -58,6 +58,17 @@ function nextLocalMidnightIso(): string {
 //    importem `raidIcon`/`eventIcon`/`eventBossFromKey` (używanymi WYŁĄCZNIE tam).
 export default function Bosses() {
   const c = useColors();
+  // Prześwit nad `PupilNavbar` (2026-10-18, §378) — ołówek edytora mapy i kafle raid/event
+  // były `position:'absolute', bottom: spacing[3]` WZGLĘDEM `{flex:1}` wrappera mapy, który
+  // (bo `SafeAreaView` ma tu tylko `edges={['top']}`) sięga do PRAWDZIWEGO dołu ekranu — a
+  // `PupilNavbar` (renderowany NIŻEJ w drzewie JSX, więc rysowany NA WIERZCHU) to
+  // pełnoszerokości, nieprzezroczysty pasek zadokowany dokładnie w tym samym miejscu. User
+  // zgłosił zrzutem ekranu: "na mapie nie mam ołówka" — oba przyciski były cały czas NIEWIDOCZNE
+  // (i nieklikalne) pod paskiem, dla KAŻDEGO usera na KAŻDym urządzeniu, nie tylko po dzisiejszej
+  // zmianie. `PUPIL_NAVBAR_CLEARANCE` = wysokość pigułki navbaru (paddingTop 4 + pill ~57px) +
+  // mały margines, licząc od `insets.bottom` tak jak liczy go sam `PupilNavbar`.
+  const insets = useSafeAreaInsets();
+  const navbarClearance = insets.bottom + 78;
   const s = useMemo(() => makeS(c), [c]);
   // useShallow (2026-09-20, audyt logika/optymalizacja runda 3) — goły `usePetStore()` bez
   // selektora subskrybował CAŁY store pupila (~50+ pól: gear, potki, dayClaims, customizacja
@@ -325,7 +336,7 @@ export default function Bosses() {
         {/* Wejście do edytora mapy (2026-10-14, ARCHITECTURE.md §322 — user: "zrobisz edytor
             ja sam ustawie wszystko mapę ścieżkę") — pływa w lewym dolnym rogu, symetrycznie
             do kafli raid/event po prawej. */}
-        <PressableScale onPress={() => { haptic.tap(); router.push('/boss-map-editor' as any); }} style={s.editMapBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.push('/boss-map-editor' as any); }} style={[s.editMapBtn, { bottom: navbarClearance }]}>
           <Pencil size={18} color={c.text.secondary} />
         </PressableScale>
 
@@ -334,7 +345,7 @@ export default function Bosses() {
             zasłaniały mapy"). Odznaka liczby medali w rogu, kropka "gotowe do walki" gdy
             odblokowane+nieukończone+jest energia. Tap → wyśrodkowany popup (`detail`) z
             pełną treścią, dokładnie tą samą co dawna zawsze-widoczna mini-karta. */}
-        <View style={s.tileRow}>
+        <View style={[s.tileRow, { bottom: navbarClearance }]}>
           <PressableScale onPress={() => { haptic.tap(); setDetail('raid'); }} style={s.tile}>
             <BossArt id={raid.id} emoji={raid.emoji} size={34} powered />
             {raidWon.length > 0 && <View style={s.tileBadge}><Text style={s.tileBadgeTxt}>{raidWon.length}</Text></View>}

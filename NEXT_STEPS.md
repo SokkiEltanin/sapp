@@ -3,6 +3,14 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴🔴 Fix: ołówek edytora mapy bossów + kafle raid/event ukryte pod navbarem (2026-10-18, §378) — PRIORYTET WYSOKI
+
+User zrzutem ekranu: "na mapie nie mam ołówka". Realny, stary bug (nie dzisiejsza regresja) —
+`editMapBtn`/`tileRow` w `app/bosses.tsx` renderowały się POD nieprzezroczystym paskiem
+`PupilNavbar` (ten sam zakres pikseli od dołu ekranu), niewidoczne i nieklikalne dla KAŻDEGO
+usera. Naprawione: oba przesunięte o `insets.bottom + 78` nad prawdziwy dół ekranu. **Priorytet
+testu WYSOKI** — checklist w ARCHITECTURE.md §378.
+
 ## 🔴🔴 Fix KRYTYCZNY: edycja istniejącego wydatku mogła się cicho zgubić (2026-10-18, §377) — PRIORYTET WYSOKI, finansowe
 
 User: "zerknij czy nie ma innych błędów takich itp" (po §376). Drugi audyt martwych funkcji

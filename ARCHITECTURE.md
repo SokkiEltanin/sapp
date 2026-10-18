@@ -20237,6 +20237,44 @@ wartości po włączeniu internetu (sprawdź po restarcie appki, nie tylko na ż
 kolorów (Kreator → dowolny picker koloru) i presetach stylu (dowolny kafel → "Zapisz jako
 preset") — długie przytrzymanie → ✏️ na istniejącym elemencie zmienia jego nazwę.
 
+## 378. Ołówek edytora mapy bossów i kafle raid/event ukryte pod PupilNavbar (2026-10-18)
+
+User przysłał zrzut ekranu Bossów (widok "Kampania"): dolny lewy i prawy róg mapy całkowicie
+puste — ani ołówka edytora pozycji (§376), ani kafli raid/event. "Na mapie nie mam ołówka".
+
+**Przyczyna — NIE regresja z dzisiejszej sesji, bug obecny od zawsze dla KAŻDEGO usera na
+KAŻDYM urządzeniu.** `app/bosses.tsx`'s `editMapBtn` (ołówek, §322) i `tileRow` (raid+event,
+kafle-ikony) to `position:'absolute', bottom: spacing[3]` (12px) WZGLĘDEM `{flex:1}` wrappera
+mapy. Ten wrapper sięga do PRAWDZIWEGO dołu ekranu — `bosses.tsx`'s `SafeAreaView` ma tylko
+`edges={['top']}`, nie rezerwuje miejsca na dole. `<PupilNavbar current="bosses" />`
+(pływający pasek Pupil/Bossy/Sklep/Questy, wspólny dla 4 ekranów-hubów) renderuje się NIŻEJ w
+drzewie JSX (ostatni element przed `</SafeAreaView>`) — w RN późniejszy sibling maluje się NA
+WIERZCHU wcześniejszego. `PupilNavbar` to pełnoszerokościowy, nieprzezroczysty pasek
+zadokowany `bottom:0`, którego pigułka (`paddingTop:4` + `pill` ~53px) zajmuje mniej więcej
+`insets.bottom+8` do `insets.bottom+65` licząc od dołu ekranu — DOKŁADNIE ten sam zakres co
+`editMapBtn` (12-56px od dołu) i `tileRow` (12-64px od dołu). Oba przyciski były więc cały
+czas renderowane, ale fizycznie POD paskiem nawigacji — niewidoczne i nieklikalne (pigułka ma
+domyślny `pointerEvents`, więc przechwytuje tapnięcia) na obu zakładkach (Kampania/MAD),
+niezależnie od postępu usera.
+
+**Naprawione** — `useSafeAreaInsets()` w `bosses.tsx`, nowy `navbarClearance = insets.bottom +
+78` (wysokość pigułki navbaru + mały margines), nałożony jako inline-override `bottom` na
+`editMapBtn` i `tileRow` (statyczny `StyleSheet.create` zostaje bez zmian jako fallback —
+nadpisanie przez `[s.editMapBtn, { bottom: navbarClearance }]`). Sprawdzone, że to jedyne takie
+miejsce — pozostałe 3 ekrany hubu Pupila (`pet.tsx`/`pet-shop.tsx`/`pet-quests.tsx`) nie mają
+żadnego analogicznego pływającego przycisku zadokowanego do dołu CAŁEGO ekranu (tylko odznaki
+względem własnego rodzica, niezależne od navbaru). `boss-map-editor.tsx` (§376, panel X/Y)
+NIE renderuje `PupilNavbar` wcale (osobny, drill-down ekran, nie zakładka hubu) — mój wczorajszy
+panel na dole nie koliduje.
+
+**Testy**: brak nowych — czysty UI-plik ekranu (ten sam status co inne ekrany tej sesji).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1459 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Bossy (obie zakładki, Kampania i MAD bossy) —
+ołówek w lewym dolnym rogu I kafle raid/event w prawym dolnym rogu muszą być WIDOCZNE, nad
+paskiem Pupil/Bossy/Sklep/Questy, nie pod nim. Sprawdź na urządzeniu z gestami (insets.bottom>0)
+i z fizycznymi przyciskami (insets.bottom=0) — oba muszą dawać czytelny prześwit.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
