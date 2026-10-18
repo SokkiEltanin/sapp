@@ -8,6 +8,7 @@ import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { feedWaterHabit, getWaterHabit, getCounts, setCounts, getHabits, saveHabits } from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
 import PressableScale from '@/components/ui/PressableScale';
@@ -90,6 +91,12 @@ function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pa
 
 export default function HealthScreen() {
   const insets = useSafeAreaInsets();
+  // Tryb pełnoekranowy płótna (2026-10-18, §381) — czytany NIEZALEŻNIE od `ScreenCanvas` niżej
+  // (ten sam store'owy klucz, patrz komentarz w `ScreenCanvas.tsx` przy `fullScreenOn`). Musi
+  // być wołany BEZWARUNKOWO, jak każdy hook — rozgałęzienie JSX jest dopiero na samym końcu
+  // funkcji (`return` niżej), PO wszystkich pozostałych hookach tego ekranu, więc kolejność
+  // wołania hooków zostaje identyczna niezależnie od wartości flagi (zasada hooków nienaruszona).
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['health'] ?? false);
   // Theme-reactive: shadow the module `colors`/`T` so the whole screen (incl. its
   // StyleSheet via makeStyles) flips with light/dark. Teal accent stays both ways.
   const colors = useColors();
@@ -594,6 +601,21 @@ export default function HealthScreen() {
     } catch { haptic.error(); toast.error('Błąd synchronizacji'); }
     finally { setSyncing(false); }
   };
+
+  // Tryb pełnoekranowy płótna (§381) — gdy włączony, CAŁY wbudowany ekran Zdrowia (wszystko
+  // poniżej) nie montuje się wcale, zastąpiony samym płótnem na cały ekran. `ScreenHeader` tu
+  // zostaje (ta sama orientacja "gdzie jestem" co zawsze) z dopiskiem "Pełny ekran" zamiast
+  // "Dzisiaj", bo "Dzisiaj" sugerowałoby że user patrzy na prawdziwe dane zdrowia — nie patrzy.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.container} edges={[]}>
+        <View style={{ marginHorizontal: -spacing[4], marginTop: -spacing[4] }}>
+          <ScreenHeader title="Zdrowie" subtitle="Pełny ekran" style={{ borderBottomColor: T.cardBorder }} />
+        </View>
+        <ScreenCanvas screenKey="health" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>

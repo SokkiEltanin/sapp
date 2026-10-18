@@ -135,6 +135,15 @@ const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTile
 
 interface CanvasComponentsState {
   items: CanvasItem[];
+  // Tryb pełnoekranowy (2026-10-18, §381) — user: "chcę od zera budować design... i móc go
+  // wdrożyć jako jakiś ekran zamiast np. zdrowia". Dotąd płótno było WYŁĄCZNIE dokładką na
+  // KOŃCU wbudowanej treści ekranu (§341+) — ten przełącznik, per `screenKey`, mówi
+  // hostującemu ekranowi "schowaj swoją wbudowaną treść, pokaż TYLKO płótno na cały ekran".
+  // Domyślnie wyłączony wszędzie (`undefined`/`false` = normalne zachowanie, zero zmiany dla
+  // nikogo kto tego nie włączy) — odwracalne w każdej chwili (sam toggle, bez utraty danych:
+  // itemy zostają w `items`, tylko przestają być jedynym widokiem ekranu).
+  fullScreenScreens: Record<string, boolean>;
+  setFullScreen: (screenKey: string, on: boolean) => void;
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
   updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
@@ -180,6 +189,10 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
   persist(
     (set, get) => ({
       items: [],
+      fullScreenScreens: {},
+      setFullScreen: (screenKey, on) => set((s) => ({
+        fullScreenScreens: { ...s.fullScreenScreens, [screenKey]: on },
+      })),
       _hydrated: false,
 
       // Nowa instancja ląduje POD najniżej leżącym elementem na TYM ekranie (nie w (0,0) na
@@ -315,7 +328,7 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
     {
       name: 'canvas-components-v1',
       storage: throttledPersistStorage(),
-      partialize: (s) => ({ items: s.items }),
+      partialize: (s) => ({ items: s.items, fullScreenScreens: s.fullScreenScreens }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

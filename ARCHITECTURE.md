@@ -20351,6 +20351,56 @@ chowa wbudowaną treść, pokazuje TYLKO płótno — patrz propozycja w rozmowi
 **Status**: czeka na potwierdzenie usera, który konkretny kierunek budować jako kolejny krok —
 nic z tego NIE zostało jeszcze zaimplementowane w tej sekcji, to zapis oceny/rekomendacji.
 
+## 381. Tryb pełnoekranowy płótna — Faza 1: infrastruktura + pilotażowy ekran Zdrowie (2026-10-18)
+
+User, po mojej ocenie z §380: "rób dopóki nie skończysz całego edytora, mam tam mieć wszystko
+od zera: budowanie kafelków, wykresów, robienie presetów itp itd. Czekam." — jasny mandat,
+kontynuacja bez dalszych pytań. Pierwszy, konkretny krok tego kierunku (z mojej własnej
+rekomendacji w §380): tryb "pełny ekran" NA ISTNIEJĄCYM już płótnie (§341-379), nie nowy,
+osobny system.
+
+**`canvasComponentsStore.ts`** — nowe pole `fullScreenScreens: Record<string, boolean>` +
+`setFullScreen(screenKey, on)`. Domyślnie wyłączony WSZĘDZIE (`undefined`/`false` = zero zmiany
+dla nikogo, kto tego nie włączy) — świadomie NIE osobny store, bo to stan ŚCIŚLE powiązany z
+tym samym `screenKey`-przestrzennym podziałem co `items` w tym samym store. Włączenie/wyłączenie
+NIE rusza `items` — odwracalne w każdej chwili, nic zbudowanego nie znika (test w
+`canvasComponentsStore.test.ts`).
+
+**`ScreenCanvas.tsx`** — `ScreenCanvasBase` czyta `fullScreenOn` BEZPOŚREDNIO ze store'u (nie
+jako prop) i renderuje NOWĄ odznakę w nagłówku (Maximize2/Minimize2, zawsze widoczna, nie tylko
+w `editing`) obok Edytuj/Warstwy. Włączenie pyta o potwierdzenie (`ConfirmDialog` — "to zastąpi
+całą wbudowaną zawartość ekranu", realna zmiana, nie kosmetyka); wyłączenie NIE pyta (zawsze
+bezpiecznie odwracalne). Gdy `fullScreenOn`, CAŁA dotychczasowa treść (`content` — identyczna,
+niezmieniona logika kafli/edycji/modali) dostaje WŁASNY `<ScrollView style={{flex:1}}>` zamiast
+być osadzona na końcu scrolla hosta — `fullScreenScroll` styl z `paddingBottom: 180`, TA SAMA
+rezerwa pod pływający TabBar co w `health.tsx`'s `styles.scroll` (ten sam powód co §378 —
+świadomie przejęte, nie zgadywane od nowa).
+
+**Pilotażowy ekran: `app/(tabs)/health.tsx`** — nowy `canvasFullScreen = useCanvasComponentsStore(
+st => st.fullScreenScreens['health'] ?? false)`, wołany BEZWARUNKOWO razem z resztą hooków na
+górze komponentu (zasada hooków — rozgałęzienie JSX dopiero na samym `return`, PO wszystkich
+hookach, nie przerywa ich kolejności). Gdy włączony: wczesny `return` z MINIMALNYM JSX
+(`ScreenHeader` z podpisem "Pełny ekran" zamiast "Dzisiaj" + `<ScreenCanvas screenKey="health"/>`)
+— CAŁA reszta (1900+ linii wbudowanych widgetów zdrowia) nie montuje się WCALE. Health wybrany
+jako pilot bo to WŁASNY przykład usera ("zamiast zdrowia").
+
+**Świadomie NIE zrobione w tej fazie** — pozostałe ~10 ekranów z płótnem (tasks/stats/finanse/
+kalendarz/mood/counters/notes/habits/pet/food) NIE dostały jeszcze tego samego wczesnego-returnu
+— infrastruktura (store+`ScreenCanvas.tsx`) jest już gotowa dla wszystkich, zostaje mechaniczne
+podłączenie per-ekran identycznym wzorcem co Health. Też NIE zrobiony: nowy typ komponentu
+"wykres" (user wymienił "wykresów" explicite) — osobna, większa praca (wybór biblioteki/stylu
+wykresu, nowy `componentType`), następna faza.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 3 nowe (domyślnie wyłączony, włącza tylko
+JEDEN `screenKey`, wyłączenie nie rusza `items`). `tsc --noEmit` czyste, `jest --silent`
+113/113 suite, 1462 testów (+3).
+
+**Priorytet testu na urządzeniu — WYSOKI, zupełnie nowy mechanizm**: Zdrowie → przewiń na dół
+do "Twoje komponenty" → nowa ikonka obok Edytuj/Warstw (kwadrat ze strzałkami) → potwierdź →
+CAŁY ekran Zdrowia znika, zostaje tylko nagłówek + płótno na cały ekran. Dodaj coś, sprawdź że
+się przewija, że TabBar na dole nie zasłania ostatniego itemu/przycisków "Dodaj". Wyłącz tą samą
+ikonką (teraz "zmniejsz") — Zdrowie wraca dokładnie takie jak było, nic nie zniknęło.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
