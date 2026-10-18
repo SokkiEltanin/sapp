@@ -19858,6 +19858,55 @@ ustaw jakiś styl → "Zapisz jako preset" → sprawdź że chip się pojawia na
 tego samego typu kafla) i że tap aplikuje go 1:1; i odwrotnie (zapisz na płótnie → zastosuj w
 Kreatorze). Długi przytrzym na chipie → 🗑 usuwa.
 
+## 371. Typ komponentu "Ikona" na wolnym płótnie (2026-10-18)
+
+User: "możesz też do edytora pododawać IKONKI które mamy w aplikacji używane i moge je
+dodawac wtedy bezposrednio skalować justować" — szósty `CanvasComponentType`, po kształtach
+(§357) i `dataField` (§358). Jak kształty: `bindingKey` ZOSTAJE `null` na zawsze (ikona JEST
+swoją treścią — wybrana z curated puli, nie metryka z apki), tap nie robi nic (interakcja
+wyłącznie przez chrome `CanvasPlacedItem`). W PRZECIWIEŃSTWIE do kształtów: NIE wchodzi do
+`ShapeComponentType`/`isShapeType()` — własny, niezależny styl/modal (picker ikony + kolor +
+rozmiar + wyrównanie, nie fill/stroke/cornerRadius kształtów), własna, jawna obsługa
+wszędzie w `ScreenCanvas.tsx` gdzie "brak podpięcia" jest istotne (`onAdd`, `onTap`, render,
+przycisk "Dodaj").
+
+**Zakres ikon — curated 45, NIE cała lucide-react-native** (1000+ ikon, nieużywalny picker).
+`src/store/iconTileStyleDefaults.ts` (nowy, pure TS) — `ICON_TILE_ICONS` (45 kluczy
+kebab-case, ten sam format co `Habit.icon`/`Counter.icon`), `IconTileStyle {iconKey, color,
+size, backgroundColor: string|null, cornerRadius, align}`, `DEFAULT_ICON_TILE_STYLE`,
+`ICON_COLOR_PRESETS` (reużyte `SHAPE_COLOR_PRESETS`, nie zduplikowane). `size` jest
+ABSOLUTNY w px (ten sam wzorzec co `TextShapeStyle.fontSize`, NIE SVG-viewBox-stretch jak
+rect/ellipse/line) — "skalować" (user) = stepper 16-128px w modalu, box wokół ikony jest
+czysto obszarem pozycjonowania/opcjonalnego tła. "justować" (user) = `align` (left/center/
+right), `justify-content` na wrapperze.
+
+**`src/components/canvas/IconTile.tsx`** (nowy, renderer) — `ICON_TILE_MAP` (kebab-case
+klucz → realny komponent lucide, ten sam wzorzec co `ICON_MAP` w `habits.tsx`, tylko 45 vs 8
+ikon) + `IconTile({style, onPress, sizeStyle})`, ta sama sygnatura co `ShapeTile`/
+`DataFieldTile` — `CanvasPlacedItem.tsx`'s `renderTile` render-prop obsługuje go bez zmian
+tam. Mapowanie klucz→komponent żyje TU (RN-touching), NIE w `iconTileStyleDefaults.ts` (pure,
+testowalne w jest/node) — ten sam podział co `CountdownTile.tsx`/`countdownTileStyleDefaults.ts`.
+
+**`src/components/canvas/CanvasIconStyleModal.tsx`** (nowy) — siatka wyboru ikony (45
+przycisków, ten sam wzorzec co `habits.tsx`'s `iconRow`/`iconBtn`) + `ColorSwatchPicker` +
+`Stepper` rozmiaru + segmented wyrównania + `Switch` "Tło pod ikoną" (warunkowo odkrywa
+drugi `ColorSwatchPicker` + `Stepper` zaokrąglenia).
+
+**Świadomie NIE dostaje biblioteki presetów stylu (§370)** — Icon nie ma odpowiednika w
+Kreatorze (`dashboard-tile-creator.tsx`), więc nie ma drugiej strony do korelacji, ten sam
+powód co Rekordy/Liczniki/dataField/kształty wykluczone tam.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +1 test (domyślny styl/kwadratowy
+rozmiar/bez podpięcia). Zręczny skrypt (nie commitowany) potwierdził 1:1 zgodność
+`ICON_TILE_ICONS` ↔ `ICON_TILE_MAP` (żadnego klucza bez komponentu, żadnego osieroconego
+komponentu) — `ICON_TILE_MAP` sam nie jest testowalny w jest/node (importuje
+`lucide-react-native`/`react-native`, jak każdy inny renderer kafla w tym systemie).
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1452 testy.
+
+**Priorytet testu na urządzeniu — ŚREDNI**: Dodaj komponent → "Kształty i ikony" → "Ikona" →
+sprawdź siatkę 45 ikon w modalu stylu (🎨), zmianę koloru/rozmiaru/wyrównania/tła działają
+na żywo, i że przeciąganie/resize/usuwanie (chrome) działa identycznie jak dla kształtów.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
