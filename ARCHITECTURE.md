@@ -19761,9 +19761,11 @@ notatki, `habits.tsx`/`pet.tsx` (wymagałyby tego samego `ScreenCanvasBase`+`bui
 obejścia co `mood.tsx` — nie zrobione teraz, bo user mówił o "oknach"/zakładkach, nie o każdym
 możliwym podekranie), achievementy.
 
-**Testy**: istniejące (żadnych nowych — `buildStreakItems` to czysty refaktor istniejącej
-logiki, pokryty już istniejącymi testami przez `useAllStreakItems`/integrację). `tsc --noEmit`
-czyste, `jest --silent` 110/110 suite, 1437 testów.
+**Testy**: istniejące (żadnych nowych w tym commicie — `buildStreakItems` to czysty refaktor
+istniejącej logiki). `tsc --noEmit` czyste, `jest --silent` 110/110 suite, 1437 testów.
+**Korekta (§369, audyt)**: twierdzenie wyżej, że to jest "pokryte istniejącymi testami przez
+`useAllStreakItems`/integrację", było NIEPRAWDĄ — zero testów dotykało tej funkcji bezpośrednio
+lub przez integrację. Patrz §369.
 
 **Priorytet testu na urządzeniu — WYSOKI** (dotyka 5 głównych ekranów na raz): na każdym z
 Nastrój/Zdrowie/Zadania/Kalendarz sprawdź że płótno się pojawia (przycisk "Dodaj komponent" na
@@ -19771,6 +19773,43 @@ dole), da się dodać/przesunąć/zmienić rozmiar kafla, i że pozostała treś
 zadań/wpisy nastroju/widok tygodnia-miesiąca kalendarza) działa bez regresji — zwłaszcza
 `mood.tsx` (refaktor `useAllStreakItems.ts`) i `tasks.tsx` (nowy typ wpięcia przez
 `ListFooterComponent`, pierwszy raz w `FlatList` a nie `SectionList`/`ScrollView`).
+
+## 369. Czwarty audyt edytorów + fix: `buildStreakItems` bez testów (zero-coverage gap) (2026-10-18)
+
+Czwarty audyt tej sesji (po §360-361 płótno, §366 finanse/edytory, §367 serie/pupil) —
+tym razem cały system edytora płótna (§341-368) na raz, w tym najnowsze wpięcia z §368.
+**Nic nowego, co kwalifikowałoby się jako realny bug** (crash/złe dane/zepsuta logika) —
+wszystkie wcześniej naprawione problemy (§360/§365/§366/§367) zweryfikowane jako faktycznie
+naprawione i konsystentne, nowe wpięcia (`mood.tsx`/`tasks.tsx`/`calendar.tsx`) poprawne (brak
+duplikacji `useHabits()`, `calendar.tsx`'s 3 rozłączne branche faktycznie się nie nakładają,
+`ListFooterComponent` to ten sam już-działający wzorzec co `finances.tsx`).
+
+**Jedno potwierdzone znalezisko**: §368 twierdziło w ARCHITECTURE.md, że `buildStreakItems()`
+jest "pokryte istniejącymi testami przez `useAllStreakItems`/integrację" — nieprawda, **zero**
+testów dotykało tej funkcji. Gorzej: nie da się jej przetestować bezpośrednio przez import z
+`useAllStreakItems.ts` — ten plik importuje `useHabits` → `notificationsService` →
+`expo-notifications` (ESM, poza `transformIgnorePatterns`), co w jest/node środowisku
+(`testEnvironment: 'node'`, patrz CLAUDE.md/jest.config.js) rzuca `SyntaxError: Cannot use
+import statement outside a module` już przy samym imporcie pliku.
+
+**Fix**: `buildStreakItems()` przeniesiona z `useAllStreakItems.ts` do nowego, czysto-TS
+`src/utils/buildStreakItems.ts` (zero importów dotykających RN/hooków/notyfikacji — ten sam
+wzorzec co wydzielenie `shapeStyleDefaults.ts`/`dataFieldTileStyleDefaults.ts` dla
+testowalności). `useAllStreakItems.ts` re-eksportuje ją (`export { buildStreakItems }`) dla
+zgodności z istniejącymi importami (`mood.tsx` dalej importuje z `@/hooks/useAllStreakItems`,
+działa bez zmian).
+
+**Drobna, nie-bugowa obserwacja z audytu (pominięta, zbyt kosmetyczna)**: `calendar.tsx`'s 3
+rozłączne `<ScreenCanvas>` to osobne instancje komponentu — przełączenie `calMode` odmontowuje
+stary i montuje nowy, więc włączony tryb "Edytuj" na płótnie wyłącza się przy zmianie
+tydzień/miesiąc. Same kafle (dane w store) nie gubią się — czysto UI-tryb, nie wart fixu teraz.
+
+**Testy**: `__tests__/buildStreakItems.test.ts` (nowy, 9 testów — exercise-entry, mapowanie
+habitów z `getStreak`, filtr liczników po `kind`/`mode`/`onDashboard`, kolejność wyniku).
+`tsc --noEmit` czyste, `jest --silent` 111/111 suite, 1446 testów.
+
+**Priorytet testu na urządzeniu — ŻADEN** (czysty refaktor + test, zero zmiany zachowania w
+runtime — `useAllStreakItems()`/`mood.tsx` liczą identycznie jak przed §369).
 
 ---
 
