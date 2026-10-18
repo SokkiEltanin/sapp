@@ -11,7 +11,9 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Stepper from '@/components/ui/Stepper';
 import { BOSSES } from '@/utils/bosses';
 import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY, MapNode } from '@/utils/bossMapLayout';
+import { baseBossId } from '@/utils/madBosses';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
+import { useCampaignMapStyleStore } from '@/store/campaignMapStyleStore';
 import { usePetStore } from '@/store/petStore';
 import { spacing, typography, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -19,7 +21,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
-const NODE = 56;
+const BASE_NODE = 60;
 const GRID = 56;
 
 // Edytor mapy bossów (2026-10-14, ARCHITECTURE.md §322) — user po pięciu rundach prób na
@@ -36,6 +38,16 @@ const GRID = 56;
 export default function BossMapEditorScreen() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
+  // Style na żywo z Kreatora mapy bossów (2026-10-18, §379 — user zrzutem: "porównaj w
+  // edytorze i na normalnym ekranie kampanii, coś się dziwnie renderuje"). Edytor dotąd
+  // czytał ZASZYTE NA SZTYWNO stałe (`NODE=56`, `strokeWidth={5}`, siatka
+  // `rgba(255,255,255,0.08)`) zamiast `campaignMapStyleStore`'s `live` — dokładnie te same
+  // wartości, które `CampaignMap.tsx` (prawdziwa mapa) czyta i które user może zmienić w
+  // Ustawienia → Personalizacja → "Kreator mapy bossów". Rozjazd: domyślnie 56 vs 60 (węzeł),
+  // 5 vs 7 (grubość ścieżki) — i KAŻDA ręczna zmiana w Kreatorze (np. większe węzły) była
+  // niewidoczna w edytorze pozycji, mimo że obie mapy mają wyglądać identycznie.
+  const mapStyle = useCampaignMapStyleStore(st => st.live);
+  const NODE = mapStyle.nodeSize;
   const overrides = useBossMapLayoutStore(st => st.positions);
   const setPosition = useBossMapLayoutStore(st => st.setPosition);
   const resetPosition = useBossMapLayoutStore(st => st.resetPosition);
@@ -67,7 +79,12 @@ export default function BossMapEditorScreen() {
   // węzła (start przeciągania) teraz RÓWNIEŻ wybiera bossa do panelu niżej.
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-  const ids = useMemo(() => BOSSES.map(b => b.id), []);
+  // `baseBossId` (2026-10-18, §379) — `bossMapLayoutStore`'s klucze są BAZOWE id (bez `mad_`
+  // prefiksu, patrz komentarz w store'u), dokładnie jak `CampaignMap.tsx` czyta je. Edytor
+  // dotąd czytał/pisał SUROWE `b.id` — dla kampanii (ta lista, bez `mad_` prefiksu) to i tak
+  // ten sam string (`baseBossId` to identity dla nieprzedrostkowanych id), więc nie gubiło
+  // zapisanych pozycji, ale było realną niespójnością konwencji vs `CampaignMap.tsx`.
+  const ids = useMemo(() => BOSSES.map(b => baseBossId(b.id)), []);
   const { nodes: baseNodes, width: canvasW, height: canvasH } = useMemo(() => {
     const base = layoutBossMap(BOSSES.length, viewport.w || 340);
     return applyLayoutOverrides(base.nodes, ids, overrides, base.width);
@@ -120,7 +137,7 @@ export default function BossMapEditorScreen() {
       },
       onPanResponderRelease: () => {
         setDragPos((prev) => {
-          if (prev && prev.idx === i) setPosition(b.id, Math.round(prev.x), Math.round(prev.y));
+          if (prev && prev.idx === i) setPosition(baseBossId(b.id), Math.round(prev.x), Math.round(prev.y));
           return null;
         });
       },
@@ -161,7 +178,7 @@ export default function BossMapEditorScreen() {
           <PressableScale key={b.id} onPress={() => jumpTo(i)}
             style={[s.jumpChip, i === currentIdx && { backgroundColor: '#38BDF8', borderColor: '#38BDF8' }, i === selectedIdx && i !== currentIdx && { borderColor: '#FB923C' }]}>
             <Text style={[s.jumpChipTxt, i === currentIdx && { color: '#05060A' }]}>{i + 1}</Text>
-            {overrides[b.id] != null && <View style={s.jumpChipDot} />}
+            {overrides[baseBossId(b.id)] != null && <View style={s.jumpChipDot} />}
           </PressableScale>
         ))}
       </ScrollView>
@@ -179,12 +196,12 @@ export default function BossMapEditorScreen() {
             <Svg width={canvasW} height={canvasH} style={StyleSheet.absoluteFillObject}>
               <Defs>
                 <Pattern id="mapGrid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
-                  <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill="rgba(255,255,255,0.08)" />
+                  <Circle cx={GRID / 2} cy={GRID / 2} r={1.6} fill={`rgba(255,255,255,${mapStyle.gridOpacity})`} />
                 </Pattern>
               </Defs>
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="#0B0E14" />
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-              {!!pathD && <Path d={pathD} stroke="#38BDF8" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+              {!!pathD && <Path d={pathD} stroke="#38BDF8" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
             </Svg>
 
             {BOSSES.map((b, i) => {
@@ -195,9 +212,9 @@ export default function BossMapEditorScreen() {
                 <View
                   key={b.id}
                   {...responders.current[i].panHandlers}
-                  style={[st_node(n, dragging)]}
+                  style={[st_node(n, dragging, NODE)]}
                 >
-                  <View style={[s.portrait, dragging && s.portraitDragging, selected && s.portraitSelected]}>
+                  <View style={[s.portrait, { width: NODE, height: NODE, borderRadius: NODE / 2 }, dragging && s.portraitDragging, selected && s.portraitSelected]}>
                     <Text style={s.badge}>{i + 1}</Text>
                     <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={false} />
                   </View>
@@ -231,18 +248,18 @@ export default function BossMapEditorScreen() {
               <BossArt id={b.id} emoji={b.emoji} size={28} mystery={false} />
               <View style={{ flex: 1 }}>
                 <Text style={s.editPanelTitle} numberOfLines={1}>{b.name}</Text>
-                <Text style={s.editPanelSub}>{overrides[b.id] != null ? 'Pozycja ustawiona ręcznie' : 'Pozycja domyślna (automatyczna)'}</Text>
+                <Text style={s.editPanelSub}>{overrides[baseBossId(b.id)] != null ? 'Pozycja ustawiona ręcznie' : 'Pozycja domyślna (automatyczna)'}</Text>
               </View>
               <PressableScale onPress={() => { haptic.tap(); setSelectedIdx(null); }} style={s.editPanelClose}>
                 <XIcon size={16} color={c.text.muted} />
               </PressableScale>
             </View>
             <Stepper label="Pozycja X" value={Math.round(n.x)} min={0} max={Math.round(canvasW)} step={8}
-              onChange={(v) => setPosition(b.id, v, Math.round(n.y))} />
+              onChange={(v) => setPosition(baseBossId(b.id), v, Math.round(n.y))} />
             <Stepper label="Pozycja Y" value={Math.round(n.y)} min={20} max={Math.round(canvasH) - 20} step={8}
-              onChange={(v) => setPosition(b.id, Math.round(n.x), v)} />
+              onChange={(v) => setPosition(baseBossId(b.id), Math.round(n.x), v)} />
             <PressableScale
-              onPress={() => { haptic.success(); resetPosition(b.id); toast.success(`Zresetowano pozycję: ${b.name}`); }}
+              onPress={() => { haptic.success(); resetPosition(baseBossId(b.id)); toast.success(`Zresetowano pozycję: ${b.name}`); }}
               style={s.editPanelReset}
             >
               <RotateCcw size={14} color={c.text.secondary} />
@@ -264,11 +281,11 @@ export default function BossMapEditorScreen() {
   );
 }
 
-function st_node(n: MapNode, dragging: boolean) {
+function st_node(n: MapNode, dragging: boolean, node: number) {
   return {
     position: 'absolute' as const,
-    left: n.x - NODE / 2, top: n.y - NODE / 2,
-    width: NODE + 24, marginLeft: -12,
+    left: n.x - node / 2, top: n.y - node / 2,
+    width: node + 24, marginLeft: -12,
     alignItems: 'center' as const,
     zIndex: dragging ? 10 : 1,
   };
@@ -295,7 +312,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
 
   stageWrap: { flex: 1, overflow: 'hidden', backgroundColor: '#05060A' },
-  portrait: { width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12161F', borderWidth: 2, borderColor: '#262c3a' },
+  // `BASE_NODE` tu to tylko baza statyczna — realny, aktualny rozmiar z `campaignMapStyleStore`
+  // nadpisywany inline w JSX (`NODE` w ciele komponentu), ten sam zabieg co CampaignMap.tsx.
+  portrait: { width: BASE_NODE, height: BASE_NODE, borderRadius: BASE_NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12161F', borderWidth: 2, borderColor: '#262c3a' },
   portraitDragging: { borderColor: '#FB923C', shadowColor: '#FB923C', shadowOpacity: 0.6, shadowRadius: 10, elevation: 8 },
   portraitSelected: { borderColor: '#FB923C' },
   badge: {

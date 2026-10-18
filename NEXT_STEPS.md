@@ -3,6 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Edytor mapy bossów — zgodność stylu z prawdziwą mapą (2026-10-18, §379) — DO WERYFIKACJI
+
+User zrzutem dwóch ekranów: "coś zjebałeś, dziwnie się renderuje, porównaj edytor i normalny
+ekran". Naprawione, POTWIERDZONE przyczyny: edytor czytał zaszyte na sztywno stałe (rozmiar
+węzła 56, grubość ścieżki 5) zamiast `campaignMapStyleStore`'s `live` — każda zmiana w
+Ustawienia → Personalizacja → "Kreator mapy bossów" była niewidoczna w edytorze. Też
+ujednolicone: klucze nadpisań pozycji (`baseBossId`, zgodnie z `CampaignMap.tsx`).
+**NIE w pełni potwierdzone**: czy to wyjaśnia CAŁĄ różnicę, czy zostaje coś w pomiarze
+szerokości viewportu — nie dało się tego jednoznacznie zweryfikować bez urządzenia. **Priorytet
+testu WYSOKI** — po tej poprawce porównaj jeszcze raz edytor vs prawdziwy ekran Bossów; jeśli
+KSZTAŁT ścieżki (nie tylko grubość/rozmiar węzłów) wciąż wygląda wyraźnie inaczej, zgłoś to —
+będzie kolejny trop do szukania. Checklist w ARCHITECTURE.md §379.
+
+## 🟡 Duży kierunek: "jeden edytor jak Figma" — czeka na decyzję, co budować dalej (2026-10-18, §380)
+
+User: "zróbmy ten edytor od zera, jeden porządny, który obejmie też ekran mapy bossów" — chce
+docelowo: projektować ekran od zera (pusty canvas, nie dokładka na końcu treści), z opcją
+tworzenia komponentów, i wdrażać go jako CAŁĄ zawartość wybranej zakładki (np. zamiast
+Zdrowia). Ocena w ARCHITECTURE.md §380: wpychanie POZYCJONOWANIA bossów (ma unikalną cechę —
+uporządkowaną ścieżkę łączącą węzły) w generyczny system swobodnych kafli (§341-377) byłoby
+niedopasowaniem — rekomendacja: zostawić `boss-map-editor.tsx` jako osobne, wyspecjalizowane
+narzędzie (już solidne po §376/§379), a "jeden edytor dla wszystkiego" realizować jako
+NIEZALEŻNY kierunek — tryb "pełny ekran" na JUŻ ISTNIEJĄCYM płótnie (przełącznik per ekran,
+chowa wbudowaną treść, zostaje tylko canvas). **NIC z tego jeszcze nie zbudowane** — czeka na
+potwierdzenie usera który kierunek/kolejność budować.
+
 ## 🔴🔴 Fix: ołówek edytora mapy bossów + kafle raid/event ukryte pod navbarem (2026-10-18, §378) — PRIORYTET WYSOKI
 
 User zrzutem ekranu: "na mapie nie mam ołówka". Realny, stary bug (nie dzisiejsza regresja) —

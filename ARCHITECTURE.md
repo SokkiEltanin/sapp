@@ -20275,6 +20275,82 @@ ołówek w lewym dolnym rogu I kafle raid/event w prawym dolnym rogu muszą być
 paskiem Pupil/Bossy/Sklep/Questy, nie pod nim. Sprawdź na urządzeniu z gestami (insets.bottom>0)
 i z fizycznymi przyciskami (insets.bottom=0) — oba muszą dawać czytelny prześwit.
 
+## 379. Edytor mapy bossów czytał zaszyte na sztywno stałe zamiast stylu na żywo (2026-10-18)
+
+User zrzutem DWÓCH ekranów: "coś zjebałeś że się dziwnie renderuje, porównaj w edytorze i na
+normalnym ekranie kampanii" — ścieżka/węzły w `boss-map-editor.tsx` wyglądały wyraźnie inaczej
+niż na prawdziwym ekranie Bossów.
+
+**Zweryfikowane, co NIE jest przyczyną**: oba ekrany liczą pozycje WSPÓLNYMI, czystymi
+funkcjami (`layoutBossMap`/`applyLayoutOverrides`/`catmullRomPath` w `bossMapLayout.ts`) —
+identyczna matematyka, brak losowości poza deterministycznym `hash01(index)`. Dla kampanii
+(bez `mad_` prefiksu) `baseBossId()` to identity, więc rozjazd kluczy nadpisań (patrz niżej)
+też nie gubił zapisanych pozycji.
+
+**Zweryfikowane, potwierdzone przyczyny** — edytor czytał WŁASNE, zaszyte na sztywno stałe
+zamiast `campaignMapStyleStore`'s `live` (§332, Ustawienia → Personalizacja → "Kreator mapy
+bossów"), którego `CampaignMap.tsx` (prawdziwa mapa) używa od zawsze:
+- `NODE = 56` (edytor) vs `mapStyle.nodeSize` (domyślnie 60, ale USER MÓGŁ TO ZMIENIĆ w
+  Kreatorze — każda taka zmiana była niewidoczna w edytorze).
+- `strokeWidth={5}` ścieżki (edytor) vs `mapStyle.pathWidth` (domyślnie 7).
+- siatka tła zaszyta `rgba(255,255,255,0.08)` (edytor, akurat zgodna z domyślną
+  `mapStyle.gridOpacity`, ale martwa na zmianę w Kreatorze).
+- `ids = BOSSES.map(b => b.id)` (edytor, surowe id) vs `ids = bosses.map(b => baseBossId(b.id))`
+  (`CampaignMap.tsx`) — ta sama niespójność w `setPosition`/`resetPosition`/odczytach
+  `overrides[...]`. Nieszkodliwe dla samej kampanii (identity), ale realna niespójność
+  konwencji, teraz ujednolicona.
+
+**Świadomie NIE zmienione** — edytor ŚWIADOMIE pokazuje WSZYSTKICH bossów pełnym artem
+(`mystery={false}` zawsze) i CAŁĄ ścieżkę jednolicie podświetloną (bez rozróżnienia
+fog/lit jak `CampaignMap.tsx`, które gasi nieodkrytą część trasy do prawie-czarnego). To
+NIE przeoczenie — w edytorze organizujesz WSZYSTKICH bossów naraz (także tych daleko w
+przyszłości), więc przygaszenie ich do nieczytelności byłoby regresją użyteczności, nie
+poprawką. Jeśli TO było źródłem wrażenia "wygląda inaczej" (edytor = cała trasa jaskrawym
+niebieskim na raz, prawdziwa mapa = tylko krótki odcinek do aktualnego bossa, reszta w mroku)
+— to zamierzona różnica między "tryb organizowania" a "tryb odkrywania", nie bug.
+
+**Nie w pełni zweryfikowane**: czy powyższe (rozmiar węzła/grubość ścieżki) tłumaczy CAŁĄ
+różnicę którą user zobaczył na zrzucie, czy jest jeszcze coś w samym pomiarze szerokości
+viewportu (`onLayout`) różniącego się między ekranami — nie udało się tego jednoznacznie
+potwierdzić bez dostępu do urządzenia (czytanie dokładnych pikseli ze skompresowanego zrzutu
+ekranu jest zawodne). Oznaczone w NEXT_STEPS.md do potwierdzenia na urządzeniu PO tej poprawce
+— jeśli nadal widać wyraźnie różny kształt ścieżki (nie tylko rozmiar węzłów/grubość), to
+sygnał że jest coś jeszcze.
+
+**Testy**: brak nowych — czysty UI-plik ekranu. `tsc --noEmit` czyste, `jest --silent`
+113/113 suite, 1459 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: otwórz edytor mapy (Bossy → ołówek) i porównaj
+OD RAZU z prawdziwym ekranem Bossów (Kampania) — rozmiar węzłów i grubość ścieżki powinny
+teraz wyglądać tak samo (zakładając domyślny styl z Kreatora; jeśli zmieniłeś styl w
+Ustawieniach, edytor powinien to ODZWIERCIEDLAĆ). Jeśli KSZTAŁT/rozstaw ścieżki (nie tylko
+grubość/rozmiar) wciąż wygląda wyraźnie inaczej — to następny trop do zgłoszenia.
+
+---
+
+## 380. Duży kierunek: "jeden edytor jak Figma" — ocena, czy obejmować nim mapę bossów (2026-10-18)
+
+User, po poprzednich pytaniach o zakres: "Wgle ja pisałem od początku że chcę dosłownie
+[edytor] JAK FIGMA wbudowany którym mogę zmieniać/edytować/dodawać/przesuwać ze wszystkimi
+ekranami jak canvas z opcją robienia komponentów... zróbmy ten edytor od zera, jeden porządny,
+który obejmie też ekran mapy bossów".
+
+**Ocena inżynierska, nie jeszcze implementacja**: istniejący system wolnego płótna (§341-377,
+`ScreenCanvas`/`canvasComponentsStore`) to NIEZALEŻNE, swobodnie pozycjonowane kafle — brak
+pojęcia "połączenia/ścieżki między komponentami w ustalonej kolejności". Mapa bossów ma
+DOKŁADNIE tę cechę jako swój rdzeń (uporządkowana sekwencja węzłów połączona krzywą
+Catmull-Rom, §322/§343) — wepchnięcie jej na siłę w generyczny system kafli byłoby
+niedopasowaniem architektonicznym (trzeba by dodać "connectory" do systemu, którego ŻADEN
+inny typ komponentu dziś nie potrzebuje), nie uproszczeniem. Rekomendacja: zostawić
+`boss-map-editor.tsx` jako wyspecjalizowane narzędzie (teraz z §376 precyzyjnym X/Y i §379
+zgodnością stylu) — "jeden edytor obejmujący wszystko" realistyczniej realizować jako
+NIEZALEŻNY kierunek: tryb "pełny ekran" na ISTNIEJĄCYM już płótnie (przełącznik per ekran,
+chowa wbudowaną treść, pokazuje TYLKO płótno — patrz propozycja w rozmowie z userem,
+2026-10-18, jeszcze nie potwierdzona/zbudowana).
+
+**Status**: czeka na potwierdzenie usera, który konkretny kierunek budować jako kolejny krok —
+nic z tego NIE zostało jeszcze zaimplementowane w tej sekcji, to zapis oceny/rekomendacji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
