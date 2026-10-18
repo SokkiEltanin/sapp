@@ -9,6 +9,7 @@ import {
   DEFAULT_RECT_SHAPE_STYLE, DEFAULT_ELLIPSE_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE, DEFAULT_TEXT_SHAPE_STYLE,
 } from '@/store/shapeStyleDefaults';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
+import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -44,7 +45,14 @@ import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataF
 // podpięcia (metric-picker, placeholder "Wybierz pole danych") co streakTile/countdownTile/
 // notesTile, tylko inny rejestr opcji. Dowód że render-prop/generic-picker architektura (§341)
 // generalizuje się na CZWARTY kształt danych bez zmiany samego mechanizmu podpięcia.
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
+// Faza 33 (2026-10-18, §371) — szósty typ, `'iconTile'` — user: "możesz też do edytora
+// pododawać IKONKI... moge je dodawac wtedy bezposrednio skalować justować". Jak kształty
+// (Faza 26): `bindingKey` ZOSTAJE `null` na zawsze (same SĄ swoją treścią — wybrana ikona z
+// curated puli, patrz `iconTileStyleDefaults.ts` — nie metryka z apki), ale NIE wchodzi do
+// `ShapeComponentType`/`isShapeType()` (inny, niezależny modal stylu — picker ikony/kolor/
+// rozmiar/wyrównanie, nie fill/stroke/cornerRadius kształtów) — własna, jawna obsługa w
+// `ScreenCanvas.tsx` wszędzie, gdzie "brak podpięcia" jest istotne.
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile';
 
 // Minimalny rozmiar itemu (Faza 28, 2026-10-17, §359) — PRZENIESIONE z `CanvasPlacedItem.tsx`
 // (gdzie żyły jako prywatne consty tego komponentu) — `resizeGroupBy` niżej potrzebuje TYCH
@@ -77,7 +85,7 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
   // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -109,8 +117,11 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   // zachowanie co zmiana rozmiaru linii w Figmie (ciągnięcie za punkt końcowy).
   lineShape: { width: 160, height: 4 },
   textShape: { width: 160, height: 40 },
+  // Kwadrat (Faza 33, §371) — ikona jest z natury symetryczna, kwadratowy box domyślnie
+  // wyśrodkowuje ją bez marginesów po jednej stronie.
+  iconTile: { width: 90, height: 90 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
@@ -119,6 +130,7 @@ const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTile
   ellipseShape: DEFAULT_ELLIPSE_SHAPE_STYLE,
   lineShape: DEFAULT_LINE_SHAPE_STYLE,
   textShape: DEFAULT_TEXT_SHAPE_STYLE,
+  iconTile: DEFAULT_ICON_TILE_STYLE,
 };
 
 interface CanvasComponentsState {

@@ -26,6 +26,20 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Typ komponentu "Ikona" na płótnie (2026-10-18, §371) — DO WERYFIKACJI
+
+User: "możesz też do edytora pododawać IKONKI... moge je dodawac wtedy bezposrednio
+skalować justować". Szósty typ komponentu na płótnie — curated 45 ikon (lucide-react-native),
+kolor/rozmiar(16-128px)/wyrównanie/opcjonalne tło, bez podpięcia danych (jak kształty).
+Nowy przycisk "Ikona" w wierszu "Kształty i ikony" (było "Kształty"). **Priorytet testu
+ŚREDNI** — checklist w ARCHITECTURE.md §371.
+
+**Kolejne w kolejce (ostatnie z listy zgłoszonej przez user tej sesji)**: snapowanie/smart
+guides przy przeciąganiu jak w Figmie — snap-to-center, snap-to-edges sąsiadów, wskaźniki
+równych odstępów, tymczasowe linie-wskazówki migające podczas gestu. Najbardziej złożone
+technicznie w tej kolejce — wymaga przekazania pozycji sąsiadów do Reanimated workletu w
+trakcie żywego gestu drag/resize.
+
 ## 🆕 Biblioteka presetów stylu — korelacja Kreator ↔ płótno (2026-10-18, §370) — DO WERYFIKACJI
 
 User: "rob korelacje miedzy nimi biblioteki". Nowa wspólna biblioteka (`tileStylePresetsStore.ts`

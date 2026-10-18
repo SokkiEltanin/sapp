@@ -1,6 +1,7 @@
 import { useCanvasComponentsStore, CanvasItem, clampItemX } from '@/store/canvasComponentsStore';
 import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 import { DEFAULT_RECT_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE } from '@/store/shapeStyleDefaults';
+import { DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
 
 // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
 // Testowane bezpośrednio na store (ten sam wzorzec co battleLayoutDraftStore.test.ts) —
@@ -38,6 +39,18 @@ describe('canvasComponentsStore — addItem (kształty-primitywy, §357)', () =>
     const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
     expect(item.style).toEqual(DEFAULT_LINE_SHAPE_STYLE);
     expect(item.height).toBeLessThan(item.width);
+  });
+});
+
+describe('canvasComponentsStore — addItem (typ "Ikona", §371)', () => {
+  test('iconTile dostaje domyślny styl, kwadratowy rozmiar i bindingKey=null (bez podpięcia, jak kształty)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('food', 'iconTile');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.componentType).toBe('iconTile');
+    expect(item.style).toEqual(DEFAULT_ICON_TILE_STYLE);
+    expect(item.width).toBe(item.height); // kwadrat
+    expect(item.bindingKey).toBeNull();
   });
 });
 
