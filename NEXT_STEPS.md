@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Edytor mapy bossów — wybór bossa + X/Y + reset pojedynczego (2026-10-18, §376) — DO WERYFIKACJI
+
+User: "wybieram bosa i wybieram pozycję i mogę zresetować na środek... nie mam możliwości
+zobaczyć innych edycji". To INNY ekran niż dzisiejsze płótno (§368-§375) —
+`app/boss-map-editor.tsx` (§322, dużo starszy). Dodane: tapnięcie bossa/numerka wybiera go →
+panel z X/Y Stepperami (precyzja bez przeciągania) + "Resetuj tego bossa" (istniejące
+`resetPosition()` w store, pierwszy raz podpięte do UI) + podtytuł ręczna/domyślna pozycja.
+Kropka na chipie pokazuje które bossy mają ręczne nadpisania. **Priorytet testu WYSOKI** —
+checklist w ARCHITECTURE.md §376.
+
 ## 🔴 Fix: podwójne tapnięcie — nowy pressGuard, 5 naprawionych miejsc (2026-10-18, §375) — DO WERYFIKACJI
 
 User: "niektóre [przyciski] zawsze da się wejść szybko i otwiera się dwa razy". Problem

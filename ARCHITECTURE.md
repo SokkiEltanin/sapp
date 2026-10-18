@@ -20112,6 +20112,45 @@ otworzyć się JEDEN ekran dodawania, "wstecz" wraca do poprzedniego ekranu (nie
 samego). W Kreatorze/na płótnie spróbuj szybko podwójnie tapnąć "Zapisz jako preset"/zapis
 koloru do biblioteki — powinien pojawić się JEDEN wpis.
 
+## 376. Edytor mapy bossów — wybór bossa + precyzyjna pozycja X/Y + reset pojedynczego (2026-10-18)
+
+User: "ani nie ulepszyłem tego z mapą kampanii bossów żebym mógł każdego bosa ustawić
+pozycja - wybieram bosa i wybieram pozycje i mogę zresetować na środek... nie mam możliwości
+zobaczyć innych edycji". WAŻNE rozróżnienie — `app/boss-map-editor.tsx` to zupełnie INNY,
+STARSZY ekran (§322, 2026-10-14, zbudowany dawno przed dzisiejszym wolnym płótnem §341+ —
+osobny store `bossMapLayoutStore.ts`, osobny plik, zero wspólnego kodu z `canvasComponentsStore.ts`).
+User miał rację że "są tylko kafelki" — cała dzisiejsza robota (§368-§375) dotyczyła
+WYŁĄCZNIE systemu płótna na ekranach appki, ten ekran nie był dziś w ogóle dotknięty, dopóki
+user nie zgłosił braku.
+
+**Co już istniało** (§322): przeciąganie palcem KAŻDEGO bossa bezpośrednio na mapie, ścieżka
+łączy automatycznie (Catmull-Rom), JEDEN globalny przycisk "Resetuj" (czyści WSZYSTKIE
+nadpisania naraz). `resetPosition(id)` (reset TYLKO jednego bossa) już istniał w
+`bossMapLayoutStore.ts` od samego początku — ale nigdy nie był podpięty do ŻADNEGO przycisku
+w UI, czysty dead-end (CLAUDE.md zasada #7).
+
+**Dodane teraz**: tapnięcie bossa (złapanie do przeciągania ALBO numerka na liście "skocz do
+bossa") WYBIERA go — otwiera się panel na dole ekranu (ten sam duch co `CanvasPropertiesModal`
+z systemu płótna, §359, ale osobna implementacja, bo to inny ekran/store) z:
+- `Stepper` X/Y (krok 8px) — precyzyjna zmiana pozycji BEZ przeciągania palcem, commituje do
+  store'u natychmiast (nie czeka na "puszczenie" jak drag).
+- "Resetuj tego bossa" — woła istniejące `resetPosition(id)`, pierwszy raz podpięte do UI.
+- Podtytuł "Pozycja ustawiona ręcznie" / "Pozycja domyślna (automatyczna)" per wybrany boss.
+
+**Widoczność innych edycji** (user: "nie mam możliwości zobaczyć innych edycji") — mała
+pomarańczowa kropka na chipie "skocz do bossa" dla KAŻDEGO bossa z ręcznym nadpisaniem
+(`overrides[b.id] != null`) — dotąd jedyny sposób odróżnić ręcznie-ustawionego bossa od
+domyślnego było przeciągnięcie go i obserwacja czy "wraca" po resecie.
+
+**Testy**: brak nowych (czysty UI-plik ekranu, ten sam status co inne ekrany w tej sesji —
+nietestowalne bezpośrednio w jest/node). `tsc --noEmit` czyste, `jest --silent` 113/113
+suite, 1459 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Bossy → ołówek (lewy dolny róg mapy) → tapnij
+dowolnego bossa albo jego numerek na górze → panel na dole z X/Y + resetem. Zmień suwakiem —
+boss na mapie przesuwa się na żywo. "Resetuj tego bossa" wraca TYLKO jego do automatycznej
+pozycji (reszta bez zmian). Kropki na chipach pokazują którzy bossowie mają ręczne pozycje.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
