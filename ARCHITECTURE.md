@@ -19692,6 +19692,33 @@ wydatek z zagraniczną kartą (konwersja walutowa), a bank redostarczy to samo p
 powinno się już dublować. **Priorytet ŚREDNI** (UX): Kreator → Liczniki/Notatki → "Kompaktowy"/
 "Minimalny" → odpowiednie przełączniki powinny teraz być ukryte, nie widoczne-ale-bez-efektu.
 
+## 367. Fix: sztywny limit 364 dni ucinał serię ćwiczeń (2026-10-18)
+
+Trzeci audyt tej sesji (po płótnie §360-361 i finansach/edytorach §366) — tym razem logika
+serii/nawyków i pupila. Znalezisko: `trainingStreakFrom()`/`exerciseStreakFrom()`
+(`personalQuests.ts`) miały pętlę `for (let i = start; i >= -364; i--)` — to NIE bezpiecznik
+przed nieskończoną pętlą, to FUNKCJONALNY limit: user z nieprzerwaną serią ćwiczeń dłuższą niż
+~365 dni dostawał ZAWSZE `365`, nigdy więcej, mimo że streak realnie rósł dalej. **Dokładnie ten
+sam bug class**, który `useHabits.ts`'s `getStreak()` miał i naprawił DWA razy (komentarze "BUG
+FIX #1"/"BUG FIX #2"/"BUG FIX #4" w tym samym repo) — fix tam nigdy nie dotarł do tych dwóch
+funkcji.
+
+**Fix**: `-364` → `-MAX_STREAK_LOOKBACK_DAYS` (3650, już eksportowany z `habits.ts` jako miękki,
+10-letni bezpiecznik, nie funkcjonalny limit) — w OBU funkcjach (`exerciseStreakFrom` używana na
+żywo na dashboardzie/kafelku ćwiczeń, `trainingStreakFrom` dziś tylko w testach/komentarzu, ale
+ten sam bug class, fix i tam dla konsekwencji).
+
+**Testy**: `__tests__/personalQuests.test.ts` +2 testy (seria 401 dni nieprzerwana → zwraca 401,
+nie 364/365, dla obu funkcji). `tsc --noEmit` czyste, `jest --silent` 110/110 suite, 1437 testów.
+
+**Sprawdzone przy tym samym audycie i POTWIERDZONE jako poprawne** (nie zgłaszam jako bug):
+`streakTier()`/`streakColor()` edge case'y (zero/ujemne dni), `levelFromXp()` (matematycznie
+konsystentne, `progress∈[0,1)`), `defeatBoss`/`claimMission`/`claimDailyFor` (poprawne guardy
+przed podwójnym przyznaniem nagrody).
+
+**Priorytet testu na urządzeniu — NISKI** (fix dla edge case'u — user musiałby mieć >364-dniową
+nieprzerwaną serię ćwiczeń, żeby to zauważyć; nie crash, tylko błędna liczba).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

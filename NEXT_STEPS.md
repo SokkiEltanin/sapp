@@ -26,6 +26,13 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Fix: sztywny limit 364 dni ucinał serię ćwiczeń (2026-10-18, §367) — DO WERYFIKACJI
+
+Trzeci audyt tej sesji. `trainingStreakFrom`/`exerciseStreakFrom` miały sztywny limit 364 dni
+(ten sam bug class już naprawiony dwa razy w `useHabits.ts`'s `getStreak()`) — nieprzerwana
+seria ćwiczeń dłuższa niż ~365 dni zawsze pokazywała 365, nie realną wartość. Naprawione.
+Priorytet niski (edge case, nie crash). Checklist w ARCHITECTURE.md §367.
+
 ## 🔴 Fix: duplikat wydatku walutowego + 3× martwy przełącznik (2026-10-18, §366) — DO WERYFIKACJI
 
 Dwa równoległe audyty (user: "rob audyty... czy dzialaja nie mają błędów"). **Finansowy
