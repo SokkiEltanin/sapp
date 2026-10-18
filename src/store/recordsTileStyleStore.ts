@@ -3,7 +3,16 @@ import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { mergeTileStyleState } from './tileStyleMerge';
 
+// Warianty kształtu (Faza 32, 2026-10-17, §364) — TRZECI i OSTATNI z listy flagowanej od
+// §355: "Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki liczbowe". `PersonalRecordsCard` nie
+// ma odpowiednika na płótnie (żaden `CanvasComponentType` dla rekordów nie istnieje) — zmiana
+// żyje wyłącznie tutaj + w Kreatorze, jak Liczniki (§362). W przeciwieństwie do Liczników/
+// Notatek (warianty PER WIERSZ), warianty tutaj są CAŁOKARTowe — hero+grid dotyczy UKŁADU CAŁEJ
+// karty (czy pierwszy rekord dostaje specjalne wyróżnienie), nie per-pozycja.
+export type RecordsLayoutPreset = 'heroGrid' | 'list' | 'grid';
+
 export interface RecordsTileStyle {
+  layoutPreset: RecordsLayoutPreset;
   cornerRadius: number;
   aspectRatio: number;
   numberScale: number;
@@ -15,6 +24,7 @@ export interface RecordsTileStyle {
 // aspectRatio=1.5 z grid-tile, złoty akcent `GOLD='#FBBF24'`, ikona-tło zawsze widoczna) —
 // bez `publish()` nic się wizualnie nie zmienia.
 export const DEFAULT_RECORDS_TILE_STYLE: RecordsTileStyle = {
+  layoutPreset: 'heroGrid',
   cornerRadius: 16,
   aspectRatio: 1.5,
   numberScale: 1,

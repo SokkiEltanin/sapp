@@ -26,11 +26,18 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Kreator kafelków — warianty kształtu Rekordów (2026-10-17, §364) — DO WERYFIKACJI — LISTA ZAKOŃCZONA
+
+Trzeci i ostatni z listy flagowanej od §355. Rekordy dostały 3 warianty CAŁOKARTowe (hero+siatka
+default / siatka bez hero / lista wierszy). Checklist w ARCHITECTURE.md §364. **Tym samym
+WSZYSTKIE 3 zgłoszone braki (Liczniki §362, Notatki §363, Rekordy §364) są zrobione** — czekają
+na test na urządzeniu.
+
 ## 🆕 Kreator kafelków — warianty kształtu Notatek (2026-10-17, §363) — DO WERYFIKACJI
 
 Drugi z trzech. Notatki dostały 3 warianty (wiersz/kompaktowy/karta) — WSPÓLNE dla płótna i
 `PinnedNotesCard` (jeden komponent, `NotesTile`, renderuje oba miejsca). Checklist w
-ARCHITECTURE.md §363. **Pozostało**: Rekordy — w toku.
+ARCHITECTURE.md §363.
 
 ## 🆕 Kreator kafelków — warianty kształtu Liczników (2026-10-17, §362) — DO WERYFIKACJI
 

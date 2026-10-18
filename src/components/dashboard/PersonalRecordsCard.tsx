@@ -8,7 +8,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
-import { useRecordsTileStyleStore, RecordsTileStyle } from '@/store/recordsTileStyleStore';
+import { useRecordsTileStyleStore, RecordsTileStyle, RecordsLayoutPreset } from '@/store/recordsTileStyleStore';
 
 const ICONS: Record<string, any> = { footprints: Footprints, moon: Moon, flame: Flame, smile: Smile, scale: Scale };
 
@@ -42,15 +42,49 @@ function PersonalRecordsCard({ records, cardBg, styleOverride }: { records: Reco
   const tileStyle = styleOverride ?? liveTileStyle;
   const GOLD = tileStyle.accentColor;
   if (records.length === 0) return null;
+  const preset: RecordsLayoutPreset = tileStyle.layoutPreset ?? 'heroGrid';
+
+  const head = (
+    <View style={s.head}>
+      <Trophy size={13} color={GOLD} />
+      <Text style={s.title}>Rekordy życiowe</Text>
+      <View style={{ flex: 1 }} />
+      <Text style={s.headCount}>{records.length}</Text>
+    </View>
+  );
+
+  // 'list' (§364) — WSZYSTKIE rekordy jako wiersze, bez wyróżnienia "najlepszego" — gęstsze,
+  // lepsze gdy user zbiera wiele rekordów naraz i chce je przeglądać jak listę, nie witrynę.
+  if (preset === 'list') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
+        style={[s.card, { backgroundColor: cardBg }]}>
+        {head}
+        <View style={{ gap: spacing[2] }}>
+          {records.map(r => renderListRow(r))}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // 'grid' (§364) — siatka kwadratów jak default, ale BEZ hero — pierwszy rekord traktowany
+  // identycznie jak resztę (zero specjalnego wyróżnienia złotym medalem).
+  if (preset === 'grid') {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
+        style={[s.card, { backgroundColor: cardBg }]}>
+        {head}
+        <View style={s.grid}>
+          {records.map(r => renderRec(r, false))}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
       style={[s.card, { backgroundColor: cardBg }]}>
-      <View style={s.head}>
-        <Trophy size={13} color={GOLD} />
-        <Text style={s.title}>Rekordy życiowe</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={s.headCount}>{records.length}</Text>
-      </View>
+      {head}
 
       {/* HERO — flagowy rekord ze złotym medalem */}
       {renderRec(records[0], true)}
@@ -62,6 +96,23 @@ function PersonalRecordsCard({ records, cardBg, styleOverride }: { records: Reco
       )}
     </TouchableOpacity>
   );
+
+  function renderListRow(r: RecordItem) {
+    const Ic = ICONS[r.icon] ?? Trophy;
+    const dateLabel = fmtRecordDate(r.date);
+    return (
+      <View key={r.key} style={[s.listRow, { borderRadius: tileStyle.cornerRadius }]}>
+        <View style={[s.listIconWrap, { backgroundColor: GOLD + '18' }]}>
+          <Ic size={16} color={GOLD} strokeWidth={1.8} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={s.label} numberOfLines={1}>{r.label}</Text>
+          {dateLabel && <Text style={s.tileDate}>{dateLabel}</Text>}
+        </View>
+        <DisplayText style={[s.listValue, { fontSize: 18 * tileStyle.numberScale }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{r.value}</DisplayText>
+      </View>
+    );
+  }
 
   function renderRec(r: RecordItem, hero: boolean) {
     const Ic = ICONS[r.icon] ?? Trophy;
@@ -129,6 +180,15 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   value: { color: c.text.primary, letterSpacing: -0.5 },
   label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3, lineHeight: 15 },
   tileDate: { fontSize: 9, color: c.text.muted, marginTop: 1 },
+
+  // 'list' (§364) — wiersz zamiast kwadratu, bez wyróżnienia "najlepszego".
+  listRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  listIconWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  listValue: { color: c.text.primary, letterSpacing: -0.3 },
 }));
 
 export default memo(PersonalRecordsCard);

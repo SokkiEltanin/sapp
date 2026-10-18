@@ -19575,6 +19575,40 @@ suite, 1423 testów.
 opcje) + dowolny ekran z płótnem → kafel notatki → 🎨 styl → to samo. "Wiersz" (default)
 wygląda DOKŁADNIE jak dotychczas w OBU miejscach.
 
+## 364. Kreator kafelków — warianty kształtu Rekordów (2026-10-17)
+
+Trzeci i OSTATNI z listy flagowanej od §355: "Rekordy/Liczniki/Notatki dalej mają TYLKO suwaki
+liczbowe". `PersonalRecordsCard` nie ma odpowiednika na płótnie (jak Liczniki, §362) — zmiana
+żyje wyłącznie w dashboardowej karcie + Kreatorze.
+
+**`RecordsLayoutPreset = 'heroGrid' | 'list' | 'grid'`** (nowy typ w `recordsTileStyleStore.ts`)
+— W PRZECIWIEŃSTWIE do Liczników/Notatek (warianty PER WIERSZ/instancję), warianty tutaj są
+CAŁOKARTowe — dotyczą UKŁADU CAŁEJ karty (czy pierwszy rekord dostaje specjalne wyróżnienie), nie
+per-pozycja: `'heroGrid'` = dokładny dotychczasowy wygląd (default — flagowy rekord jako hero ze
+złotym medalem, reszta jako siatka kwadratów). `'list'` = WSZYSTKIE rekordy jako wiersze, bez
+wyróżnienia "najlepszego" — gęstsze, lepsze gdy user zbiera wiele rekordów naraz. `'grid'` =
+siatka kwadratów jak default, ale BEZ hero (pierwszy rekord traktowany identycznie jak reszta).
+
+**`PersonalRecordsCard.tsx`** — branch na POZIOMIE CAŁEJ KARTY (nie per-tile jak Liczniki/
+Notatki) — trzy osobne wczesne-return gałęzie renderu, każda z własnym nagłówkiem (`head`,
+wydzielony jako lokalna zmienna, żeby nie duplikować 3×). Nowa funkcja `renderListRow()` (icon+
+wartość+etykieta+data w rzędzie) dla `'list'`.
+
+**`dashboard-tile-creator.tsx`** — nowy segmented "Styl kafelka" dla "Rekordy"; współdzielona
+sekcja "Kształt" (streaks+records) chowa "Proporcje kafelka" dla `'list'` (nie ma siatki
+kwadratów), sekcja "Kolor i warstwy" chowa "Ikona w tle" dla `'list'` (wiersze mają własną,
+zawsze-widoczną małą ikonkę, nie watermark w tle).
+
+**Testy**: czysto UI-wiring (jak §355/§362/§363) — `tsc --noEmit` czyste, `jest --silent`
+109/109 suite, 1423 testów.
+
+**Tym samym WSZYSTKIE 3 zgłoszone braki z listy §355 są zrobione** (Liczniki §362, Notatki
+§363, Rekordy §364) — czekają na test na urządzeniu.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kreator kafelków → "Rekordy" → sekcja "Styl
+kafelka" powinna pokazywać 3 opcje, przełączanie zmienia podgląd na żywo, "Hero + siatka"
+(default) wygląda DOKŁADNIE jak dotychczas.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
