@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { Plus, Check, RotateCcw, BookmarkPlus, Trash2 } from 'lucide-react-native';
+import { Plus, Check, RotateCcw, BookmarkPlus, Trash2, Pencil, X } from 'lucide-react-native';
 import { useColorLibraryStore } from '@/store/colorLibraryStore';
 import { normalizeHex } from '@/utils/color';
 import { useColors } from '@/theme/useColors';
@@ -32,8 +32,15 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
   const libraryColors = useColorLibraryStore(st => st.colors);
   const addColor = useColorLibraryStore(st => st.addColor);
   const removeColor = useColorLibraryStore(st => st.removeColor);
+  const renameColor = useColorLibraryStore(st => st.renameColor);
   const [adding, setAdding] = useState(false);
   const [hexInput, setHexInput] = useState('');
+  // Zmiana nazwy (audyt martwych funkcji, §377) — `renameColor` istniał w store od §354, ale
+  // nigdy nie był podpięty do żadnego UI, a `name` nigdzie nie było ustawiane ani czytane.
+  // Minimalne, realne zastosowanie: ustawiona nazwa staje się `accessibilityLabel` kółka
+  // (dotąd czytnik ekranu nie miał ŻADNEJ etykiety na kolorach z biblioteki).
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState('');
   // Tryb zarządzania biblioteką — długie przytrzymanie DOWOLNEGO koloru z biblioteki pokazuje
   // małe "🗑" na KAŻDYM z nich (nie tylko przytrzymanym), tap na "🗑" usuwa TEN konkretny.
   // Ten sam, prosty wzorzec co "tryb zaznaczania" na płótnie (§349) — osobny tryb zamiast
@@ -71,13 +78,21 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
         {libraryColors.length > 0 && <View style={s.divider} />}
         {libraryColors.map(lc => (
           <TouchableOpacity key={lc.id}
+            accessibilityLabel={lc.name || `kolor ${lc.hex}`}
             onPress={() => { if (manageMode) return; haptic.tap(); onSelect(lc.hex); }}
             onLongPress={() => { haptic.medium(); setManageMode(v => !v); }}
             style={[s.swatch, { backgroundColor: lc.hex }, current.toUpperCase() === lc.hex.toUpperCase() && s.swatchOn]}>
             {manageMode && (
-              <TouchableOpacity onPress={() => { haptic.medium(); removeColor(lc.id); }} style={s.removeBadge} hitSlop={6}>
-                <Trash2 size={9} color="#fff" />
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={() => { haptic.tap(); setManageMode(false); setRenamingId(lc.id); setNameInput(lc.name ?? ''); }}
+                  style={s.renameBadge} hitSlop={6}>
+                  <Pencil size={9} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.medium(); removeColor(lc.id); }} style={s.removeBadge} hitSlop={6}>
+                  <Trash2 size={9} color="#fff" />
+                </TouchableOpacity>
+              </>
             )}
           </TouchableOpacity>
         ))}
@@ -108,8 +123,27 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
           </TouchableOpacity>
         </View>
       )}
+      {renamingId && (
+        <View style={s.addRow}>
+          <View style={[s.hexPreview, { backgroundColor: libraryColors.find(lc => lc.id === renamingId)?.hex ?? c.bg.elevated }]} />
+          <TextInput
+            value={nameInput} onChangeText={setNameInput} placeholder="Nazwa koloru…"
+            placeholderTextColor={c.text.muted} maxLength={30} autoFocus
+            style={s.hexInput} returnKeyType="done"
+            onSubmitEditing={() => { renameColor(renamingId, nameInput.trim()); setRenamingId(null); setNameInput(''); }}
+          />
+          <TouchableOpacity
+            onPress={() => { haptic.success(); renameColor(renamingId, nameInput.trim()); setRenamingId(null); setNameInput(''); }}
+            style={[s.hexBtn, { backgroundColor: c.accent.blue }]}>
+            <Check size={14} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setRenamingId(null); setNameInput(''); }} style={[s.hexBtn, s.hexBtnGhost]}>
+            <X size={14} color={c.text.secondary} />
+          </TouchableOpacity>
+        </View>
+      )}
       {manageMode && (
-        <Text style={s.manageHint}>Tryb zarządzania biblioteką — tapnij 🗑 żeby usunąć kolor, tapnij "+" żeby wyjść.</Text>
+        <Text style={s.manageHint}>Tryb zarządzania biblioteką — tapnij ✏️ żeby nazwać kolor, 🗑 żeby usunąć, tapnij "+" żeby wyjść.</Text>
       )}
     </View>
   );
@@ -128,6 +162,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   removeBadge: {
     position: 'absolute', right: -4, top: -4, width: 14, height: 14, borderRadius: 7,
     backgroundColor: c.accent.red, alignItems: 'center', justifyContent: 'center',
+  },
+  renameBadge: {
+    position: 'absolute', left: -4, top: -4, width: 14, height: 14, borderRadius: 7,
+    backgroundColor: c.accent.blue, alignItems: 'center', justifyContent: 'center',
   },
 
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

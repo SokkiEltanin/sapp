@@ -360,8 +360,9 @@ export default function ExpenseDetailScreen() {
   // Selektor (2026-10-12, audyt optymalizacji runda 4) — bez tego re-render na każdą
   // niezwiązaną zmianę w expensesStore (np. `isLoading`/`filters`/`pendingSync`) podczas gdy
   // ten ekran edycji jest długo otwarty.
-  const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore(useShallow(s => ({
+  const { expenses, updateExpense, deleteExpense, setExpenses, markPending, confirmSync } = useExpensesStore(useShallow(s => ({
     expenses: s.expenses, updateExpense: s.updateExpense, deleteExpense: s.deleteExpense, setExpenses: s.setExpenses,
+    markPending: s.markPending, confirmSync: s.confirmSync,
   })));
   const expense = expenses.find(e => e.id === id);
   const colors = useColors();
@@ -497,7 +498,8 @@ export default function ExpenseDetailScreen() {
   const reclassifyFv = async (bucket: FvBucket | null) => {
     haptic.medium();
     updateExpense(expense.id, { fvOverride: bucket });
-    try { await expensesService.update(expense.id, { fvOverride: bucket }); }
+    markPending(expense.id);
+    try { await expensesService.update(expense.id, { fvOverride: bucket }); confirmSync(expense.id); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
 
@@ -527,7 +529,8 @@ export default function ExpenseDetailScreen() {
     haptic.medium();
     setReimbPicker(false);
     updateExpense(expense.id, { reimbursedAmount: value, reimbursedFromId: source.id });
-    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: source.id }); }
+    markPending(expense.id);
+    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: source.id }); confirmSync(expense.id); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
   const saveReimbManual = async () => {
@@ -538,14 +541,16 @@ export default function ExpenseDetailScreen() {
     haptic.medium();
     setReimbPicker(false);
     updateExpense(expense.id, { reimbursedAmount: value, reimbursedFromId: '' });
-    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: '' }); }
+    markPending(expense.id);
+    try { await expensesService.update(expense.id, { reimbursedAmount: value, reimbursedFromId: '' }); confirmSync(expense.id); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
   const unlinkReimb = async () => {
     haptic.medium();
     setReimbPicker(false);
     updateExpense(expense.id, { reimbursedAmount: 0, reimbursedFromId: '' });
-    try { await expensesService.update(expense.id, { reimbursedAmount: 0, reimbursedFromId: '' }); }
+    markPending(expense.id);
+    try { await expensesService.update(expense.id, { reimbursedAmount: 0, reimbursedFromId: '' }); confirmSync(expense.id); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
   };
   const reimbCandidates = useMemo(
@@ -622,9 +627,10 @@ export default function ExpenseDetailScreen() {
       updatedAt: new Date().toISOString(),
     };
     updateExpense(id!, itemUpdates);
+    markPending(id!);
     setAmount(nextAmount.toString());
     expensesService.update(id!, itemUpdates)
-      .then(() => toast.success('Zapisano produkt'))
+      .then(() => { confirmSync(id!); toast.success('Zapisano produkt'); })
       .catch(() => toast.error('Nie zapisano produktu'));
 
     // Save to shared product memory so future receipt scans auto-apply corrections
@@ -764,6 +770,7 @@ export default function ExpenseDetailScreen() {
       const changeSummary = summarizeChanges(before, after);
 
       updateExpense(id!, updates);
+      markPending(id!);
       // Ucz auto-łapacza: gdy zmieniasz kategorię wydatku ze sklepem, zapamiętaj ją dla
       // tego sprzedawcy → kolejne auto-złapane płatności z tego sklepu dostają poprawną
       // kategorię (ten sam storeKey = pierwsze słowo nazwy, co parser powiadomień).
@@ -791,6 +798,7 @@ export default function ExpenseDetailScreen() {
         recordEditHistory({ expenseId: id!, summary: changeSummary, learned: learnedBits.join('; ') || undefined });
       }
       await expensesService.update(id!, updates);
+      confirmSync(id!);
       haptic.success();
       setEditing(false);
       toast.success('Zapisano');

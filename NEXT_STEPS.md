@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴🔴 Fix KRYTYCZNY: edycja istniejącego wydatku mogła się cicho zgubić (2026-10-18, §377) — PRIORYTET WYSOKI, finansowe
+
+User: "zerknij czy nie ma innych błędów takich itp" (po §376). Drugi audyt martwych funkcji
+w store'ach znalazł: `expensesStore.ts`'s `markPending`/`confirmSync` (mechanizm chroniący
+niezsynchronizowaną lokalną zmianę przed nadpisaniem przez świeży `setExpenses()` z chmury —
+dokładnie to co `MoodCheckInModal.tsx` robi dla humoru) były wołane TYLKO przy dodaniu
+NOWEGO wydatku. Każda EDYCJA istniejącego wydatku (główny ekran edycji `[id].tsx`, przypisanie
+pojazdu, doskanowanie paragonu do płatności, szybkie przeklasyfikowanie z dashboardu,
+auto-dopasowanie bankowe) nigdy nie flagowała wiersza jako pending — na słabym łączu albo przy
+wyścigu z innym ekranem robiącym własne odświeżenie, edycja mogła zostać cicho nadpisana
+starą wartością, BEZ błędu i BEZ retry. Naprawione we wszystkich 13 znalezionych miejscach
+(`app/expenses/[id].tsx` ×6, `app/vehicles.tsx`, `scan.tsx`/`manual.tsx`'s doskanowanie,
+`app/(tabs)/index.tsx` ×2, `src/services/bankCommit.ts` ×4). **Priorytet testu WYSOKI** —
+checklist w ARCHITECTURE.md §377. Przy tej samej okazji podpięte dwa martwe "rename": biblioteka
+kolorów (✏️ w trybie zarządzania) i presety stylu (✏️ obok 🗑 na chipie).
+
 ## 🆕 Edytor mapy bossów — wybór bossa + X/Y + reset pojedynczego (2026-10-18, §376) — DO WERYFIKACJI
 
 User: "wybieram bosa i wybieram pozycję i mogę zresetować na środek... nie mam możliwości
@@ -8017,6 +8033,14 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
 
 ## 🟡 Wymaga Twojej akcji, nie kodu
 
+- **`triggerTasksSort()`/`tasksSortTrigger` w `uiActions.ts` — martwa funkcja, decyzja
+  otwarta** (znalezione przy audycie §377). Strona odbierająca jest gotowa i podpięta
+  (`tasks.tsx:601-602` otwiera arkusz sortowania), ale NIC jej nie woła — ten sam wzorzec co
+  `openWorkPanel`/`openPaydayPrompt` w tym samym store, tylko te dwa MAJĄ wołającego (FAB/
+  deep-link), a ten nie ma żadnego. `git log -S` trafia tylko w jeden ogromny commit
+  importu-repo — nie da się odtworzyć, co miało to wołać. Jeśli chcesz to podpiąć, potrzebna
+  decyzja GDZIE: przycisk w FAB Zadań? Coś z powiadomień? Zostaw info albo usuń funkcję, jeśli
+  już niepotrzebna.
 - **Diagnostyka faz snu**: Zdrowie → przycisk "Diagnostyka faz snu z zegarka" (`probeSleep`).
   Wykres faz snu na dashboardzie jest pusty od kilku zgłoszeń — cały pipeline sprawdzony w
   kodzie, jest CZYSTY, więc dalsze zgadywanie w kodzie nic nie da. Odpal przycisk i wyślij co

@@ -20151,6 +20151,92 @@ dowolnego bossa albo jego numerek na górze → panel na dole z X/Y + resetem. Z
 boss na mapie przesuwa się na żywo. "Resetuj tego bossa" wraca TYLKO jego do automatycznej
 pozycji (reszta bez zmian). Kropki na chipach pokazują którzy bossowie mają ręczne pozycje.
 
+## 377. Audyt martwych funkcji w store'ach (§368-376) — zabezpieczenie edycji wydatków + dwa rename UI (2026-10-18)
+
+User: "Wtedy zerknij czy nie ma innych błędów takich itp" (po §376 — dead `resetPosition`).
+Drugi, szerszy fork-audyt (po §375's podwójnym-tapie) przeszedł przez wszystkie ~53 store'y
+szukając funkcji w interfejsie (set/add/remove/reset/update/toggle/clear/undo) z ZERO
+wywołań w `app/`/`src/components/`/`src/hooks/` — ten sam wzorzec co §376's `resetPosition`,
+uogólniony. 4 zgłoszone, każde zweryfikowane osobiście (grep + odczyt realnego kodu) przed
+naprawą, nie zaufane w ślepo.
+
+**#1 — KRYTYCZNE, utrata danych finansowych: edycja istniejącego wydatku nie jest chroniona
+`pendingSync`.** `expensesStore.ts`/`moodStore.ts` mają identyczny wzorzec: `pendingSync:
+string[]` + `markPending(id)` flaguje wiersz jako "lokalna zmiana jeszcze nie potwierdzona w
+chmurze" — `setExpenses(incoming)` (wywoływane przy KAŻDYM `expensesService.getAll()`, np.
+`useExpenses.ts:27` na mount, `app/search.tsx`, `app/habit-year.tsx`) wtedy PRZEDKŁADA lokalną
+wersję nad przychodzącą z chmury dla wierszy we `pendingSync`, dokładnie po to żeby świeży
+zapis/edycja nie zniknęła, gdy odśwież-z-chmury wyścignie zapis w tle. Na stronie humoru ten
+wzorzec jest kompletny — `MoodCheckInModal.tsx:138-141` woła `updateEntry()` +
+`markPending()` + `.then(confirmSync)` razem. Na stronie wydatków `markPending`/`confirmSync`
+istniały w store od początku (komentarz w kodzie nawet to opisuje), ale były wołane TYLKO
+przy DODANIU nowego wydatku (`addPending` w `scan.tsx`/`manual.tsx`) — żadne z 13 miejsc, które
+EDYTUJĄ już-zsynchronizowany wydatek, nigdy nie flagowało go jako pending.
+
+Realny skutek: edytujesz kwotę/kategorię/tagi istniejącej transakcji (`app/expenses/[id].tsx`)
+→ zapis lokalny + `expensesService.update()` w tle. Jeśli w tym oknie (słabe łącze, albo
+inny zamontowany ekran z `useExpenses()` robi akurat swój własny `getAll()`+`setExpenses()`)
+przyjdzie świeże `setExpenses()` ZE STARĄ (przed-edycją) wersją tego wiersza — edycja jest
+CICHO nadpisana z powrotem na starą wartość, bez błędu, bez retry (bo wiersz nigdy nie był w
+`pendingSync`, `flushPendingExpenseWrites()` nigdy by go nie podjął przy następnym
+foregroundzie). Offline edycja = tak samo cicho zgubiona na dobre.
+
+**Naprawione — `markPending(id)` przed lokalnym zapisem + `confirmSync(id)` po potwierdzonym
+zapisie do chmury, DOKŁADNIE wzorzec `MoodCheckInModal.tsx`, we WSZYSTKICH 13 miejscach:**
+- `app/expenses/[id].tsx` — `reclassifyFv`, `linkReimb`, `saveReimbManual`, `unlinkReimb`,
+  `handleItemSave` (edycja pozycji paragonu), `handleSave` (główny formularz edycji) — 6
+  miejsc, to GŁÓWNY ekran edycji, najwyższy priorytet.
+- `app/vehicles.tsx`'s `attachExpense` (przypisanie pojazdu do wydatku).
+- `app/expenses/scan.tsx` i `app/expenses/manual.tsx` — gałąź `attachToId` (doskanowanie
+  paragonu do istniejącej płatności, "if (inStore) updateExpense(...)").
+- `app/(tabs)/index.tsx`'s `removeTagItem`/`reclassifyFvExpense` (szybkie przeklasyfikowanie z
+  widgetów dashboardu — tu przez `setExpenses(live.map(...))`, nie `updateExpense`, ale
+  identyczne ryzyko wyścigu).
+- `src/services/bankCommit.ts` — 4 miejsca ustawiające `bankMatched: true` na już-istniejącym
+  wpisie. Niższe ryzyko (sam proces dopasowania w tle, nie user-edycja), ale ten sam wzorzec —
+  i utrata flagi miałaby boczny efekt: `findMatchingExpense`/`findMatchingIncome` ŚWIADOMIE
+  pomijają `bankMatched` wpisy przy dedup, więc zgubiona flaga = ponownie dostarczone
+  powiadomienie bankowe mogłoby dodać DUPLIKAT.
+
+**#2 — `renameColor(id, name)` w `colorLibraryStore.ts` (§354) nigdy nie było wołane, a `name`
+nigdzie nie było ani ustawiane, ani czytane** — w całym repo `colorLibraryStore` ma jednego
+konsumenta (`ColorSwatchPicker.tsx`), zero miejsc czytało `.name`. Podpięte: w trybie
+zarządzania biblioteką kółko dostaje DRUGĄ odznakę (✏️, niebieska, lewy-górny róg, naprzeciw
+🗑) — tap otwiera ten sam wizualny wiersz co dodawanie koloru (`addRow`), ale z polem na NAZWĘ
+zamiast hex, zapisuje przez `renameColor`. Nazwa — skoro i tak nigdzie nie była wyświetlana —
+teraz ZASILA `accessibilityLabel` kółka (czytnik ekranu dotąd nie miał żadnej etykiety na
+kolorach z biblioteki, tylko gołe "button").
+
+**#3 — `renamePreset(id, name)` w `tileStylePresetsStore.ts` (§370, mój własny kod) nigdy nie
+było wołane** — w przeciwieństwie do kolorów, presety JUŻ wyświetlają nazwę (`<Text>{p.name}</Text>`
+na chipie), więc to czystszy przypadek "funkcja w interfejsie store'u, zero UI". Podpięte:
+ta sama ✏️ odznaka co kolory, obok istniejącego 🗑 na chipie w trybie zarządzania, otwiera
+WSPÓŁDZIELONY `addRow`/`nameInput` (ten sam wiersz co "Zapisz jako preset", `renamingId`
+odróżnia zapis-nowego od zmiany-nazwy-istniejącego) wypełniony aktualną nazwą.
+
+**#4 — `triggerTasksSort()`/`tasksSortTrigger` w `uiActions.ts`, ŚWIADOMIE NIE naprawione
+— przeniesione do NEXT_STEPS.md.** Strona odbierająca jest gotowa i podpięta
+(`app/(tabs)/tasks.tsx:601-602` — `tasksSortTrigger > 0` otwiera `SortSheet`), identyczny
+wzorzec co `openWorkPanel`/`openPaydayPrompt` w tym samym store (oba MAJĄ wołającego — FAB w
+`TabBar.tsx`, deep-link w `_layout.tsx`). Ale `triggerTasksSort` nie ma ŻADNEGO wołającego, a
+`git log -S "triggerTasksSort"` trafia tylko w jeden, ogromny commit importu-repo (#363) —
+historia sprzed tego punktu jest spłaszczona/wyciszona, więc nie da się archeologicznie
+odtworzyć, co miało to wołać (FAB? powiadomienie? coś usunięte przy refaktorze?). Zgadywanie
+miejsca podpięcia (np. dorzucenie przycisku "Sortuj" do FAB Zadań) byłoby decyzją produktową,
+nie poprawką buga — ten sam standard co battle-layout-lab (§376-poprzedzający wątek): pytam, a
+nie zgaduję, gdy ryzyko złej decyzji przewyższa koszt zapytania.
+
+**Testy**: brak nowych — to podpięcie istniejącego, już przetestowanego zachowania store'ów
+(`markPending`/`confirmSync`/`renameColor`/`renamePreset` mają testy od §354/§370) do
+wcześniej-nieistniejących wołań w UI/serwisach, nie nowa logika. `tsc --noEmit` czyste,
+`jest --silent` 113/113 suite, 1459 testów (bez zmian liczby testów).
+
+**Priorytet testu na urządzeniu — WYSOKI (finansowe)**: edytuj istniejący wydatek (kwotę,
+kategorię, zwrot) na słabym/wyłączonym łączu — zapis nie powinien nigdy "wrócić" do starej
+wartości po włączeniu internetu (sprawdź po restarcie appki, nie tylko na żywo). W bibliotece
+kolorów (Kreator → dowolny picker koloru) i presetach stylu (dowolny kafel → "Zapisz jako
+preset") — długie przytrzymanie → ✏️ na istniejącym elemencie zmienia jego nazwę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

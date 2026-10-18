@@ -121,7 +121,8 @@ export async function commitBankTx(
     if (alreadyIncome) {
       if (!alreadyIncome.bankMatched) {
         st.updateExpense(alreadyIncome.id, { bankMatched: true });
-        expensesService.update(alreadyIncome.id, { bankMatched: true }).catch(() => {});
+        st.markPending(alreadyIncome.id);
+        expensesService.update(alreadyIncome.id, { bankMatched: true }).then(() => st.confirmSync(alreadyIncome.id)).catch(() => {});
       }
       return { ok: true, matched: true };
     }
@@ -129,7 +130,8 @@ export async function commitBankTx(
     try {
       if (dup) {
         st.updateExpense(dup.id, { bankMatched: true });
-        expensesService.update(dup.id, { bankMatched: true }).catch(() => {});
+        st.markPending(dup.id);
+        expensesService.update(dup.id, { bankMatched: true }).then(() => st.confirmSync(dup.id)).catch(() => {});
         return { ok: true, matched: true };
       }
       const wp = (useWorkStore.getState().settings.workPrefix ?? '').trim();
@@ -185,7 +187,8 @@ export async function commitBankTx(
   if (already) {
     if (!already.bankMatched) {
       st.updateExpense(already.id, { bankMatched: true });
-      expensesService.update(already.id, { bankMatched: true }).catch(() => {});
+      st.markPending(already.id);
+      expensesService.update(already.id, { bankMatched: true }).then(() => st.confirmSync(already.id)).catch(() => {});
     }
     return { ok: true, matched: true };
   }
@@ -194,7 +197,8 @@ export async function commitBankTx(
   try {
     if (match) {
       st.updateExpense(match.id, { bankMatched: true });
-      expensesService.update(match.id, { bankMatched: true }).catch(() => {});
+      st.markPending(match.id);
+      expensesService.update(match.id, { bankMatched: true }).then(() => st.confirmSync(match.id)).catch(() => {});
     } else {
       const exp = await expensesService.add({
         type: 'expense', amount: finalAmount, currency: finalCurrency, category: p.category,

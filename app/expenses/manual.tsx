@@ -411,6 +411,7 @@ export default function ManualReceiptScreen() {
   const confirmSync = useExpensesStore(s => s.confirmSync);
   const updateExpense = useExpensesStore(s => s.updateExpense);
   const setExpenses = useExpensesStore(s => s.setExpenses);
+  const markPending = useExpensesStore(s => s.markPending);
   // Rozpoznawanie znanych produktów przy ręcznym wpisywaniu (2026-09-09, user: "produkty
   // które już istnieją jak wpisuje żeby się pokazywały szybciej bo od razu tag cena i wgle
   // wskoczy") — TE SAME magazyny pamięci co scan.tsx już od dawna zapisuje po zeskanowanym
@@ -652,9 +653,9 @@ export default function ManualReceiptScreen() {
           updatedAt: nowIso,
         };
         const inStore = useExpensesStore.getState().expenses.some(e => e.id === attachToId);
-        if (inStore) updateExpense(attachToId, updates);
+        if (inStore) { updateExpense(attachToId, updates); markPending(attachToId); }
         expensesService.update(attachToId, updates)
-          .then(() => { if (!inStore) expensesService.getAll().then(setExpenses).catch(() => {}); })
+          .then(() => { if (inStore) confirmSync(attachToId); else expensesService.getAll().then(setExpenses).catch(() => {}); })
           .catch(() => {});
         haptic.success();
         toast.success('Dodano paragon do płatności');

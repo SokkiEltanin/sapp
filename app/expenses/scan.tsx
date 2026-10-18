@@ -109,6 +109,7 @@ export default function ScanReceiptModal() {
   const updateExpense = useExpensesStore(s => s.updateExpense);
   const setExpenses = useExpensesStore(s => s.setExpenses);
   const confirmSync = useExpensesStore(s => s.confirmSync);
+  const markPending = useExpensesStore(s => s.markPending);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   // A brand-new custom tag typed on ONE product should be pickable for every OTHER product in
@@ -563,9 +564,9 @@ export default function ScanReceiptModal() {
           updatedAt: new Date().toISOString(),
         };
         const inStore = useExpensesStore.getState().expenses.some(e => e.id === attachToId);
-        if (inStore) updateExpense(attachToId, updates);
+        if (inStore) { updateExpense(attachToId, updates); markPending(attachToId); }
         expensesService.update(attachToId, updates)
-          .then(() => { if (!inStore) expensesService.getAll().then(setExpenses).catch(() => {}); })
+          .then(() => { if (inStore) confirmSync(attachToId); else expensesService.getAll().then(setExpenses).catch(() => {}); })
           .catch(() => {});
         toast.success('Dodano paragon do płatności');
       } else {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { Plus, Check, BookmarkPlus, Trash2 } from 'lucide-react-native';
+import { Plus, Check, BookmarkPlus, Trash2, Pencil } from 'lucide-react-native';
 import { useTileStylePresetsStore, presetsForFamily, StylePresetFamily } from '@/store/tileStylePresetsStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -35,9 +35,15 @@ export default function StylePresetBar({ family, style, onApply }: {
   const presets = useMemo(() => presetsForFamily(allPresets, family), [allPresets, family]);
   const addPreset = useTileStylePresetsStore(st => st.addPreset);
   const removePreset = useTileStylePresetsStore(st => st.removePreset);
+  const renamePreset = useTileStylePresetsStore(st => st.renamePreset);
   const [adding, setAdding] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [manageMode, setManageMode] = useState(false);
+  // Zmiana nazwy (audyt martwych funkcji, §377) — `renamePreset` istniał w store od §370, ale
+  // nigdy nie był podpięty do żadnego UI. Współdzieli `addRow`/`nameInput` z dodawaniem nowego
+  // presetu — `renamingId` ustawiony = ten sam wiersz zapisuje zmianę nazwy ISTNIEJĄCEGO
+  // presetu zamiast tworzyć nowy.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const trimmed = nameInput.trim();
   // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt) — `if (!trimmed) return` chroni
@@ -47,9 +53,25 @@ export default function StylePresetBar({ family, style, onApply }: {
   const save = () => {
     if (!trimmed || !saveGuard.allow()) return;
     haptic.success();
-    addPreset(family, trimmed, style);
+    if (renamingId) renamePreset(renamingId, trimmed);
+    else addPreset(family, trimmed, style);
     setNameInput('');
+    setRenamingId(null);
     setAdding(false);
+  };
+  const startRename = (id: string, currentName: string) => {
+    haptic.tap();
+    setManageMode(false);
+    setRenamingId(id);
+    setNameInput(currentName);
+    setAdding(true);
+  };
+  const closeAddRow = () => {
+    haptic.tap();
+    setManageMode(false);
+    setRenamingId(null);
+    setNameInput('');
+    setAdding(v => !v);
   };
 
   return (
@@ -62,24 +84,29 @@ export default function StylePresetBar({ family, style, onApply }: {
             style={s.chip}>
             <Text style={s.chipText} numberOfLines={1}>{p.name}</Text>
             {manageMode && (
-              <TouchableOpacity onPress={() => { haptic.medium(); removePreset(p.id); }} style={s.removeBadge} hitSlop={6}>
-                <Trash2 size={9} color="#fff" />
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity onPress={() => startRename(p.id, p.name)} style={s.renameBadge} hitSlop={6}>
+                  <Pencil size={9} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.medium(); removePreset(p.id); }} style={s.removeBadge} hitSlop={6}>
+                  <Trash2 size={9} color="#fff" />
+                </TouchableOpacity>
+              </>
             )}
           </TouchableOpacity>
         ))}
-        <TouchableOpacity onPress={() => { haptic.tap(); setManageMode(false); setAdding(v => !v); }}
+        <TouchableOpacity onPress={closeAddRow}
           style={[s.addChip, adding && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
           <Plus size={13} color={adding ? c.accent.blue : c.text.secondary} />
-          <Text style={[s.addChipText, adding && { color: c.accent.blue }]}>Zapisz jako preset</Text>
+          <Text style={[s.addChipText, adding && { color: c.accent.blue }]}>{renamingId ? 'Zamknij' : 'Zapisz jako preset'}</Text>
         </TouchableOpacity>
       </View>
 
       {adding && (
         <View style={s.addRow}>
-          <BookmarkPlus size={14} color={c.text.secondary} />
+          {renamingId ? <Pencil size={14} color={c.text.secondary} /> : <BookmarkPlus size={14} color={c.text.secondary} />}
           <TextInput
-            value={nameInput} onChangeText={setNameInput} placeholder="Nazwa presetu…"
+            value={nameInput} onChangeText={setNameInput} placeholder={renamingId ? 'Nowa nazwa…' : 'Nazwa presetu…'}
             placeholderTextColor={c.text.muted} maxLength={30} autoFocus
             style={s.nameInput} onSubmitEditing={save} returnKeyType="done"
           />
@@ -89,7 +116,7 @@ export default function StylePresetBar({ family, style, onApply }: {
         </View>
       )}
       {manageMode && (
-        <Text style={s.manageHint}>Tryb zarządzania presetami — tapnij 🗑 żeby usunąć, tapnij "Zapisz jako preset" żeby wyjść.</Text>
+        <Text style={s.manageHint}>Tryb zarządzania presetami — tapnij ✏️ żeby zmienić nazwę, 🗑 żeby usunąć, tapnij "Zapisz jako preset" żeby wyjść.</Text>
       )}
     </View>
   );
@@ -106,6 +133,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   removeBadge: {
     width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
     backgroundColor: c.accent.red, marginLeft: 2,
+  },
+  renameBadge: {
+    width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.accent.blue, marginLeft: 2,
   },
   addChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
