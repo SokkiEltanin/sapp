@@ -26,6 +26,12 @@ import { gearCombatBonuses, gearFlatHp, gearAtkFlat, gearById, gearSellValue, is
 import { computePetState, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
+import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
+import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
+import { useAllNotesItems } from '@/hooks/useAllNotesItems';
+import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -272,7 +278,15 @@ export default function Pet() {
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
-  const { habits, todayDone } = useHabits();
+  const { habits, todayDone, getStreak } = useHabits();
+  // Wolne płótno (§373) — ten ekran JUŻ montuje `useHabits()` wyżej, więc jak `mood.tsx`/
+  // `habits.tsx` (§368/§373): `useStreakItemsFromHabits()` dociąga resztę bez drugiego
+  // AsyncStorage fetchu. Reszta hooków wołana normalnie — ten ekran ich nie montuje.
+  const canvasStreakItems = useStreakItemsFromHabits(habits, getStreak);
+  const canvasCountdownItems = useAllCountdownItems();
+  const canvasNotesItems = useAllNotesItems();
+  const canvasDataFieldRegistry = useDataFieldRegistry();
+  const { color: canvasAccentColor } = useTimeAccent();
   const { entries: moodEntries } = useMoodStore();
   // Selektor pojedynczego pola (2026-09-18, audyt wydajności runda 4) — gołe
   // `useExpensesStore()` obok już zoptymalizowanego `usePetStore(useShallow(...))` tuż nad tą
@@ -753,6 +767,17 @@ export default function Pet() {
           })}
         </View>
 
+        {/* Wolne płótno (§373) — `allStreakItems` budowany ręcznie wyżej, żeby nie montować
+            `useHabits()` drugi raz. */}
+        <ScreenCanvasBase
+          screenKey="pet"
+          title="Twoje komponenty"
+          allStreakItems={canvasStreakItems}
+          allCountdownItems={canvasCountdownItems}
+          allNotesItems={canvasNotesItems}
+          dataFieldRegistry={canvasDataFieldRegistry}
+          accentColor={canvasAccentColor}
+        />
       </ScrollView>
 
       <ConfirmDialog

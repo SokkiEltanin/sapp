@@ -1,13 +1,7 @@
-import { useMemo } from 'react';
 import { useHabits } from '@/hooks/useHabits';
-import { useDayKey } from '@/hooks/useDayKey';
-import { useCounters } from '@/store/countersStore';
-import { useExpensesStore } from '@/store/expensesStore';
-import { useFoodStore } from '@/store/foodStore';
-import { useExercisesStore } from '@/store/exercisesStore';
-import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
 import { buildStreakItems } from '@/utils/buildStreakItems';
+import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
 
 // Re-eksport dla zgodności z istniejącymi importami (`buildStreakItems` żyje teraz w
 // `@/utils/buildStreakItems.ts` — czysty plik bez importów RN/hooków, testowalny w jest/node,
@@ -30,29 +24,16 @@ export { buildStreakItems };
 // w `index.tsx`/kreatorze.
 //
 // UWAGA przy wpinaniu `<ScreenCanvas>` (zawiera ten hook) na KOLEJNYM ekranie — sprawdź najpierw
-// `grep -n "useHabits(" <plik>`. `habits.tsx` i `pet.tsx` JUŻ montują `useHabits()` dla
-// własnej treści (nawyki/pupil), więc nie są bezpiecznym celem bez zmiany architektury tego
-// hooka — dokładnie ta sama pułapka co `index.tsx`/kreator opisana wyżej, inny ekran.
+// `grep -n "useHabits(" <plik>`. Jeśli TAK (jak `mood.tsx`/`habits.tsx`/`pet.tsx` dziś) — NIE
+// używaj domyślnego `<ScreenCanvas>` (zamontowałby `useHabits()` drugi raz), użyj
+// `ScreenCanvasBase` + `useStreakItemsFromHabits(habits, getStreak)` (patrz ten hook niżej) z
+// WŁASNYMI, już-zamontowanymi `habits`/`getStreak` tamtego ekranu.
 //
-// `buildStreakItems()` (§368, 2026-10-18) — czysta część WYDZIELONA z tego hooka (teraz w
-// `@/utils/buildStreakItems.ts`), bo `mood.tsx` JUŻ montuje `useHabits()` dla własnej treści
-// (ten sam przypadek co `habits.tsx`/`pet.tsx` wyżej) — zamiast wykluczać `mood` z płótna (jak
-// `habits`/`pet`), `mood.tsx` może wywołać TĘ funkcję ze SWOIMI już-zamontowanymi
-// `habits`/`getStreak` + resztą (lekkie, Zustand-owe selektory, bezpieczne wszędzie) i
-// przekazać wynik do `ScreenCanvasBase` bezpośrednio — ten sam wzorzec co `index.tsx` robi dla
-// `streakWall`.
+// `buildStreakItems()`/`useStreakItemsFromHabits()` (§368/§373, 2026-10-18) — `buildStreakItems`
+// to czysta część WYDZIELONA z tego hooka (teraz w `@/utils/buildStreakItems.ts`),
+// `useStreakItemsFromHabits` to dociąganie RESZTY źródeł (tanie Zustand-selektory) OBOK
+// `habits`/`getStreak` — ten hook sam jest teraz tylko `useHabits()` + `useStreakItemsFromHabits()`.
 export function useAllStreakItems(): StreakItem[] {
   const { habits, getStreak } = useHabits();
-  const counters = useCounters(st => st.counters);
-  const expenses = useExpensesStore(st => st.expenses);
-  const foodMeals = useFoodStore(st => st.meals);
-  const foodProducts = useFoodStore(st => st.products);
-  const exerciseLogs = useExercisesStore(st => st.logs);
-  const dayKey = useDayKey();
-  const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
-
-  return useMemo(
-    () => buildStreakItems({ habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak }),
-    [habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak],
-  );
+  return useStreakItemsFromHabits(habits, getStreak);
 }

@@ -16,6 +16,11 @@ import { useTasks } from '@/hooks/useTasks';
 import { useCounters } from '@/store/countersStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
+import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useAllStreakItems } from '@/hooks/useAllStreakItems';
+import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
+import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import TimePickerField from '@/components/ui/TimePickerField';
@@ -699,6 +704,14 @@ export default function NotesScreen() {
   const [confirmDelete, setConfirmDelete] = useState<{ kind: 'note'; note: Note } | { kind: 'folder'; name: string } | null>(null);
   const { create: createTask }        = useTasks();
   const { counters } = useCounters();
+  // Wolne płótno (§373) — ten ekran NIE montuje `useHabits()`, więc `useAllStreakItems()`
+  // normalnie bezpieczny; `allNotesItems` przekazane z WŁASNEGO, już-załadowanego `notes`
+  // (zamiast `useAllNotesItems()`, który zrobiłby DRUGIE `getAllNotes()` — ten sam powód co
+  // `useHabits()`'owy case w `mood.tsx`/`habits.tsx`/`pet.tsx`, tylko inny hook/store).
+  const canvasStreakItems = useAllStreakItems();
+  const canvasCountdownItems = useAllCountdownItems();
+  const canvasDataFieldRegistry = useDataFieldRegistry();
+  const { color: canvasAccentColor } = useTimeAccent();
   const counterName = (counterId?: string) => counterId ? counters.find(cn => cn.id === counterId)?.name : undefined;
 
   const loadAll = useCallback(async () => {
@@ -1004,6 +1017,17 @@ export default function NotesScreen() {
               onConvert={handleConvert}
             />
           ))}
+
+          {/* Wolne płótno (§373) — `allNotesItems` z własnego, już-załadowanego `notes`. */}
+          <ScreenCanvasBase
+            screenKey="notes"
+            title="Twoje komponenty"
+            allStreakItems={canvasStreakItems}
+            allCountdownItems={canvasCountdownItems}
+            allNotesItems={notes}
+            dataFieldRegistry={canvasDataFieldRegistry}
+            accentColor={canvasAccentColor}
+          />
         </ScrollView>
       )}
 

@@ -8,6 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import DisplayText from '@/components/ui/DisplayText';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 import RingCountdown from '@/components/counters/RingCountdown';
 import { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
@@ -205,6 +206,10 @@ export default function Counters() {
             </TouchableOpacity>
           );
         })}
+
+        {/* Wolne płótno (§373, kontynuacja §368 — explicite odłożone nie-tab ekrany) — ten
+            ekran nie montuje `useHabits()`/`useAllNotesItems()`, zero ryzyka duplikacji. */}
+        <ScreenCanvas screenKey="counters" title="Twoje komponenty" />
         <View style={{ height: 60 }} />
       </ScrollView>
 
