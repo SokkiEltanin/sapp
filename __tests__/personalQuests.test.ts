@@ -109,7 +109,25 @@ describe('personalQuests — trainingStreakFrom', () => {
     const days = { '2026-08-11': true, '2026-08-10': true, '2026-08-08': true, '2026-08-07': true } as Record<string, true>;
     expect(trainingStreakFrom(days, '2026-08-11')).toBe(2); // 11 i 10, 9 brakuje → stop
   });
+
+  // Fix §367 (audyt) — sztywne `-364` w pętli ucinało serię na 364, dokładnie ten sam bug class
+  // już dwukrotnie naprawiony w `useHabits.ts`'s `getStreak()` (BUG FIX #1/#2/#4 tam).
+  test('nieprzerwana seria DŁUŻSZA niż 364 dni nie jest ucinana (fix §367)', () => {
+    const today = '2026-08-11';
+    const days: Record<string, true> = {};
+    for (let i = 0; i <= 400; i++) days[isoOffset(today, -i)] = true;
+    expect(trainingStreakFrom(days, today)).toBe(401);
+  });
 });
+
+// Generuje ISO datę `n` dni przed/po `iso` — lokalny helper testu (fix §367), bez zależności od
+// prywatnej `offsetDate` z `personalQuests.ts`.
+function isoOffset(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  const p = (v: number) => String(v).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
 
 describe('personalQuests — amountLoggedOn (log ćwiczeń, fundament ekranu Zdrowie)', () => {
   const log = (exercise: ExerciseLogEntry['exercise'], amount: number, date: string): ExerciseLogEntry =>
@@ -156,6 +174,13 @@ describe('personalQuests — exerciseStreakFrom (log-based, zastępuje trainingD
   test('dziura w środku → seria tylko od najnowszej ciągłej reszty', () => {
     const logs = [log('pushups', '2026-08-11'), log('squats', '2026-08-10'), log('bike', '2026-08-08')];
     expect(exerciseStreakFrom(logs, '2026-08-11')).toBe(2);
+  });
+
+  // Fix §367 — ten sam bug class co `trainingStreakFrom` wyżej.
+  test('nieprzerwana seria DŁUŻSZA niż 364 dni nie jest ucinana (fix §367)', () => {
+    const today = '2026-08-11';
+    const logs = Array.from({ length: 401 }, (_, i) => log('plank', isoOffset(today, -i)));
+    expect(exerciseStreakFrom(logs, today)).toBe(401);
   });
 });
 

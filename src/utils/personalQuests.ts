@@ -1,4 +1,5 @@
 import { Gender, TrainingLevel } from '@/store/profileStore';
+import { MAX_STREAK_LOOKBACK_DAYS } from '@/utils/habits';
 
 // Wiek w pełnych latach z daty urodzenia (YYYY-MM-DD), liczony wg DZISIEJSZEJ lokalnej
 // daty — patrz memory date_local_iso.md, ale tu wystarczy zwykłe Date() bo porównujemy
@@ -89,7 +90,12 @@ function offsetDate(from: string, days: number): string {
 export function trainingStreakFrom(trainingDays: Record<string, true>, today: string): number {
   let streak = 0;
   const start = trainingDays[today] ? 0 : -1;
-  for (let i = start; i >= -364; i--) {
+  // `-MAX_STREAK_LOOKBACK_DAYS`, NIE sztywne `-364` (fix §367, audyt) — ten sam bug class, który
+  // `useHabits.ts`'s `getStreak()` miał i naprawił dwa razy (BUG FIX #1/#2/#4 tam) — sztywny
+  // limit ucina realną serię dłuższą niż ~365 dni, pokazując zawsze maksymalnie 364 mimo że
+  // streak realnie rośnie dalej. `MAX_STREAK_LOOKBACK_DAYS=3650` to miękki bezpiecznik (10 lat),
+  // nie funkcjonalny limit.
+  for (let i = start; i >= -MAX_STREAK_LOOKBACK_DAYS; i--) {
     if (trainingDays[offsetDate(today, i)]) streak++; else break;
   }
   return streak;
@@ -146,7 +152,9 @@ export function exerciseStreakFrom(logs: ExerciseLogEntry[], today: string): num
   const days = new Set(logs.map(l => l.date));
   let streak = 0;
   const start = days.has(today) ? 0 : -1;
-  for (let i = start; i >= -364; i--) {
+  // `-MAX_STREAK_LOOKBACK_DAYS`, NIE sztywne `-364` (fix §367) — patrz identyczny komentarz przy
+  // `trainingStreakFrom` wyżej, ten sam bug class.
+  for (let i = start; i >= -MAX_STREAK_LOOKBACK_DAYS; i--) {
     if (days.has(offsetDate(today, i))) streak++; else break;
   }
   return streak;
