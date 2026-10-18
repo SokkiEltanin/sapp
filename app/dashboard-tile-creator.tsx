@@ -30,7 +30,7 @@ import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import GCalCard from '@/components/dashboard/GCalCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
-import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE } from '@/store/recordsTileStyleStore';
+import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE, RecordsLayoutPreset } from '@/store/recordsTileStyleStore';
 import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
 import { CountdownLayoutPreset } from '@/store/countdownTileStyleDefaults';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE, SinceCounterLayoutPreset } from '@/store/sinceCountersTileStyleStore';
@@ -331,6 +331,24 @@ export default function DashboardTileCreator() {
             </View>
           </>
         )}
+        {/* Warianty kształtu Rekordów (§364) — CAŁOKARTowe (dotyczą układu hero+grid, nie
+            per-pozycja jak Liczniki/Notatki). */}
+        {activeCard === 'records' && (
+          <>
+            <Text style={s.sectionLabel}>Styl kafelka</Text>
+            <View style={s.segmented}>
+              {([['heroGrid', 'Hero + siatka'], ['grid', 'Siatka'], ['list', 'Lista']] as [RecordsLayoutPreset, string][]).map(([m, lbl]) => {
+                const on = recordsDraft.layoutPreset === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setRecordsDraft({ layoutPreset: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
         {/* Warianty kształtu Notatek (§363) — treść unikalna (tytuł+treść+tagi). */}
         {activeCard === 'notes' && (
           <>
@@ -453,10 +471,16 @@ export default function DashboardTileCreator() {
             <Stepper label="Zaokrąglenie rogów"
               value={activeCard === 'streaks' ? streaksDraft.cornerRadius : recordsDraft.cornerRadius} min={0} max={32} step={2}
               onChange={v => activeCard === 'streaks' ? setStreaksDraft({ cornerRadius: v }) : setRecordsDraft({ cornerRadius: v })} />
-            <View style={s.divider} />
-            <Stepper label="Proporcje kafelka"
-              value={activeCard === 'streaks' ? streaksDraft.aspectRatio : recordsDraft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
-              onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} />
+            {/* Proporcje kafelka (§364) — dotyczą TYLKO siatki kwadratów (`aspectRatio` na
+                `s.tile`), 'list' u Rekordów renderuje wiersze bez tego pola. */}
+            {!(activeCard === 'records' && recordsDraft.layoutPreset === 'list') && (
+              <>
+                <View style={s.divider} />
+                <Stepper label="Proporcje kafelka"
+                  value={activeCard === 'streaks' ? streaksDraft.aspectRatio : recordsDraft.aspectRatio} min={1.1} max={2.6} step={0.1} decimals={1}
+                  onChange={v => activeCard === 'streaks' ? setStreaksDraft({ aspectRatio: v }) : setRecordsDraft({ aspectRatio: v })} />
+              </>
+            )}
             {/* Skala liczby nie ma odpowiednika w stylu "Pierścień" — RingCountdown rysuje
                 liczbę dni sam, w swojej własnej skali (patrz §334). */}
             {!(activeCard === 'streaks' && streaksDraft.layoutPreset === 'ring') && (
@@ -629,12 +653,18 @@ export default function DashboardTileCreator() {
                   />
                 </View>
               </View>
-              <View style={s.divider} />
-              <View style={s.row}>
-                <Text style={s.rowLabel}>Ikona w tle</Text>
-                <Switch value={recordsDraft.showBgIcon} onValueChange={v => { haptic.tap(); setRecordsDraft({ showBgIcon: v }); }}
-                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
-              </View>
+              {/* 'list' (§364) — wiersze mają własną, zawsze-widoczną małą ikonkę, nie
+                  watermark w tle jak hero/grid — przełącznik tam nie ma zastosowania. */}
+              {recordsDraft.layoutPreset !== 'list' && (
+                <>
+                  <View style={s.divider} />
+                  <View style={s.row}>
+                    <Text style={s.rowLabel}>Ikona w tle</Text>
+                    <Switch value={recordsDraft.showBgIcon} onValueChange={v => { haptic.tap(); setRecordsDraft({ showBgIcon: v }); }}
+                      trackColor={{ false: c.border.default, true: c.accent.blue }} />
+                  </View>
+                </>
+              )}
             </View>
           </>
         ) : activeCard === 'since' ? (
