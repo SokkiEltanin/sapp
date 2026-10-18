@@ -26,6 +26,25 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🔴 Wolne płótno — pięć kolejnych ekranów (2026-10-18, §368) — DO WERYFIKACJI
+
+User: "każde okno ma mieć możliwość edycji (oczywiście bez kręgosłupa czyli ustawień je
+zostawiamy)". Płótno (§341+) dodane do `health.tsx`/`stats.tsx`/`tasks.tsx`/`calendar.tsx`
+(jednoliniowy `<ScreenCanvas>`, `tasks.tsx` przez `ListFooterComponent` bo `FlatList`) oraz
+`mood.tsx` (przez `ScreenCanvasBase` + nową, wyodrębnioną `buildStreakItems()` — ten ekran już
+montuje `useHabits()`). Teraz płótno jest na: dashboard, Jedzenie, Ćwiczenia, Finanse, Zdrowie,
+Zadania, Kalendarz (tab + ekran nawigacyjny), Nastrój. **Priorytet testu WYSOKI** (dotyka 5
+ekranów na raz) — checklist w ARCHITECTURE.md §368.
+
+**Świadomie NIE zrobione**: Ustawienia (user: "bez kręgosłupa"); nie-tab ekrany (liczniki,
+notatki, `habits.tsx`, `pet.tsx`, achievementy) — `habits.tsx`/`pet.tsx` wymagałyby tego samego
+`buildStreakItems()` obejścia co `mood.tsx`, osobny follow-up jeśli user zechce płótno i tam.
+
+**Kolejne w kolejce (user, ta sama sesja)**: biblioteka presetów stylu łącząca Kreator ↔
+płótno; nowy typ komponentu "Ikona" (z istniejącego seta lucide-react-native, skalowalny,
+kolorowalny); snapowanie/smart guides przy przeciąganiu jak w Figmie (najbardziej złożone —
+wymaga przekazania pozycji sąsiadów do Reanimated workletu w trakcie gestu).
+
 ## 🆕 Fix: sztywny limit 364 dni ucinał serię ćwiczeń (2026-10-18, §367) — DO WERYFIKACJI
 
 Trzeci audyt tej sesji. `trainingStreakFrom`/`exerciseStreakFrom` miały sztywny limit 364 dni

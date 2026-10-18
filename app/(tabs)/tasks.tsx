@@ -24,6 +24,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { notificationsService } from '@/services/notificationsService';
 import { useUiActions } from '@/store/uiActions';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 // Green/red accents stay both themes; the dark surfaces flip via gFor(c).
@@ -751,6 +752,13 @@ export default function TasksScreen() {
               <Text style={s.emptyTitle}>Brak zadań</Text>
               <Text style={s.emptySub}>Naciśnij + żeby dodać pierwsze</Text>
             </View>
+          }
+          ListFooterComponent={
+            // Wolne płótno (§368, "każde okno poza Ustawieniami") — `FlatList`, nie
+            // `ScrollView`, więc jak `finances.tsx`'s `SectionList` wpięte przez
+            // `ListFooterComponent`. Ten ekran nie montuje `useHabits()`/`useAllNotesItems()`,
+            // zero ryzyka duplikacji.
+            <ScreenCanvas screenKey="tasks" title="Twoje komponenty" />
           }
         />
 

@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarDays, Briefcase, LayoutGrid, RefreshCw } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -508,6 +509,10 @@ export default function CalendarScreen() {
             </View>
           </View>
           <DayDetail />
+
+          {/* Wolne płótno (§368, "każde okno poza Ustawieniami") — ten ekran nie montuje
+              `useHabits()`/`useAllNotesItems()`, zero ryzyka duplikacji. */}
+          <ScreenCanvas screenKey="calendar" title="Twoje komponenty" />
         </ScrollView>
       )}
 
@@ -556,6 +561,9 @@ export default function CalendarScreen() {
           </View>
 
           <DayDetail />
+
+          {/* Wolne płótno (§368) — patrz komentarz w widoku tygodnia wyżej. */}
+          <ScreenCanvas screenKey="calendar" title="Twoje komponenty" />
         </ScrollView>
       )}
 
@@ -606,6 +614,9 @@ export default function CalendarScreen() {
               detailed
             />
           </View>
+
+          {/* Wolne płótno (§368) — patrz komentarz w widoku tygodnia wyżej. */}
+          <ScreenCanvas screenKey="calendar" title="Twoje komponenty" />
         </ScrollView>
       )}
     </SafeAreaView>

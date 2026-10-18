@@ -19719,6 +19719,59 @@ przed podwójnym przyznaniem nagrody).
 **Priorytet testu na urządzeniu — NISKI** (fix dla edge case'u — user musiałby mieć >364-dniową
 nieprzerwaną serię ćwiczeń, żeby to zauważyć; nie crash, tylko błędna liczba).
 
+## 368. Wolne płótno — pięć kolejnych ekranów (Nastrój, Zdrowie, Zadania, Kalendarz×2) (2026-10-18)
+
+User: "każde okno ma mieć możliwość edycji (oczywiście bez kręgosłupa czyli ustawień je
+zostawiamy)" — rozszerzenie systemu wolnego płótna (§341+) na WSZYSTKIE pozostałe
+zakładki/ekrany apki poza Ustawieniami. Dotąd płótno miało tylko dashboard (`index.tsx`,
+§356), `food.tsx`, `exercises.tsx`, `finances.tsx` (Faza 15/19).
+
+**`health.tsx`, `stats.tsx` ("Kalendarz" tab), `tasks.tsx`** — żaden z nich nie montuje
+`useHabits()`/`useAllNotesItems()`, więc zwykły jednoliniowy `<ScreenCanvas screenKey="…"
+title="Twoje komponenty" />` (jak `food.tsx`/`exercises.tsx`). `tasks.tsx` ma `FlatList`, nie
+`ScrollView` — wpięte przez `ListFooterComponent`, dokładnie ten sam wzorzec co
+`finances.tsx`'s `SectionList`.
+
+**`calendar.tsx`** (ekran "Kalendarz" osiągalny z nawigacji, inny niż tab `stats.tsx` o tym
+samym tytule) — ma TRZY rozłączne `ScrollView` (`calMode==='week'` /
+`calMode==='month'&&!monthExpanded` / `calMode==='month'&&monthExpanded`), tylko jeden
+zamontowany na raz. Płótno wpięte na końcu KAŻDEGO z trzech (ten sam `screenKey="calendar"` we
+wszystkich, bo rozłączne — zero ryzyka duplikacji), mirror istniejącego wzorca w tym pliku
+gdzie `<DayDetail />` jest już wywoływane dwa razy w analogicznych miejscach.
+
+**`mood.tsx`** — JEDYNY z pięciu, który już montuje `useHabits()` (dla `habitRateByDate`,
+własna treść ekranu) — ten sam przypadek co `habits.tsx`/`pet.tsx` (patrz ostrzeżenie w
+`useAllStreakItems.ts`), więc zwykły `<ScreenCanvas>` zamontowałby `useHabits()` drugi raz.
+
+**Fix/refaktor pod to** — `useAllStreakItems.ts` rozbite na: nową, czystą, eksportowaną
+`buildStreakItems(args: {habits, getStreak, counters, expenses, foodMeals, foodProducts,
+exerciseStreak})` (ta sama logika co dotąd w ciele hooka, teraz parametryzowana) + `useAllStreakItems()`
+jako cienki wrapper wołający ją z własnymi hookami. `mood.tsx` woła `buildStreakItems()`
+bezpośrednio ze swoim już-zamontowanym `habits`/`getStreak` (z `useHabits()`) + lekkimi
+Zustand-selektorami (`useCounters`/`useExpensesStore` — już zamontowany tam jako
+`allExpenses`/`useFoodStore`/`useExercisesStore`) i przekazuje wynik do `ScreenCanvasBase` —
+identyczny wzorzec co `index.tsx` robi dla `streakWall`. Pozostałe propsy `ScreenCanvasBase`
+(`allCountdownItems`/`allNotesItems`/`dataFieldRegistry`/`accentColor`) wołane normalnie
+(`useAllCountdownItems`/`useAllNotesItems`/`useDataFieldRegistry`/`useTimeAccent`), bo `mood.tsx`
+jeszcze ich nigdzie nie montował.
+
+**Pozostają poza płótnem (świadomie, user: "bez kręgosłupa")**: Ustawienia i ich podekrany.
+**Nie zrobione w tym przebiegu** (nie-tab ekrany, osobny follow-up jeśli user zechce): liczniki,
+notatki, `habits.tsx`/`pet.tsx` (wymagałyby tego samego `ScreenCanvasBase`+`buildStreakItems()`
+obejścia co `mood.tsx` — nie zrobione teraz, bo user mówił o "oknach"/zakładkach, nie o każdym
+możliwym podekranie), achievementy.
+
+**Testy**: istniejące (żadnych nowych — `buildStreakItems` to czysty refaktor istniejącej
+logiki, pokryty już istniejącymi testami przez `useAllStreakItems`/integrację). `tsc --noEmit`
+czyste, `jest --silent` 110/110 suite, 1437 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI** (dotyka 5 głównych ekranów na raz): na każdym z
+Nastrój/Zdrowie/Zadania/Kalendarz sprawdź że płótno się pojawia (przycisk "Dodaj komponent" na
+dole), da się dodać/przesunąć/zmienić rozmiar kafla, i że pozostała treść ekranu (lista
+zadań/wpisy nastroju/widok tygodnia-miesiąca kalendarza) działa bez regresji — zwłaszcza
+`mood.tsx` (refaktor `useAllStreakItems.ts`) i `tasks.tsx` (nowy typ wpięcia przez
+`ListFooterComponent`, pierwszy raz w `FlatList` a nie `SectionList`/`ScrollView`).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

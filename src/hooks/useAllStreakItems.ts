@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useHabits } from '@/hooks/useHabits';
 import { useDayKey } from '@/hooks/useDayKey';
-import { useCounters, autoDaysWithout } from '@/store/countersStore';
+import { useCounters, autoDaysWithout, Counter } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
-import { useFoodStore } from '@/store/foodStore';
+import { useFoodStore, MealEntry, FoodProduct } from '@/store/foodStore';
 import { useExercisesStore } from '@/store/exercisesStore';
 import { exerciseStreakFrom } from '@/utils/personalQuests';
 import { StreakItem } from '@/components/dashboard/StreakWallCard';
+import { Habit, Expense } from '@/types';
 
 // Ta sama logika co `app/(tabs)/index.tsx`'s `streakWall` i `app/dashboard-tile-creator.tsx`'s
 // `realStreaks` (habity + auto-liczniki "dni bez" + ćwiczenia → `StreakItem[]`), wyciągnięta
@@ -25,6 +26,31 @@ import { StreakItem } from '@/components/dashboard/StreakWallCard';
 // `grep -n "useHabits(" <plik>`. `habits.tsx` i `pet.tsx` JUŻ montują `useHabits()` dla
 // własnej treści (nawyki/pupil), więc nie są bezpiecznym celem bez zmiany architektury tego
 // hooka — dokładnie ta sama pułapka co `index.tsx`/kreator opisana wyżej, inny ekran.
+//
+// `buildStreakItems()` (Faza 34, 2026-10-18, §368) — czysta część WYDZIELONA z tego hooka, bo
+// `mood.tsx` JUŻ montuje `useHabits()` dla własnej treści (ten sam przypadek co `habits.tsx`/
+// `pet.tsx` wyżej) — zamiast wykluczać `mood` z płótna (jak `habits`/`pet`), `mood.tsx` może
+// wywołać TĘ funkcję ze SWOIMI już-zamontowanymi `habits`/`getStreak` + resztą (lekkie,
+// Zustand-owe selektory, bezpieczne wszędzie) i przekazać wynik do `ScreenCanvasBase`
+// bezpośrednio — ten sam wzorzec co `index.tsx` robi dla `streakWall`.
+export function buildStreakItems(args: {
+  habits: Habit[];
+  getStreak: (habitId: string) => number;
+  counters: Counter[];
+  expenses: Expense[];
+  foodMeals: MealEntry[];
+  foodProducts: FoodProduct[];
+  exerciseStreak: number;
+}): StreakItem[] {
+  const { habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak } = args;
+  const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id), kind: h.kind }));
+  const fromCounters = counters
+    .filter(cn => cn.kind === 'since' && cn.mode === 'auto' && cn.onDashboard !== false)
+    .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
+  const exercise: StreakItem = { key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak };
+  return [exercise, ...fromHabits, ...fromCounters];
+}
+
 export function useAllStreakItems(): StreakItem[] {
   const { habits, getStreak } = useHabits();
   const counters = useCounters(st => st.counters);
@@ -35,12 +61,8 @@ export function useAllStreakItems(): StreakItem[] {
   const dayKey = useDayKey();
   const exerciseStreak = useMemo(() => exerciseStreakFrom(exerciseLogs, dayKey), [exerciseLogs, dayKey]);
 
-  return useMemo<StreakItem[]>(() => {
-    const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id), kind: h.kind }));
-    const fromCounters = counters
-      .filter(cn => cn.kind === 'since' && cn.mode === 'auto' && cn.onDashboard !== false)
-      .map(cn => ({ key: `c:${cn.id}`, name: `bez ${cn.name}`, days: autoDaysWithout(cn, expenses, foodMeals, foodProducts) }));
-    const exercise: StreakItem = { key: 'ex:exercises', name: 'Ćwiczenia', days: exerciseStreak };
-    return [exercise, ...fromHabits, ...fromCounters];
-  }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey, exerciseStreak]);
+  return useMemo(
+    () => buildStreakItems({ habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak }),
+    [habits, getStreak, counters, expenses, foodMeals, foodProducts, exerciseStreak],
+  );
 }
