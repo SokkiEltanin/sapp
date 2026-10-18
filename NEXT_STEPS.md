@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴🔴 Fix KRYTYCZNY: nieskończona pętla re-renderów w StylePresetBar (2026-10-18, §374) — PRIORYTET NATYCHMIASTOWY
+
+User przysłał screenshot realnego crasha: "Maximum update depth exceeded" na urządzeniu
+(globalny "ostatni błąd" w Ustawieniach pokazał crash z innego ekranu — mechanizm
+`RouteErrorBoundary`/`persistCrash`). Przyczyna: `StylePresetBar.tsx` (§370) miało
+referencyjnie-niestabilny selektor Zustand (`.filter()` wewnątrz selektora bez `useMemo`) —
+klasyczny `useSyncExternalStore` infinite-loop. `StylePresetBar` jest zamontowany na KAŻDYM
+ekranie z płótnem (wewnątrz zawsze-renderowanych modali stylu), więc to był crash
+praktycznie WSZĘDZIE, nie tylko tam gdzie się pokazał. Naprawione (selektor surowy +
+`useMemo`). **Priorytet testu KRYTYCZNY, NATYCHMIASTOWY** — sprawdź że appka w ogóle się nie
+crashuje na żadnym ekranie z płótnem. Checklist w ARCHITECTURE.md §374.
+
+Szerszy audyt CAŁEGO repo (380 wywołań Zustand selektorów) potwierdził: to był odosobniony
+przypadek, nie wzorzec — żadnych dodatkowych fixów nie trzeba.
+
 ## 🆕 Wolne płótno na ostatnich nie-tab ekranach (2026-10-18, §373) — DO WERYFIKACJI
 
 Kontynuacja §368 — płótno dodane też do `counters.tsx`/`notes.tsx`/`habits.tsx`/`pet.tsx`

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { Plus, Check, BookmarkPlus, Trash2 } from 'lucide-react-native';
 import { useTileStylePresetsStore, presetsForFamily, StylePresetFamily } from '@/store/tileStylePresetsStore';
@@ -21,7 +21,17 @@ export default function StylePresetBar({ family, style, onApply }: {
 }) {
   const c = useColors();
   const s = makeS(c);
-  const presets = useTileStylePresetsStore(st => presetsForFamily(st.presets, family));
+  // FIX (§374, realny crash na urządzeniu — "Maximum update depth exceeded") — selektor
+  // `st => presetsForFamily(st.presets, family)` zwracał NOWĄ tablicę (`.filter()`) przy
+  // KAŻDYM wywołaniu, więc `useSyncExternalStore`/Zustand nigdy nie widział tej samej
+  // referencji dwa razy — nieskończona pętla re-renderów (`forceStoreRerender`/
+  // `updateStoreInstance` w stack trace to dokładnie ten mechanizm). Fix: selektor zwraca
+  // SUROWĄ, stabilną referencję (`st.presets` — zmienia się TYLKO gdy `addPreset`/
+  // `removePreset`/`renamePreset` faktycznie mutują stan), filtr po `family` przeniesiony do
+  // `useMemo` w ciele komponentu — ten sam wzorzec co `ScreenCanvas.tsx`'s `myItems`/
+  // `orderedItems` (selektor surowy ze store'u, filtr/sort osobno, zmemoizowany).
+  const allPresets = useTileStylePresetsStore(st => st.presets);
+  const presets = useMemo(() => presetsForFamily(allPresets, family), [allPresets, family]);
   const addPreset = useTileStylePresetsStore(st => st.addPreset);
   const removePreset = useTileStylePresetsStore(st => st.removePreset);
   const [adding, setAdding] = useState(false);
