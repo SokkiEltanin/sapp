@@ -9,6 +9,7 @@ import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
 import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
+import StylePresetBar from '@/components/ui/StylePresetBar';
 
 // Edycja stylu PER-INSTANCJA na wolnym płótnie (system kopiowania komponentów, Faza 16,
 // §342) — dotychczas (Faza 15) nowa instancja miała tylko `DEFAULT_STREAK_TILE_STYLE`, bez
@@ -46,6 +47,12 @@ export default function CanvasStreakStyleModal({ visible, style, boundItem, onCh
           </View>
 
           <ScrollView contentContainerStyle={{ gap: spacing[2] }}>
+            {/* Presety stylu (§370) — korelacja z zakładką "Twoje serie" w dashboard-tile-
+                creator.tsx: `StreakTileStyle` to IDENTYCZNY typ w obu miejscach, więc zapisany
+                tu preset aplikuje się tam 1:1 i odwrotnie. */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="streak" style={style as unknown as Record<string, unknown>} onApply={(p) => onChange(p as Partial<StreakTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl</Text>
             <View style={s.segmented}>
               {([['classic', 'Klasyczny'], ['ring', 'Pierścień'], ['stripe', 'Pasek'], ['compact', 'Kompaktowy']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {

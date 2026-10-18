@@ -26,6 +26,18 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🆕 Biblioteka presetów stylu — korelacja Kreator ↔ płótno (2026-10-18, §370) — DO WERYFIKACJI
+
+User: "rob korelacje miedzy nimi biblioteki". Nowa wspólna biblioteka (`tileStylePresetsStore.ts`
++ `StylePresetBar.tsx`, ten sam wzorzec co biblioteka kolorów §354) — zapisany styl kafla w
+Kreatorze LUB na płótnie jest od razu dostępny do zaaplikowania w drugim miejscu. Dotyczy
+TYLKO 3 rodzin, które istnieją po obu stronach: Serie, Odliczania, Notatki (Rekordy/Liczniki
+są tylko w Kreatorze, dataField/kształty tylko na płótnie — brak drugiej strony do korelacji).
+**Priorytet testu ŚREDNI** — checklist w ARCHITECTURE.md §370.
+
+**Kolejne w kolejce**: nowy typ komponentu "Ikona" na płótnie (z lucide-react-native, 
+skalowalny/kolorowalny); snapowanie/smart guides przy przeciąganiu jak w Figmie.
+
 ## ✅ Czwarty audyt edytorów + fix zero-coverage gap (2026-10-18, §369) — BEZ RYZYKA
 
 Audyt całego systemu edytora płótna (§341-368) — nic nowego do naprawienia (wszystkie

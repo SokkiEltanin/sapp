@@ -9,6 +9,7 @@ import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
 import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
+import StylePresetBar from '@/components/ui/StylePresetBar';
 import { useHabits } from '@/hooks/useHabits';
 import { useCounters, autoDaysWithout, isOver, daysUntil, isDuringEvent, daysSince } from '@/store/countersStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -31,10 +32,10 @@ import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import GCalCard from '@/components/dashboard/GCalCard';
 import { useStreakTileStyleStore, StreakTileStyle, HabitCalendarStyle, FlameCorner, StreakLayoutPreset, DEFAULT_STREAK_TILE_STYLE } from '@/store/streakTileStyleStore';
 import { useRecordsTileStyleStore, DEFAULT_RECORDS_TILE_STYLE, RecordsLayoutPreset } from '@/store/recordsTileStyleStore';
-import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE } from '@/store/countdownsTileStyleStore';
+import { useCountdownsTileStyleStore, DEFAULT_COUNTDOWNS_TILE_STYLE, CountdownsTileStyle } from '@/store/countdownsTileStyleStore';
 import { CountdownLayoutPreset } from '@/store/countdownTileStyleDefaults';
 import { useSinceCountersTileStyleStore, DEFAULT_SINCE_COUNTERS_TILE_STYLE, SinceCounterLayoutPreset } from '@/store/sinceCountersTileStyleStore';
-import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE } from '@/store/pinnedNotesTileStyleStore';
+import { usePinnedNotesTileStyleStore, DEFAULT_PINNED_NOTES_TILE_STYLE, PinnedNotesTileStyle } from '@/store/pinnedNotesTileStyleStore';
 import { NotesLayoutPreset } from '@/store/notesTileStyleDefaults';
 import { useGCalTileStyleStore, DEFAULT_GCAL_TILE_STYLE } from '@/store/gcalTileStyleStore';
 
@@ -301,6 +302,11 @@ export default function DashboardTileCreator() {
             pasek/kompaktowy/duża liczba zamiast klasyczny/pierścień/pasek/kompaktowy). */}
         {activeCard === 'streaks' && (
           <>
+            {/* Presety stylu (§370) — korelacja z `CanvasStreakStyleModal.tsx`: `StreakTileStyle`
+                to identyczny typ w obu miejscach, preset zapisany tu działa 1:1 na płótnie. */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="streak" style={streaksDraft as unknown as Record<string, unknown>} onApply={(p) => setStreaksDraft(p as Partial<StreakTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl kafelka</Text>
             <View style={s.segmented}>
               {([['classic', 'Klasyczny'], ['ring', 'Pierścień'], ['stripe', 'Pasek akcentu'], ['compact', 'Kompaktowy']] as [StreakLayoutPreset, string][]).map(([m, lbl]) => {
@@ -317,6 +323,11 @@ export default function DashboardTileCreator() {
         )}
         {activeCard === 'countdowns' && (
           <>
+            {/* Presety stylu (§370) — korelacja z `CanvasCountdownStyleModal.tsx` (patrz
+                komentarz tam o różnicy pól `maxVisible`/partial-merge). */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="countdown" style={countdownsDraft as unknown as Record<string, unknown>} onApply={(p) => setCountdownsDraft(p as Partial<CountdownsTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl kafelka</Text>
             <View style={s.segmented}>
               {([['ring', 'Pierścień'], ['bar', 'Pasek'], ['compact', 'Kompaktowy'], ['hero', 'Duża liczba']] as [CountdownLayoutPreset, string][]).map(([m, lbl]) => {
@@ -352,6 +363,11 @@ export default function DashboardTileCreator() {
         {/* Warianty kształtu Notatek (§363) — treść unikalna (tytuł+treść+tagi). */}
         {activeCard === 'notes' && (
           <>
+            {/* Presety stylu (§370) — korelacja z `CanvasNotesStyleModal.tsx` (patrz
+                komentarz tam o różnicy pól `maxVisible`/partial-merge). */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="notes" style={notesDraft as unknown as Record<string, unknown>} onApply={(p) => setNotesDraft(p as Partial<PinnedNotesTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl kafelka</Text>
             <View style={s.segmented}>
               {([['row', 'Wiersz'], ['compact', 'Kompaktowy'], ['card', 'Karta']] as [NotesLayoutPreset, string][]).map(([m, lbl]) => {

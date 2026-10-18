@@ -19811,6 +19811,53 @@ habitów z `getStreak`, filtr liczników po `kind`/`mode`/`onDashboard`, kolejno
 **Priorytet testu na urządzeniu — ŻADEN** (czysty refaktor + test, zero zmiany zachowania w
 runtime — `useAllStreakItems()`/`mood.tsx` liczą identycznie jak przed §369).
 
+## 370. Biblioteka presetów stylu — korelacja Kreator ↔ płótno (2026-10-18)
+
+User: "sprawdzaj te edytory ulepszaj je rob korelacje miedzy nimi biblioteki itp itd" —
+rozszerzenie `colorLibraryStore`/`ColorSwatchPicker` (§354, JEDNA wspólna biblioteka kolorów
+dla wszystkich miejsc stylowania) na CAŁE style kafli: zapisany styl w jednym miejscu
+(Kreator LUB płótno) jest od razu dostępny do zaaplikowania w drugim.
+
+**Zakres — tylko 3 rodziny, bo tylko te mają DWIE strony do korelacji.**
+`CanvasComponentType` (`canvasComponentsStore.ts`) = `'streakTile' | 'countdownTile' |
+'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape'` —
+Rekordy i Liczniki (since) z Kreatora NIE MAJĄ odpowiednika na płótnie (brak
+`CanvasComponentType` dla nich — Kreator buduje z nich gotowe karty dashboardu, nie
+instancje płótna), a `dataField`/kształty na płótnie nie mają zakładki w Kreatorze. Presety
+dostają więc tylko: **streak** (zakładka "Twoje serie" ↔ `CanvasStreakStyleModal`),
+**countdown** ("Odliczania" ↔ `CanvasCountdownStyleModal`), **notes** ("Notatki" ↔
+`CanvasNotesStyleModal`).
+
+**`src/store/tileStylePresetsStore.ts`** (nowy) — ten sam wzorzec co `colorLibraryStore.ts`:
+`TileStylePreset { id, family, name, style: Record<string, unknown> }`, `addPreset`/
+`removePreset`/`renamePreset` + czysty, testowalny filtr `presetsForFamily(presets, family)`.
+`style` jest LOOSELY typowany (`Record<string, unknown>`, nie konkretny `StreakTileStyle`
+itp.) bo Kreator i płótno dla `countdown`/`notes` mają NIECO różne typy (Kreator ma dodatkowe
+`maxVisible`, płótno nie — `StreakTileStyle` jest WYJĄTKIEM, identyczny typ w obu miejscach).
+Zastosowanie presetu idzie przez `onChange`/`setDraft`, które już są partial-merge
+(`{...current, ...patch}`) — brakujące pole po drugiej stronie zostaje nietknięte, nieznane
+dodatkowe pole to martwy, nieszkodliwy nadmiar w zapisanym obiekcie stylu (nigdy czytany).
+Cast na konkretny typ (`as Partial<StreakTileStyle>` itd.) w KAŻDYM miejscu wołania — ten sam,
+wielokrotnie użyty w tej sesji wzorzec co przy TS union-spread castach (§355/§363), nie
+discriminated union.
+
+**`src/components/ui/StylePresetBar.tsx`** (nowy) — drop-in UI, ten sam UX co
+`ColorSwatchPicker`: chipy z nazwą presetu (tap aplikuje), "+" → pole na nazwę + zapisz
+aktualny `style`, długi przytrzym na chipie → tryb zarządzania (🗑 na każdym).
+
+**Wpięte w 6 miejscach** (3 rodziny × Kreator/płótno) — nowa sekcja "Presety" NAD istniejącą
+"Styl kafelka"/"Styl": `dashboard-tile-creator.tsx` (zakładki streaks/countdowns/notes),
+`CanvasStreakStyleModal.tsx`, `CanvasCountdownStyleModal.tsx`, `CanvasNotesStyleModal.tsx`.
+
+**Testy**: `__tests__/tileStylePresetsStore.test.ts` (nowy, 5 testów — add/remove/rename,
+brak deduplikacji, `presetsForFamily` filtr). `tsc --noEmit` czyste, `jest --silent` 112/112
+suite, 1451 testów.
+
+**Priorytet testu na urządzeniu — ŚREDNI**: w Kreatorze (zakładka Serie/Odliczania/Notatki)
+ustaw jakiś styl → "Zapisz jako preset" → sprawdź że chip się pojawia na PŁÓTNIE (modal stylu
+tego samego typu kafla) i że tap aplikuje go 1:1; i odwrotnie (zapisz na płótnie → zastosuj w
+Kreatorze). Długi przytrzym na chipie → 🗑 usuwa.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
