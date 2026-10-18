@@ -1,6 +1,6 @@
 import { useEffect, ReactNode } from 'react';
 import { View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
-import Reanimated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, runOnJS, SharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Move, Trash2, Palette, SlidersHorizontal, CircleCheck } from 'lucide-react-native';
 import { CanvasItem, MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
@@ -15,7 +15,10 @@ const MIN_HEIGHT = MIN_ITEM_HEIGHT;
 // `runOnJS` commitujący pozycję do store'u TYLKO na `onEnd`, nie na każdej ramce — unika
 // zalewu renderów Zustand podczas przeciągania). Różnica od `DashEditRow`: tam ruch jest
 // 1-wymiarowy i snapuje do siatki wierszy (reorder listy); tutaj ruch jest WOLNY 2D (user:
-// "wolne płótno jak Figma/Canva" — żadnego snapowania, elementy mogą się nakładać).
+// "wolne płótno jak Figma/Canva" — elementy mogą się nakładać, pozycja NIE jest ograniczona do
+// siatki). Smart guides (§372, niżej w `dragGesture.onUpdate`) dodają MIĘKKIE snapowanie do
+// krawędzi/centrum sąsiadów podczas przeciągania — user wciąż może przeciągnąć gdziekolwiek
+// (nakładanie zostaje możliwe), snap tylko "przyciąga" w promieniu kilku pikseli, jak w Figmie.
 //
 // `renderTile` (Faza 17, 2026-10-17, drugi `componentType`) — TEN komponent nie wie NIC o
 // `StreakTile`/`CountdownTile`/przyszłych typach, tylko o geście/pozycji/rozmiarze/chrome
@@ -28,12 +31,18 @@ const MIN_HEIGHT = MIN_ITEM_HEIGHT;
 // dokłada: uchwyt przeciągania (CAŁY obszar kafla — tapnięcie bez ruchu otwiera picker metryki,
 // patrz `Gesture.Race` niżej), uchwyt zmiany rozmiaru (róg), przyciski styl/usuń.
 export default function CanvasPlacedItem({
-  item, editing, canvasWidth, onTap, onDelete, onMove, onResize, onStyle, onProperties, renderTile,
+  item, editing, canvasWidth, allRects, guides, onTap, onDelete, onMove, onResize, onStyle, onProperties, renderTile,
   selectMode = false, selected = false, onToggleSelect, grouped = false,
 }: {
   item: CanvasItem;
   editing: boolean;
   canvasWidth: number;
+  // Smart guides (§372) — geometria WSZYSTKICH itemów tego ekranu (siebie samego filtrujemy
+  // niżej po `id`) + WSPÓLNA shared value z `ScreenCanvas.tsx`, do której TYLKO ten item pisze
+  // PODCZAS WŁASNEGO przeciągania (patrz `dragGesture.onUpdate` niżej) — reszta instancji
+  // dostaje TĘ SAMĄ referencję, ale nigdy do niej nie pisze, kiedy to nie ONA jest przeciągana.
+  allRects: { id: string; x: number; y: number; width: number; height: number }[];
+  guides: SharedValue<{ vx: number | null; vy1: number; vy2: number; hy: number | null; hx1: number; hx2: number }>;
   onTap: () => void;
   onDelete: () => void;
   onMove: (x: number, y: number) => void;
@@ -64,15 +73,78 @@ export default function CanvasPlacedItem({
   useEffect(() => { tx.value = item.x; ty.value = item.y; }, [item.x, item.y]);
   useEffect(() => { w.value = item.width; h.value = item.height; }, [item.width, item.height]);
 
+  // Smart guides (§372) — geometria sąsiadów jako shared value (nie prop bezpośrednio — gesty
+  // Reanimated czytają TYLKO ze shared values, nigdy z propsów/closure JS na UI thread), ten
+  // sam wzorzec synchronizacji co `tx`/`ty`/`w`/`h` wyżej.
+  const rectsShared = useSharedValue(allRects);
+  useEffect(() => { rectsShared.value = allRects; }, [allRects]);
+
   const dragStart = useSharedValue({ x: 0, y: 0 });
   const dragGesture = Gesture.Pan()
     .minDistance(4)
     .onStart(() => { dragStart.value = { x: tx.value, y: ty.value }; })
     .onUpdate((e) => {
-      tx.value = Math.max(0, Math.min(Math.max(0, canvasWidth - w.value), dragStart.value.x + e.translationX));
-      ty.value = Math.max(0, dragStart.value.y + e.translationY);
+      const rawX = Math.max(0, Math.min(Math.max(0, canvasWidth - w.value), dragStart.value.x + e.translationX));
+      const rawY = Math.max(0, dragStart.value.y + e.translationY);
+
+      // Snapowanie do krawędzi/centrum sąsiadów (§372, user: "SNAPOWANIE do centrum
+      // obiektu... jak w Figmie") — INLINE w tym workletcie (NIE importowana funkcja — ta
+      // sama, świadoma ostrożność co przy `clampItemX` niżej w tym pliku/`canvasComponentsStore.
+      // ts`: wywołanie zaimportowanej funkcji z workletu wymagałoby poprawnego "workletyzowania"
+      // przez babel, niesprawdzone na tym etapie Reanimated 4/New Architecture w tym projekcie —
+      // patrz identyczny komentarz przy `clampItemX`). PIERWSZY dopasowany próg (lewa/środek/
+      // prawa, góra/środek/dół) WYGRYWA, nie najbliższy — prosta, przewidywalna reguła.
+      const THRESH = 6;
+      const myW = w.value, myH = h.value;
+      const sibs = rectsShared.value.filter((r) => r.id !== item.id);
+
+      let vx: number | null = null, vy1 = 0, vy2 = 0;
+      let snapDX = 0;
+      for (let i = 0; i < sibs.length; i++) {
+        const r = sibs[i];
+        const myLeft = rawX, myRight = rawX + myW, myCenter = rawX + myW / 2;
+        const sLeft = r.x, sRight = r.x + r.width, sCenter = r.x + r.width / 2;
+        let at: number | null = null, dx = 0;
+        if (Math.abs(myLeft - sLeft) < THRESH) { at = sLeft; dx = sLeft - myLeft; }
+        else if (Math.abs(myCenter - sCenter) < THRESH) { at = sCenter; dx = sCenter - myCenter; }
+        else if (Math.abs(myRight - sRight) < THRESH) { at = sRight; dx = sRight - myRight; }
+        if (at != null) {
+          vx = at; snapDX = dx;
+          vy1 = Math.min(rawY, r.y); vy2 = Math.max(rawY + myH, r.y + r.height);
+          break;
+        }
+      }
+
+      let hy: number | null = null, hx1 = 0, hx2 = 0;
+      let snapDY = 0;
+      for (let i = 0; i < sibs.length; i++) {
+        const r = sibs[i];
+        const myTop = rawY, myBottom = rawY + myH, myCenter = rawY + myH / 2;
+        const sTop = r.y, sBottom = r.y + r.height, sCenter = r.y + r.height / 2;
+        let at: number | null = null, dy = 0;
+        if (Math.abs(myTop - sTop) < THRESH) { at = sTop; dy = sTop - myTop; }
+        else if (Math.abs(myCenter - sCenter) < THRESH) { at = sCenter; dy = sCenter - myCenter; }
+        else if (Math.abs(myBottom - sBottom) < THRESH) { at = sBottom; dy = sBottom - myBottom; }
+        if (at != null) {
+          hy = at; snapDY = dy;
+          hx1 = Math.min(rawX, r.x); hx2 = Math.max(rawX + myW, r.x + r.width);
+          break;
+        }
+      }
+
+      // Re-klamrowanie PO snapie (bezpiecznik) — snap do centrum/krawędzi sąsiada w teorii
+      // mógłby przesunąć o kilka px poza granicę płótna (np. sąsiad szerszy/węższy niż
+      // przeciągany item, snap na centrum) — ten sam zakres co `rawX`/`rawY` wyżej.
+      const snappedX = vx != null ? rawX + snapDX : rawX;
+      const snappedY = hy != null ? rawY + snapDY : rawY;
+      tx.value = Math.max(0, Math.min(Math.max(0, canvasWidth - myW), snappedX));
+      ty.value = Math.max(0, snappedY);
+      guides.value = { vx, vy1, vy2, hy, hx1, hx2 };
     })
-    .onEnd(() => { runOnJS(onMove)(tx.value, ty.value); });
+    .onEnd(() => {
+      guides.value = { vx: null, vy1: 0, vy2: 0, hy: null, hx1: 0, hx2: 0 };
+      runOnJS(onMove)(tx.value, ty.value);
+    });
 
   const tapGesture = Gesture.Tap().onEnd(() => { runOnJS(onTap)(); });
   const moveOrTap = Gesture.Race(dragGesture, tapGesture);

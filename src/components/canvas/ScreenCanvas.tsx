@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
+import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
@@ -48,6 +49,18 @@ const SHAPE_DEFAULT_BY_KIND: Record<ShapeComponentType, ShapeStyle> = {
   lineShape: DEFAULT_LINE_SHAPE_STYLE,
   textShape: DEFAULT_TEXT_SHAPE_STYLE,
 };
+
+// Smart guides / snapowanie (Faza 34, 2026-10-18, §372) — user: "dodaj właśnie SNAPOWANIE do
+// centrum obiektu... z na bieżąco pokazującymi się na chwilkę linijkami żeby było widać że
+// jest równo... jak w Figmie". `GuideState` to WSPÓLNA shared value (JEDNA instancja, stworzona
+// TU, przekazana do WSZYSTKICH `CanvasPlacedItem` na tym ekranie jako ten sam obiekt-referencja)
+// — tylko AKTUALNIE przeciągany item zapisuje do niej ze swojego gesture-workletu (viz. tam),
+// reszta tylko dostaje tę samą referencję bez pisania. Dwie linie (pionowa = snap po X, pozioma
+// = snap po Y), każda albo widoczna (gdy aktywny snap) albo offscreen+opacity 0 — ten sam
+// "fixed slot, warunkowa widoczność" wzorzec co linie-pointerEvents="none" gdzie indziej w tym
+// pliku (np. `groupFrame`), zamiast dynamicznej listy (prostsze, bezpieczniejsze dla workletu).
+type GuideState = { vx: number | null; vy1: number; vy2: number; hy: number | null; hx1: number; hx2: number };
+const HIDDEN_GUIDES: GuideState = { vx: null, vy1: 0, vy2: 0, hy: null, hx1: 0, hx2: 0 };
 
 const MIN_CANVAS_HEIGHT = 140;
 const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą instancją
@@ -124,6 +137,25 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // DODANIA, nie bieżącą warstwę po ewentualnym "na wierzch"/"na spód"). `?? 0` — patrz komentarz
   // przy `CanvasItem.zIndex` w `canvasComponentsStore.ts`.
   const orderedItems = useMemo(() => [...myItems].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)), [myItems]);
+
+  // Smart guides (§372) — płaska lista geometrii WSZYSTKICH itemów tego ekranu (siebie
+  // samego filtruje `CanvasPlacedItem` po `id`, patrz tam) — JEDNA tablica, nie per-item kopia,
+  // żeby nie tworzyć N nowych tablic na każdy render `ScreenCanvas`.
+  const itemRects = useMemo(
+    () => myItems.map(i => ({ id: i.id, x: i.x, y: i.y, width: i.width, height: i.height })),
+    [myItems],
+  );
+  const guides = useSharedValue<GuideState>(HIDDEN_GUIDES);
+  const vGuideStyle = useAnimatedStyle(() => ({
+    position: 'absolute', left: guides.value.vx ?? -9999, top: guides.value.vy1,
+    width: 1.5, height: Math.max(0, guides.value.vy2 - guides.value.vy1),
+    opacity: guides.value.vx != null ? 1 : 0,
+  }));
+  const hGuideStyle = useAnimatedStyle(() => ({
+    position: 'absolute', top: guides.value.hy ?? -9999, left: guides.value.hx1,
+    height: 1.5, width: Math.max(0, guides.value.hx2 - guides.value.hx1),
+    opacity: guides.value.hy != null ? 1 : 0,
+  }));
 
   // Opisowa etykieta itemu (§365) — WSPÓLNA dla listy warstw, jedno miejsce rozwiązywania
   // podpięcia-na-nazwę zamiast powtarzania per-wiersz logiki z głównej pętli renderu niżej.
@@ -299,6 +331,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               item={item}
               editing={editing}
               canvasWidth={canvasWidth}
+              allRects={itemRects}
+              guides={guides}
               onTap={onTap}
               onDelete={() => removeItem(item.id)}
               onMove={(x, y) => {
@@ -387,6 +421,17 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             left: box.x - 8, top: box.y - 8, width: box.width + 16, height: box.height + 16,
           }]} />
         ))}
+        {/* Smart guides (§372) — dwie linie o stałej pozycji w drzewie (ten sam fixed-slot
+            wzorzec co ramka grupy wyżej), widoczność/pozycja czytane z `guides` shared value
+            wypisywanej przez AKTUALNIE przeciągany `CanvasPlacedItem`. Różowy akcent (nie
+            fioletowy jak ramka grupy/niebieski jak reszta chrome) — wizualnie odróżnialny
+            "trzeci język" UI, ten sam kolor co Figma/Sketch/XD używają do linii wyrównania. */}
+        {editing && !selectMode && (
+          <>
+            <Reanimated.View pointerEvents="none" style={[vGuideStyle, { backgroundColor: '#EC4899' }]} />
+            <Reanimated.View pointerEvents="none" style={[hGuideStyle, { backgroundColor: '#EC4899' }]} />
+          </>
+        )}
       </View>
 
       {editing && selectMode && (
