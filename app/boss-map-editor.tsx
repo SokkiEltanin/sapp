@@ -214,7 +214,14 @@ export default function BossMapEditorScreen() {
           przeciąganie palcem) + reset TYLKO tego bossa (`resetPosition`, istniał w store od
           §322, nigdy nie podpięty do UI). Czyta `nodes[selectedIdx]` — ta sama, scalona z
           `dragPos` wartość co rysowanie na płótnie, więc jeśli user WŁAŚNIE przeciąga
-          wybranego bossa, suwaki pokazują żywą pozycję, nie starą. */}
+          wybranego bossa, suwaki pokazują żywą pozycję, nie starą.
+          `position: 'absolute'` (fix PRZED wysłaniem, znaleziony przy własnym przeglądzie) —
+          jako zwykły sibling flex pod `stageWrap` (flex:1) panel ZMNIEJSZAŁBY jego zmierzoną
+          wysokość za każdym razem gdy się pojawia/znika, co przez `key={viewport.w x
+          viewport.h}` na `ScrollView` niżej WYMUSZAŁOBY jej REMOUNT (React remountuje przy
+          zmianie key) — a to zeruje `contentOffset`, skacząc z powrotem na aktualnego bossa
+          kampanii i gubiąc miejsce przewinięcia usera przy KAŻDYM wyborze bossa. Overlay nie
+          zmienia rozmiaru `stageWrap` wcale, więc `viewport`/`key` zostają stabilne. */}
       {selectedIdx != null && (() => {
         const b = BOSSES[selectedIdx];
         const n = nodes[selectedIdx];
@@ -299,8 +306,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   nodeLabel: { fontSize: 10, fontWeight: '800', color: '#fff', textAlign: 'center', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   editPanel: {
+    // `position: 'absolute'` (patrz komentarz przy renderze) — panel NIE jest zwykłym flex
+    // sibling'em `stageWrap`, żeby nie zmieniać jego zmierzonej wysokości (→ remount
+    // ScrollView przez `key` → reset scrolla) przy każdym pojawieniu/zniknięciu.
+    position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: c.bg.secondary, borderTopWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[3], gap: spacing[1],
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 12,
   },
   editPanelHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[1] },
   editPanelTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
