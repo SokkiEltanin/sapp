@@ -36,6 +36,7 @@ import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import CanvasPropertiesModal from './CanvasPropertiesModal';
 import CanvasLayersModal, { LayerRow } from './CanvasLayersModal';
+import { usePressGuard } from '@/hooks/usePressGuard';
 import { IconTile } from './IconTile';
 import CanvasIconStyleModal from './CanvasIconStyleModal';
 import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
@@ -244,7 +245,14 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
   const onLayout = (e: LayoutChangeEvent) => setCanvasWidth(e.nativeEvent.layout.width);
 
+  // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt — user: "otwiera się dwa razy") —
+  // `onAdd` nie miał ŻADNEGO guardu, więc szybkie podwójne tapnięcie "Dodaj kafel serii" itd.
+  // wołało `addItem()` dwa razy, dodając dwa identyczne itemy zamiast jednego. JEDEN guard dla
+  // wszystkich 9 przycisków "Dodaj" (nie osobny per przycisk) — świadomy kompromis, patrz
+  // komentarz w `pressGuard.ts`.
+  const addGuard = usePressGuard();
   const onAdd = (type: CanvasComponentType) => {
+    if (!addGuard.allow()) return;
     haptic.tap();
     const id = addItem(screenKey, type);
     // Kształty (§357) i Ikona (§371) nie mają podpięcia danych — nie otwieraj metric-pickera

@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 Fix: podwójne tapnięcie — nowy pressGuard, 5 naprawionych miejsc (2026-10-18, §375) — DO WERYFIKACJI
+
+User: "niektóre [przyciski] zawsze da się wejść szybko i otwiera się dwa razy". Problem
+SYSTEMOWY (RN nie ma wbudowanego debounce na `onPress`) — nowy `src/utils/pressGuard.ts` +
+`src/hooks/usePressGuard.ts` (gotowe do reużycia wszędzie). Naprawione 5 najbardziej
+prawdopodobnych miejsc: płótno "Dodaj komponent" (dublowało itemy), `TabBar`'s rząd szybkich
+akcji (dublowało nawigację na stosie), `StylePresetBar`/`ColorSwatchPicker`'s zapis
+(dublowało wpisy w bibliotece), `tasks.tsx`'s szybkie dodawanie zadania. **Priorytet testu
+WYSOKI** — checklist w ARCHITECTURE.md §375.
+
+**NIE zrobione (scope cut)**: pełny sweep wszystkich ~197 wystąpień `router.push`/`navigate`
+w repo — tylko najczęściej klikane miejsca naprawione. Jeśli user zauważy to gdzie indziej,
+`pressGuard`/`usePressGuard` są gotowe, trzeba tylko wpiąć w kolejnym miejscu.
+
 ## 🔴🔴 Fix KRYTYCZNY: nieskończona pętla re-renderów w StylePresetBar (2026-10-18, §374) — PRIORYTET NATYCHMIASTOWY
 
 User przysłał screenshot realnego crasha: "Maximum update depth exceeded" na urządzeniu

@@ -7,6 +7,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { usePressGuard } from '@/hooks/usePressGuard';
 
 // Wspólny wybór koloru (Faza 23, 2026-10-17, §354) — user: "nie ma możliwości customowego
 // koloru... dodaj bibliotekę kolorów gdzie moge dodawac kolory zeby miec do nich dostęp
@@ -40,6 +41,9 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
   const [manageMode, setManageMode] = useState(false);
 
   const normalized = normalizeHex(hexInput);
+  // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt) — `saveToLibrary` dodaje NOWY
+  // wpis do biblioteki (`addColor`), szybkie podwójne tapnięcie dawało dwa identyczne kolory.
+  const saveGuard = usePressGuard();
 
   const applyCustom = () => {
     if (!normalized) return;
@@ -49,7 +53,7 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
     setAdding(false);
   };
   const saveToLibrary = () => {
-    if (!normalized) return;
+    if (!normalized || !saveGuard.allow()) return;
     haptic.success();
     addColor(normalized);
     onSelect(normalized);

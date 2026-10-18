@@ -25,6 +25,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { notificationsService } from '@/services/notificationsService';
 import { useUiActions } from '@/store/uiActions';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { usePressGuard } from '@/hooks/usePressGuard';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 // Green/red accents stay both themes; the dark surfaces flip via gFor(c).
@@ -639,14 +640,18 @@ export default function TasksScreen() {
   const [quickText, setQuickText] = useState('');
   const [quickKind, setQuickKind] = useState<TaskKind | null>(null);   // null = auto-infer
   const effectiveQuickKind = quickKind ?? inferKind(quickText || '');
+  // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt) — `if (!title) return` chroni
+  // TYLKO przed pustym tytułem, nie przed dwoma tapnięciami zanim `setQuickText('')` zdąży
+  // się przerenderować (szybkie podwójne tapnięcie/Enter → dwa identyczne zadania).
+  const submitGuard = usePressGuard();
   const submitQuick = useCallback(() => {
     const title = quickText.trim();
-    if (!title) return;
+    if (!title || !submitGuard.allow()) return;
     const kind = quickKind ?? inferKind(title);
     create({ title, status: 'pending', priority: 'normal', tags: [], kind } as any);
     haptic.success();
     setQuickText(''); setQuickKind(null);
-  }, [quickText, quickKind, create]);
+  }, [quickText, quickKind, create, submitGuard]);
   const cycleQuickKind = useCallback(() => {
     haptic.tap();
     const cur = effectiveQuickKind;
