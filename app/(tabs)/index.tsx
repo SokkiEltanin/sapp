@@ -325,6 +325,8 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const liveExpenses = useExpensesStore(s => s.expenses);
   const setExpenses = useExpensesStore(s => s.setExpenses);
+  const markExpensePending = useExpensesStore(s => s.markPending);
+  const confirmExpenseSync = useExpensesStore(s => s.confirmSync);
   // ── Trigger-based stats snapshot ────────────────────────────────────────────
   // Every heavy widget memo below reads THIS `expenses` (a snapshot), NOT the live
   // store. The store churns constantly (bank sync, other screens calling setExpenses,
@@ -1058,11 +1060,12 @@ export default function DashboardScreen() {
       updates = { receiptItems: newItems };
       setExpenses(live.map(x => x.id === item.expenseId ? { ...x, receiptItems: newItems } : x));
     }
+    markExpensePending(item.expenseId);
     setTagModal((m: any) => m ? { ...m, items: m.items.filter((it: any) => !(it.expenseId === item.expenseId && it.idx === item.idx)) } : m);
     haptic.medium();
-    try { await expensesService.update(item.expenseId, updates); }
+    try { await expensesService.update(item.expenseId, updates); confirmExpenseSync(item.expenseId); }
     catch { haptic.error(); toast.error('Nie usunięto — sprawdź połączenie'); }
-  }, [setExpenses]);
+  }, [setExpenses, markExpensePending, confirmExpenseSync]);
 
   // Ręczne przeklasyfikowanie transakcji w widgecie "Na co idą pieniądze" (2026-09-12, user:
   // "zebym mógł kliknąć ze np cos sie zle liczy... zeby sie uczyło") — z widoku rozbicia
@@ -1074,10 +1077,11 @@ export default function DashboardScreen() {
     if (!live.some(x => x.id === expenseId)) return;
     const updates: Partial<Expense> = { fvOverride: bucket };
     setExpenses(live.map(x => x.id === expenseId ? { ...x, fvOverride: bucket } : x));
+    markExpensePending(expenseId);
     haptic.medium();
-    try { await expensesService.update(expenseId, updates); }
+    try { await expensesService.update(expenseId, updates); confirmExpenseSync(expenseId); }
     catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
-  }, [setExpenses]);
+  }, [setExpenses, markExpensePending, confirmExpenseSync]);
 
   // Render a user-added custom tile (a pinned note, or a quick link).
   // Data context for stat widgets (custom tiles of type 'stat').

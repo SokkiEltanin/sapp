@@ -64,8 +64,9 @@ export default function VehiclesScreen() {
   // useShallow (audyt optymalizacji, 2026-10-11) — gołe `useExpensesStore()` subskrybowało cały
   // store (filters/isLoading/pendingSync/error — nic z tego tu nie jest używane), re-renderując
   // ekran na każde tło-sync wydatków gdziekolwiek w appce.
-  const { expenses, setExpenses, updateExpense } = useExpensesStore(useShallow((st) => ({
+  const { expenses, setExpenses, updateExpense, markPending, confirmSync } = useExpensesStore(useShallow((st) => ({
     expenses: st.expenses, setExpenses: st.setExpenses, updateExpense: st.updateExpense,
+    markPending: st.markPending, confirmSync: st.confirmSync,
   })));
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -220,8 +221,9 @@ export default function VehiclesScreen() {
   const attachExpense = async (v: Vehicle, e: Expense) => {
     haptic.tap();
     updateExpense(e.id, { vehicleId: v.id });
+    markPending(e.id);
     setPicker(null);
-    try { await expensesService.update(e.id, { vehicleId: v.id }); toast.success('Przypisano wydatek'); }
+    try { await expensesService.update(e.id, { vehicleId: v.id }); confirmSync(e.id); toast.success('Przypisano wydatek'); }
     catch { toast.error('Nie przypisano'); }
   };
   const linkToMaintenance = (e: Expense) => {
