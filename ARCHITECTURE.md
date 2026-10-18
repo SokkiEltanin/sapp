@@ -20057,6 +20057,61 @@ płótnem (dashboard wystarczy) i sprawdź że appka NIE crashuje/nie zawiesza s
 sprawdź konkretnie "Presety" w modalu stylu Serii/Odliczań/Notatek na płótnie oraz w
 Kreatorze — dodawanie/usuwanie/aplikowanie presetu powinno działać płynnie, bez zacięcia.
 
+## 375. Fix: podwójne tapnięcie (brak debounce na onPress) — audyt + nowy `pressGuard` (2026-10-18)
+
+User, po naprawie §374: "sprawdzaj czy przyciski nie są zbudowane bo niektóre zawsze da się
+wejść szybko i otwiera się dwa razy". Audyt potwierdził: `TouchableOpacity`/`PressableScale`
+NIE MAJĄ wbudowanego debounce na `onPress` — RN woła handler za KAŻDYM tapnięciem,
+niezależnie jak szybko kolejne następują. Problem jest SYSTEMOWY (brak jakiegokolwiek
+centralnego mechanizmu w całej appce, nie tylko w kodzie z dzisiejszej sesji), ale audyt
+namierzył konkretne, zweryfikowane, realne skutki.
+
+**`src/utils/pressGuard.ts`** (nowy, pure TS, testowalne) — `createPressGuard(windowMs=600)`
+zwraca `{ allow(): boolean }` — `true` tylko jeśli minęło `windowMs` od OSTATNIEGO
+dozwolonego wywołania (zablokowane wywołanie NIE resetuje okna). Czysta funkcja (nie hook) —
+działa też WEWNĄTRZ `.map()`, gdzie hooki per-element są niedozwolone: JEDEN guard na CAŁĄ
+grupę przycisków (świadomy kompromis — chroni też przed "tap A, natychmiast tap B" w tym
+samym rzędzie, nie tylko przed dwa razy tym samym przyciskiem). **`src/hooks/usePressGuard.ts`**
+— wygodny wrapper (`useRef(createPressGuard(windowMs)).current`) dla najczęstszego
+przypadku (jeden guard na jeden handler).
+
+**5 zweryfikowanych, naprawionych miejsc**:
+1. `ScreenCanvas.tsx`'s `onAdd()` — brak guardu → szybkie podwójne tapnięcie "Dodaj kafel
+   serii"/"Odliczanie"/itd. dodawało DWA identyczne itemy na płótnie. JEDEN guard dla
+   wszystkich 9 przycisków "Dodaj" (na WSZYSTKICH 12 ekranach z płótnem).
+2. `TabBar.tsx`'s rząd przycisków szybkich akcji (widoczny na każdym ekranie, per-tab) —
+   każdy woła `router.push(...)` bez guardu → podwójne tapnięcie wypychało TEN SAM ekran DWA
+   RAZY na stos nawigacji ("wstecz" wracało do tego samego ekranu). Kontrast: 4-zakładkowy
+   pasek NIŻEJ w tym samym pliku JUŻ miał analogiczny guard (`if (currentIndex !== i)`) —
+   ktoś już o tym pomyślał przy głównej nawigacji, przeoczył rząd szybkich akcji.
+3. `StylePresetBar.tsx`'s `save()` — `if (!trimmed) return` chroniło tylko przed pustą
+   nazwą, nie przed dwoma tapnięciami zanim `setNameInput('')` się przerenderuje → dwa
+   identyczne presety.
+4. `ColorSwatchPicker.tsx`'s `saveToLibrary()` — ten sam wzorzec, dwa identyczne kolory w
+   bibliotece. `applyCustom()` ŚWIADOMIE NIE naprawione — nie mutuje danych (tylko
+   `onSelect`), podwójne wywołanie jest nieszkodliwe (ten sam wybór zastosowany dwa razy).
+5. `app/(tabs)/tasks.tsx`'s `submitQuick()` — ten sam wzorzec co #3, dwa identyczne zadania
+   z szybkiego podwójnego Enter/tapnięcia "+".
+
+**Świadomie NIE zrobione (scope cut, przekazane do decyzji)**: pełny sweep WSZYSTKICH ~197
+wystąpień `router.push`/`router.navigate` w repo — audyt namierzył NAJBARDZIEJ prawdopodobne,
+najczęściej klikane miejsca (duże przyciski "Dodaj"/menu szybkich akcji), nie każde
+pojedyncze miejsce nawigacji w appce. Reszta to większy, osobny follow-up, jeśli user go
+zechce — `pressGuard`/`usePressGuard` są gotowe do reużycia tam bez dalszej pracy
+architektonicznej.
+
+**Testy**: `__tests__/pressGuard.test.ts` (nowy, 7 testów — pierwsze wywołanie zawsze
+dozwolone, drugie w oknie zablokowane, po oknie znów dozwolone, granica okna, zablokowane
+wywołanie nie resetuje okna, dwa niezależne guardy nie dzielą stanu, domyślne okno 600ms).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1459 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: na płótnie spróbuj szybko podwójnie tapnąć
+"Dodaj kafel serii" — powinien pojawić się JEDEN item, nie dwa. Na dowolnym ekranie z
+przyciskami szybkich akcji (np. Zadania → "+") spróbuj szybko podwójnie tapnąć — powinien
+otworzyć się JEDEN ekran dodawania, "wstecz" wraca do poprzedniego ekranu (nie do tego
+samego). W Kreatorze/na płótnie spróbuj szybko podwójnie tapnąć "Zapisz jako preset"/zapis
+koloru do biblioteki — powinien pojawić się JEDEN wpis.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

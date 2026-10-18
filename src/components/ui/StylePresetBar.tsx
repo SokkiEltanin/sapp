@@ -6,6 +6,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { usePressGuard } from '@/hooks/usePressGuard';
 
 // Presety stylu (§370) — korelacja Kreator ↔ płótno: ten sam, dropuj-i-gotowe komponent w obu
 // miejscach dla danej `family` ('streak'/'countdown'/'notes' — patrz `tileStylePresetsStore.ts`
@@ -39,8 +40,12 @@ export default function StylePresetBar({ family, style, onApply }: {
   const [manageMode, setManageMode] = useState(false);
 
   const trimmed = nameInput.trim();
+  // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt) — `if (!trimmed) return` chroni
+  // TYLKO przed pustą nazwą, nie przed dwoma tapnięciami zanim `setNameInput('')` zdąży się
+  // przerenderować (szybkie podwójne tapnięcie "Zapisz" → dwa identyczne presety).
+  const saveGuard = usePressGuard();
   const save = () => {
-    if (!trimmed) return;
+    if (!trimmed || !saveGuard.allow()) return;
     haptic.success();
     addPreset(family, trimmed, style);
     setNameInput('');

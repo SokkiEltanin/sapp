@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { haptic } from '@/utils/haptics';
+import { usePressGuard } from '@/hooks/usePressGuard';
 
 type Props = { currentIndex: number };
 
@@ -58,6 +59,12 @@ export default function TabBar({ currentIndex }: Props) {
   const todayDueCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && (t.deadline?.split('T')[0] === todayStr || t.scheduledDate === todayStr)).length);
 
   const activeAccent = TAB_ACCENTS[currentIndex] ?? timeAccent;
+  // Zabezpieczenie przed podwójnym tapnięciem (§375, audyt — user: "otwiera się dwa razy") —
+  // każdy przycisk w rzędzie poniżej woła `router.push` BEZ żadnego guardu; szybkie podwójne
+  // tapnięcie wypychało TEN SAM ekran dwa razy na stos nawigacji ("wstecz" wracało do tego
+  // samego ekranu). JEDEN guard dla CAŁEGO rzędu (nie per przycisk — hooki nie mogą być
+  // wołane wewnątrz `.map()`), patrz komentarz w `pressGuard.ts`.
+  const actionGuard = usePressGuard();
   const openWorkPanel = useUiActions(s => s.openWorkPanel);
 
   // Animated "island" that slides under the active tab (Dynamic-Island feel).
@@ -139,7 +146,7 @@ export default function TabBar({ currentIndex }: Props) {
               <TouchableOpacity
                 key={i}
                 style={[s.actionFab, { borderColor: c.border.default, backgroundColor: c.bg.elevated }]}
-                onPress={() => { haptic.tap(); a.onPress(); }}
+                onPress={() => { if (!actionGuard.allow()) return; haptic.tap(); a.onPress(); }}
                 activeOpacity={0.85}
               >
                 <Icon size={21} color={c.text.primary} strokeWidth={2.2} />
