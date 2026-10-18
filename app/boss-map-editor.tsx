@@ -3,16 +3,17 @@ import { View, Text, StyleSheet, ScrollView, PanResponder, PanResponderInstance,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path, Rect, Pattern, Circle, Defs } from 'react-native-svg';
-import { ChevronLeft, RotateCcw } from 'lucide-react-native';
+import { ChevronLeft, RotateCcw, X as XIcon } from 'lucide-react-native';
 
 import BossArt from '@/components/bosses/BossArt';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Stepper from '@/components/ui/Stepper';
 import { BOSSES } from '@/utils/bosses';
 import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY, MapNode } from '@/utils/bossMapLayout';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
 import { usePetStore } from '@/store/petStore';
-import { spacing, typography } from '@/theme';
+import { spacing, typography, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -37,6 +38,7 @@ export default function BossMapEditorScreen() {
   const s = useMemo(() => makeS(c), [c]);
   const overrides = useBossMapLayoutStore(st => st.positions);
   const setPosition = useBossMapLayoutStore(st => st.setPosition);
+  const resetPosition = useBossMapLayoutStore(st => st.resetPosition);
   const resetAll = useBossMapLayoutStore(st => st.resetAll);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [confirmReset, setConfirmReset] = useState(false);
@@ -55,6 +57,15 @@ export default function BossMapEditorScreen() {
   // Pozycja PRZECIĄGANEGO węzła podczas gestu — lokalny stan, NIE store (patrz komentarz
   // wyżej). `null` gdy nic nie jest aktualnie przeciągane.
   const [dragPos, setDragPos] = useState<{ idx: number; x: number; y: number } | null>(null);
+  // Wybór bossa do edycji precyzyjnej (2026-10-18, §376) — user: "wybieram bosa i wybieram
+  // pozycję i mogę zresetować na środek ekranu... nie mam możliwości zobaczyć innych edycji"
+  // (porównanie do panelu właściwości X/Y + reset w systemie wolnego płótna z tej samej sesji,
+  // §359). Dotąd jedyny sposób zmiany pozycji to przeciąganie palcem (precyzyjne ustawienie
+  // "na pikselu" trudne) i jedyny reset to GLOBALNY `resetAll()` (wszyscy bossowie naraz) —
+  // `resetPosition(id)` w `bossMapLayoutStore.ts` istniał od Fazy edytora (§322), ale nigdy nie
+  // był podpięty do ŻADNEGO przycisku w UI. Tapnięcie chipu "skocz do bossa" ALBO złapanie
+  // węzła (start przeciągania) teraz RÓWNIEŻ wybiera bossa do panelu niżej.
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const ids = useMemo(() => BOSSES.map(b => b.id), []);
   const { nodes: baseNodes, width: canvasW, height: canvasH } = useMemo(() => {
@@ -71,6 +82,7 @@ export default function BossMapEditorScreen() {
   const initialTargetY = centerScrollY(baseNodes, currentIdx, viewport.h);
   const jumpTo = (idx: number) => {
     haptic.tap();
+    setSelectedIdx(idx);
     scrollRef.current?.scrollTo({ y: centerScrollY(baseNodes, idx, viewport.h), animated: true });
   };
 
@@ -94,6 +106,7 @@ export default function BossMapEditorScreen() {
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         haptic.tap();
+        setSelectedIdx(i);
         setDragPos({ idx: i, x: nodesRef.current[i].x, y: nodesRef.current[i].y });
       },
       onPanResponderMove: (_e, g) => {
@@ -134,15 +147,21 @@ export default function BossMapEditorScreen() {
           <RotateCcw size={18} color={c.text.secondary} />
         </PressableScale>
       </View>
-      <Text style={s.hint}>Przeciągnij bossów, żeby ułożyć mapę po swojemu — ścieżka łączy ich automatycznie.</Text>
+      <Text style={s.hint}>Przeciągnij bossa palcem ALBO tapnij go/numerek, żeby wybrać i ustawić pozycję precyzyjnie niżej.</Text>
 
       {/* Lista "skocz do bossa" — numerki odpowiadają odznace na węźle. Rozwiązuje "nie widzę
           bossa, jak mam go przeciągnąć": zamiast przewijać na oślep, tapnięcie numeru centruje
-          kamerę na TYM bosie, NIEZALEŻNIE jak daleko jest na płótnie. */}
+          kamerę na TYM bosie, NIEZALEŻNIE jak daleko jest na płótnie. Kropka w rogu (§376,
+          user: "nie mam możliwości wgle zobaczyć innych edycji") — pokazuje, który boss ma
+          RĘCZNIE ustawioną pozycję (`overrides[b.id]` istnieje) a który dalej używa
+          domyślnego, proceduralnego układu — dotąd nie było ŻADNEGO sposobu to odróżnić bez
+          przeciągnięcia go i patrzenia czy "wraca" po resecie. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.jumpRow} contentContainerStyle={s.jumpRowContent}>
         {BOSSES.map((b, i) => (
-          <PressableScale key={b.id} onPress={() => jumpTo(i)} style={[s.jumpChip, i === currentIdx && { backgroundColor: '#38BDF8', borderColor: '#38BDF8' }]}>
+          <PressableScale key={b.id} onPress={() => jumpTo(i)}
+            style={[s.jumpChip, i === currentIdx && { backgroundColor: '#38BDF8', borderColor: '#38BDF8' }, i === selectedIdx && i !== currentIdx && { borderColor: '#FB923C' }]}>
             <Text style={[s.jumpChipTxt, i === currentIdx && { color: '#05060A' }]}>{i + 1}</Text>
+            {overrides[b.id] != null && <View style={s.jumpChipDot} />}
           </PressableScale>
         ))}
       </ScrollView>
@@ -171,13 +190,14 @@ export default function BossMapEditorScreen() {
             {BOSSES.map((b, i) => {
               const n = nodes[i];
               const dragging = dragPos?.idx === i;
+              const selected = selectedIdx === i && !dragging;
               return (
                 <View
                   key={b.id}
                   {...responders.current[i].panHandlers}
                   style={[st_node(n, dragging)]}
                 >
-                  <View style={[s.portrait, dragging && s.portraitDragging]}>
+                  <View style={[s.portrait, dragging && s.portraitDragging, selected && s.portraitSelected]}>
                     <Text style={s.badge}>{i + 1}</Text>
                     <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={false} />
                   </View>
@@ -189,6 +209,48 @@ export default function BossMapEditorScreen() {
         </ScrollView>
         )}
       </View>
+
+      {/* Panel edycji wybranego bossa (§376) — X/Y precyzyjnie (Stepper, nie tylko
+          przeciąganie palcem) + reset TYLKO tego bossa (`resetPosition`, istniał w store od
+          §322, nigdy nie podpięty do UI). Czyta `nodes[selectedIdx]` — ta sama, scalona z
+          `dragPos` wartość co rysowanie na płótnie, więc jeśli user WŁAŚNIE przeciąga
+          wybranego bossa, suwaki pokazują żywą pozycję, nie starą.
+          `position: 'absolute'` (fix PRZED wysłaniem, znaleziony przy własnym przeglądzie) —
+          jako zwykły sibling flex pod `stageWrap` (flex:1) panel ZMNIEJSZAŁBY jego zmierzoną
+          wysokość za każdym razem gdy się pojawia/znika, co przez `key={viewport.w x
+          viewport.h}` na `ScrollView` niżej WYMUSZAŁOBY jej REMOUNT (React remountuje przy
+          zmianie key) — a to zeruje `contentOffset`, skacząc z powrotem na aktualnego bossa
+          kampanii i gubiąc miejsce przewinięcia usera przy KAŻDYM wyborze bossa. Overlay nie
+          zmienia rozmiaru `stageWrap` wcale, więc `viewport`/`key` zostają stabilne. */}
+      {selectedIdx != null && (() => {
+        const b = BOSSES[selectedIdx];
+        const n = nodes[selectedIdx];
+        return (
+          <View style={s.editPanel}>
+            <View style={s.editPanelHead}>
+              <BossArt id={b.id} emoji={b.emoji} size={28} mystery={false} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.editPanelTitle} numberOfLines={1}>{b.name}</Text>
+                <Text style={s.editPanelSub}>{overrides[b.id] != null ? 'Pozycja ustawiona ręcznie' : 'Pozycja domyślna (automatyczna)'}</Text>
+              </View>
+              <PressableScale onPress={() => { haptic.tap(); setSelectedIdx(null); }} style={s.editPanelClose}>
+                <XIcon size={16} color={c.text.muted} />
+              </PressableScale>
+            </View>
+            <Stepper label="Pozycja X" value={Math.round(n.x)} min={0} max={Math.round(canvasW)} step={8}
+              onChange={(v) => setPosition(b.id, v, Math.round(n.y))} />
+            <Stepper label="Pozycja Y" value={Math.round(n.y)} min={20} max={Math.round(canvasH) - 20} step={8}
+              onChange={(v) => setPosition(b.id, Math.round(n.x), v)} />
+            <PressableScale
+              onPress={() => { haptic.success(); resetPosition(b.id); toast.success(`Zresetowano pozycję: ${b.name}`); }}
+              style={s.editPanelReset}
+            >
+              <RotateCcw size={14} color={c.text.secondary} />
+              <Text style={s.editPanelResetTxt}>Resetuj tego bossa (domyślna pozycja)</Text>
+            </PressableScale>
+          </View>
+        );
+      })()}
 
       <ConfirmDialog
         visible={confirmReset}
@@ -227,14 +289,39 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     backgroundColor: '#12161F', borderWidth: 1, borderColor: '#262c3a',
   },
   jumpChipTxt: { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.6)' },
+  jumpChipDot: {
+    position: 'absolute', top: -2, right: -2, width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: '#FB923C', borderWidth: 1, borderColor: '#05060A',
+  },
 
   stageWrap: { flex: 1, overflow: 'hidden', backgroundColor: '#05060A' },
   portrait: { width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12161F', borderWidth: 2, borderColor: '#262c3a' },
   portraitDragging: { borderColor: '#FB923C', shadowColor: '#FB923C', shadowOpacity: 0.6, shadowRadius: 10, elevation: 8 },
+  portraitSelected: { borderColor: '#FB923C' },
   badge: {
     position: 'absolute', top: -6, left: -6, width: 18, height: 18, borderRadius: 9,
     backgroundColor: '#05060A', borderWidth: 1, borderColor: '#262c3a', color: c.text.muted,
     fontSize: 9.5, fontWeight: '700', textAlign: 'center', lineHeight: 17, overflow: 'hidden', zIndex: 2,
   },
   nodeLabel: { fontSize: 10, fontWeight: '800', color: '#fff', textAlign: 'center', marginTop: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+
+  editPanel: {
+    // `position: 'absolute'` (patrz komentarz przy renderze) — panel NIE jest zwykłym flex
+    // sibling'em `stageWrap`, żeby nie zmieniać jego zmierzonej wysokości (→ remount
+    // ScrollView przez `key` → reset scrolla) przy każdym pojawieniu/zniknięciu.
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: c.bg.secondary, borderTopWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[3], gap: spacing[1],
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 12,
+  },
+  editPanelHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[1] },
+  editPanelTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
+  editPanelSub: { fontSize: 10.5, color: c.text.muted, marginTop: 1 },
+  editPanelClose: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  editPanelReset: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: spacing[1], paddingVertical: spacing[2], borderRadius: radius.md,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
+  },
+  editPanelResetTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
 }));
