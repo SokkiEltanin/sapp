@@ -19651,6 +19651,47 @@ pojawić fioletowa, przerywana ramka WOKÓŁ CAŁEJ grupy (dodatkowo do dotychcz
 pojedynczych obrysów). Dodaj 2+ komponenty → przycisk 📚 w nagłówku → lista warstw, strzałki
 ↑/↓ powinny zmieniać który kafel jest na wierzchu przy nakładaniu się.
 
+## 366. Audyt finansowy + edytorów — duplikat wydatku walutowego, martwe przełączniki (2026-10-18)
+
+User: "rob audyty lepiej tych edytorze czy dzialaja nie mają błędów itp, dawaj dawaj" — po
+zamknięciu listy §357-365, dwa równoległe audyty (fork): logika finansowa (bankCommit/
+bankNotification/saldo) i edytory (Kreator kafelków, boss-map-editor, system płótna).
+
+**Fix — duplikat wydatku dla redostarczonej płatności walutowej z `plnOverride`** (realny,
+potwierdzony bug, nie UX): gdy transakcja walutowa (np. 9.99 EUR) jest ręcznie zatwierdzana w
+`bank-review.tsx` z `plnOverride` (np. 43.50 PLN), zapisany `Expense` ma `amount: 43.50` (PLN) +
+`originalAmount: 9.99` (oryginalna kwota — `commitBankTx`'s `originalFields`). WSZYSTKIE 4
+miejsca dedup/matching (`bankCommit.ts`'s `alreadyIncome`/`already`, `bankNotification.ts`'s
+`findMatchingIncome`/`findMatchingExpense`) porównywały WYŁĄCZNIE `e.amount` (już-PLN) do
+`tx.amount` (surowa, wciąż walutowa kwota z nowego powiadomienia) — redostarczone/zdublowane
+powiadomienie o TEJ SAMEJ płatności (już znany typ incydentu w tej apce, patrz komentarz "Re-drain
+guard" w `bankCommit.ts`) nigdy nie było wykrywane jako duplikat, tworząc DRUGI wydatek i
+zawyżając saldo/sumy miesięczne o pełną kwotę.
+
+**Fix**: nowa, eksportowana `amountMatches(e, txAmount)` w `bankNotification.ts` — sprawdza
+`e.amount` ORAZ (jeśli istnieje) `e.originalAmount` — użyta we WSZYSTKICH 4 miejscach, jeden
+wspólny punkt prawdy zamiast duplikowanej logiki porównania. `MatchExpense` interfejs
+rozszerzony o `originalAmount?: number`.
+
+**Fix — 3× "martwy przełącznik" w Kreatorze/modalach stylu notatek** (UX, nie crash,
+znalezione przy audycie edytorów po dzisiejszych §362/§363): przełącznik "Poświata" (Liczniki,
+`dashboard-tile-creator.tsx`) i "Tagi" (Notatki, `dashboard-tile-creator.tsx` + 
+`CanvasNotesStyleModal.tsx`) były widoczne BEZ WARUNKU, mimo że odpowiadające im warianty
+kształtu (`'compact'`/`'bar'`/`'minimal'` dla liczników, `'compact'` dla notatek) nigdy nie
+renderują tej treści — zmiana przełącznika nie robiła NIC, wyglądając jak zepsuty kontrolka.
+Przy dodawaniu wariantów (§362/§363) warunkowość była poprawnie zastosowana dla innych pól
+(`rowRadius`/`numberScale`/`showBgIcon`), ale przeoczona dla tych dwóch. Fix: owinięte w
+warunek dopasowany do tego, co faktycznie dany wariant renderuje.
+
+**Testy**: `__tests__/bankAmountMatch.test.ts` (nowy, 6 testów — `amountMatches` bezpośrednio +
+`findMatchingExpense`/`findMatchingIncome` ze scenariuszem redostarczonej płatności walutowej).
+`tsc --noEmit` czyste, `jest --silent` 110/110 suite, 1435 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI** (fix finansowy — realne pieniądze): jeśli masz
+wydatek z zagraniczną kartą (konwersja walutowa), a bank redostarczy to samo powiadomienie, NIE
+powinno się już dublować. **Priorytet ŚREDNI** (UX): Kreator → Liczniki/Notatki → "Kompaktowy"/
+"Minimalny" → odpowiednie przełączniki powinny teraz być ukryte, nie widoczne-ale-bez-efektu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

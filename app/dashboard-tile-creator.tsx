@@ -442,12 +442,18 @@ export default function DashboardTileCreator() {
               <Switch value={notesDraft.showBody} onValueChange={v => { haptic.tap(); setNotesDraft({ showBody: v }); }}
                 trackColor={{ false: c.border.default, true: c.accent.blue }} />
             </View>
-            <View style={s.divider} />
-            <View style={s.row}>
-              <Text style={s.rowLabel}>Tagi</Text>
-              <Switch value={notesDraft.showTags} onValueChange={v => { haptic.tap(); setNotesDraft({ showTags: v }); }}
-                trackColor={{ false: c.border.default, true: c.accent.blue }} />
-            </View>
+            {/* Tagi (§363, fix §366) — wariant 'compact' (`NotesTile.tsx`) nigdy nie renderuje
+                tagów — przełącznik tam był martwym no-opem. */}
+            {notesDraft.layoutPreset !== 'compact' && (
+              <>
+                <View style={s.divider} />
+                <View style={s.row}>
+                  <Text style={s.rowLabel}>Tagi</Text>
+                  <Switch value={notesDraft.showTags} onValueChange={v => { haptic.tap(); setNotesDraft({ showTags: v }); }}
+                    trackColor={{ false: c.border.default, true: c.accent.blue }} />
+                </View>
+              </>
+            )}
           </View>
         ) : activeCard === 'gcal' ? (
           <View style={s.card}>
@@ -672,15 +678,22 @@ export default function DashboardTileCreator() {
             {/* "Liczniki" (§337) nie ma koloru akcentu (kolor wiersza pochodzi z progu serii,
                 ten sam `streakColor()` co "Twoje serie" — zmiana tego TU wymagałaby tej samej
                 izolacji co `tierColorOverrides`, nie robię teraz bez osobnej decyzji) — tylko
-                poświata da się wyłączyć. */}
-            <Text style={s.sectionLabel}>Warstwy</Text>
-            <View style={s.card}>
-              <View style={s.row}>
-                <Text style={s.rowLabel}>Poświata</Text>
-                <Switch value={sinceDraft.showGlow} onValueChange={v => { haptic.tap(); setSinceDraft({ showGlow: v }); }}
-                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
-              </View>
-            </View>
+                poświata da się wyłączyć. Poświata (§362, fix §366) — WYŁĄCZNIE wariant 'row'
+                (default) ją renderuje (`SinceCountersCard.tsx`'s `RadialGlow` żyje tylko w tej
+                gałęzi) — przełącznik dla innych wariantów był martwym no-opem, więc sekcja
+                pokazuje się TYLKO dla 'row'. */}
+            {sinceDraft.layoutPreset === 'row' && (
+              <>
+                <Text style={s.sectionLabel}>Warstwy</Text>
+                <View style={s.card}>
+                  <View style={s.row}>
+                    <Text style={s.rowLabel}>Poświata</Text>
+                    <Switch value={sinceDraft.showGlow} onValueChange={v => { haptic.tap(); setSinceDraft({ showGlow: v }); }}
+                      trackColor={{ false: c.border.default, true: c.accent.blue }} />
+                  </View>
+                </View>
+              </>
+            )}
           </>
         ) : null}
 

@@ -51,12 +51,18 @@ export default function CanvasNotesStyleModal({ visible, style, onChange, onClos
                 <Switch value={style.showBody} onValueChange={v => { haptic.tap(); onChange({ showBody: v }); }}
                   trackColor={{ false: c.border.default, true: c.accent.blue }} />
               </View>
-              <View style={s.divider} />
-              <View style={s.row}>
-                <Text style={s.rowLabel}>Tagi</Text>
-                <Switch value={style.showTags} onValueChange={v => { haptic.tap(); onChange({ showTags: v }); }}
-                  trackColor={{ false: c.border.default, true: c.accent.blue }} />
-              </View>
+              {/* Tagi (fix §366) — wariant 'compact' nigdy nie renderuje tagów
+                  (`NotesTile.tsx`) — przełącznik tam był martwym no-opem. */}
+              {(style.layoutPreset ?? 'row') !== 'compact' && (
+                <>
+                  <View style={s.divider} />
+                  <View style={s.row}>
+                    <Text style={s.rowLabel}>Tagi</Text>
+                    <Switch value={style.showTags} onValueChange={v => { haptic.tap(); onChange({ showTags: v }); }}
+                      trackColor={{ false: c.border.default, true: c.accent.blue }} />
+                  </View>
+                </>
+              )}
             </View>
           </ScrollView>
         </Pressable>

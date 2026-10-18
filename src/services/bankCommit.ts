@@ -1,6 +1,6 @@
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
-import { findMatchingExpense, findMatchingIncome, sameLocalDay, localDayKey } from '@/utils/bankNotification';
+import { findMatchingExpense, findMatchingIncome, sameLocalDay, localDayKey, amountMatches } from '@/utils/bankNotification';
 import { withLock } from '@/utils/asyncLock';
 import { recordMerchantAccept, MerchantInfo } from '@/utils/merchantMemory';
 import { PendingBankTx } from '@/store/bankQueueStore';
@@ -115,7 +115,7 @@ export async function commitBankTx(
     const pTimeIn = new Date(p.dateISO).getTime();
     const alreadyIncome = st.expenses.find(e =>
       e.type === 'income' &&
-      Math.abs(e.amount - p.amount) <= 0.011 &&
+      amountMatches(e, p.amount) &&
       !!e.date && sameLocalDay(new Date(e.date).getTime(), pTimeIn),
     );
     if (alreadyIncome) {
@@ -178,7 +178,7 @@ export async function commitBankTx(
   };
   const already = st.expenses.find(e =>
     (e.type === 'expense' || !e.type) &&
-    Math.abs(e.amount - p.amount) <= 0.011 &&
+    amountMatches(e, p.amount) &&
     !!e.date && sameLocalDay(new Date(e.date).getTime(), pTime) &&
     storeMatches(e),
   );

@@ -143,7 +143,7 @@ export function findMatchingIncome(tx: ParsedBankTx, expenses: MatchExpense[], w
   const txTime = new Date(tx.dateISO).getTime();
   for (const e of expenses) {
     if (e.type !== 'income' || e.bankMatched) continue;
-    if (Math.abs(e.amount - tx.amount) > 0.011) continue;
+    if (!amountMatches(e, tx.amount)) continue;
     const et = new Date(e.date ?? '').getTime();
     if (!et) continue;
     if (sameLocalDay(et, txTime) || Math.abs(et - txTime) / 60000 <= windowMin) return e;
@@ -154,7 +154,17 @@ export function findMatchingIncome(tx: ParsedBankTx, expenses: MatchExpense[], w
 // ── Match a parsed bank tx to an existing (scanned) expense ──────────────────
 // Same amount (±1 gr), within `windowMin` minutes, store name related. Returns the
 // best candidate expense id or null (→ create a fresh expense from the notification).
-export interface MatchExpense { id: string; type?: string; amount: number; date?: string; storeName?: string; note?: string; bankMatched?: boolean }
+export interface MatchExpense { id: string; type?: string; amount: number; originalAmount?: number; date?: string; storeName?: string; note?: string; bankMatched?: boolean }
+
+// Dedup fix (§366, audyt finansowy) — gdy `e.amount` jest skonwertowaną wartością PLN
+// (`plnOverride` z `bank-review.tsx`, patrz `commitBankTx`'s `originalFields`), oryginalna,
+// walutowa wartość ZOSTAJE zapamiętana na `e.originalAmount`. Redostarczone/zdublowane
+// powiadomienie banku (`tx.amount`) wciąż niesie SUROWĄ, walutową kwotę (np. 9.99 EUR), nie
+// PLN (43.50) — porównanie WYŁĄCZNIE do `e.amount` nigdy nie wykrywało takiego duplikatu
+// (|43.50-9.99| ≫ 0.011), tworząc DRUGI wydatek na tę samą płatność. Sprawdź OBIE wartości.
+export function amountMatches(e: { amount: number; originalAmount?: number }, txAmount: number): boolean {
+  return Math.abs(e.amount - txAmount) <= 0.011 || (e.originalAmount != null && Math.abs(e.originalAmount - txAmount) <= 0.011);
+}
 
 export function sameLocalDay(a: number, b: number): boolean {
   const da = new Date(a), db = new Date(b);
@@ -173,7 +183,7 @@ export function findMatchingExpense(tx: ParsedBankTx, expenses: MatchExpense[], 
   let best: { e: MatchExpense; score: number } | null = null;
   for (const e of expenses) {
     if (e.type === 'income' || e.bankMatched) continue;
-    if (Math.abs(e.amount - tx.amount) > 0.011) continue;               // amount must match
+    if (!amountMatches(e, tx.amount)) continue;                          // amount must match
     const et = new Date(e.date ?? '').getTime();
     if (!et) continue;
     const diffMin = Math.abs(et - txTime) / 60000;
