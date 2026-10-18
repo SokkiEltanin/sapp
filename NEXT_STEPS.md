@@ -29,11 +29,16 @@ po fazie, każda osobnym PR-em przez pełny rytuał (tsc/jest/ARCHITECTURE/commi
 - §381 (Faza 1): infrastruktura trybu pełnoekranowego (`canvasComponentsStore`'s
   `fullScreenScreens`/`setFullScreen`, nowa odznaka w `ScreenCanvas.tsx`'s nagłówku) +
   pilotażowy ekran **Zdrowie** (userowy własny przykład) w pełni działający.
+- §382 (Faza 2a): to samo podłączone do **Notatek, Nawyków, Pupila, Liczników** (4 kolejne
+  ekrany, mechaniczne, identyczny wzorzec).
 
 **Zostaje (kolejne fazy, w trakcie budowania)**:
-- Rozszerzenie trybu pełnoekranowego na pozostałe ~10 ekranów z płótnem (tasks/stats/finanse/
-  kalendarz/mood/counters/notes/habits/pet/food) — infrastruktura gotowa, mechaniczne
-  podłączenie per ekran identycznym wzorcem co Health.
+- Rozszerzenie trybu pełnoekranowego na pozostałe ~7 ekranów z płótnem: stats/finanse/tasks/
+  food/exercises (proste, identyczny wzorzec), **calendar.tsx** (3 mutually-exclusive montowania
+  `ScreenCanvas` — tydzień/miesiąc-kompakt/miesiąc-rozwinięty — ale JEDEN wspólny `screenKey`,
+  więc jeden branch na górze wystarczy), **mood.tsx** (`ScreenCanvasBase`, podobny wzorzec co
+  §382), i **`(tabs)/index.tsx`** (główny dashboard, `ScreenCanvasBase` — NAJWIĘKSZY i
+  najbardziej czuły na wydajność ekran appki, osobna, ostrożniejsza faza).
 - Nowy typ komponentu "wykres" (user explicite wymienił "wykresów") — NIE zbudowany, większa,
   osobna praca (wybór stylu/biblioteki wykresu, nowy `componentType`).
 - "robienie presetów" — JUŻ istnieje (`StylePresetBar`, §370/§377), nic dodatkowego nie

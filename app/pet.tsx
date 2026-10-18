@@ -27,6 +27,7 @@ import { computePetState, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
 import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
 import { useAllNotesItems } from '@/hooks/useAllNotesItems';
@@ -287,6 +288,8 @@ export default function Pet() {
   const canvasNotesItems = useAllNotesItems();
   const canvasDataFieldRegistry = useDataFieldRegistry();
   const { color: canvasAccentColor } = useTimeAccent();
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['pet'] ?? false);
   const { entries: moodEntries } = useMoodStore();
   // Selektor pojedynczego pola (2026-09-18, audyt wydajności runda 4) — gołe
   // `useExpensesStore()` obok już zoptymalizowanego `usePetStore(useShallow(...))` tuż nad tą
@@ -423,6 +426,33 @@ export default function Pet() {
       if (upgradeCombatItem(id, cost, maxLevel)) { haptic.success(); toast.success(`${COMBAT_ITEMS[id].name} → poziom ${level + 1}`); }
     });
   };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — gdy włączony, reszta ekranu Pupila nie
+  // montuje się wcale. `PupilNavbar` ZOSTAJE (ten sam hub, user dalej musi móc przejść do
+  // Bossy/Sklep/Questy stąd, nie jest to drill-down ekran jak Zdrowie/Nawyki/Notatki).
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.header}>
+          <PressableScale onPress={() => router.back()} style={s.backBtn}>
+            <ChevronLeft size={22} color={c.text.primary} />
+          </PressableScale>
+          <Text style={s.headerTitle}>Pupil</Text>
+          <View style={s.backBtn} />
+        </View>
+        <ScreenCanvasBase
+          screenKey="pet"
+          title="Twoje komponenty"
+          allStreakItems={canvasStreakItems}
+          allCountdownItems={canvasCountdownItems}
+          allNotesItems={canvasNotesItems}
+          dataFieldRegistry={canvasDataFieldRegistry}
+          accentColor={canvasAccentColor}
+        />
+        <PupilNavbar current="pet" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>

@@ -16,6 +16,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useHabits, DayState } from '@/hooks/useHabits';
 import { useDayKey } from '@/hooks/useDayKey';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
 import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
 import { useAllNotesItems } from '@/hooks/useAllNotesItems';
@@ -779,6 +780,8 @@ export default function HabitsScreen() {
   const canvasNotesItems = useAllNotesItems();
   const canvasDataFieldRegistry = useDataFieldRegistry();
   const { color: canvasAccentColor } = useTimeAccent();
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['habits'] ?? false);
   // Refresh on focus so HC-fed water (and edits made elsewhere) show up live.
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
@@ -818,6 +821,34 @@ export default function HabitsScreen() {
 
   const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null);
   const handleDelete = (habit: Habit) => { haptic.tap(); setConfirmDelete(habit); };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — gdy włączony, reszta ekranu (lista nawyków,
+  // siatka miesiąca itd.) nie montuje się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <PressableScale onPress={() => router.back()} style={styles.iconBtn}>
+            <ArrowLeft size={20} color={colors.text.secondary} />
+          </PressableScale>
+          <View style={styles.headerCenter}>
+            <Text style={styles.title}>Nawyki</Text>
+            <Text style={styles.subtitle}>Pełny ekran</Text>
+          </View>
+          <View style={styles.iconBtn} />
+        </View>
+        <ScreenCanvasBase
+          screenKey="habits"
+          title="Twoje komponenty"
+          allStreakItems={canvasStreakItems}
+          allCountdownItems={canvasCountdownItems}
+          allNotesItems={canvasNotesItems}
+          dataFieldRegistry={canvasDataFieldRegistry}
+          accentColor={canvasAccentColor}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
