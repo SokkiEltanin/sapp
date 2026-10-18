@@ -20013,6 +20013,50 @@ Notatki/Nawyki/Pupil sprawdź że płótno się pojawia i działa (dodaj/przesu�
 — zwłaszcza `habits.tsx`/`pet.tsx` (refaktor na `useStreakItemsFromHabits`) i `notes.tsx`
 (nowy wzorzec: własny stan jako `allNotesItems` zamiast hooka).
 
+## 374. Fix KRYTYCZNY: nieskończona pętla re-renderów w `StylePresetBar` (crash na urządzeniu) (2026-10-18)
+
+User przysłał screenshot realnego crasha na telefonie: "Maximum update depth exceeded",
+pokazany przez globalny mechanizm ostatniego błędu (`RouteErrorBoundary` → `persistCrash()` →
+`last_crash` w AsyncStorage → ekran Ustawienia odczytuje i pokazuje). Stack trace
+(`forceStoreRerender`/`updateStoreInstance`/`enqueueConcurrentRenderForLane`) to dokładnie
+wewnętrzne nazwy funkcji Zustand/`useSyncExternalStore` przy KLASYCZNYM buggu:
+referencyjnie-niestabilny selektor.
+
+**Przyczyna**: `StylePresetBar.tsx` (§370, dzisiejsza sesja) miało `useTileStylePresetsStore(st
+=> presetsForFamily(st.presets, family))` — `presetsForFamily()` robi `.filter()`, który
+tworzy NOWĄ tablicę przy KAŻDYM wywołaniu selektora. `useSyncExternalStore` (pod spodem
+Zustand) decyduje, czy odświeżyć komponent, porównując `Object.is()` nowego wyniku selektora
+z poprzednim — skoro wynik to zawsze nowa referencja (nawet gdy faktyczna zawartość
+identyczna), KAŻDE wywołanie wygląda jak "stan się zmienił", więc planuje kolejny render,
+który znów woła selektor, znów dostaje nową referencję — nieskończona pętla. Crash nie musiał
+wystąpić na ekranie Ustawień — `StylePresetBar` jest zamontowany (jako JSX wewnątrz
+`CanvasStreakStyleModal`/`CanvasCountdownStyleModal`/`CanvasNotesStyleModal`, ZAWSZE
+renderowanych niezależnie od `visible` propa Modala) na KAŻDYM ekranie z płótnem — czyli,
+po §368-§373, praktycznie wszędzie poza Ustawieniami. Ustawienia tylko POKAZAŁY zapisany
+ostatni crash z dowolnego wcześniejszego ekranu.
+
+**Fix**: selektor zwraca teraz surową, stabilną referencję (`st.presets` — zmienia się TYLKO
+gdy `addPreset`/`removePreset`/`renamePreset` faktycznie mutują stan), filtr po `family`
+przeniesiony do `useMemo` w ciele komponentu. Ten sam, już ustalony w tym repo wzorzec co
+`ScreenCanvas.tsx`'s `myItems`/`orderedItems` (surowy selektor ze store'u + osobny, zmemoizowany
+filtr/sort) — gdyby ten wzorzec był zastosowany od razu w §370, bug by nie powstał.
+
+**Szerszy audyt (ten sam commit)** — sprawdzone CAŁE `src/`+`app/` (380 wywołań `use*Store(...)`
+w repo) pod kątem TEGO SAMEGO bug class (`.filter()`/`.map()`/`.sort()`/spread/literal obiektu
+WEWNĄTRZ selektora Zustand bez `useShallow` ani przeniesienia do `useMemo`). Jedyne inne
+trafienia (`TabBar.tsx`'s 3 selektory liczące `tasks.filter(...).length`) są BEZPIECZNE —
+`.filter()` tworzy pośrednią tablicę, ale selektor zwraca `.length` (prymityw, porównanie przez
+wartość). **Wniosek: ten bug był odosobnionym przypadkiem w tym repo, nie częścią szerszego
+wzorca — żadnych dodatkowych fixów nie trzeba.**
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1452 testy (bez zmian —
+komponent React, nietestowalny bezpośrednio w jest/node; weryfikacja na urządzeniu).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, NATYCHMIASTOWY**: otwórz dowolny ekran z
+płótnem (dashboard wystarczy) i sprawdź że appka NIE crashuje/nie zawiesza się. Potem
+sprawdź konkretnie "Presety" w modalu stylu Serii/Odliczań/Notatek na płótnie oraz w
+Kreatorze — dodawanie/usuwanie/aplikowanie presetu powinno działać płynnie, bez zacięcia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
