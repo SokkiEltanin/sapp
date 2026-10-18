@@ -19609,6 +19609,48 @@ zawsze-widoczną małą ikonkę, nie watermark w tle).
 kafelka" powinna pokazywać 3 opcje, przełączanie zmienia podgląd na żywo, "Hero + siatka"
 (default) wygląda DOKŁADNIE jak dotychczas.
 
+## 365. Wizualna ramka grupy + lista warstw z reorderem (2026-10-17)
+
+Ostatni punkt listy "doszlifowania" po §357-364. §359 świadomie odłożyło dwie rzeczy jako "osobny,
+większy fix": wspólną wizualną ramkę dla CAŁEJ grupy (dotąd: tylko per-member fioletowy border) i
+pełną listę warstw z drag-to-reorder (dotąd: tylko "na wierzch"/"na spód", skok na sam koniec
+stosu). Ten krok robi OBIE rzeczy, ale w wersji pośredniej/bezpiecznej — nie pełny drag-and-drop
+(nowy system gestów na płótnie = realne ryzyko regresji, ta sama kategoria problemu co już
+rozwiązywana w tej sesji przy PanResponder/ScrollView), tylko lista + krokowa zamiana.
+
+**Wizualna ramka grupy** — `groupBoxes` (nowy `useMemo` w `ScreenCanvas.tsx`) liczy bounding-box
+KAŻDEJ grupy obecnej na ekranie; renderowana jako DODATKOWA (nie zastępująca per-member border),
+`pointerEvents="none"`, fioletowa, przerywana ramka wokół całego zestawu — widoczna tylko w
+trybie edycji, poza select-mode.
+
+**Lista warstw** — nowy przycisk 📚 w nagłówku (widoczny gdy `editing && myItems.length>=2`),
+otwiera `CanvasLayersModal.tsx`: lista WSZYSTKICH itemów na ekranie, TOP-FIRST (góra listy =
+na wierzchu — tak user intuicyjnie myśli), z etykietą rozwiązaną przez nowy helper
+`describeItem()` (nazwa podpiętego nawyku/licznika/notatki/pola danych, albo generyczna nazwa
+kształtu) i strzałkami ↑/↓ do zamiany z NAJBLIŻSZYM sąsiadem.
+
+**`moveLayer(id, direction)`** (nowa akcja store'a) — zamienia item z sąsiadem w PORZĄDKU
+`zIndex`, nie w tablicy `items`. **Fix znaleziony przy pisaniu testu**: stare/migrowane itemy
+mogą dzielić TEN SAM fallback `zIndex ?? 0` — naiwna zamiana dwóch RÓWNYCH wartości byłaby
+no-opem (`swap(0,0)` nic nie zmienia). Fix: PRZED zamianą, wszyscy siblingowie na danym
+`screenKey` są normalizowani do kolejnych, unikalnych wartości (0,1,2,…) WG BIEŻĄCEGO porządku
+(stabilne sortowanie zachowuje względną kolejność) — DOPIERO na tych normalizowanych wartościach
+zamieniane są dwie docelowe pozycje. Gwarantuje działanie nawet gdy oryginalne dane miały
+duplikaty.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` +6 testów (`moveLayer` up/down, no-op na
+krańcach stosu, **naprawiony edge-case równych zIndex**, izolacja per-screenKey). `tsc --noEmit`
+czyste, `jest --silent` 109/109 suite, 1429 testów.
+
+**Świadomie NIE zrobione**: prawdziwy drag-and-drop w liście warstw (przeciąganie wiersza na
+dowolną pozycję, nie tylko krok w górę/dół) — jeśli user zgłosi że krokowa zamiana jest zbyt
+wolna przy wielu warstwach, to osobny, większy fix (nowy gest, nowe ryzyko).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: pogrupuj 2+ kafle w trybie edycji → powinna się
+pojawić fioletowa, przerywana ramka WOKÓŁ CAŁEJ grupy (dodatkowo do dotychczasowych
+pojedynczych obrysów). Dodaj 2+ komponenty → przycisk 📚 w nagłówku → lista warstw, strzałki
+↑/↓ powinny zmieniać który kafel jest na wierzchu przy nakładaniu się.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
