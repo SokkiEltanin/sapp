@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2 } from 'lucide-react-native';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -120,6 +121,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // jednocześnie przeciągać/zaznaczać (user by się pogubił które tapnięcie co robi).
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Tryb pełnoekranowy (§381) — czytany TU, nie przekazany jako prop: hostujący ekran
+  // (np. health.tsx) czyta TEN SAM store'owy klucz niezależnie, żeby zdecydować czy w ogóle
+  // montować swoją wbudowaną treść. Dwa niezależne odczyty tego samego Zustand selektora, nie
+  // prop-drilling — oba re-renderują się razem, Zustand gwarantuje spójność.
+  const [confirmFullScreen, setConfirmFullScreen] = useState(false);
+  const fullScreenOn = useCanvasComponentsStore(st => st.fullScreenScreens[screenKey] ?? false);
+  const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
@@ -273,7 +281,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     setSelectedIds([]);
   };
 
-  return (
+  const content = (
     <View style={s.wrap}>
       <View style={s.header}>
         <LayoutGrid size={13} color={c.text.secondary} />
@@ -284,6 +292,16 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             <Layers size={13} color={c.text.secondary} />
           </TouchableOpacity>
         )}
+        {/* Tryb pełnoekranowy (§381) — ZAWSZE widoczny (nie tylko w `editing`), żeby dało się go
+            wyłączyć bez najpierw wchodzenia w edycję. Włączenie pyta o potwierdzenie (chowa
+            wbudowaną treść ekranu — realna zmiana, nie kosmetyka), wyłączenie nie (zawsze
+            bezpiecznie odwracalne, dane w `items` nietknięte). */}
+        <TouchableOpacity
+          onPress={() => { haptic.tap(); if (fullScreenOn) setFullScreen(screenKey, false); else setConfirmFullScreen(true); }}
+          style={[s.layersBtn, fullScreenOn && { borderColor: c.accent.purple, backgroundColor: c.accent.purple + '18' }]}
+        >
+          {fullScreenOn ? <Minimize2 size={13} color={c.accent.purple} /> : <Maximize2 size={13} color={c.text.secondary} />}
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => { haptic.tap(); setEditing(v => !v); setSelectMode(false); setSelectedIds([]); }}
           style={[s.editBtn, editing && { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' }]}>
           {editing ? <Check size={13} color={c.accent.blue} /> : <Pencil size={13} color={c.text.secondary} />}
@@ -642,8 +660,35 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onMoveDown={(id) => moveLayer(id, 'down')}
         onClose={() => setLayersOpen(false)}
       />
+
+      <ConfirmDialog
+        visible={confirmFullScreen}
+        title="Pełny ekran?"
+        message="To zastąpi całą wbudowaną zawartość tego ekranu Twoim płótnem — zobaczysz TYLKO
+to, co tu zbudujesz. Możesz to wyłączyć w każdej chwili (ten sam przycisk), nic z tego co
+masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
+        confirmLabel="Włącz pełny ekran"
+        onConfirm={() => { setFullScreen(screenKey, true); setConfirmFullScreen(false); haptic.success(); }}
+        onCancel={() => setConfirmFullScreen(false)}
+      />
     </View>
   );
+
+  // Tryb pełnoekranowy (§381) — gdy włączony, CAŁOŚĆ powyższego (identyczna, niezmieniona
+  // treść/logika — dalej te same itemy/edycja/modale) dostaje WŁASNY, pełnoekranowy,
+  // przewijany kontener zamiast być osadzona na końcu scrolla hostującego ekranu. Hostujący
+  // ekran (np. health.tsx) robi wczesny `return` gdy ten sam flag jest włączony, więc TA
+  // ścieżka jest w praktyce jedynym, co się renderuje — ale `ScreenCanvasBase` sama o tym nie
+  // wie (świadomie, patrz komentarz przy `fullScreenOn` wyżej), więc i tak musi umieć
+  // wypełnić cały ekran samodzielnie, bez polegania na hoście.
+  if (fullScreenOn) {
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.fullScreenScroll} showsVerticalScrollIndicator={false}>
+        {content}
+      </ScrollView>
+    );
+  }
+  return content;
 }
 
 // Cienki wrapper (§356) — wołający 3 hooki (AsyncStorage/Zustand) SAM, jak `ScreenCanvasBase`
@@ -670,6 +715,11 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   wrap: { gap: spacing[2] },
+  // Tryb pełnoekranowy (§381) — padding boczny/górny bo ten `ScrollView` nie jest już
+  // osadzony w scrollu hosta (który dotąd dawał te marginesy); `paddingBottom: 180` to ta
+  // sama, ustalona w całej appce rezerwa pod pływający `TabBar`/`PupilNavbar` (patrz np.
+  // `health.tsx`'s `styles.scroll` — identyczna wartość, żeby nie zgadywać nowej).
+  fullScreenScroll: { padding: spacing[4], paddingBottom: 180, flexGrow: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9 },
   editBtn: {

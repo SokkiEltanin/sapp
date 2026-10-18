@@ -341,3 +341,33 @@ describe('canvasComponentsStore — resizeGroupBy (rozszerzone grupowanie, §359
     expect(cAfter.width).toBe(cBefore.width); // c nie jest w grupie — bez zmian
   });
 });
+
+// Tryb pełnoekranowy (§381) — user: "chcę od zera budować design... i móc go wdrożyć jako
+// jakiś ekran zamiast np. zdrowia". Flaga per `screenKey`, domyślnie wyłączona wszędzie,
+// odwracalna, nie rusza `items`.
+describe('canvasComponentsStore — fullScreenScreens (§381)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [], fullScreenScreens: {} });
+  });
+
+  test('domyślnie wyłączony dla każdego ekranu', () => {
+    expect(useCanvasComponentsStore.getState().fullScreenScreens['health']).toBeUndefined();
+  });
+
+  test('setFullScreen(key, true) włącza TYLKO ten jeden screenKey', () => {
+    useCanvasComponentsStore.getState().setFullScreen('health', true);
+    const s = useCanvasComponentsStore.getState();
+    expect(s.fullScreenScreens['health']).toBe(true);
+    expect(s.fullScreenScreens['food']).toBeUndefined();
+  });
+
+  test('setFullScreen(key, false) wyłącza z powrotem, nie rusza items', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    addItem('health', 'rectShape');
+    useCanvasComponentsStore.getState().setFullScreen('health', true);
+    useCanvasComponentsStore.getState().setFullScreen('health', false);
+    const s = useCanvasComponentsStore.getState();
+    expect(s.fullScreenScreens['health']).toBe(false);
+    expect(s.items).toHaveLength(1); // nietknięte — wyłączenie nie usuwa zbudowanych komponentów
+  });
+});

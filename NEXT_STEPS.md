@@ -16,18 +16,31 @@ testu WYSOKI** — po tej poprawce porównaj jeszcze raz edytor vs prawdziwy ekr
 KSZTAŁT ścieżki (nie tylko grubość/rozmiar węzłów) wciąż wygląda wyraźnie inaczej, zgłoś to —
 będzie kolejny trop do szukania. Checklist w ARCHITECTURE.md §379.
 
-## 🟡 Duży kierunek: "jeden edytor jak Figma" — czeka na decyzję, co budować dalej (2026-10-18, §380)
+## 🆕 "Jeden edytor jak Figma" — W TRAKCIE, buduję fazami bez przerywania (2026-10-18, §380-381+)
 
-User: "zróbmy ten edytor od zera, jeden porządny, który obejmie też ekran mapy bossów" — chce
-docelowo: projektować ekran od zera (pusty canvas, nie dokładka na końcu treści), z opcją
-tworzenia komponentów, i wdrażać go jako CAŁĄ zawartość wybranej zakładki (np. zamiast
-Zdrowia). Ocena w ARCHITECTURE.md §380: wpychanie POZYCJONOWANIA bossów (ma unikalną cechę —
-uporządkowaną ścieżkę łączącą węzły) w generyczny system swobodnych kafli (§341-377) byłoby
-niedopasowaniem — rekomendacja: zostawić `boss-map-editor.tsx` jako osobne, wyspecjalizowane
-narzędzie (już solidne po §376/§379), a "jeden edytor dla wszystkiego" realizować jako
-NIEZALEŻNY kierunek — tryb "pełny ekran" na JUŻ ISTNIEJĄCYM płótnie (przełącznik per ekran,
-chowa wbudowaną treść, zostaje tylko canvas). **NIC z tego jeszcze nie zbudowane** — czeka na
-potwierdzenie usera który kierunek/kolejność budować.
+User potwierdził kierunek z §380: "rób dopóki nie skończysz całego edytora... budowanie
+kafelków, wykresów, robienie presetów itp itd. Czekam." — kontynuuję BEZ dalszych pytań, faza
+po fazie, każda osobnym PR-em przez pełny rytuał (tsc/jest/ARCHITECTURE/commit/PR/CI/merge).
+
+**Zrobione**:
+- §380 (ocena): mapa bossów zostaje OSOBNYM narzędziem (unikalna ścieżka-connector), nie
+  wpychana w generyczny system kafli — "jeden edytor dla wszystkiego" = tryb pełnoekranowy na
+  już istniejącym płótnie.
+- §381 (Faza 1): infrastruktura trybu pełnoekranowego (`canvasComponentsStore`'s
+  `fullScreenScreens`/`setFullScreen`, nowa odznaka w `ScreenCanvas.tsx`'s nagłówku) +
+  pilotażowy ekran **Zdrowie** (userowy własny przykład) w pełni działający.
+
+**Zostaje (kolejne fazy, w trakcie budowania)**:
+- Rozszerzenie trybu pełnoekranowego na pozostałe ~10 ekranów z płótnem (tasks/stats/finanse/
+  kalendarz/mood/counters/notes/habits/pet/food) — infrastruktura gotowa, mechaniczne
+  podłączenie per ekran identycznym wzorcem co Health.
+- Nowy typ komponentu "wykres" (user explicite wymienił "wykresów") — NIE zbudowany, większa,
+  osobna praca (wybór stylu/biblioteki wykresu, nowy `componentType`).
+- "robienie presetów" — JUŻ istnieje (`StylePresetBar`, §370/§377), nic dodatkowego nie
+  wymagane, chyba że user miał na myśli coś innego po zobaczeniu reszty.
+
+**Priorytet testu na urządzeniu — WYSOKI**: checklist pilotażowej Fazy 1 w ARCHITECTURE.md
+§381 (Zdrowie → nowa odznaka pełnego ekranu w "Twoje komponenty").
 
 ## 🔴🔴 Fix: ołówek edytora mapy bossów + kafle raid/event ukryte pod navbarem (2026-10-18, §378) — PRIORYTET WYSOKI
 
