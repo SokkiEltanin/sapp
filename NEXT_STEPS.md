@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Wolne płótno na ostatnich nie-tab ekranach (2026-10-18, §373) — DO WERYFIKACJI
+
+Kontynuacja §368 — płótno dodane też do `counters.tsx`/`notes.tsx`/`habits.tsx`/`pet.tsx`
+(ostatnie 4 ekrany explicite odłożone wtedy). `habits.tsx`/`pet.tsx` montują `useHabits()`
+dla własnej treści — nowy `useStreakItemsFromHabits.ts` (wydzielony z `useAllStreakItems()`,
+używany też przez `mood.tsx` po refaktorze) rozwiązuje to bez drugiego AsyncStorage fetchu.
+`notes.tsx` przekazuje WŁASNY już-załadowany stan notatek, nie nowy hook. **Płótno jest teraz
+na WSZYSTKICH ekranach poza Ustawieniami.** **Priorytet testu WYSOKI** (4 ekrany na raz) —
+checklist w ARCHITECTURE.md §373.
+
 ## 🆕 Usunięcie TopPill (2026-10-17, §353) — DO WERYFIKACJI
 
 User: "wywalamy go zupełnie, ja sobie zrobię kafelek". Pigułka u góry wszystkich zakładek

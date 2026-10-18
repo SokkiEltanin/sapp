@@ -19970,6 +19970,49 @@ przeciąganie DALEKO od innych kafli wciąż działa płynnie bez żadnego "szar
 przeciąganie w grupie (`groupId`) nie psuje się (snap liczy się tylko dla POJEDYNCZEGO
 przeciąganego itemu, grupa i tak commituje przez `onMove`→`moveGroupBy` jak dotąd).
 
+## 373. Wolne płótno na ostatnich nie-tab ekranach: Liczniki, Notatki, Nawyki, Pupil (2026-10-18)
+
+Kontynuacja §368 (który explicite odłożył te 4 ekrany: "nie-tab ekrany... osobny follow-up
+jeśli user zechce płótno i tam"). Teraz płótno jest na WSZYSTKICH ekranach appki poza
+Ustawieniami (tabby z §368 + te 4).
+
+**`counters.tsx`** — nie montuje `useHabits()`/`useAllNotesItems()`, zwykły jednoliniowy
+`<ScreenCanvas screenKey="counters" />`.
+
+**`notes.tsx`** — ładuje notatki SAM (`getAllNotes()` w `loadAll()`, własny stan `notes`),
+więc domyślny `<ScreenCanvas>` (który wewnątrz woła `useAllNotesItems()` → DRUGIE
+`getAllNotes()`) byłby tym samym double-fetch hazardem co `useHabits()`, tylko inny
+hook/store. Fix: `ScreenCanvasBase` + `allNotesItems={notes}` — WŁASNY, już-załadowany stan
+przekazany bezpośrednio, zero nowego hooka (w przeciwieństwie do `buildStreakItems()` —
+`useAllNotesItems()` NIE MA żadnej logiki do wydzielenia, to czysto `getAllNotes()` w
+`useEffect`, więc "wydzielenie" to tu po prostu "użyj tego co ekran już ma").
+
+**`habits.tsx`/`pet.tsx`** — oba JUŻ montują `useHabits()` dla własnej treści (tabela
+nawyków / `todayDone` pupila) — ten sam przypadek co `mood.tsx` (§368). **Nowy, wydzielony
+`src/hooks/useStreakItemsFromHabits.ts`** — reszta źródeł, które `buildStreakItems()`
+potrzebuje OBOK `habits`/`getStreak` (liczniki/wydatki/jedzenie/ćwiczenia, same tanie
+Zustand-selektory), wydzielona z `useAllStreakItems()` do WŁASNEGO hooka — unika
+POTRÓJNEGO kopiowania tych samych ~10 linijek boilerplate'u (`mood.tsx` już miał własną
+kopię z §368). `useAllStreakItems()` jest teraz tylko: `useHabits()` +
+`useStreakItemsFromHabits(habits, getStreak)` — ten sam wzorzec, który `habits.tsx`/`pet.tsx`
+teraz też używają ze SWOIMI `habits`/`getStreak`. `pet.tsx` wcześniej nie destrukturyzowało
+`getStreak` z `useHabits()` — dodane.
+
+**Płótno teraz WSZĘDZIE poza Ustawieniami** (świadomie, user: "bez kręgosłupa") — lista
+ekranów z płótnem: dashboard, Jedzenie, Ćwiczenia, Finanse, Zdrowie, Zadania, Kalendarz
+(tab+ekran), Nastrój, Liczniki, Notatki, Nawyki, Pupil.
+
+**Testy**: istniejące (`useStreakItemsFromHabits`/`ScreenCanvasBase` to hooki/komponenty
+React — nietestowalne w jest/node bez renderera, ten sam status co `useAllStreakItems()` sam
+nigdy nie miał bezpośredniego testu — tylko `buildStreakItems()`, czysta funkcja którą
+wywołują, ma testy). `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1452 testy.
+
+**Priorytet testu na urządzeniu — WYSOKI** (4 kolejne ekrany na raz): na każdym z Liczniki/
+Notatki/Nawyki/Pupil sprawdź że płótno się pojawia i działa (dodaj/przesuń/zmień rozmiar), i
+że pozostała treść ekranu (lista liczników/notatek/nawyków, ekran pupila) działa bez regresji
+— zwłaszcza `habits.tsx`/`pet.tsx` (refaktor na `useStreakItemsFromHabits`) i `notes.tsx`
+(nowy wzorzec: własny stan jako `allNotesItems` zamiast hooka).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
