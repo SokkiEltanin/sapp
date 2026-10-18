@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -696,6 +697,10 @@ export default function CalendarTabScreen() {
               </View>
             )}
           </View>
+
+          {/* Wolne płótno (§368, "każde okno poza Ustawieniami") — ten ekran nie montuje
+              `useHabits()`/`useAllNotesItems()`, zero ryzyka duplikacji. */}
+          <ScreenCanvas screenKey="stats" title="Twoje komponenty" />
         </ScrollView>
       </View>
 

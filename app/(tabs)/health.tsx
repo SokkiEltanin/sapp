@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenCanvas from '@/components/canvas/ScreenCanvas';
 import { feedWaterHabit, getWaterHabit, getCounts, setCounts, getHabits, saveHabits } from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
 import PressableScale from '@/components/ui/PressableScale';
@@ -1174,6 +1175,9 @@ export default function HealthScreen() {
           <Text style={styles.noteText}>Health Connect — integracja wkrótce</Text>
         </View>
 
+        {/* Wolne płótno (§368, "każde okno poza Ustawieniami") — ten ekran nie montuje
+            `useHabits()`/`useAllNotesItems()`, zero ryzyka duplikacji. */}
+        <ScreenCanvas screenKey="health" title="Twoje komponenty" />
       </ScrollView>
       {/* Weight input modal */}
       <Modal visible={weightModal} transparent animationType="fade" onRequestClose={() => setWeightModal(false)}>
