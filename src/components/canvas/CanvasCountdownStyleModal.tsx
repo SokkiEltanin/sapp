@@ -6,6 +6,7 @@ import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
+import StylePresetBar from '@/components/ui/StylePresetBar';
 
 // Edycja stylu PER-INSTANCJA odliczania na płótnie (Faza 17, 2026-10-17) — rozszerzone w
 // Fazie 24 (§355, user: "nie ma możliwości wyboru własnego kształtu od zera") o 4 warianty
@@ -31,6 +32,13 @@ export default function CanvasCountdownStyleModal({ visible, style, onChange, on
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ gap: spacing[2] }}>
+            {/* Presety stylu (§370) — korelacja z zakładką "Odliczania" w dashboard-tile-
+                creator.tsx: `CountdownTileStyle` (tu) vs `CountdownsTileStyle` (tam) różnią
+                się jednym polem (`maxVisible`, tylko w Kreatorze) — partial-merge przez
+                `onChange`/`setDraft` ignoruje brakujące/nieznane pole po drugiej stronie. */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="countdown" style={style as unknown as Record<string, unknown>} onApply={(p) => onChange(p as Partial<CountdownTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl</Text>
             <View style={s.segmented}>
               {([['ring', 'Pierścień'], ['bar', 'Pasek'], ['compact', 'Kompaktowy'], ['hero', 'Duża liczba']] as [CountdownLayoutPreset, string][]).map(([m, lbl]) => {

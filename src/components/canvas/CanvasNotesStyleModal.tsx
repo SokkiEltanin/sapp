@@ -6,6 +6,7 @@ import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
+import StylePresetBar from '@/components/ui/StylePresetBar';
 
 // Edycja stylu PER-INSTANCJA notatki na płótnie (Faza 21, 2026-10-17, §350) — rozszerzone w
 // Fazie 31 (§363, user: lista "doszlifowania" po §357-361) o `NotesLayoutPreset` — ten sam
@@ -29,6 +30,13 @@ export default function CanvasNotesStyleModal({ visible, style, onChange, onClos
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ gap: spacing[2] }}>
+            {/* Presety stylu (§370) — korelacja z zakładką "Notatki" w dashboard-tile-
+                creator.tsx: `NotesTileStyle` (tu) vs `PinnedNotesTileStyle` (tam) różnią się
+                jednym polem (`maxVisible`, tylko w Kreatorze) — ten sam partial-merge co
+                `CanvasCountdownStyleModal`. */}
+            <Text style={s.sectionLabel}>Presety</Text>
+            <StylePresetBar family="notes" style={style as unknown as Record<string, unknown>} onApply={(p) => onChange(p as Partial<NotesTileStyle>)} />
+
             <Text style={s.sectionLabel}>Styl</Text>
             <View style={s.segmented}>
               {([['row', 'Wiersz'], ['compact', 'Kompaktowy'], ['card', 'Karta']] as [NotesLayoutPreset, string][]).map(([m, lbl]) => {
