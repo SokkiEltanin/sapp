@@ -26,6 +26,16 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## ✅ Czwarty audyt edytorów + fix zero-coverage gap (2026-10-18, §369) — BEZ RYZYKA
+
+Audyt całego systemu edytora płótna (§341-368) — nic nowego do naprawienia (wszystkie
+wcześniejsze fixy §360/§365/§366/§367 potwierdzone jako działające). Jedno znalezisko:
+§368's `buildStreakItems()` NIE miała żadnego testu (dokumentacja twierdziła inaczej) i nie
+dało się jej przetestować bez przeniesienia do czystego pliku (`useAllStreakItems.ts` ciągnie
+`expo-notifications` przez `useHabits`→`notificationsService`). Przeniesiona do
+`src/utils/buildStreakItems.ts`, +9 testów. Zero zmiany zachowania w runtime — priorytet testu
+na urządzeniu ŻADEN. Checklist w ARCHITECTURE.md §369.
+
 ## 🔴 Wolne płótno — pięć kolejnych ekranów (2026-10-18, §368) — DO WERYFIKACJI
 
 User: "każde okno ma mieć możliwość edycji (oczywiście bez kręgosłupa czyli ustawień je
