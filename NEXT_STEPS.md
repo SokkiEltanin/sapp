@@ -26,6 +26,17 @@ układów. Nie zaczęte — jeśli user będzie chciał to samo i tam, trzeba pr
 "inny wariant" znaczy dla każdego (wiersz licznika / notatka z tekstem — inny kształt treści
 niż pierścień odliczania, nie kopiować 1:1).
 
+## 🔴 Fix: duplikat wydatku walutowego + 3× martwy przełącznik (2026-10-18, §366) — DO WERYFIKACJI
+
+Dwa równoległe audyty (user: "rob audyty... czy dzialaja nie mają błędów"). **Finansowy
+(WYSOKI priorytet, realne pieniądze)**: redostarczone powiadomienie banku o płatności walutowej
+z ręcznie podaną kwotą PLN (`plnOverride`) nigdy nie było wykrywane jako duplikat (dedup
+porównywał tylko już-przeliczoną PLN kwotę, nie oryginalną walutową) — tworzyło DRUGI wydatek.
+Naprawione (`amountMatches()` w `bankNotification.ts`, użyta we wszystkich 4 miejscach dedup).
+**Edytory (średni priorytet, UX)**: 3 przełączniki (Poświata/Tagi) widoczne bez warunku mimo że
+wybrany wariant kształtu ich nie używa — martwe no-opy. Naprawione. Checklist w ARCHITECTURE.md
+§366.
+
 ## 🆕 Wizualna ramka grupy + lista warstw z reorderem (2026-10-17, §365) — DO WERYFIKACJI — LISTA DOSZLIFOWANIA ZAKOŃCZONA
 
 Ostatni punkt z listy "doszlifowania" (§357-365). §359 odłożyło wspólną ramkę grupy i pełną
