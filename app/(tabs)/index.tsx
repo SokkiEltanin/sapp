@@ -2595,6 +2595,7 @@ export default function DashboardScreen() {
             allNotesItems={allNotes}
             dataFieldRegistry={dataFieldRegistry}
             accentColor={accentColor}
+            statCtx={statCtx}
           />
         </SafeAreaView>
       </View>
@@ -3158,6 +3159,7 @@ export default function DashboardScreen() {
                 allNotesItems={allNotes}
                 dataFieldRegistry={dataFieldRegistry}
                 accentColor={accentColor}
+                statCtx={statCtx}
               />
             );
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;

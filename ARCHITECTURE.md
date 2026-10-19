@@ -20537,6 +20537,47 @@ wszystkie karty) znika, zostaje tylko płótno. Sprawdź że appka się nie cras
 ("zmniejsz") przywraca dashboard DOKŁADNIE jak był (żadna karta nie zniknęła/nie przesunęła
 się). To najważniejszy test tej całej serii faz — jeśli coś miało się zepsuć, to tu.
 
+## 386. Typ komponentu "Wykres" na wolnym płótnie — Faza 4, ostatni kawałek §380 (2026-10-19)
+
+Kontynuacja §380-385 — ostatnia brakująca rzecz z pierwotnego zamówienia usera ("budowanie
+kafelków, WYKRESÓW, robienie presetów"). Siódmy `CanvasComponentType`, `'statTile'`.
+
+**Reużyty, nie zbudowany od zera**: dashboard ma już PEŁNY, dojrzały system "widgetów
+statystycznych" (`CustomTile` typu `'stat'`, `src/utils/statWidgets.ts` — rejestr 29 metryk w
+4 grupach: Finanse/Konsumpcja/Nastrój i zdrowie/Praca i zadania, z czystymi funkcjami
+`metricNumber`/`metricSeries` liczącymi wartość/serię z `StatCtx`). Nowy typ na płótnie
+UŻYWA TEGO SAMEGO rejestru (`WIDGET_METRICS`) do podpięcia (`bindingKey` = id metryki, ten sam
+mechanizm co streakTile/countdownTile/notesTile/dataField) — żadnego nowego słownika metryk.
+
+**Świadomie NIE reużyty wprost**: pełny `StatTile.tsx` z dashboardu ma własne sprzężenie
+(`updateCustomTile`/`pixelDayCache`, interaktywny stan dla 'compare'/'pixels'). Zamiast tego
+nowy, lekki `StatCanvasTile.tsx` — woła te same czyste funkcje rejestru + istniejący
+`WaveChart.tsx`, ale własny, prostszy styl (`StatTileCanvasStyle { period, viz }`,
+`src/store/statTileStyleDefaults.ts`) pasujący do slotu `CanvasItem.style`.
+
+**v1 celowo ograniczony do `viz: 'number' | 'wave'`** (dwa z sześciu wariantów dashboardu) —
+'compare' (drugi metric + offset), 'donut'/'list' (rozbicie kategorii), 'pixels' (cache
+per-dzień) wymagają dodatkowych podpięć/danych, świadomie odłożone, patrz NEXT_STEPS.md.
+
+**Dostępność — TYLKO Dashboard, i to świadomie, nie przeoczenie.** `StatCtx` (wydatki, nastrój,
+praca, zadania, zdrowie z zegarka...) jest drogi do policzenia i dziś liczony WYŁĄCZNIE na
+dashboardzie. `ScreenCanvasBase` dostał nowy, OPCJONALNY prop `statCtx?: StatCtx` — tylko
+`index.tsx` go przekazuje (w OBU miejscach: normalnym branchu i §385's trybie pełnoekranowym).
+Bez tego propa (wszystkie pozostałe 13 ekranów) przycisk "Wykres" w ogóle się NIE POKAZUJE w
+trybie edycji (CLAUDE.md #7 — nie zostawiaj martwego przycisku) — a `StatCanvasTile` samo w
+sobie, gdyby jednak trafił na ekran bez `statCtx` (np. stary item przeniesiony ręcznie
+`screenKey`), renderuje czytelny placeholder "Wykresy — tylko na Dashboardzie", nie crash ani
+pusty box.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 1 nowy (domyślny styl/rozmiar/
+bindingKey=null dla `addItem(..., 'statTile')`). `tsc --noEmit` czyste, `jest --silent`
+113/113 suite, 1463 testów (+1).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Dashboard → "Twoje komponenty" → Edytuj → "Wykres"
+→ wybierz dowolną metrykę (np. "Wydatki") → sprawdź oba warianty stylu (Liczba/Wykres fali) w
+🎨. Na INNYM ekranie (np. Zdrowie) sprawdź że przycisk "Wykres" w ogóle się nie pojawia w
+rzędzie "Dodaj".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

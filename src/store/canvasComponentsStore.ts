@@ -10,6 +10,7 @@ import {
 } from '@/store/shapeStyleDefaults';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
+import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -52,7 +53,15 @@ import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDef
 // `ShapeComponentType`/`isShapeType()` (inny, niezależny modal stylu — picker ikony/kolor/
 // rozmiar/wyrównanie, nie fill/stroke/cornerRadius kształtów) — własna, jawna obsługa w
 // `ScreenCanvas.tsx` wszędzie, gdzie "brak podpięcia" jest istotne.
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile';
+// Faza 4 (2026-10-19, §386) — siódmy typ, `'statTile'` ("Wykres") — user: "chcę... też
+// wykresów". UŻYWA `bindingKey` (klucz metryki z `WIDGET_METRICS` w `statWidgets.ts` —
+// `spend`/`moodAvg`/`steps`/itd., ten sam rejestr co dashboardowe "Dodaj widget") — ten sam
+// mechanizm podpięcia co streakTile/countdownTile/notesTile/dataField. Renderowany przez
+// NOWY, lekki `StatCanvasTile.tsx` (NIE pełny `StatTile.tsx` z dashboardu — ten ma własne
+// sprzężenie z `updateCustomTile`/`pixelDayCache`), wymaga `statCtx` (patrz `ScreenCanvas.tsx`
+// — dziś dostarcza go TYLKO dashboard, więc na innych ekranach ten typ pokazuje "tylko na
+// Dashboardzie" zamiast dodawalnego przycisku).
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile' | 'statTile';
 
 // Minimalny rozmiar itemu (Faza 28, 2026-10-17, §359) — PRZENIESIONE z `CanvasPlacedItem.tsx`
 // (gdzie żyły jako prywatne consty tego komponentu) — `resizeGroupBy` niżej potrzebuje TYCH
@@ -85,7 +94,7 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
   // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -120,8 +129,10 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   // Kwadrat (Faza 33, §371) — ikona jest z natury symetryczna, kwadratowy box domyślnie
   // wyśrodkowuje ją bez marginesów po jednej stronie.
   iconTile: { width: 90, height: 90 },
+  // Wykres (Faza 4, §386) — na tyle szeroki, by wave-wariant był czytelny od razu po dodaniu.
+  statTile: { width: 170, height: 110 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
@@ -131,6 +142,7 @@ const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTile
   lineShape: DEFAULT_LINE_SHAPE_STYLE,
   textShape: DEFAULT_TEXT_SHAPE_STYLE,
   iconTile: DEFAULT_ICON_TILE_STYLE,
+  statTile: DEFAULT_STAT_TILE_STYLE,
 };
 
 interface CanvasComponentsState {

@@ -2,6 +2,7 @@ import { useCanvasComponentsStore, CanvasItem, clampItemX } from '@/store/canvas
 import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 import { DEFAULT_RECT_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE } from '@/store/shapeStyleDefaults';
 import { DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
+import { DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 
 // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
 // Testowane bezpośrednio na store (ten sam wzorzec co battleLayoutDraftStore.test.ts) —
@@ -369,5 +370,20 @@ describe('canvasComponentsStore — fullScreenScreens (§381)', () => {
     const s = useCanvasComponentsStore.getState();
     expect(s.fullScreenScreens['health']).toBe(false);
     expect(s.items).toHaveLength(1); // nietknięte — wyłączenie nie usuwa zbudowanych komponentów
+  });
+});
+
+// Typ "Wykres" (§386) — siódmy componentType, bindingKey = klucz metryki z WIDGET_METRICS
+// (statWidgets.ts), style = { period, viz } (NIE pełny CustomTile z dashboardu).
+describe('canvasComponentsStore — addItem (statTile, §386)', () => {
+  test('statTile dostaje domyślny styl (miesiąc/liczba) i bindingKey=null (jeszcze nie podpięty)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('dashboard', 'statTile');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.componentType).toBe('statTile');
+    expect(item.style).toEqual(DEFAULT_STAT_TILE_STYLE);
+    expect(item.bindingKey).toBeNull();
+    expect(item.width).toBeGreaterThan(0);
+    expect(item.height).toBeGreaterThan(0);
   });
 });

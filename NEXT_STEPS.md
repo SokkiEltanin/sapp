@@ -40,12 +40,30 @@ każda osobnym PR-em przez pełny rytuał.
 odznaka pełnego ekranu → potwierdź → sprawdź że appka się nie crashuje i że wyłączenie
 przywraca dashboard DOKŁADNIE jak był. Checklist w ARCHITECTURE.md §385.
 
-**Zostaje z oryginalnego §380 zamówienia**:
-- Nowy typ komponentu "wykres" (user explicite wymienił) — jeszcze NIE zaczęty, osobna, większa
-  praca (wybór stylu/biblioteki wykresu, nowy `componentType` w `canvasComponentsStore.ts`,
-  modal stylu, dane do wykresu z istniejącego `useDataFieldRegistry()`/innych źródeł appki).
-- "Budowanie kafelków" i "robienie presetów" — JUŻ istniały przed tym kierunkiem (system
-  kopiowania komponentów §341-377, `StylePresetBar` §370/§377), nic dodatkowego nie wymagały.
+- §386 (Faza 4, OSTATNI kawałek §380): nowy typ komponentu **"Wykres"** — reużywa istniejący
+  rejestr 29 metryk dashboardu (`statWidgets.ts`), v1 ograniczony do `viz: 'number'|'wave'`
+  (reszta — compare/donut/list/pixels — świadomie odłożona niżej), dostępny TYLKO na
+  Dashboardzie (jedyne miejsce, które dziś liczy drogi `StatCtx`). **Priorytet testu WYSOKI** —
+  checklist w ARCHITECTURE.md §386.
+
+**🎉 Całe zamówienie usera z §380 ("budowanie kafelków, wykresów, robienie presetów") —
+ZROBIONE.** Kafelki i presety już istniały (§341-377/§370), tryb pełnoekranowy (§381-385) i
+wykresy (§386) dobudowane w tej serii.
+
+## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
+
+v1 typu "Wykres" na płótnie wspiera tylko `number`/`wave`. Jeśli user zechce więcej:
+- **`compare`** (porównanie z poprzednim okresem/rokiem) — wymaga drugiego podpięcia
+  (`metric2`/`compareOffset`, jak `CustomTile` na dashboardzie) — dziś `StatTileCanvasStyle` ma
+  tylko `period`/`viz`, trzeba rozszerzyć.
+- **`donut`/`list`** (rozbicie na kategorie/produkty, np. "Wydatki per kategoria") — inny
+  kształt danych (`metricList`, nie `metricNumber`/`metricSeries`) — osobna gałąź renderu w
+  `StatCanvasTile.tsx`.
+- **`pixels`** (siatka dni w roku, jak nawyki) — wymaga `pixelDayCache`, dziś liczony TYLKO na
+  dashboardzie obok `statCtx` — trzeba by też przekazać przez `ScreenCanvasBase`.
+- Rozszerzenie dostępności POZA Dashboard — wymagałoby fetchowania pełnego `StatCtx`
+  (wydatki/nastrój/praca/zdrowie) na KAŻDYM ekranie z płótnem, dziś świadomie unikane
+  (kosztowne, patrz komentarz przy `statCtx` propie w `ScreenCanvas.tsx`).
 - Nowy typ komponentu "wykres" (user explicite wymienił "wykresów") — NIE zbudowany, większa,
   osobna praca (wybór stylu/biblioteki wykresu, nowy `componentType`).
 - "robienie presetów" — JUŻ istnieje (`StylePresetBar`, §370/§377), nic dodatkowego nie
