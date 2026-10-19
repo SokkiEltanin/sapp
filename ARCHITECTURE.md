@@ -20626,6 +20626,66 @@ koncepcja "Projektów" (szablon/pusty canvas + wybór ekranu docelowego, w tym N
 "Dane"-tryb edytora z zagnieżdżonym płótnem dla popupów — W TOKU, osobne, kolejne fazy. Patrz
 NEXT_STEPS.md.
 
+## 388. Wizualny color/gradient picker (nasycenie/jasność + odcień) zamiast gołego HEX (2026-10-19)
+
+Kontynuacja §387 — ta sama wiadomość usera, drugi konkretny wymóg: "jak wybieram customowy
+kolor/gradient to żebym miał paletę taką a nie wpisywał tylko HEX xd i żeby wybrany kolor się
+pokazywał". `ColorSwatchPicker.tsx` (WSPÓLNY komponent dla WSZYSTKICH modali stylu — shapes/
+streak/countdown/notes/dataField/icon/statTile) miał dotąd TYLKO presety + bibliotekę + jeden
+`TextInput` na hex. Jedna zmiana w jednym miejscu naprawia to wszędzie naraz.
+
+**Nowe, pure funkcje w `color.ts`** — `hexToHsv(hex): Hsv`/`hsvToHex(h,s,v): string` (`Hsv =
+{h: 0-360, s: 0-1, v: 0-1}`), testowalne w `testEnvironment: 'node'`, ten sam powód co
+`normalizeHex`. 4 nowe testy w `__tests__/color.test.ts` (kolory podstawowe, biały/czarny/szary
+— `s=0`, round-trip hex→hsv→hex, zawijanie odcienia).
+
+**Nowy `src/components/ui/ColorPickerPanel.tsx`** — panel nasycenie/jasność (kwadrat 150px,
+dwa nałożone `LinearGradient` z `expo-linear-gradient` na solidnym tle czystego odcienia: biały→
+przezroczysty poziomo, przezroczysty→czarny pionowo — klasyczna technika SV-pickera) + pasek
+odcienia (siedem stopów tęczy, `LinearGradient` poziomo) — każdy z własnym `Gesture.Pan()` +
+przeciągalnym kółkiem-uchwytem. `onChange` woła się NA ŻYWO na KAŻDYM `onUpdate` (nie dopiero na
+`onEnd` jak przy przeciąganiu itemów na płótnie w `CanvasPlacedItem.tsx` — tam batching chroni
+przed przeliczaniem POZYCJI WSZYSTKICH sąsiadów co klatkę; tu `onChange` to pojedyncze ustawienie
+jednego stringa, więc żywy feedback na docelowym elemencie — dokładnie to, o co user prosił —
+jest tani i pożądany, zero throttlingu).
+
+**Matematyka w workletcie, konwersja poza nim** — ten sam, świadomy wzorzec co `clampItemX`/
+snap w `CanvasPlacedItem.tsx`: gesty liczą TYLKO surowe h/s/v (arytmetyka, bez wywołań
+zaimportowanych funkcji wewnątrz workletu), oddają przez `runOnJS` do `commit()` (zwykła funkcja
+JS w komponencie), która DOPIERO TAM woła zaimportowany `hsvToHex`.
+
+**`GestureHandlerRootView` WEWNĄTRZ komponentu** — ten panel zawsze ląduje wewnątrz jakiegoś
+natywnego `Modal` (wszystkie modale stylu płótna). Udokumentowany, wcześniej już raz napotkany
+bug (§162, `MoodCheckInModal.tsx`): `Modal` portuje treść do OSOBNEJ natywnej hierarchii, poza
+zasięgiem jedynego `GestureHandlerRootView` w `app/_layout.tsx` — bez WŁASNEGO roota tutaj
+`Gesture.Pan()` panelu nigdy nie dostawałby poprawnie zroutowanych dotknięć, niezależnie od tego
+jak poprawna byłaby reszta kodu. Fix zastosowany z góry (nie czekano na powtórkę buga).
+
+**Integracja w `ColorSwatchPicker.tsx`** — panel renderuje się NAD istniejącym hex `TextInput`
+w bloku "adding" (custom kolor), `value={normalized ?? current}` (pokazuje bieżący kolor itemu
+na starcie), `onChange` jednocześnie synchronizuje `hexInput` (dla pola tekstowego/przycisku
+"Zapisz do biblioteki") I woła `onSelect(hex)` na żywo (aplikuje na REALNY edytowany element,
+nie tylko podgląd w panelu). Hex `TextInput` + przycisk "Zatwierdź" ZOSTAJĄ bez zmian
+zachowania (precyzyjne wpisanie znanej wartości, wciąż wymaga potwierdzenia) — panel to
+DODATKOWY, szybszy sposób wyboru, nie zamiennik.
+
+**Świadomie NIE w tym PR**: gradient (wielostopniowe wypełnienie) dla `shapeStyleDefaults.ts`
+(dziś `fill: string` płaski) — user wspomniał "kolor/gradient" razem, ale budowa custom
+multi-stop gradientu dla kształtów to osobna, większa zmiana modelu danych + renderu SVG
+(`LinearGradient`/`Defs` z `react-native-svg`, wspierane, ale nowy typ pola + UI wyboru stopów),
+odłożona jako osobny punkt w NEXT_STEPS.md — ten PR naprawia TYLKO brak wizualnego pickera dla
+pojedynczego koloru (uniwersalnie, we wszystkich miejscach, które już dziś wybierają kolor).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1467 testów (+4).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny modal stylu na płótnie (np. 🎨 na
+prostokącie) → "+" przy kolorach → sprawdź że pojawia się kwadrat nasycenie/jasność + pasek
+odcienia, przeciągnięcie w kwadracie/pasku NA ŻYWO zmienia kolor elementu pod spodem (nie
+dopiero po puszczeniu), tap (bez przeciągania) w dowolnym miejscu obu pasków też działa,
+wpisanie hex ręcznie nadal wymaga "✓". **Szczególnie ważne: sprawdzić że gest w ogóle łapie
+dotyk** (znany, udokumentowany wcześniej bug klasy "RNGH w Modalu bez własnego roota", §162) —
+jeśli przeciąganie nic nie robi, to dokładnie ten scenariusz.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

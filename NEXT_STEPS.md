@@ -138,24 +138,58 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
      brzmi jak zmiana w logice ŹRÓDŁA danych (`statWidgets.ts`/`SinceCounters`), nie tylko w
      stylu kafla na płótnie — **wymaga konkretnego przykładu od usera przed implementacją**,
      żeby nie zgadywać złej abstrakcji.
-7. **Prawdziwy color/gradient picker, nie goły input HEX** — user: "jak wybieram customowy
-   kolor/gradient to żebym miał paletę taką a nie wpisywał tylko HEX, i żeby wybrany kolor się
-   pokazywał". `ColorSwatchPicker.tsx` (wspólny dla WSZYSTKICH modali stylu — shapes/streak/
-   countdown/notes/dataField/icon/statTile) ma dziś TYLKO: presety + bibliotekę + jeden
-   `TextInput` na hex (z małym podglądem-kółkiem, ale to nie to, o co user prosi). Potrzebny
-   prawdziwy wizualny piker (np. panel nasycenie/jasność + pasek odcienia, jak w Figmie/Canvie)
-   ZAMIAST/OBOK hex inputu — WYSOKA wartość, bo to JEDEN komponent używany wszędzie, więc jedna
-   zmiana naprawia to w całej appce naraz. Gradient (dwa/więcej stopów koloru) dziś istnieje
-   częściowo (np. `CanvasStreakStyleModal.tsx`) ale NIE w `shapeStyleDefaults.ts` (shapes mają
-   tylko płaski `fill: string`) — żeby shapes/inne typy dostały gradient, trzeba dodać
-   `fill: string | { type: 'gradient', stops: string[], angle? }` (discriminated) i obsłużyć to
-   w `ShapeTile.tsx`'s SVG (react-native-svg ma `LinearGradient`/`Defs` — wspierane).
+7. ✅ **ZROBIONE (§388) — prawdziwy color picker, nie goły input HEX** — user: "jak wybieram
+   customowy kolor/gradient to żebym miał paletę taką a nie wpisywał tylko HEX, i żeby wybrany
+   kolor się pokazywał". `ColorPickerPanel.tsx` (nowy) — panel nasycenie/jasność + pasek
+   odcienia, żywy `onChange` na każdym kroku przeciągania — wpięty w `ColorSwatchPicker.tsx`
+   (WSPÓLNY dla wszystkich modali stylu), więc naprawia to wszędzie naraz. Checklist w
+   ARCHITECTURE.md §388. **Priorytet testu WYSOKI** — to pierwszy `Gesture.Pan()` w tej appce
+   wewnątrz zwykłego `<Modal>` od czasu §162 (`MoodCheckInModal`), sprawdzić że dotyk w ogóle
+   łapie (znany bug, zaadresowany z góry własnym `GestureHandlerRootView`, ale wymaga
+   potwierdzenia na urządzeniu).
+   **NIE zrobione w tym PR — gradient**: dwa/więcej stopów koloru dziś istnieje częściowo (np.
+   `CanvasStreakStyleModal.tsx`'s `gradientMode`, ale to automatyczny cień JEDNEGO koloru, nie
+   user-definiowalny multi-stop) i wcale nie istnieje w `shapeStyleDefaults.ts` (shapes mają
+   tylko płaski `fill: string`). Żeby shapes/inne typy dostały PRAWDZIWY, edytowalny gradient,
+   trzeba: nowy typ pola (np. `fill: string | { type: 'gradient', stops: string[], angle? }`,
+   discriminated), UI wyboru/dodawania stopów (prawdopodobnie 2+ instancje `ColorPickerPanel`
+   + lista stopów), i obsługę w `ShapeTile.tsx`'s SVG (`react-native-svg` ma `LinearGradient`/
+   `Defs` — wspierane, niezbudowane).
 
-**Status**: §387 (fix kształtów) zrobiony i wysłany. Reszta (punkty 1-7) W TOKU, budowane fazami
-bez przerywania (ten sam rytm co §381-386), z własnymi numerami ARCHITECTURE.md i checklistami
-testowymi per faza. **Kolejność planowana**: 7 (color picker — samodzielne, wysoka wartość,
-jedna zmiana naprawia wszędzie) → 6/zakres (najniższe zwisające owoce w statTile) → 1-3 (Ustawienia/
-Projekty/wybór ekranu) → 5 (tryb Dane/popup) → 4 (Navbar, najtrudniejsze, na koniec).
+8. **Paski progresu — konfigurowalny zakres; liczniki/progi — konfigurowalne thresholdy**
+   (2026-10-19, kolejna wiadomość usera, "przemyśl to dobrze"): "tak samo z PASKAMI PROGRESU
+   muszę mieć [możliwość] ustawiać zakresy, tak samo z licznikami muszę mieć opcję dodania
+   progów co ile [i] jakie (czy liczba czy procent itp)". Dwa OSOBNE podsystemy, żaden jeszcze
+   nie zbadany na tyle, by zacząć kodować:
+   - **Paski progresu** (`showProgressBar` — `streakTileStyleStore.ts` i prawdopodobnie inne
+     tile style stores z podobnym polem) — dziś to WIZUALNY włącznik/wyłącznik, zakres
+     (co liczy się jako "pełny") jest dorozumiany z logiki danego typu kafla (np. dla serii:
+     pewnie % do następnego progu). User chce to USTAWIALNE — potrzebny konkretny przykład
+     PRZED kodowaniem: pasek progresu NA CZYM konkretnie (który typ kafla), zakres skąd-dokąd
+     (np. "0 do mojego dziennego celu kroków" — wtedy trzeba pola `rangeMin`/`rangeMax` albo
+     `targetValue` w stylu TEGO kafla + UI do wpisania).
+   - **Progi liczników** (`STREAK_TIERS` w `streakTiers.ts`, dziś sztywno zaszyte 8 progów ze
+     stałymi wartościami dni, importowane w ~5 miejscach appki — kalendarz, dashboard, kreator,
+     canvas). Dziś user może nadpisać TYLKO kolor progu (`tierColorOverrides`, keyed po
+     indeksie 0-7) — NIE wartości progów, NIE liczbę progów, NIE jednostkę. User chce: dodawać
+     własne progi, wybierać "co ile" (interwał) i jednostkę (liczba dni vs procent czegoś).
+     **To jest zmiana modelu danych, nie tylko UI** — `tierColorOverrides: Record<number,
+     string>` zakłada STAŁĄ listę indeksów 0-7; zmienna liczba/wartości progów per-user wymaga
+     innej struktury (np. `tiers: {min: number, color: string}[]` per-user, zamiast
+     nadpisań-na-sztywnej-liście), i trzeba rozstrzygnąć migrację istniejących
+     `tierColorOverrides` + wszystkich ~5 miejsc, które dziś czytają `STREAK_TIERS` jako
+     GLOBALNĄ, współdzieloną stałą (nie per-user). **Nie zaczynać kodować bez jasnego ustalenia
+     z userem**: czy to ma być per-typ-kafla (każda instancja na płótnie ma WŁASNE progi) czy
+     globalna zmiana `STREAK_TIERS` (wpływa na WSZYSTKIE miejsca appki, nie tylko płótno)? To
+     drugie jest dużo większą, inwazyjną zmianą niż "tryb Dane na płótnie" i prawdopodobnie
+     wykracza poza sam system canvas/edytora.
+
+**Status**: §387 (fix kształtów) i §388 (color picker) zrobione i wysłane. Reszta (punkty 1-6,
+8) W TOKU, budowane fazami bez przerywania (ten sam rytm co §381-388), z własnymi numerami
+ARCHITECTURE.md i checklistami testowymi per faza. **Kolejność planowana**: 6/zakres
+(najniższe zwisające owoce w statTile, samodzielne) → 1-3 (Ustawienia/Projekty/wybór ekranu) →
+5 (tryb Dane/popup) → 8 (paski/progi, wymaga doprecyzowania z userem przed startem) → 4
+(Navbar, najtrudniejsze, na koniec).
 
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 
