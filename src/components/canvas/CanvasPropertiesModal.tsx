@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
-import { X, SlidersHorizontal, ArrowUpToLine, ArrowDownToLine, Link2Off } from 'lucide-react-native';
+import { X, SlidersHorizontal, ArrowUpToLine, ArrowDownToLine, Link2Off, SquareStack } from 'lucide-react-native';
 import { MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
@@ -16,7 +16,10 @@ import Stepper from '@/components/ui/Stepper';
 // `onUngroup` tu, NIE jako osobny przycisk w chrome `CanvasPlacedItem.tsx` (gdzie żył do §359)
 // — skupia WSZYSTKIE "układowe" akcje (pozycja/rozmiar/warstwa/grupa) w jednym miejscu,
 // jednocześnie zwalniając miejsce w ciasnym rogu kafla (3 przyciski max, nie 4).
-export default function CanvasPropertiesModal({ visible, x, y, width, height, canvasWidth, grouped, onChange, onBringToFront, onSendToBack, onUngroup, onClose }: {
+export default function CanvasPropertiesModal({
+  visible, x, y, width, height, canvasWidth, grouped, onChange, onBringToFront, onSendToBack, onUngroup,
+  onTapAction, onChangeTapAction, onEditPopup, onClose,
+}: {
   visible: boolean;
   x: number; y: number; width: number; height: number;
   canvasWidth: number;
@@ -25,6 +28,13 @@ export default function CanvasPropertiesModal({ visible, x, y, width, height, ca
   onBringToFront: () => void;
   onSendToBack: () => void;
   onUngroup: () => void;
+  // Tryb "Dane"/popup (§391) — akcja po tapnięciu na ŻYWYM ekranie, uniwersalna dla WSZYSTKICH
+  // typów (stąd tutaj, nie w modalu stylu per-typ). `onEditPopup` otwiera `CanvasPopupModal` w
+  // trybie edycji — żyje tu, nie w `ScreenCanvas.tsx` wprost, bo to naturalne miejsce "ustawień"
+  // tego konkretnego itemu.
+  onTapAction: 'none' | 'openPopup';
+  onChangeTapAction: (v: 'none' | 'openPopup') => void;
+  onEditPopup: () => void;
   onClose: () => void;
 }) {
   const c = useColors();
@@ -67,6 +77,25 @@ export default function CanvasPropertiesModal({ visible, x, y, width, height, ca
                 <Text style={s.layerBtnTxt}>Na wierzch</Text>
               </TouchableOpacity>
             </View>
+
+            <Text style={s.sectionLabel}>Po tapnięciu (na żywym ekranie)</Text>
+            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+              {([['none', 'Zwykłe'], ['openPopup', 'Otwórz popup']] as ['none' | 'openPopup', string][]).map(([m, lbl]) => {
+                const on = onTapAction === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); onChangeTapAction(m); }}
+                    style={[s.layerBtn, { flex: 1 }, on && { backgroundColor: c.accent.blue + '18', borderColor: c.accent.blue }]} activeOpacity={0.85}>
+                    <Text style={[s.layerBtnTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {onTapAction === 'openPopup' && (
+              <TouchableOpacity onPress={() => { haptic.tap(); onEditPopup(); }} style={[s.layerBtn, { backgroundColor: c.accent.blue + '18', borderColor: c.accent.blue }]} activeOpacity={0.85}>
+                <SquareStack size={14} color={c.accent.blue} />
+                <Text style={[s.layerBtnTxt, { color: c.accent.blue }]}>Edytuj zawartość popupu</Text>
+              </TouchableOpacity>
+            )}
 
             {grouped && (
               <>

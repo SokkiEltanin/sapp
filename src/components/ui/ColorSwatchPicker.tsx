@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-nativ
 import { Plus, Check, RotateCcw, BookmarkPlus, Trash2, Pencil, X } from 'lucide-react-native';
 import { useColorLibraryStore } from '@/store/colorLibraryStore';
 import { normalizeHex } from '@/utils/color';
+import ColorPickerPanel from './ColorPickerPanel';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
@@ -108,19 +109,30 @@ export default function ColorSwatchPicker({ presets, current, onSelect, onReset 
       </View>
 
       {adding && (
-        <View style={s.addRow}>
-          <View style={[s.hexPreview, { backgroundColor: normalized ?? c.bg.elevated }]} />
-          <TextInput
-            value={hexInput} onChangeText={setHexInput} placeholder="#RRGGBB"
-            placeholderTextColor={c.text.muted} autoCapitalize="characters" autoCorrect={false} maxLength={7}
-            style={s.hexInput}
+        // Wizualny piker (§388, user: "żebym miał paletę taką a nie wpisywał tylko HEX") —
+        // nad hex inputem, aplikuje NA ŻYWO przez `onSelect` podczas przeciągania (nie czeka na
+        // "Zatwierdź") + trzyma `hexInput` zsynchronizowany, żeby pole tekstowe/przycisk zapisu
+        // do biblioteki widziały tę samą wartość. Hex input zostaje — precyzyjne wpisanie
+        // znanej wartości wciąż wymaga "Zatwierdź" jak dotąd (bez zmiany tego zachowania).
+        <View style={{ gap: spacing[2] }}>
+          <ColorPickerPanel
+            value={normalized ?? current}
+            onChange={(hex) => { setHexInput(hex); onSelect(hex); }}
           />
-          <TouchableOpacity onPress={applyCustom} disabled={!normalized} style={[s.hexBtn, { backgroundColor: c.accent.blue, opacity: normalized ? 1 : 0.4 }]}>
-            <Check size={14} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={saveToLibrary} disabled={!normalized} style={[s.hexBtn, s.hexBtnGhost, { opacity: normalized ? 1 : 0.4 }]}>
-            <BookmarkPlus size={14} color={c.accent.blue} />
-          </TouchableOpacity>
+          <View style={s.addRow}>
+            <View style={[s.hexPreview, { backgroundColor: normalized ?? c.bg.elevated }]} />
+            <TextInput
+              value={hexInput} onChangeText={setHexInput} placeholder="#RRGGBB"
+              placeholderTextColor={c.text.muted} autoCapitalize="characters" autoCorrect={false} maxLength={7}
+              style={s.hexInput}
+            />
+            <TouchableOpacity onPress={applyCustom} disabled={!normalized} style={[s.hexBtn, { backgroundColor: c.accent.blue, opacity: normalized ? 1 : 0.4 }]}>
+              <Check size={14} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={saveToLibrary} disabled={!normalized} style={[s.hexBtn, s.hexBtnGhost, { opacity: normalized ? 1 : 0.4 }]}>
+              <BookmarkPlus size={14} color={c.accent.blue} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
       {renamingId && (

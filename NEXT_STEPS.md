@@ -50,6 +50,157 @@ przywraca dashboard DOKŁADNIE jak był. Checklist w ARCHITECTURE.md §385.
 ZROBIONE.** Kafelki i presety już istniały (§341-377/§370), tryb pełnoekranowy (§381-385) i
 wykresy (§386) dobudowane w tej serii.
 
+## ✅ Fix: zaokrąglenie rogów prostokąta się rozciągało (2026-10-19, §387)
+
+Po §386 user wrócił z konkretnym bugiem: kształty "wydłużają się i wyglądają jak gówno" przy
+zaokrąglonych rogach. Potwierdzone i naprawione — `rectShape` w `ShapeTile.tsx` rysował się w
+znormalizowanym `viewBox 0-100`, który dla niekwadratowego boxa skalował X/Y różnymi
+współczynnikami i rozciągał okrągły róg w elipsę. Teraz `viewBox` = realne piksele instancji.
+Checklist w ARCHITECTURE.md §387. **Priorytet testu WYSOKI.**
+
+## 🆕🆕🆕 Prawdziwy "edytor jak Canva" — user doprecyzował, że to więcej niż tryb pełnoekranowy (2026-10-19)
+
+Ta sama wiadomość co fix powyżej — user wyjaśnił, że §380-386 to NIE było to, o co prosił od
+początku. Pełny cytat (dla kontekstu): "ja pisałem od początku że chcę dosłownie projektor jak
+Figma wbudowany... wgle wiesz co zrobmy ten edytor od zera jeden porządny" + po mojej realizacji
+trybu pełnoekranowego: "ty trochę źle zrozumiałeś... miała być możliwość kliknięcia w
+ustawieniach nie na ekranach, utwórz projekt (tam wybierasz szablon czy pusty canvas) i dodajesz
+kształty... później jak bierzesz pusty musisz wybrać gdzie to ma być czyli czy to dashboard
+projektujesz czy zdrowie itp. Czy np navbar (jak projektujesz navbar to nie wiem jak to
+rozwiązać xd) tam masz 2 tryby... tryb dodawania kafelków/obiektów/tekstów/rysowania, edycji
+koloru/gradientów, zapisywania ich itp. A drugi tryb to dane — jak masz grupy itp to po
+kliknięciu co się ma wyświetlać, jak ekran popup to dostajesz drugie canvas obok z tym do
+zaprojektowania co ma się wyświetlić i muszę mieć możliwość kliknięcia danych [i] wyświetlenia
+ich w dowolny sposób. Wzoruje się na Canvie."
+
+**Rozłożone na kawałki**:
+1. ✅ **ZROBIONE (§390) — wejście do edytora z Ustawień, nie z ekranów**: nowa sekcja "Edytor
+   płótna" → "Projekty" w `app/settings.tsx`, lista 13 ekranów, tapnięcie nawiguje i od razu
+   włącza tryb edycji (`pendingAutoEdit` w `canvasComponentsStore.ts`). Odznaka ✏️/🔳 NA
+   ekranach ZOSTAŁA bez zmian (nie usunięta) — Ustawienia to DODATKOWA, szybsza droga wejścia,
+   nie zamiennik. Checklist w ARCHITECTURE.md §390.
+2. **NIE zrobione — "Szablon"**: wybór Szablon vs Pusty canvas przy tworzeniu. Szablony
+   (gotowe zestawy `CanvasItem[]` do skopiowania) jeszcze NIE ISTNIEJĄ jako dane — trzeba
+   zaprojektować co to konkretnie jest (jedna gotowa kompozycja? kilka do wyboru? skąd się
+   biorą — zaszyte na sztywno w kodzie, czy user może zapisać WŁASNY układ jako szablon do
+   powtórnego użycia na innym ekranie?) — **wymaga doprecyzowania z userem przed kodowaniem**,
+   żeby nie zbudować niepotrzebnej abstrakcji.
+3. ✅ **ZROBIONE (§390) — wybór ekranu docelowego**: lista `PROJECT_SCREENS` w `app/settings.tsx`
+   WYBIERALNA (13 ekranów, nazwa + ikona + liczba komponentów/"Puste płótno"), nie dorozumiana
+   z aktualnego ekranu.
+4. ✅ **ZROBIONE (§392) — Navbar Pupila jako cel projektowania**. Zapytany `AskUserQuestion` o 3
+   opcje (tylko styl / dekoracje nad navbarem / pełna przebudowa jak Figma) — user wybrał
+   **pełną przebudowę**. Nowy `CanvasComponentType` `'navTab'` (zamknięta lista 4 stałych
+   tabów, `src/data/pupilNavTabs.ts`), nowy `app/navbar-editor.tsx` (dedykowany ekran edycji,
+   dodany do Ustawień → "Edytor płótna" → "Projekty"), osobna persystowana flaga
+   `customNavbarEnabled` + PODWÓJNA walidacja kompletności (w edytorze i w żywym
+   `PupilNavbar.tsx` — żywy render NIGDY nie ufa samej fladze, zawsze sam weryfikuje i wraca do
+   domyślnego navbaru, jeśli układ niekompletny). Checklist w ARCHITECTURE.md §392.
+   **Priorytet testu KRYTYCZNY** — to prawdziwa nawigacja, nie dekoracja; scenariusz
+   bezpieczeństwa (usunięcie przycisku z włączonym custom navbarem → automatyczny powrót do
+   domyślnego) jest NAJWAŻNIEJSZYM testem w całej tej serii faz.
+   **TYLKO `PupilNavbar` (4 ekrany Pupila)** — główny `TabBar.tsx` (6 zakładek, dashboard/
+   zadania/kalendarz/finanse/zdrowie/jedzenie) świadomie NIE objęty tą fazą (wyższe ryzyko,
+   używany wszędzie) — jeśli user zechce to też dla `TabBar`, to osobna, kolejna faza, reużywa
+   DOKŁADNIE ten sam wzorzec (zamknięta lista tabów + osobna flaga + podwójna walidacja).
+5. ✅ **ZROBIONE (§391) — tryb "Dane" edytora — popup z drugim, zagnieżdżonym płótnem**.
+   `CanvasItem.onTapAction?: 'none' | 'openPopup'` (uniwersalne dla wszystkich typów) +
+   `screenKey = 'popup:' + itemId` (ta sama "podprzestrzeń" w `canvasComponentsStore.ts`, zero
+   nowego modelu danych) + `CanvasPopupModal.tsx` (dwa tryby: `view` — tap na żywym ekranie,
+   czysta treść; `edit` — przycisk w panelu właściwości, pełny edytor). Pełny, działający
+   kawałek od triggera przez projektowanie do wyświetlenia na żywo — nic nie zostało odłożone
+   w połowie. Checklist w ARCHITECTURE.md §391. **Priorytet testu WYSOKI.**
+   **NIE zrobione — zagnieżdżanie popup-w-popupie**: emergentnie powinno działać (każda
+   `ScreenCanvasBase` ma własny, lokalny stan popupu), ale nieprzetestowane na urządzeniu i user
+   nie prosił o to explicite — niska priorytetowość.
+
+**Doprecyzowanie usera (2026-10-19, kolejna wiadomość tego samego dnia)** — odpowiedź na pytanie
+o "grupy" wyżej, POTWIERDZONE: tak, nowy koncept (trigger→popup), ale user doprecyzował że to
+NIE zamiast live-podglądu na głównym kaflu — DODATKOWO do popupu: "chcę mieć możliwość też w
+głównym kafelku wyświetlić [dane] z ich podglądem na żywo". Główne kafle już TO ROBIĄ dla
+istniejących typów (`streakTile`/`countdownTile`/`dataField`/`statTile` renderują żywe dane ze
+store'ów/`StatCtx` już dziś, w edycji I na żywym ekranie) — więc to w dużej mierze POTWIERDZENIE
+zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, nowe wymagania:
+
+6. **Bogatsza konfiguracja zakresu/formatowania danych per kafel** — user: "wybierać ile tych
+   dni, jakie zakresy dniowe/tyg./miesięczne itp. oraz jakie zaokrąglenia danych, zkąd i kiedy
+   mają się resetować". Rozkłada się na cztery, OSOBNE podsystemy (różny stan dojrzałości):
+   - ✅ **ZROBIONE (§389) — zakres/okres** (ile dni, dzień/tydzień/miesiąc) dla `statTile`:
+     `StatTileCanvasStyle.rangeN` (opcjonalne, `?? 6`) + Stepper "Ile punktów na wykresie" w
+     `CanvasStatStyleModal.tsx` (widoczny tylko dla `viz: 'wave'`), przekazywane do
+     `metricSeries`. Checklist w ARCHITECTURE.md §389. Dla `dataField`/innych typów bez periodu
+     — NIE zrobione, trzeba sprawdzić per-pole w `useDataFieldRegistry()`, czy dane źródłowe to
+     w ogóle wspierają (żaden konkretny przykład od usera jeszcze nie padł).
+   - **Zaokrąglenie (precyzja wyświetlania)** — dziś `fmtStat()` (`statWidgets.ts`) ma WŁASNĄ,
+     zaszytą logikę liczby miejsc po przecinku per metryka (nie konfigurowalną). Żeby user mógł
+     to zmienić per-instancja na płótnie, trzeba dodać pole (np. `decimals?: number`) do
+     `StatTileCanvasStyle` + Stepper w modalu + respektować je w `StatCanvasTile.tsx` (override
+     domyślnego formatowania `fmtStat`).
+   - **Źródło ("zkąd")** — już istnieje jako wybór metryki/pola w `MetricPickerModal` (binding).
+     Prawdopodobnie user ma na myśli coś INNEGO (np. "z którego licznika/nawyku", gdy jeden typ
+     danych ma wiele instancji) — TO JUŻ DZIAŁA przez istniejący picker, chyba że user doda
+     konkretny przykład gdzie nie wystarcza.
+   - **Reset (kiedy dane się zerują)** — NAJMNIEJ dojrzałe. Niektóre dane w appce już mają
+     własny, wbudowany reset (np. liczniki `SinceCounters` liczą "od" konkretnej daty, nawyki
+     resetują się o północy) — ale to jest własnością DANYCH, nie kafla na płótnie. Zanim
+     dodawać UI do tego na płótnie, trzeba ustalić z userem: reset KTÓRYCH konkretnie danych
+     (przykład: "wydatki tygodniowe mają się zerować w poniedziałek, nie w niedzielę")? To
+     brzmi jak zmiana w logice ŹRÓDŁA danych (`statWidgets.ts`/`SinceCounters`), nie tylko w
+     stylu kafla na płótnie — **wymaga konkretnego przykładu od usera przed implementacją**,
+     żeby nie zgadywać złej abstrakcji.
+7. ✅ **ZROBIONE (§388) — prawdziwy color picker, nie goły input HEX** — user: "jak wybieram
+   customowy kolor/gradient to żebym miał paletę taką a nie wpisywał tylko HEX, i żeby wybrany
+   kolor się pokazywał". `ColorPickerPanel.tsx` (nowy) — panel nasycenie/jasność + pasek
+   odcienia, żywy `onChange` na każdym kroku przeciągania — wpięty w `ColorSwatchPicker.tsx`
+   (WSPÓLNY dla wszystkich modali stylu), więc naprawia to wszędzie naraz. Checklist w
+   ARCHITECTURE.md §388. **Priorytet testu WYSOKI** — to pierwszy `Gesture.Pan()` w tej appce
+   wewnątrz zwykłego `<Modal>` od czasu §162 (`MoodCheckInModal`), sprawdzić że dotyk w ogóle
+   łapie (znany bug, zaadresowany z góry własnym `GestureHandlerRootView`, ale wymaga
+   potwierdzenia na urządzeniu).
+   **NIE zrobione w tym PR — gradient**: dwa/więcej stopów koloru dziś istnieje częściowo (np.
+   `CanvasStreakStyleModal.tsx`'s `gradientMode`, ale to automatyczny cień JEDNEGO koloru, nie
+   user-definiowalny multi-stop) i wcale nie istnieje w `shapeStyleDefaults.ts` (shapes mają
+   tylko płaski `fill: string`). Żeby shapes/inne typy dostały PRAWDZIWY, edytowalny gradient,
+   trzeba: nowy typ pola (np. `fill: string | { type: 'gradient', stops: string[], angle? }`,
+   discriminated), UI wyboru/dodawania stopów (prawdopodobnie 2+ instancje `ColorPickerPanel`
+   + lista stopów), i obsługę w `ShapeTile.tsx`'s SVG (`react-native-svg` ma `LinearGradient`/
+   `Defs` — wspierane, niezbudowane).
+
+8. **Paski progresu — konfigurowalny zakres; liczniki/progi — konfigurowalne thresholdy**
+   (2026-10-19, kolejna wiadomość usera, "przemyśl to dobrze"): "tak samo z PASKAMI PROGRESU
+   muszę mieć [możliwość] ustawiać zakresy, tak samo z licznikami muszę mieć opcję dodania
+   progów co ile [i] jakie (czy liczba czy procent itp)". Dwa OSOBNE podsystemy, żaden jeszcze
+   nie zbadany na tyle, by zacząć kodować:
+   - **Paski progresu** (`showProgressBar` — `streakTileStyleStore.ts` i prawdopodobnie inne
+     tile style stores z podobnym polem) — dziś to WIZUALNY włącznik/wyłącznik, zakres
+     (co liczy się jako "pełny") jest dorozumiany z logiki danego typu kafla (np. dla serii:
+     pewnie % do następnego progu). User chce to USTAWIALNE — potrzebny konkretny przykład
+     PRZED kodowaniem: pasek progresu NA CZYM konkretnie (który typ kafla), zakres skąd-dokąd
+     (np. "0 do mojego dziennego celu kroków" — wtedy trzeba pola `rangeMin`/`rangeMax` albo
+     `targetValue` w stylu TEGO kafla + UI do wpisania).
+   - **Progi liczników** (`STREAK_TIERS` w `streakTiers.ts`, dziś sztywno zaszyte 8 progów ze
+     stałymi wartościami dni, importowane w ~5 miejscach appki — kalendarz, dashboard, kreator,
+     canvas). Dziś user może nadpisać TYLKO kolor progu (`tierColorOverrides`, keyed po
+     indeksie 0-7) — NIE wartości progów, NIE liczbę progów, NIE jednostkę. User chce: dodawać
+     własne progi, wybierać "co ile" (interwał) i jednostkę (liczba dni vs procent czegoś).
+     **To jest zmiana modelu danych, nie tylko UI** — `tierColorOverrides: Record<number,
+     string>` zakłada STAŁĄ listę indeksów 0-7; zmienna liczba/wartości progów per-user wymaga
+     innej struktury (np. `tiers: {min: number, color: string}[]` per-user, zamiast
+     nadpisań-na-sztywnej-liście), i trzeba rozstrzygnąć migrację istniejących
+     `tierColorOverrides` + wszystkich ~5 miejsc, które dziś czytają `STREAK_TIERS` jako
+     GLOBALNĄ, współdzieloną stałą (nie per-user). **Nie zaczynać kodować bez jasnego ustalenia
+     z userem**: czy to ma być per-typ-kafla (każda instancja na płótnie ma WŁASNE progi) czy
+     globalna zmiana `STREAK_TIERS` (wpływa na WSZYSTKIE miejsca appki, nie tylko płótno)? To
+     drugie jest dużo większą, inwazyjną zmianą niż "tryb Dane na płótnie" i prawdopodobnie
+     wykracza poza sam system canvas/edytora.
+
+**Status**: §387 (fix kształtów) i §388 (color picker) zrobione i wysłane. Reszta (punkty 1-6,
+8) W TOKU, budowane fazami bez przerywania (ten sam rytm co §381-388), z własnymi numerami
+ARCHITECTURE.md i checklistami testowymi per faza. **Kolejność planowana**: 6/zakres
+(najniższe zwisające owoce w statTile, samodzielne) → 1-3 (Ustawienia/Projekty/wybór ekranu) →
+5 (tryb Dane/popup) → 8 (paski/progi, wymaga doprecyzowania z userem przed startem) → 4
+(Navbar, najtrudniejsze, na koniec).
+
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 
 v1 typu "Wykres" na płótnie wspiera tylko `number`/`wave`. Jeśli user zechce więcej:

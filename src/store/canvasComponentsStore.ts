@@ -11,6 +11,7 @@ import {
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
 import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
+import { NavTabStyle, DEFAULT_NAV_TAB_STYLE } from '@/store/navTabStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -61,7 +62,13 @@ import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileSt
 // sprzężenie z `updateCustomTile`/`pixelDayCache`), wymaga `statCtx` (patrz `ScreenCanvas.tsx`
 // — dziś dostarcza go TYLKO dashboard, więc na innych ekranach ten typ pokazuje "tylko na
 // Dashboardzie" zamiast dodawalnego przycisku).
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile' | 'statTile';
+// Faza §392 (2026-10-19) — ósmy typ, `'navTab'` ("Przycisk nawigacji"), user: "pełna przebudowa
+// jak Figma" dla Navbaru Pupila. UŻYWA `bindingKey` (klucz z `PUPIL_NAV_TABS`, zamknięta lista
+// 4 stałych tabów — `src/data/pupilNavTabs.ts`, NIE dowolna trasa) — podobny mechanizm co
+// streakTile/itd., ale celowo WĄSKI rejestr opcji (bezpieczeństwo: nie da się skonfigurować
+// przycisku prowadzącego do nieistniejącej strony). Dostępny WYŁĄCZNIE dla `screenKey ===
+// 'navbar'` (patrz `ScreenCanvas.tsx`'s add-button) — na innych ekranach nie miałby sensu.
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile' | 'statTile' | 'navTab';
 
 // Minimalny rozmiar itemu (Faza 28, 2026-10-17, §359) — PRZENIESIONE z `CanvasPlacedItem.tsx`
 // (gdzie żyły jako prywatne consty tego komponentu) — `resizeGroupBy` niżej potrzebuje TYCH
@@ -94,7 +101,7 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
   // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -102,6 +109,16 @@ export interface CanvasItem {
   // na WSPÓLNE przesuwanie (patrz `moveGroupBy` niżej) — rozmiar/styl/podpięcie zostają w pełni
   // per-instancja nawet wewnątrz grupy (świadomie uproszczone na v1, patrz NEXT_STEPS.md).
   groupId: string | null;
+  // Akcja po tapnięciu na ŻYWYM ekranie (Faza §391, "tryb Dane" — user: "jak masz grupy itp to
+  // po kliknięciu co się ma wyświetlać, jak ekran popup to dostajesz drugie canvas obok").
+  // `undefined`/`'none'` = brak akcji (dotychczasowe zachowanie — nawigacja/picker per typ, bez
+  // zmian). `'openPopup'` = tapnięcie (TYLKO poza edycją — w edycji tap zawsze otwiera
+  // picker/właściwości jak dotąd) otwiera `CanvasPopupModal` z WŁASNYM, niezależnym płótnem
+  // (`screenKey = 'popup:' + item.id`, osobna "podprzestrzeń" w TYM SAMYM store'cie — ten sam
+  // mechanizm co każdy inny `screenKey`, zero nowego modelu danych) ZAMIAST normalnego
+  // zachowania typu — działa jednolicie dla WSZYSTKICH typów, łącznie z kształtami/ikonami
+  // (dotąd ignorowały tap, patrz `ScreenCanvas.tsx`'s `onTap`).
+  onTapAction?: 'none' | 'openPopup';
   // Warstwy (Faza 28, 2026-10-17, §359) — user, po AskUserQuestion o zakres "pełnego edytora":
   // "...grupowanie i wgle potem podpisanie danych itp itd" + wcześniej zbadane "panel
   // właściwości + warstwy". Wyższy `zIndex` = renderowany PÓŹNIEJ = wizualnie NA WIERCHU (ten
@@ -131,8 +148,11 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   iconTile: { width: 90, height: 90 },
   // Wykres (Faza 4, §386) — na tyle szeroki, by wave-wariant był czytelny od razu po dodaniu.
   statTile: { width: 170, height: 110 },
+  // Przycisk nawigacji (§392) — kwadrat jak ikona (Faza 33), symetryczny box dla symetrycznej
+  // ikony tabu.
+  navTab: { width: 64, height: 64 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
@@ -143,6 +163,7 @@ const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTile
   textShape: DEFAULT_TEXT_SHAPE_STYLE,
   iconTile: DEFAULT_ICON_TILE_STYLE,
   statTile: DEFAULT_STAT_TILE_STYLE,
+  navTab: DEFAULT_NAV_TAB_STYLE,
 };
 
 interface CanvasComponentsState {
@@ -156,9 +177,32 @@ interface CanvasComponentsState {
   // itemy zostają w `items`, tylko przestają być jedynym widokiem ekranu).
   fullScreenScreens: Record<string, boolean>;
   setFullScreen: (screenKey: string, on: boolean) => void;
+  // Wejście do edytora z Ustawień (Faza §390, user: "miała być możliwość kliknięcia w
+  // ustawieniach nie na ekranach"). Tranzjentny, NIEPERSYSTOWANY sygnał (patrz `partialize`
+  // niżej — nie w `partialize` = nie trafia do AsyncStorage) — Ustawienia wołają
+  // `setPendingAutoEdit(screenKey)` TUŻ PRZED `router.push()` na docelowy ekran;
+  // `ScreenCanvasBase` (`ScreenCanvas.tsx`) sprawdza przy montowaniu, czy `pendingAutoEdit`
+  // odpowiada JEJ WŁASNEMU `screenKey` — jeśli tak, włącza `editing` od razu i czyści flagę
+  // (jednorazowy "strzał", nie trwały stan). Dzięki temu Ustawienia mogą wylądować usera
+  // bezpośrednio W TRYBIE EDYCJI płótna, bez dodatkowego tapnięcia ✏️ na docelowym ekranie,
+  // BEZ dotykania wszystkich 14 ekranów hostujących — jedyne miejsce, które to czyta, to
+  // WSPÓLNY `ScreenCanvasBase`.
+  pendingAutoEdit: string | null;
+  setPendingAutoEdit: (screenKey: string | null) => void;
+  // Własny navbar Pupila (Faza §392) — OSOBNE pole od `fullScreenScreens` (świadomie, nie
+  // reużyte — tamto znaczy "ten EKRAN pokazuje TYLKO płótno", to tutaj znaczy "ŻYWY, pływający
+  // PupilNavbar używa WŁASNEGO układu z płótna `screenKey='navbar'` zamiast zaszytego na
+  // sztywno JSX" — inny byt, inne miejsce odczytu, nazwa dzieląca byłaby pomyłką prowadzącą do
+  // nieprzewidzianych skutków w DWÓCH miejscach odczytu naraz). Persystowane (prawdziwa,
+  // trwała preferencja, NIE jednorazowy sygnał jak `pendingAutoEdit`). Samo WŁĄCZENIE flagi NIE
+  // GWARANTUJE użycia custom navbaru — `PupilNavbar.tsx` dodatkowo WALIDUJE, że wszystkie 4
+  // wymagane taby są podpięte, inaczej bezpiecznie wraca do domyślnego, zaszytego navbaru (patrz
+  // komentarz tam) — ta flaga więc znaczy "spróbuj", nie "zawsze używaj".
+  customNavbarEnabled: boolean;
+  setCustomNavbarEnabled: (on: boolean) => void;
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
-  updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
+  updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style' | 'onTapAction'>>) => void;
   removeItem: (id: string) => void;
   // Grupowanie (§349) — `groupItems` ignoruje id'ki spoza `screenKey` (obrona przed pomyłką
   // wołającego, nie powinno się zdarzyć bo `ScreenCanvas` zaznacza tylko WŁASNE itemy) i
@@ -205,6 +249,10 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
       setFullScreen: (screenKey, on) => set((s) => ({
         fullScreenScreens: { ...s.fullScreenScreens, [screenKey]: on },
       })),
+      pendingAutoEdit: null,
+      setPendingAutoEdit: (screenKey) => set({ pendingAutoEdit: screenKey }),
+      customNavbarEnabled: false,
+      setCustomNavbarEnabled: (on) => set({ customNavbarEnabled: on }),
       _hydrated: false,
 
       // Nowa instancja ląduje POD najniżej leżącym elementem na TYM ekranie (nie w (0,0) na
@@ -340,7 +388,7 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
     {
       name: 'canvas-components-v1',
       storage: throttledPersistStorage(),
-      partialize: (s) => ({ items: s.items, fullScreenScreens: s.fullScreenScreens }),
+      partialize: (s) => ({ items: s.items, fullScreenScreens: s.fullScreenScreens, customNavbarEnabled: s.customNavbarEnabled }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

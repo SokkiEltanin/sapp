@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2 } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2, Compass } from 'lucide-react-native';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -36,6 +36,7 @@ import { DataFieldTile } from './DataFieldTile';
 import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import CanvasPropertiesModal from './CanvasPropertiesModal';
+import CanvasPopupModal from './CanvasPopupModal';
 import CanvasLayersModal, { LayerRow } from './CanvasLayersModal';
 import { usePressGuard } from '@/hooks/usePressGuard';
 import { IconTile } from './IconTile';
@@ -45,6 +46,8 @@ import { StatCanvasTile } from './StatCanvasTile';
 import CanvasStatStyleModal from './CanvasStatStyleModal';
 import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 import { WIDGET_METRICS, StatCtx } from '@/utils/statWidgets';
+import { NavTabTile } from './NavTabTile';
+import { PUPIL_NAV_TABS } from '@/data/pupilNavTabs';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -98,7 +101,7 @@ const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą inst
 // `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE już wyliczone dane (`streakWall` 1:1 jako
 // `allStreakItems` — zero dodatkowego kodu, `counters`/`allNotes` już w pamięci dla pozostałych
 // dwóch — tani dodatkowy `.filter()`, NIE drugi fetch).
-export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor, statCtx }: {
+export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor, statCtx, viewOnly }: {
   screenKey: string;
   title?: string;
   allStreakItems: StreakItem[];
@@ -113,6 +116,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // ogóle się nie pokazuje w trybie edycji (patrz niżej), więc user nie trafia na martwy,
   // niedziałający przycisk.
   statCtx?: StatCtx;
+  // Tryb "Dane"/popup (§391) — `CanvasPopupModal.tsx` renderuje TĘ SAMĄ `ScreenCanvasBase` dla
+  // podglądu popupu na żywym ekranie. `true` = czysta treść, BEZ chrome (nagłówek/odznaki
+  // pełnego ekranu/edycji w ogóle się nie renderują, `pendingAutoEdit` jest ignorowane) —
+  // `editing` nie ma jak zostać włączone (jedyne dwa miejsca, które to robią, są wyłączone),
+  // więc cała reszta komponentu (render itemów) automatycznie zostaje w gałęzi `editing=false`,
+  // zero duplikacji logiki renderowania per-typ. `undefined`/`false` = dotychczasowe zachowanie.
+  viewOnly?: boolean;
 }) {
   const c = useColors();
   const s = makeS(c);
@@ -123,6 +133,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // Panel właściwości (§359) — X/Y/W/H + warstwy + rozgrupuj, osobny od `styleForId` (który
   // steruje modalami stylu PER-TYP) — ten panel jest UNIWERSALNY dla wszystkich typów.
   const [propsForId, setPropsForId] = useState<string | null>(null);
+  // Tryb "Dane"/popup (§391) — `mode: 'view'` (tap na żywym ekranie, czysta treść bez chrome)
+  // vs `'edit'` (przycisk "Edytuj zawartość popupu" z panelu właściwości, pełny edytor).
+  const [popup, setPopup] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null);
   // Lista warstw (§365) — osobny panel od reszty (nie wiąże się z JEDNYM itemem jak style/
   // properties, tylko z CAŁYM ekranem naraz).
   const [layersOpen, setLayersOpen] = useState(false);
@@ -139,6 +152,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const [confirmFullScreen, setConfirmFullScreen] = useState(false);
   const fullScreenOn = useCanvasComponentsStore(st => st.fullScreenScreens[screenKey] ?? false);
   const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
+  // Wejście do edytora z Ustawień (§390) — jednorazowy sygnał, patrz komentarz w
+  // `canvasComponentsStore.ts`. Sprawdzamy TYLKO raz, przy zmianie `pendingAutoEdit` (nie na
+  // każdy render) — jeśli dotyczy WŁASNEGO ekranu, włącz edycję i natychmiast wyczyść flagę
+  // (żeby np. nawigacja z powrotem na ten sam ekran później nie znowu-włączyła edycji).
+  const pendingAutoEdit = useCanvasComponentsStore(st => st.pendingAutoEdit);
+  const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
+  useEffect(() => {
+    if (!viewOnly && pendingAutoEdit === screenKey) { setEditing(true); setPendingAutoEdit(null); }
+  }, [pendingAutoEdit, screenKey, viewOnly]);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
@@ -189,6 +211,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     if (item.componentType === 'lineShape') return 'Linia';
     if (item.componentType === 'textShape') return 'Tekst';
     if (item.componentType === 'statTile') return item.bindingKey ? (WIDGET_METRICS.find(m => m.id === item.bindingKey)?.label ?? 'Wykres') : 'Wykres (brak podpięcia)';
+    if (item.componentType === 'navTab') return item.bindingKey ? (PUPIL_NAV_TABS.find(t => t.key === item.bindingKey)?.label ?? 'Przycisk nawigacji') : 'Przycisk nawigacji (brak podpięcia)';
     return 'Ikona';
   };
   // TOP-FIRST (odwrotność `orderedItems` — user intuicyjnie myśli "co jest na wierzchu" jako
@@ -265,6 +288,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     [],
   );
 
+  // Szósty "widget z danymi" (§392) — ALE lista opcji to WYŁĄCZNIE 4 stałe taby Navbaru Pupila
+  // (`PUPIL_NAV_TABS`, ta sama tablica co w `PupilNavbar.tsx` — jedno źródło prawdy), nie
+  // dowolna trasa. Celowo zamknięta lista: nie da się skonfigurować przycisku prowadzącego do
+  // nieistniejącej strony.
+  const navTabOptions: PickerOption[] = useMemo(
+    () => PUPIL_NAV_TABS.map(t => ({ key: t.key, label: t.label, meta: t.path })),
+    [],
+  );
+
   const canvasHeight = Math.max(
     MIN_CANVAS_HEIGHT,
     ...myItems.map(i => i.y + i.height),
@@ -302,6 +334,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
   const content = (
     <View style={s.wrap}>
+      {!viewOnly && (
       <View style={s.header}>
         <LayoutGrid size={13} color={c.text.secondary} />
         <Text style={s.title}>{title ?? 'Twoje komponenty'}</Text>
@@ -327,8 +360,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           <Text style={[s.editTxt, editing && { color: c.accent.blue }]}>{editing ? 'Gotowe' : 'Edytuj'}</Text>
         </TouchableOpacity>
       </View>
+      )}
 
-      {myItems.length === 0 && !editing && (
+      {myItems.length === 0 && !editing && !viewOnly && (
         <Text style={s.hintText}>
           Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii albo odliczania
           z inną metryką — np. ten sam kafel co na dashboardzie, przepięty na inny nawyk/licznik.
@@ -347,12 +381,22 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const isShape = isShapeType(item.componentType);
           const isIcon = item.componentType === 'iconTile';
           const isStat = item.componentType === 'statTile';
+          // Przycisk nawigacji dla Navbaru Pupila (Faza §392) — podpięcie do JEDNEGO z 4
+          // STAŁYCH, predefiniowanych tabów (`PUPIL_NAV_TABS`), NIE dowolnej trasy — niemożliwe
+          // skonfigurować "zepsuty" przycisk, bo lista opcji jest zamknięta.
+          const isNavTab = item.componentType === 'navTab';
+          const boundNavTab = isNavTab && item.bindingKey ? PUPIL_NAV_TABS.find(t => t.key === item.bindingKey) ?? null : null;
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundDataField = isDataField && item.bindingKey ? dataFieldRegistry.find(f => f.id === item.bindingKey) ?? null : null;
 
           const onTap = () => {
+            // Tryb "Dane"/popup (§391) — PRIORYTET nad wszystkim innym poniżej (działa dla
+            // WSZYSTKICH typów, łącznie z kształtami/ikonami, które inaczej ignorują tap).
+            // TYLKO poza edycją — w edycji tap zawsze służy do konfiguracji (picker/brak akcji
+            // na kształtach), zgodnie z dotychczasowym zachowaniem.
+            if (!editing && item.onTapAction === 'openPopup') { haptic.tap(); setPopup({ id: item.id, mode: 'view' }); return; }
             if (isShape || isIcon) return;
             if (editing) { setPickerForId(item.id); return; }
             if (isStreak) {
@@ -455,10 +499,19 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
+              ) : isNavTab ? (
+                <NavTabTile
+                  tab={boundNavTab}
+                  active={false}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                />
               ) : (
                 <ShapeTile
                   kind={item.componentType as ShapeComponentType}
                   style={item.style as ShapeStyle}
+                  width={item.width}
+                  height={item.height}
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
@@ -540,6 +593,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                 <Text style={s.addTxt}>Wykres</Text>
               </TouchableOpacity>
             )}
+            {/* Przycisk nawigacji (§392) — WYŁĄCZNIE na `screenKey='navbar'` (edytor Navbaru
+                Pupila, `app/navbar-editor.tsx`) — na innych ekranach nie miałby sensu (CLAUDE.md
+                #7, nie zostawiaj martwego przycisku). */}
+            {screenKey === 'navbar' && (
+              <TouchableOpacity onPress={() => onAdd('navTab')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+                <Plus size={15} color="#fff" />
+                <Text style={s.addTxt}>Przycisk nawigacji</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {/* Kształty-primitywy (§357) i Ikona (§371) — osobny, wizualnie oddzielony wiersz
               (szary, nie niebieski jak "komponenty z danymi" wyżej) — inna kategoria: BEZ
@@ -590,9 +652,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
@@ -602,6 +664,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           ? 'Rejestr pól danych jest pusty — to nie powinno się zdarzyć.'
           : pickerItem?.componentType === 'statTile'
           ? 'Rejestr metryk jest pusty — to nie powinno się zdarzyć.'
+          : pickerItem?.componentType === 'navTab'
+          ? 'Lista zakładek jest pusta — to nie powinno się zdarzyć.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
@@ -698,7 +762,17 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onBringToFront={() => { if (propsItem) bringToFront(propsItem.id); }}
         onSendToBack={() => { if (propsItem) sendToBack(propsItem.id); }}
         onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
+        onTapAction={propsItem?.onTapAction === 'openPopup' ? 'openPopup' : 'none'}
+        onChangeTapAction={(v) => { if (propsItem) updateItem(propsItem.id, { onTapAction: v }); }}
+        onEditPopup={() => { if (propsItem) { const id = propsItem.id; setPropsForId(null); setPopup({ id, mode: 'edit' }); } }}
         onClose={() => setPropsForId(null)}
+      />
+
+      <CanvasPopupModal
+        visible={!!popup}
+        itemId={popup?.id ?? null}
+        mode={popup?.mode ?? 'view'}
+        onClose={() => setPopup(null)}
       />
 
       <CanvasLayersModal
@@ -742,7 +816,7 @@ masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
 // Cienki wrapper (§356) — wołający 3 hooki (AsyncStorage/Zustand) SAM, jak `ScreenCanvasBase`
 // robiło dotąd wprost. Jedzenie/Ćwiczenia/Finanse importują TEN komponent (domyślny eksport),
 // bez żadnej zmiany w ich własnym kodzie — ta sama nazwa, te same propsy `screenKey`/`title`.
-export default function ScreenCanvas({ screenKey, title }: { screenKey: string; title?: string }) {
+export default function ScreenCanvas({ screenKey, title, viewOnly }: { screenKey: string; title?: string; viewOnly?: boolean }) {
   const allStreakItems = useAllStreakItems();
   const allCountdownItems = useAllCountdownItems();
   const allNotesItems = useAllNotesItems();
@@ -757,6 +831,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       allNotesItems={allNotesItems}
       dataFieldRegistry={dataFieldRegistry}
       accentColor={accentColor}
+      viewOnly={viewOnly}
     />
   );
 }

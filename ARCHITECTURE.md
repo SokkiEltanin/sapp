@@ -20578,6 +20578,321 @@ bindingKey=null dla `addItem(..., 'statTile')`). `tsc --noEmit` czyste, `jest --
 🎨. Na INNYM ekranie (np. Zdrowie) sprawdź że przycisk "Wykres" w ogóle się nie pojawia w
 rzędzie "Dodaj".
 
+## 387. Fix: zaokrąglenie rogów prostokąta na płótnie się rozciągało (2026-10-19)
+
+User po §386 (cały zamówiony "edytor" z §380-386 gotowy): "wgle ja pisałem... chcę dosłownie
+projektor jak Figma... [screeny] podsyłam bo coś zjebałeś że się dziwnie renderuje" + konkretny
+opis buga przy kształtach: "bez zaokrąglone bo tak to się wydłużają i wygląda jak gówno, trzeba
+korektora ten błąd". Trafiony, realny bug w `rectShape` (§357) — DOKŁADNIE ten scenariusz,
+który komentarz w `shapeStyleDefaults.ts` już wcześniej przewidywał ("jeśli user zgłosi że to
+przeszkadza, v2 przejdzie na piksele absolutne").
+
+**Root cause**: `ShapeTile.tsx` rysował `rectShape` w znormalizowanym `viewBox="0 0 100 100"` +
+`preserveAspectRatio="none"`. Dla NIEKWADRATOWEGO boxa (domyślny rozmiar kształtu to 140×90)
+transformacja viewBox→viewport skaluje X i Y RÓŻNYMI współczynnikami. `cornerRadius` (ten sam
+promień w obu osiach w lokalnej przestrzeni) po takiej nierównomiernej skali przestawał być
+kołem — zamieniał się w rozciągniętą, eliptyczną ćwiartkę w rogu. To NIE jest to samo co
+`ellipseShape` (tam rozciągnięcie okrągłego kształtu w elipsę jest GEOMETRYCZNIE POPRAWNE i
+zamierzone) — tu user chce okrągły róg, a dostawał rozciągnięty.
+
+**Fix**: `ShapeTile.tsx`'s `rectShape` dostał nowe, wymagane propy `width`/`height` (realny
+rozmiar instancji, `item.width`/`item.height` przekazane z jedynego miejsca wołającego —
+`ScreenCanvas.tsx`, `item` już było w zasięgu tego closure). `viewBox` dla `rectShape` to teraz
+`0 0 {width} {height}` (realne piksele, nie znormalizowany kwadrat) — `cornerRadius`/
+`strokeWidth` tego typu są od teraz REALNYMI pikselami (nie jednostkami 0-100), klamrowane do
+połowy krótszej krawędzi boxa (po odjęciu obrysu), żeby nie nałożyły się na siebie przy wąskich/
+płaskich kształtach. `ellipseShape`/`lineShape`/`textShape` BEZ ZMIAN (nie miały tego buga).
+
+**Konsekwencja podczas aktywnego resize**: `width`/`height` to ostatnie SKOMITOWANE wymiary ze
+store'u (nie live Reanimated shared value z `CanvasPlacedItem.tsx` — sam box nadal animuje się
+płynnie przez `sizeStyle`/flex 100%, bez `onLayout`). Przez moment aktywnego przeciągania uchwytu
+resize viewBox jest nieznacznie nieaktualny (stary rozmiar) — kosmetyczna, przejściowa
+niedokładność WYŁĄCZNIE podczas samego gestu, znika natychmiast po puszczeniu (`onEnd` →
+`onResize` → store → re-render z poprawnym `viewBox`). Nieporównywalnie lepsze od poprzedniego
+stanu, gdzie każdy niekwadratowy prostokąt był rozciągnięty NA STAŁE, zawsze.
+
+**Testy**: brak nowych (czysta geometria SVG, bez logiki do testowania w `testEnvironment:
+'node'` — `ShapeTile.tsx` to komponent RN, nieimportowany w żadnym teście). `tsc --noEmit`
+czyste, `jest --silent` 113/113 suite, 1463 testów (bez zmiany liczby — brak nowych testów).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → dodaj "Prostokąt" →
+rozciągnij go w szeroki, płaski box (resize uchwytem) → w 🎨 ustaw duże "Zaokrąglenie rogów" →
+sprawdź że rogi wyglądają jak ćwiartki KOŁA (nie rozciągniętej elipsy) niezależnie od tego jak
+bardzo box jest niekwadratowy.
+
+**Status reszty zamówienia usera z tej samej wiadomości** (dużo większe, user: "wiem że to
+ciężkie... tylko się postaraj") — przeniesienie wejścia do edytora z ekranów do Ustawień +
+koncepcja "Projektów" (szablon/pusty canvas + wybór ekranu docelowego, w tym Navbar) + drugi,
+"Dane"-tryb edytora z zagnieżdżonym płótnem dla popupów — W TOKU, osobne, kolejne fazy. Patrz
+NEXT_STEPS.md.
+
+## 388. Wizualny color/gradient picker (nasycenie/jasność + odcień) zamiast gołego HEX (2026-10-19)
+
+Kontynuacja §387 — ta sama wiadomość usera, drugi konkretny wymóg: "jak wybieram customowy
+kolor/gradient to żebym miał paletę taką a nie wpisywał tylko HEX xd i żeby wybrany kolor się
+pokazywał". `ColorSwatchPicker.tsx` (WSPÓLNY komponent dla WSZYSTKICH modali stylu — shapes/
+streak/countdown/notes/dataField/icon/statTile) miał dotąd TYLKO presety + bibliotekę + jeden
+`TextInput` na hex. Jedna zmiana w jednym miejscu naprawia to wszędzie naraz.
+
+**Nowe, pure funkcje w `color.ts`** — `hexToHsv(hex): Hsv`/`hsvToHex(h,s,v): string` (`Hsv =
+{h: 0-360, s: 0-1, v: 0-1}`), testowalne w `testEnvironment: 'node'`, ten sam powód co
+`normalizeHex`. 4 nowe testy w `__tests__/color.test.ts` (kolory podstawowe, biały/czarny/szary
+— `s=0`, round-trip hex→hsv→hex, zawijanie odcienia).
+
+**Nowy `src/components/ui/ColorPickerPanel.tsx`** — panel nasycenie/jasność (kwadrat 150px,
+dwa nałożone `LinearGradient` z `expo-linear-gradient` na solidnym tle czystego odcienia: biały→
+przezroczysty poziomo, przezroczysty→czarny pionowo — klasyczna technika SV-pickera) + pasek
+odcienia (siedem stopów tęczy, `LinearGradient` poziomo) — każdy z własnym `Gesture.Pan()` +
+przeciągalnym kółkiem-uchwytem. `onChange` woła się NA ŻYWO na KAŻDYM `onUpdate` (nie dopiero na
+`onEnd` jak przy przeciąganiu itemów na płótnie w `CanvasPlacedItem.tsx` — tam batching chroni
+przed przeliczaniem POZYCJI WSZYSTKICH sąsiadów co klatkę; tu `onChange` to pojedyncze ustawienie
+jednego stringa, więc żywy feedback na docelowym elemencie — dokładnie to, o co user prosił —
+jest tani i pożądany, zero throttlingu).
+
+**Matematyka w workletcie, konwersja poza nim** — ten sam, świadomy wzorzec co `clampItemX`/
+snap w `CanvasPlacedItem.tsx`: gesty liczą TYLKO surowe h/s/v (arytmetyka, bez wywołań
+zaimportowanych funkcji wewnątrz workletu), oddają przez `runOnJS` do `commit()` (zwykła funkcja
+JS w komponencie), która DOPIERO TAM woła zaimportowany `hsvToHex`.
+
+**`GestureHandlerRootView` WEWNĄTRZ komponentu** — ten panel zawsze ląduje wewnątrz jakiegoś
+natywnego `Modal` (wszystkie modale stylu płótna). Udokumentowany, wcześniej już raz napotkany
+bug (§162, `MoodCheckInModal.tsx`): `Modal` portuje treść do OSOBNEJ natywnej hierarchii, poza
+zasięgiem jedynego `GestureHandlerRootView` w `app/_layout.tsx` — bez WŁASNEGO roota tutaj
+`Gesture.Pan()` panelu nigdy nie dostawałby poprawnie zroutowanych dotknięć, niezależnie od tego
+jak poprawna byłaby reszta kodu. Fix zastosowany z góry (nie czekano na powtórkę buga).
+
+**Integracja w `ColorSwatchPicker.tsx`** — panel renderuje się NAD istniejącym hex `TextInput`
+w bloku "adding" (custom kolor), `value={normalized ?? current}` (pokazuje bieżący kolor itemu
+na starcie), `onChange` jednocześnie synchronizuje `hexInput` (dla pola tekstowego/przycisku
+"Zapisz do biblioteki") I woła `onSelect(hex)` na żywo (aplikuje na REALNY edytowany element,
+nie tylko podgląd w panelu). Hex `TextInput` + przycisk "Zatwierdź" ZOSTAJĄ bez zmian
+zachowania (precyzyjne wpisanie znanej wartości, wciąż wymaga potwierdzenia) — panel to
+DODATKOWY, szybszy sposób wyboru, nie zamiennik.
+
+**Świadomie NIE w tym PR**: gradient (wielostopniowe wypełnienie) dla `shapeStyleDefaults.ts`
+(dziś `fill: string` płaski) — user wspomniał "kolor/gradient" razem, ale budowa custom
+multi-stop gradientu dla kształtów to osobna, większa zmiana modelu danych + renderu SVG
+(`LinearGradient`/`Defs` z `react-native-svg`, wspierane, ale nowy typ pola + UI wyboru stopów),
+odłożona jako osobny punkt w NEXT_STEPS.md — ten PR naprawia TYLKO brak wizualnego pickera dla
+pojedynczego koloru (uniwersalnie, we wszystkich miejscach, które już dziś wybierają kolor).
+
+**Testy**: `tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1467 testów (+4).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny modal stylu na płótnie (np. 🎨 na
+prostokącie) → "+" przy kolorach → sprawdź że pojawia się kwadrat nasycenie/jasność + pasek
+odcienia, przeciągnięcie w kwadracie/pasku NA ŻYWO zmienia kolor elementu pod spodem (nie
+dopiero po puszczeniu), tap (bez przeciągania) w dowolnym miejscu obu pasków też działa,
+wpisanie hex ręcznie nadal wymaga "✓". **Szczególnie ważne: sprawdzić że gest w ogóle łapie
+dotyk** (znany, udokumentowany wcześniej bug klasy "RNGH w Modalu bez własnego roota", §162) —
+jeśli przeciąganie nic nie robi, to dokładnie ten scenariusz.
+
+## 389. Konfigurowalny zakres (ile punktów) serii na "Wykresie" płótna (2026-10-19)
+
+Kontynuacja §386/§388 — pierwszy, najniżej zwisający owoc z NEXT_STEPS.md punktu 6 (user:
+"wybierać ile tych dni, jakie zakresy dniowe/tyg./miesięczne"). `metricSeries(metric, ctx,
+period, n=6, tag?)` w `statWidgets.ts` już PRZYJMOWAŁ `n` od samego początku (§386) — tylko
+nigdzie w UI nie było to wystawione, `StatCanvasTile.tsx` wołał je z zahardkodowanym `6`.
+
+**Zmiana**: `StatTileCanvasStyle` dostał nowe, OPCJONALNE pole `rangeN?: number` (opcjonalne —
+stare, persystowane instancje sprzed tej fazy nie mają tego pola, `?? 6` na miejscu odczytu w
+`StatCanvasTile.tsx` dogania ich dotychczasowe zachowanie, ten sam wzorzec co `CanvasItem.
+zIndex`). `CanvasStatStyleModal.tsx` dostał nowy `Stepper` "Ile punktów na wykresie" (3-24),
+widoczny TYLKO gdy `style.viz === 'wave'` (jedyny wariant, który w ogóle rysuje serię —
+`'number'` woła `metricNumber`, nie `metricSeries`, `rangeN` dla niego nie ma znaczenia).
+
+**Świadomie NIE w tym kroku**: "zaokrąglenie/precyzja" (`fmtStat()` ma własną, zaszytą logikę
+miejsc po przecinku per-metryka, nie konfigurowalną) i "reset" (własność ŹRÓDŁA danych, nie
+stylu kafla) — obie czekają na konkretniejszy przykład od usera, patrz NEXT_STEPS.md punkt 6.
+
+**Testy**: brak nowych (czyste dociągnięcie istniejącego, już przetestowanego parametru
+`metricSeries`'s `n` do UI — sama funkcja nie zmieniła się). `tsc --noEmit` czyste, `jest
+--silent` 113/113 suite, 1467 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: Dashboard → "Wykres" → viz "Wykres fali" → zmień
+"Ile punktów" → sprawdź że linia na mini-wykresie faktycznie ma inną liczbę punktów (np. 3 vs
+24) i się nie psuje przy ekstremach zakresu.
+
+## 390. Wejście do edytora płótna z Ustawień ("Projekty") (2026-10-19)
+
+Pierwsza faza największej, wciąż nieukończonej części zamówienia usera z §387 ("miała być
+możliwość kliknięcia w ustawieniach nie na ekranach, utwórz projekt... później jak bierzesz
+pusty musisz wybrać gdzie to ma być"). Dotąd JEDYNYM sposobem wejścia w edycję płótna danego
+ekranu było odwiedzenie TEGO ekranu i tapnięcie małej odznaki ✏️ w jego nagłówku — user chciał
+scentralizowany punkt startowy w Ustawieniach.
+
+**Nowa sekcja "Edytor płótna" w `app/settings.tsx`** — jeden item `kind: 'custom'` renderujący
+`EditorProjectsList` (nowy lokalny komponent, ten sam wzorzec co inne "list builders" w tym
+pliku, np. `ConfirmedMonths`). Lista `PROJECT_SCREENS` (13 wpisów) — WSZYSTKIE ekrany hostujące
+`ScreenCanvas`/`ScreenCanvasBase` w `app/**`: Dashboard (`dashboard`, `/(tabs)`), Zdrowie
+(`health`), Jedzenie (`food`), Zadania (`tasks`), Finanse (`finances`), Kalendarz-zakładka
+(`stats`, UI tytuł "Kalendarz" mimo nazwy pliku/screenKey — historyczna niespójność, NIE błąd w
+tej fazie, zob. `stats.tsx`), Kalendarz-pełny-widok (`calendar`, osobny ekran, też UI "Kalendarz"
+— rozróżnione w etykiecie listy, żeby nie pomylić dwóch różnych ekranów o tej samej nazwie),
+Nastrój (`mood`), Nawyki (`habits`), Notatki (`notes`), Pupil (`pet`), Liczniki (`counters`),
+Ćwiczenia (`exercises`). Każdy wiersz pokazuje liczbę już postawionych komponentów (`items.
+filter(screenKey===...).length`) albo "Puste płótno".
+
+**"Projekt" = ISTNIEJĄCY mechanizm, NOWY launcher nad nim** — świadoma decyzja: NIE tworzymy
+nowego modelu danych "projektów" z własnym id/nazwą/wieloma-wariantami-per-ekran. "Projekt" to
+po prostu płótno DANEGO `screenKey`, które już istnieje jako dane (`items`/`fullScreenScreens`).
+Ta lista to tylko NOWA, scentralizowana droga DOTARCIA do niego, nie nowa warstwa abstrakcji.
+
+**`pendingAutoEdit` — zero dodatkowego tapnięcia na docelowym ekranie**: nowy, jednorazowy,
+NIEPERSYSTOWANY (nie w `partialize`) sygnał w `canvasComponentsStore.ts`. Tapnięcie wiersza w
+Ustawieniach woła `setPendingAutoEdit(screenKey)` TUŻ PRZED `router.push(route)`. `ScreenCanvasBase`
+(WSPÓLNY dla wszystkich 13 ekranów — `ScreenCanvas.tsx`) dostał nowy `useEffect`, który przy
+zmianie `pendingAutoEdit` sprawdza czy odpowiada WŁASNEMU `screenKey` — jeśli tak, włącza
+`editing` od razu i czyści flagę. Efekt: user wylądował z Ustawień DOKŁADNIE w trybie edycji,
+gotowy stawiać komponenty, bez szukania ✏️. Jedno miejsce zmiany (`ScreenCanvasBase`) obsługuje
+WSZYSTKIE 13 ekranów naraz — zero dotykania plików hostujących.
+
+**Świadomie NIE w tej fazie**:
+- **"Szablon vs pusty canvas"** — oryginalna wiadomość usera chciała wyboru przy tworzeniu.
+  Szablony (gotowe zestawy `CanvasItem[]` do skopiowania) jeszcze NIE ISTNIEJĄ jako dane —
+  dziś "Projekty" zawsze otwiera PUSTY (lub już-zbudowany) stan danego ekranu. Lista w
+  Ustawieniach pokazuje tylko ISTNIEJĄCE ekrany, nie ma kroku wyboru szablonu.
+- **Navbar jako cel** — najtrudniejszy kawałek z oryginalnej wiadomości, user sam: "nie wiem
+  jak to rozwiązać xd". Nie ma go na liście `PROJECT_SCREENS` — `PupilNavbar`/`TabBar` wciąż
+  nie są częścią systemu płótna (§378). Osobna, dalsza faza.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 2 nowe (`pendingAutoEdit` domyślnie
+`null`, `setPendingAutoEdit` ustawia/czyści). `tsc --noEmit` czyste, `jest --silent` 113/113
+suite, 1469 testów (+2).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → "Edytor płótna" → "Projekty" → tapnij
+dowolny wiersz (np. "Zdrowie") → sprawdź że appka ląduje na ekranie Zdrowie Z JUŻ WŁĄCZONYM
+trybem edycji płótna (nie trzeba dodatkowo tapać ✏️). Potem wróć do Ustawień i wejdź na INNY
+ekran — sprawdź że poprzedni `pendingAutoEdit` nie "odpala się" przypadkowo gdzie indziej.
+
+## 391. Tryb "Dane" edytora — popup z zagnieżdżonym płótnem (2026-10-19)
+
+Druga faza z §387 ("drugi tryb to dane... po kliknięciu co się ma wyświetlać, jak ekran popup
+to dostajesz drugie canvas obok z tym do zaprojektowania co ma się wyświetlić i muszę mieć
+możliwość kliknięcia danych [i] wyświetlenia ich w dowolny sposób"). PEŁNY, działający kawałek
+od końca do końca (zgodnie z CLAUDE.md #7 — żadna połowa funkcji, żaden dead-end): można
+OZNACZYĆ dowolny item jako trigger, ZAPROJEKTOWAĆ co pokazuje, i ZOBACZYĆ to na żywym ekranie —
+wszystkie trzy kawałki w JEDNEJ fazie, nie osobno.
+
+**`CanvasItem.onTapAction?: 'none' | 'openPopup'`** (`canvasComponentsStore.ts`) — nowe,
+opcjonalne pole, UNIWERSALNE dla WSZYSTKICH typów komponentów (łącznie z kształtami/ikonami,
+które dotąd ignorowały tap). `undefined`/`'none'` = dotychczasowe zachowanie (nawigacja/picker
+per typ) — zero zmiany dla nikogo kto tego nie ustawi.
+
+**`screenKey = 'popup:' + item.id`** — ŚWIADOMA decyzja: zero nowego modelu danych. Popup to
+po prostu KOLEJNA, niezależna "podprzestrzeń" w TYM SAMYM `canvasComponentsStore.ts` — te same
+`items`/`addItem`/`updateItem`/grupowanie/warstwy/style, zero duplikacji mechanizmu.
+
+**`ScreenCanvasBase` dostał nowy, opcjonalny `viewOnly?: boolean`** (`ScreenCanvas.tsx`,
+przekazywany też przez cienki wrapper `ScreenCanvas`) — gdy `true`: chowa CAŁE chrome (nagłówek,
+odznaki pełnego ekranu/edycji) i ignoruje `pendingAutoEdit` (§390). Bez przycisku do włączenia
+`editing` (jedyne dwa miejsca, które to robią, są wyłączone w tej gałęzi) `editing` zostaje
+`false` na zawsze — CAŁA reszta renderowania itemów (switch po `componentType`) działa
+NIEZMIENIONA w gałęzi "nie-edycja", zero duplikacji logiki renderowania per-typ dla popupu.
+
+**Nowy `CanvasPopupModal.tsx`** — jedna prezentacja, dwa tryby:
+- `mode: 'view'` — tap na ŻYWYM ekranie (poza edycją, PRIORYTET nad całą resztą `onTap` w
+  `ScreenCanvas.tsx` — działa nawet dla kształtów/ikon). `<ScreenCanvas viewOnly />` — czysta
+  treść.
+- `mode: 'edit'` — przycisk "Edytuj zawartość popupu" w NOWEJ sekcji panelu właściwości
+  (`CanvasPropertiesModal.tsx` — segmentowany wybór "Zwykłe"/"Otwórz popup" + ten przycisk, gdy
+  wybrane "Otwórz popup"; uniwersalne, stąd w panelu właściwości, nie w modalu stylu per-typ).
+  Zwykłe `<ScreenCanvas>` BEZ `viewOnly` — PEŁNY edytor, zero nowego kodu.
+
+**`GestureHandlerRootView` wewnątrz `CanvasPopupModal.tsx`** — ten sam, udokumentowany fix co
+§388/§162: `Gesture.Pan()` (przeciąganie/resize w `mode: 'edit'`) wewnątrz zwykłego `Modal`
+wymaga własnego roota.
+
+**Świadomie NIE w tej fazie**: zagnieżdżanie popup-w-popupie nie jest explicite zbudowane, ale
+EMERGENTNIE działa (każda `ScreenCanvasBase` ma własny, lokalny stan `popup`) — nieprzetestowane
+na urządzeniu, niska priorytetowość (user nie prosił o to explicite).
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 2 nowe (`onTapAction` domyślnie
+`undefined`, `updateItem` ustawia bez ruszania innych pól). `tsc --noEmit` czyste, `jest
+--silent` 113/113 suite, 1471 testów (+2).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → dodaj kafel (np. kształt)
+→ panel właściwości (ikona ⚙️/slider) → "Po tapnięciu" → "Otwórz popup" → "Edytuj zawartość
+popupu" → zaprojektuj coś wewnątrz (np. kafel serii) → zamknij → WYJDŹ Z EDYCJI całego ekranu
+→ tapnij ten kafel na ŻYWO → sprawdź że pokazuje się popup z zaprojektowaną treścią, BEZ chrome
+edytora (bez przycisku "Dodaj"/pencil), i że zamyka się poprawnie (X/tap poza sheet).
+
+## 392. Navbar Pupila jako cel projektowania — "pełna przebudowa jak Figma" (2026-10-19)
+
+Ostatni, najtrudniejszy kawałek z §387/§380 — user sam: "jak projektujesz navbar to nie wiem
+jak to rozwiązać xd". Zapytany `AskUserQuestion` o 3 opcje (tylko styl / dekoracje nad
+navbarem / pełna przebudowa), **wybrał pełną przebudowę** — najbliższą oryginalnej wizji, ale
+najwyższego ryzyka: `PupilNavbar.tsx` to PRAWDZIWA nawigacja (4 zakładki Pupila), nie tylko
+dekoracja — zepsucie jej zostawiłoby usera bez sposobu przełączania się między Pupilem/Bossami/
+Sklepem/Questami.
+
+**Projekt skoncentrowany na BEZPIECZEŃSTWIE PRZEZ KONSTRUKCJĘ, nie przez walidację w jednym
+miejscu**:
+1. **Zamknięta lista opcji** — nowy `CanvasComponentType` `'navTab'` podpina się WYŁĄCZNIE do
+   jednego z 4 STAŁYCH wpisów `PUPIL_NAV_TABS` (nowy `src/data/pupilNavTabs.ts`, wydzielone z
+   `PupilNavbar.tsx`'s dawnego prywatnego `TABS` — jedno źródło prawdy, zero zmiany
+   zachowania). Fizycznie NIE DA SIĘ skonfigurować przycisku prowadzącego do nieistniejącej/
+   złej trasy — to nie "walidacja", to brak możliwości błędu.
+2. **Osobna, persystowana flaga `customNavbarEnabled`** (`canvasComponentsStore.ts`) — ŚWIADOMIE
+   NIE reużyta `fullScreenScreens` (inny byt, inne miejsce odczytu, nazwa dzieląca znaczenie
+   groziłaby pomyłką w DWÓCH miejscach naraz). Samo `true` NIE WYSTARCZA.
+3. **PODWÓJNA walidacja kompletności** — `app/navbar-editor.tsx` (edycja) ORAZ `PupilNavbar.tsx`
+   (żywy render) OBA, NIEZALEŻNIE, sprawdzają że wszystkie 4 wymagane taby są podpięte PRZED
+   użyciem custom-renderu. `PupilNavbar.tsx` to OSTATNIA linia obrony — nawet gdyby
+   `customNavbarEnabled=true` z jakiegoś powodu (stary stan AsyncStorage, przyszły bug gdzie
+   indziej), żywy navbar i tak sam weryfikuje i BEZPIECZNIE WRACA do domyślnego, zaszytego na
+   sztywno JSX, jeśli walidacja nie przejdzie — nigdy nie ufa samej fladze.
+
+**Nowy `app/navbar-editor.tsx`** — dedykowany ekran (NIE jeden z 4 ekranów Pupila —
+`screenKey='navbar'` nie "należy" do żadnego z nich), hostujący ZWYKŁE `<ScreenCanvas
+screenKey="navbar">` — pełny istniejący edytor, zero nowego kodu renderowania dla SAMEGO
+budowania. Dodany do Ustawień → "Edytor płótna" → "Projekty" jako 14. wpis (`PROJECT_SCREENS`),
+`pendingAutoEdit` (§390) działa identycznie jak dla reszty. Pokazuje NA ŻYWO czy układ jest
+kompletny (lista brakujących tabów) i przełącznik "Użyj własnego navbaru" — **nie da się go
+WŁĄCZYĆ, gdy niekompletny** (próba pokazuje toast z listą brakujących), ale MOŻNA zawsze
+wyłączyć, nawet po fakcie usunięcia itemu.
+
+**Dispatch w `ScreenCanvas.tsx`** (ten sam, ustalony wzorzec co każdy inny typ) — `isNavTab`,
+`navTabOptions` (z `PUPIL_NAV_TABS`), nowy branch w `MetricPickerModal` dispatchu (ikona
+`Compass`, tytuł "Wybierz zakładkę"), `describeItem`, i renderTile → nowy `NavTabTile.tsx`
+(placeholder "?" gdy niepodpięty, inaczej ikona taba). Przycisk "Przycisk nawigacji" w
+toolbarze WYŁĄCZNIE gdy `screenKey === 'navbar'` (CLAUDE.md #7, nie pokazuj martwego przycisku
+gdzie indziej).
+
+**Żywy render — `CustomPupilNavbarContent`, NOWY, BESPOKE komponent w `PupilNavbar.tsx`, NIE
+reużywający `ScreenCanvas.tsx`/`viewOnly`** (w przeciwieństwie do popupów, §391) — bo potrzebuje
+WŁASNEGO zachowania tapnięcia: `navTab` → `router.replace()` do realnej trasy, nie
+metric-picker. Renderuje itemy `screenKey='navbar'` w ich zapisanych x/y/w/h, dysponując
+`ShapeTile`/`IconTile`/`NavTabTile` (te same komponenty co editor, inny kontekst — bez gestów/
+chrome). Inne typy (gdyby jakoś się tu znalazły) — defensywnie `null`, nie crash.
+
+**`NavTabStyle` — pułapka TS znaleziona PRZED wysłaniem**: pierwsza wersja `Record<string,
+never>` (pusty obiekt bez pól) dodała niejawny `[x: string]: never` index signature, który
+łamał ISTNIEJĄCE spready gdzie indziej w pliku operujące na CAŁEJ unii `CanvasItem['style']`
+(`{ ...styleItem.style, tierColorOverrides: next }` w obsłudze `CanvasStreakStyleModal`) — TS
+rozdziela spread po unii, a `never`-indeksowany człon wymuszał `never` na NOWYM polu w INNYCH,
+niepowiązanych miejscach. Fix: zwykły, pusty `interface NavTabStyle {}` (bez niejawnego index
+signature) — złapane przez `tsc --noEmit` PRZED commitem, nie na urządzeniu.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 3 nowe (`navTab` domyślny styl/rozmiar/
+bindingKey=null, `customNavbarEnabled` domyślnie `false`, `setCustomNavbarEnabled` ustawia).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1474 testów (+3). **Logika
+walidacji/custom-renderu w `PupilNavbar.tsx`/`navbar-editor.tsx` NIE jest testowana w jest**
+(komponenty RN, `testEnvironment: 'node'`) — stąd priorytet testu na urządzeniu poniżej jest
+WYJĄTKOWO wysoki, wyższy niż zwykle w tej serii.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY (najwyższy w całej tej serii)**:
+1. Ustawienia → "Edytor płótna" → "Navbar Pupila" → dodaj WSZYSTKIE 4 "Przycisk nawigacji",
+   podepnij każdy do innego tabu → włącz "Użyj własnego navbaru" → wróć/przejdź na którykolwiek
+   z 4 ekranów Pupila (`/pet`, `/bosses`, `/pet-shop`, `/pet-quests`) → **sprawdź że navigacja
+   WCIĄŻ DZIAŁA** (wszystkie 4 przyciski prowadzą do właściwych ekranów, podświetlenie aktywnego
+   tabu działa).
+2. **Scenariusz bezpieczeństwa (NAJWAŻNIEJSZY)**: z włączonym custom navbarem, wróć do edytora
+   i USUŃ jeden z 4 przycisków (albo odepnij podpięcie) → natychmiast sprawdź na żywym ekranie
+   Pupila, że navbar **automatycznie wrócił do domyślnego, zaszytego wyglądu** (NIE zostajesz z
+   3 przyciskami/bez nawigacji).
+3. Dodaj też dekoracje (kształt/ikonę) do navbaru — sprawdź że się wyświetlają, ale NIE są
+   klikalne/nie przeszkadzają w tapnięciu przycisków nawigacji pod/nad nimi.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

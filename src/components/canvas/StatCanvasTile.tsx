@@ -59,7 +59,7 @@ export function StatCanvasTile({ metric, style, statCtx, accentColor, onPress, s
           {!!uChip && <Text style={[st.unit, { color: accentColor }]}>{uChip}</Text>}
         </View>
         {style.viz === 'wave' ? (() => {
-          const { values } = metricSeries(metric!, statCtx, period, 6);
+          const { values } = metricSeries(metric!, statCtx, period, style.rangeN ?? 6);
           return values.some(v => v !== 0)
             ? <WaveChart data={values} color={accentColor} />
             : <Text style={[st.emptyTxt, { color: c.text.muted }]}>Brak danych</Text>;
