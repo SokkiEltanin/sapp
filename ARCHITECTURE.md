@@ -21063,6 +21063,33 @@ NIE otwiera edytora (to osobna akcja od tapnięcia całego wiersza) → potwierd
 ekran → sprawdź że faktycznie pokazuje tryb pełnoekranowy. Włącz edycję (z Ustawień) →
 sprawdź że "Gotowe" poprawnie wychodzi z edycji na żywym ekranie.
 
+## 397. Konfigurowalne zaokrąglenie (miejsca po przecinku) na "Wykresie" (2026-10-19)
+
+Po zamknięciu zamówienia KWGT i usunięciu starych odznak (§396), user: "narazie dopieczmy ten
+edytor do końca" (w odpowiedzi na pytanie o osobny temat — widget pulpitu). Dociągnięcie
+NEXT_STEPS.md punktu 6 ("jakie zaokrąglenia danych") dla `viz: 'number'` typu "Wykres" — drugiej
+(po §389's `rangeN` dla `viz: 'wave'`) z trzech zaplanowanych tam podczęści.
+
+**`StatTileCanvasStyle.decimals?: number`** — opcjonalne. Gdy ustawione, `StatCanvasTile.tsx`
+pokazuje `value.toFixed(decimals)` ZAMIAST `fmtStat()`'s zaszytej na sztywno logiki per-metryka
+— jednostka nie gubi się (wciąż widoczna w nagłówku kafla, `unitChip`). `fmtStat()` sam
+NIETKNIĘTY (zero ryzyka dla jego innych wołających, np. dashboardowy `StatTile.tsx`).
+
+**Osobny przełącznik Automatyczne/Własne w `CanvasStatStyleModal.tsx`** (ten sam wzorzec co
+`GradientFillEditor.tsx`'s Płasko/Gradient) — ŚWIADOMIE nie goły Stepper startujący na "0":
+`decimals === undefined` (stare/nietknięte instancje) znaczy "użyj `fmtStat()` jak dotąd", NIE
+"0 miejsc po przecinku" (fmtStat dla kg/h już dziś pokazuje 1 miejsce) — Stepper widoczny od
+razu na "0" sugerowałby fałszywie aktualny stan. Przełączenie na "Automatyczne" woła
+`onChange({ decimals: undefined })` — po `JSON.stringify` (persist) pole po prostu znika z
+obiektu, identyczne jak nigdy nieustawione.
+
+**Testy**: brak nowych (czysty `.toFixed()`, nie warte osobnej pure-funkcji do testowania).
+`tsc --noEmit` czyste, `jest --silent` 114/114 suite, 1481 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — NISKI**: Dashboard → "Wykres" → viz "Liczba" → 🎨 →
+"Zaokrąglenie" → "Własne" → zmień miejsca po przecinku → sprawdź że liczba na kaflu faktycznie
+pokazuje ustawioną precyzję, "Automatyczne" wraca do dotychczasowego formatowania.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

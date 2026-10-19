@@ -131,11 +131,10 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
      `metricSeries`. Checklist w ARCHITECTURE.md §389. Dla `dataField`/innych typów bez periodu
      — NIE zrobione, trzeba sprawdzić per-pole w `useDataFieldRegistry()`, czy dane źródłowe to
      w ogóle wspierają (żaden konkretny przykład od usera jeszcze nie padł).
-   - **Zaokrąglenie (precyzja wyświetlania)** — dziś `fmtStat()` (`statWidgets.ts`) ma WŁASNĄ,
-     zaszytą logikę liczby miejsc po przecinku per metryka (nie konfigurowalną). Żeby user mógł
-     to zmienić per-instancja na płótnie, trzeba dodać pole (np. `decimals?: number`) do
-     `StatTileCanvasStyle` + Stepper w modalu + respektować je w `StatCanvasTile.tsx` (override
-     domyślnego formatowania `fmtStat`).
+   - ✅ **ZROBIONE (§397) — zaokrąglenie (precyzja wyświetlania)** dla `viz: 'number'`:
+     `StatTileCanvasStyle.decimals?: number` + przełącznik Automatyczne/Własne +
+     Stepper w `CanvasStatStyleModal.tsx`, respektowane w `StatCanvasTile.tsx` (override
+     `fmtStat`, jednostka zostaje widoczna w nagłówku). Checklist w ARCHITECTURE.md §397.
    - **Źródło ("zkąd")** — już istnieje jako wybór metryki/pola w `MetricPickerModal` (binding).
      Prawdopodobnie user ma na myśli coś INNEGO (np. "z którego licznika/nawyku", gdy jeden typ
      danych ma wiele instancji) — TO JUŻ DZIAŁA przez istniejący picker, chyba że user doda

@@ -65,7 +65,11 @@ export function StatCanvasTile({ metric, style, statCtx, accentColor, onPress, s
             : <Text style={[st.emptyTxt, { color: c.text.muted }]}>Brak danych</Text>;
         })() : (() => {
           const { value, unit } = metricNumber(metric!, statCtx, period);
-          return <Text style={[st.number, { color: c.text.primary }]} numberOfLines={1}>{fmtStat(value, unit)}</Text>;
+          // Zaokrąglenie (§397) — gdy user ustawił `decimals`, pokaż SAMĄ liczbę z tą precyzją
+          // zamiast `fmtStat()`'s zaszytej na sztywno logiki per-metryka. Jednostka nie gubi
+          // się — wciąż widoczna w nagłówku powyżej (`uChip`).
+          const text = style.decimals != null ? value.toFixed(style.decimals) : fmtStat(value, unit);
+          return <Text style={[st.number, { color: c.text.primary }]} numberOfLines={1}>{text}</Text>;
         })()}
       </View>
     </TouchableOpacity>
