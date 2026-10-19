@@ -256,6 +256,19 @@ interface CanvasComponentsState {
   // tego, co faktycznie rozwiązuje problem: "lista + do góry/do dołu" pokazuje PEŁNY porządek
   // warstw, czego "na wierzch"/"na spód" nie dawało).
   moveLayer: (id: string, direction: 'up' | 'down') => void;
+  // Draft/Symulator/Wdrożenie (Faza §398, 2026-10-19) — user: "miałem mieć jak w FIGMIE
+  // odzielne OKNO EDYTORA... projektuje tam od zera... potem w symulatorze testuje na danych
+  // prawdziwych a dopiero jak działa WDROŻENIE ROBIĘ". Projekt roboczy żyje pod
+  // `screenKey = 'draft:' + target` — ten sam trik namespacingu co `popup:<id>` (§391)/`navbar`
+  // (§392), ZERO zmian w modelu `CanvasItem`. `deployDraft(target)` KOPIUJE (nie przenosi)
+  // `draft:<target>` → `<target>` z NOWYMI id (draft zostaje nietknięty, gotowy do dalszej
+  // iteracji/ponownego wdrożenia), a PRZED nadpisaniem żywego ekranu robi snapshot jego
+  // BIEŻĄCEJ zawartości do `backup:<target>` (nadpisując poprzedni backup) — czysta siatka
+  // bezpieczeństwa w samych danych, bez UI przywracania w tej fazie (patrz NEXT_STEPS.md).
+  // `groupId` kopiowany 1:1 (nie regenerowany) — bezpieczne, bo grupowanie jest zawsze
+  // filtrowane przez PARĘ (screenKey, groupId) wszędzie (`moveGroupBy`/`resizeGroupBy`/
+  // `groupItems` wyżej), a wdrożone itemy dostają WSZYSTKIE ten sam, nowy `screenKey = target`.
+  deployDraft: (target: string) => void;
 }
 
 export const useCanvasComponentsStore = create<CanvasComponentsState>()(
@@ -416,6 +429,24 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         zById.set(target.id, otherZ);
         zById.set(otherId, targetZ);
         return { items: s.items.map(i => zById.has(i.id) ? { ...i, zIndex: zById.get(i.id)! } : i) };
+      }),
+
+      deployDraft: (target) => set((s) => {
+        const draftKey = `draft:${target}`;
+        const backupKey = `backup:${target}`;
+        const stamp = Date.now();
+        const liveItems = s.items.filter(i => i.screenKey === target);
+        const draftItems = s.items.filter(i => i.screenKey === draftKey);
+        const backedUp: CanvasItem[] = liveItems.map((i, idx) => ({
+          ...i, id: `canvas:${stamp}-bak-${idx}-${Math.random().toString(36).slice(2, 8)}`, screenKey: backupKey,
+        }));
+        const deployed: CanvasItem[] = draftItems.map((i, idx) => ({
+          ...i, id: `canvas:${stamp}-dep-${idx}-${Math.random().toString(36).slice(2, 8)}`, screenKey: target,
+        }));
+        // Usuń starą zawartość `target` i stary `backupKey` (nadpisywany) — `draftKey` NIGDY
+        // nie jest filtrowany tutaj, więc oryginał projektu roboczego zostaje nietknięty.
+        const rest = s.items.filter(i => i.screenKey !== target && i.screenKey !== backupKey);
+        return { items: [...rest, ...backedUp, ...deployed] };
       }),
     }),
     {

@@ -20,6 +20,14 @@ export interface StatTileCanvasStyle {
   // wartość, którą miały wszystkie instancje PRZED tą fazą. Nieużywane dla `viz: 'number'`
   // (ta wariacja nie rysuje serii, tylko jedną wartość z `metricNumber`).
   rangeN?: number;
+  // Zaokrąglenie/precyzja (Faza §397, 2026-10-19, NEXT_STEPS.md punkt 6 — "jakie zaokrąglenia
+  // danych") — OPCJONALNE (stare instancje bez tego pola = dotychczasowe zachowanie,
+  // `fmtStat()`'s wbudowana logika per-metryka). Gdy ustawione, `StatCanvasTile.tsx` dla
+  // `viz: 'number'` pokazuje `value.toFixed(decimals)` ZAMIAST `fmtStat()` — jednostka wciąż
+  // widoczna w nagłówku (`unitChip`), więc nic się nie gubi, tylko samą liczbę user kontroluje
+  // dokładniej niż zaszyta na sztywno logika `fmtStat`. Nieużywane dla `viz: 'wave'` (ta
+  // wariacja nie rysuje liczby jako tekstu).
+  decimals?: number;
 }
 
 export const DEFAULT_STAT_TILE_STYLE: StatTileCanvasStyle = { period: 'month', viz: 'number' };

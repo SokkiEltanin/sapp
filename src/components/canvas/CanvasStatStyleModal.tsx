@@ -63,6 +63,37 @@ export default function CanvasStatStyleModal({ visible, style, onChange, onClose
                   onChange={v => onChange({ rangeN: v })} />
               </View>
             )}
+            {style.viz === 'number' && (() => {
+              // Automatyczne/Własne (§397) — ŚWIADOMIE osobny przełącznik, nie goły Stepper
+              // domyślny na "0": `style.decimals` bywa `undefined` (stare/nietknięte instancje),
+              // co dziś znaczy "użyj fmtStat() jak dotąd" (NIE "0 miejsc po przecinku" — fmtStat
+              // dla kg/h już dziś pokazuje 1 miejsce). Pokazanie Steppera od razu na wartości "0"
+              // sugerowałoby fałszywie, że to AKTUALNY stan, mimo że realnie renderuje się inaczej
+              // (przez fmtStat) do momentu PIERWSZEGO dotknięcia. Ten sam wzorzec dwóch trybów co
+              // `GradientFillEditor.tsx`'s Płasko/Gradient.
+              const custom = style.decimals != null;
+              return (
+                <View style={{ gap: spacing[2] }}>
+                  <Text style={s.sectionLabel}>Zaokrąglenie</Text>
+                  <View style={s.segmented}>
+                    <TouchableOpacity onPress={() => { if (custom) { haptic.tap(); onChange({ decimals: undefined }); } }}
+                      style={[s.segBtn, { flex: 1, alignItems: 'center' }, !custom && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                      <Text style={[s.segTxt, !custom && { color: c.accent.blue }]}>Automatyczne</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { if (!custom) { haptic.tap(); onChange({ decimals: 0 }); } }}
+                      style={[s.segBtn, { flex: 1, alignItems: 'center' }, custom && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                      <Text style={[s.segTxt, custom && { color: c.accent.blue }]}>Własne</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {custom && (
+                    <View style={s.innerCard}>
+                      <Stepper label="Miejsca po przecinku" value={style.decimals ?? 0} min={0} max={3} step={1}
+                        onChange={v => onChange({ decimals: v })} />
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
             <Text style={s.hint}>Tapnij kafel na płótnie, żeby wybrać/zmienić metrykę.</Text>
           </ScrollView>
         </Pressable>
