@@ -16,34 +16,36 @@ testu WYSOKI** — po tej poprawce porównaj jeszcze raz edytor vs prawdziwy ekr
 KSZTAŁT ścieżki (nie tylko grubość/rozmiar węzłów) wciąż wygląda wyraźnie inaczej, zgłoś to —
 będzie kolejny trop do szukania. Checklist w ARCHITECTURE.md §379.
 
-## 🆕 "Jeden edytor jak Figma" — W TRAKCIE, buduję fazami bez przerywania (2026-10-18, §380-381+)
+## 🆕🆕 "Jeden edytor jak Figma" — rollout trybu pełnoekranowego ZAKOŃCZONY, zostaje "wykresy" (2026-10-18/19, §380-385)
 
 User potwierdził kierunek z §380: "rób dopóki nie skończysz całego edytora... budowanie
-kafelków, wykresów, robienie presetów itp itd. Czekam." — kontynuuję BEZ dalszych pytań, faza
-po fazie, każda osobnym PR-em przez pełny rytuał (tsc/jest/ARCHITECTURE/commit/PR/CI/merge).
+kafelków, wykresów, robienie presetów itp itd. Czekam." — zbudowane fazami bez przerywania,
+każda osobnym PR-em przez pełny rytuał.
 
-**Zrobione**:
+**Zrobione — WSZYSTKIE 14 ekranów z płótnem mają teraz tryb pełnoekranowy**:
 - §380 (ocena): mapa bossów zostaje OSOBNYM narzędziem (unikalna ścieżka-connector), nie
   wpychana w generyczny system kafli — "jeden edytor dla wszystkiego" = tryb pełnoekranowy na
   już istniejącym płótnie.
-- §381 (Faza 1): infrastruktura trybu pełnoekranowego (`canvasComponentsStore`'s
-  `fullScreenScreens`/`setFullScreen`, nowa odznaka w `ScreenCanvas.tsx`'s nagłówku) +
-  pilotażowy ekran **Zdrowie** (userowy własny przykład) w pełni działający.
-- §382 (Faza 2a): to samo podłączone do **Notatek, Nawyków, Pupila, Liczników** (4 kolejne
-  ekrany, mechaniczne, identyczny wzorzec).
-- §383 (Faza 2b): to samo podłączone do **Kalendarza (stats.tsx), Jedzenia, Zadań, Finansów,
-  Ćwiczeń** (5 kolejnych) — PRZY OKAZJI samo-znaleziony i naprawiony fix nagłówka z §381
-  (Zdrowie: ujemne marginesy bez niczego do skasowania wypychały `ScreenHeader` pod belkę
-  statusu w pełnym ekranie — zamienione na zwykły `paddingTop: insets.top`).
-- §384 (Faza 2c): **`calendar.tsx`** (właściwy plik kalendarza, 3 montowania `ScreenCanvas`,
-  jeden wspólny `screenKey` — jeden branch wystarczył) i **`mood.tsx`**. **Wszystkie 13
-  ekranów-"liści" appki mają teraz tryb pełnoekranowy.**
+- §381 (Faza 1): infrastruktura (`canvasComponentsStore`'s `fullScreenScreens`/
+  `setFullScreen`, nowa odznaka w `ScreenCanvas.tsx`'s nagłówku) + pilot **Zdrowie**.
+- §382 (Faza 2a): **Notatki, Nawyki, Pupil, Liczniki**.
+- §383 (Faza 2b): **Kalendarz (stats.tsx), Jedzenie, Zadania, Finanse, Ćwiczenia** + samo-
+  znaleziony fix nagłówka z §381 (ujemne marginesy wypychały `ScreenHeader` pod belkę statusu).
+- §384 (Faza 2c): **`calendar.tsx`** (właściwy, 3 montowania/1 `screenKey`) i **`mood.tsx`**.
+- §385 (Faza 3, OSTATNIA): **główny dashboard** (`(tabs)/index.tsx`) — ten sam wzorzec, PLUS
+  realny zysk wydajnościowy (ogromny, niepamiętany `nodes`-blok w ogóle się nie liczy w trybie
+  pełnoekranowym, nie tylko się nie renderuje).
 
-**Zostaje (ostatnia faza tego kierunku, w trakcie budowania)**:
-- **`(tabs)/index.tsx`** (główny dashboard, `ScreenCanvasBase` — NAJWIĘKSZY i najbardziej czuły
-  na wydajność ekran appki, osobna, ostrożniejsza faza — JEDYNY pozostały ekran bez trybu
-  pełnoekranowego).
-- Po tym: nowy typ komponentu "wykres" (user explicite wymienił), jeszcze nie zaczęty.
+**Priorytet testu na urządzeniu — NAJWAŻNIEJSZY w tej serii**: dashboard → "Twoje komponenty" →
+odznaka pełnego ekranu → potwierdź → sprawdź że appka się nie crashuje i że wyłączenie
+przywraca dashboard DOKŁADNIE jak był. Checklist w ARCHITECTURE.md §385.
+
+**Zostaje z oryginalnego §380 zamówienia**:
+- Nowy typ komponentu "wykres" (user explicite wymienił) — jeszcze NIE zaczęty, osobna, większa
+  praca (wybór stylu/biblioteki wykresu, nowy `componentType` w `canvasComponentsStore.ts`,
+  modal stylu, dane do wykresu z istniejącego `useDataFieldRegistry()`/innych źródeł appki).
+- "Budowanie kafelków" i "robienie presetów" — JUŻ istniały przed tym kierunkiem (system
+  kopiowania komponentów §341-377, `StylePresetBar` §370/§377), nic dodatkowego nie wymagały.
 - Nowy typ komponentu "wykres" (user explicite wymienił "wykresów") — NIE zbudowany, większa,
   osobna praca (wybór stylu/biblioteki wykresu, nowy `componentType`).
 - "robienie presetów" — JUŻ istnieje (`StylePresetBar`, §370/§377), nic dodatkowego nie
