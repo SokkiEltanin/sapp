@@ -94,19 +94,16 @@ ich w dowolny sposób. Wzoruje się na Canvie."
    §378). Potrzebny będzie nowy `screenKey='navbar'` + miejsce w `PupilNavbar.tsx`/`TabBar.tsx`,
    które renderuje płótno TYLKO gdy jest ono "włączone" dla navbaru — czeka na własną fazę
    projektową (jak go wyrenderować jako pasek na dole, nie pełny ekran).
-5. **Tryb "Dane" edytora — popup z drugim, zagnieżdżonym płótnem** — NOWY koncept, nie istnieje
-   dziś NIC podobnego. Robocze rozumienie (do potwierdzenia z userem, zapytane 2026-10-19,
-   odpowiedź jeszcze nie przyszła): klikalny element (kafel/kontener) dostaje nowe pole typu
-   `onTapAction: 'none' | 'openPopup'` (NIE to samo co dzisiejsze `groupId` — grupowanie dziś
-   to tylko wspólne przesuwanie/resize kilku zaznaczonych itemów, zero koncepcji "kliknięcia").
-   Gdy `onTapAction='openPopup'`, edytor dostaje nowy, osobny `screenKey` (np.
-   `popup:<itemId>`) z WŁASNYM, w pełni niezależnym płótnem (ten sam `CanvasItem`/
-   `ScreenCanvas` mechanizm, nowa instancja), które się otwiera jako modal/popup na żywym
-   ekranie po tapnięciu triggera. Wewnątrz tego popup-płótna user może stawiać DOWOLNE typy
-   kafli z DOWOLNYM podpięciem danych (ten sam generyczny `bindingKey`/`MetricPickerModal`
-   mechanizm co dziś, tylko bez ograniczenia do jednego ekranu) — "wyświetlenie ich w dowolny
-   sposób" sugeruje że user chce PEŁNEJ swobody kompozycji, nie gotowego szablonu detail-view.
-   **TO JEST DUŻA, WIELOFAZOWA RZECZ** — nie próbować zrobić jednym PR-em.
+5. ✅ **ZROBIONE (§391) — tryb "Dane" edytora — popup z drugim, zagnieżdżonym płótnem**.
+   `CanvasItem.onTapAction?: 'none' | 'openPopup'` (uniwersalne dla wszystkich typów) +
+   `screenKey = 'popup:' + itemId` (ta sama "podprzestrzeń" w `canvasComponentsStore.ts`, zero
+   nowego modelu danych) + `CanvasPopupModal.tsx` (dwa tryby: `view` — tap na żywym ekranie,
+   czysta treść; `edit` — przycisk w panelu właściwości, pełny edytor). Pełny, działający
+   kawałek od triggera przez projektowanie do wyświetlenia na żywo — nic nie zostało odłożone
+   w połowie. Checklist w ARCHITECTURE.md §391. **Priorytet testu WYSOKI.**
+   **NIE zrobione — zagnieżdżanie popup-w-popupie**: emergentnie powinno działać (każda
+   `ScreenCanvasBase` ma własny, lokalny stan popupu), ale nieprzetestowane na urządzeniu i user
+   nie prosił o to explicite — niska priorytetowość.
 
 **Doprecyzowanie usera (2026-10-19, kolejna wiadomość tego samego dnia)** — odpowiedź na pytanie
 o "grupy" wyżej, POTWIERDZONE: tak, nowy koncept (trigger→popup), ale user doprecyzował że to

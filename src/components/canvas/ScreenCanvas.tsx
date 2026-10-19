@@ -36,6 +36,7 @@ import { DataFieldTile } from './DataFieldTile';
 import CanvasDataFieldStyleModal from './CanvasDataFieldStyleModal';
 import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataFieldTileStyleDefaults';
 import CanvasPropertiesModal from './CanvasPropertiesModal';
+import CanvasPopupModal from './CanvasPopupModal';
 import CanvasLayersModal, { LayerRow } from './CanvasLayersModal';
 import { usePressGuard } from '@/hooks/usePressGuard';
 import { IconTile } from './IconTile';
@@ -98,7 +99,7 @@ const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą inst
 // `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE już wyliczone dane (`streakWall` 1:1 jako
 // `allStreakItems` — zero dodatkowego kodu, `counters`/`allNotes` już w pamięci dla pozostałych
 // dwóch — tani dodatkowy `.filter()`, NIE drugi fetch).
-export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor, statCtx }: {
+export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor, statCtx, viewOnly }: {
   screenKey: string;
   title?: string;
   allStreakItems: StreakItem[];
@@ -113,6 +114,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // ogóle się nie pokazuje w trybie edycji (patrz niżej), więc user nie trafia na martwy,
   // niedziałający przycisk.
   statCtx?: StatCtx;
+  // Tryb "Dane"/popup (§391) — `CanvasPopupModal.tsx` renderuje TĘ SAMĄ `ScreenCanvasBase` dla
+  // podglądu popupu na żywym ekranie. `true` = czysta treść, BEZ chrome (nagłówek/odznaki
+  // pełnego ekranu/edycji w ogóle się nie renderują, `pendingAutoEdit` jest ignorowane) —
+  // `editing` nie ma jak zostać włączone (jedyne dwa miejsca, które to robią, są wyłączone),
+  // więc cała reszta komponentu (render itemów) automatycznie zostaje w gałęzi `editing=false`,
+  // zero duplikacji logiki renderowania per-typ. `undefined`/`false` = dotychczasowe zachowanie.
+  viewOnly?: boolean;
 }) {
   const c = useColors();
   const s = makeS(c);
@@ -123,6 +131,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // Panel właściwości (§359) — X/Y/W/H + warstwy + rozgrupuj, osobny od `styleForId` (który
   // steruje modalami stylu PER-TYP) — ten panel jest UNIWERSALNY dla wszystkich typów.
   const [propsForId, setPropsForId] = useState<string | null>(null);
+  // Tryb "Dane"/popup (§391) — `mode: 'view'` (tap na żywym ekranie, czysta treść bez chrome)
+  // vs `'edit'` (przycisk "Edytuj zawartość popupu" z panelu właściwości, pełny edytor).
+  const [popup, setPopup] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null);
   // Lista warstw (§365) — osobny panel od reszty (nie wiąże się z JEDNYM itemem jak style/
   // properties, tylko z CAŁYM ekranem naraz).
   const [layersOpen, setLayersOpen] = useState(false);
@@ -146,8 +157,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const pendingAutoEdit = useCanvasComponentsStore(st => st.pendingAutoEdit);
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
   useEffect(() => {
-    if (pendingAutoEdit === screenKey) { setEditing(true); setPendingAutoEdit(null); }
-  }, [pendingAutoEdit, screenKey]);
+    if (!viewOnly && pendingAutoEdit === screenKey) { setEditing(true); setPendingAutoEdit(null); }
+  }, [pendingAutoEdit, screenKey, viewOnly]);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
@@ -311,6 +322,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
   const content = (
     <View style={s.wrap}>
+      {!viewOnly && (
       <View style={s.header}>
         <LayoutGrid size={13} color={c.text.secondary} />
         <Text style={s.title}>{title ?? 'Twoje komponenty'}</Text>
@@ -336,8 +348,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           <Text style={[s.editTxt, editing && { color: c.accent.blue }]}>{editing ? 'Gotowe' : 'Edytuj'}</Text>
         </TouchableOpacity>
       </View>
+      )}
 
-      {myItems.length === 0 && !editing && (
+      {myItems.length === 0 && !editing && !viewOnly && (
         <Text style={s.hintText}>
           Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii albo odliczania
           z inną metryką — np. ten sam kafel co na dashboardzie, przepięty na inny nawyk/licznik.
@@ -362,6 +375,11 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const boundDataField = isDataField && item.bindingKey ? dataFieldRegistry.find(f => f.id === item.bindingKey) ?? null : null;
 
           const onTap = () => {
+            // Tryb "Dane"/popup (§391) — PRIORYTET nad wszystkim innym poniżej (działa dla
+            // WSZYSTKICH typów, łącznie z kształtami/ikonami, które inaczej ignorują tap).
+            // TYLKO poza edycją — w edycji tap zawsze służy do konfiguracji (picker/brak akcji
+            // na kształtach), zgodnie z dotychczasowym zachowaniem.
+            if (!editing && item.onTapAction === 'openPopup') { haptic.tap(); setPopup({ id: item.id, mode: 'view' }); return; }
             if (isShape || isIcon) return;
             if (editing) { setPickerForId(item.id); return; }
             if (isStreak) {
@@ -709,7 +727,17 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onBringToFront={() => { if (propsItem) bringToFront(propsItem.id); }}
         onSendToBack={() => { if (propsItem) sendToBack(propsItem.id); }}
         onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
+        onTapAction={propsItem?.onTapAction === 'openPopup' ? 'openPopup' : 'none'}
+        onChangeTapAction={(v) => { if (propsItem) updateItem(propsItem.id, { onTapAction: v }); }}
+        onEditPopup={() => { if (propsItem) { const id = propsItem.id; setPropsForId(null); setPopup({ id, mode: 'edit' }); } }}
         onClose={() => setPropsForId(null)}
+      />
+
+      <CanvasPopupModal
+        visible={!!popup}
+        itemId={popup?.id ?? null}
+        mode={popup?.mode ?? 'view'}
+        onClose={() => setPopup(null)}
       />
 
       <CanvasLayersModal
@@ -753,7 +781,7 @@ masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
 // Cienki wrapper (§356) — wołający 3 hooki (AsyncStorage/Zustand) SAM, jak `ScreenCanvasBase`
 // robiło dotąd wprost. Jedzenie/Ćwiczenia/Finanse importują TEN komponent (domyślny eksport),
 // bez żadnej zmiany w ich własnym kodzie — ta sama nazwa, te same propsy `screenKey`/`title`.
-export default function ScreenCanvas({ screenKey, title }: { screenKey: string; title?: string }) {
+export default function ScreenCanvas({ screenKey, title, viewOnly }: { screenKey: string; title?: string; viewOnly?: boolean }) {
   const allStreakItems = useAllStreakItems();
   const allCountdownItems = useAllCountdownItems();
   const allNotesItems = useAllNotesItems();
@@ -768,6 +796,7 @@ export default function ScreenCanvas({ screenKey, title }: { screenKey: string; 
       allNotesItems={allNotesItems}
       dataFieldRegistry={dataFieldRegistry}
       accentColor={accentColor}
+      viewOnly={viewOnly}
     />
   );
 }

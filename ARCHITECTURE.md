@@ -20764,6 +20764,58 @@ dowolny wiersz (np. "Zdrowie") → sprawdź że appka ląduje na ekranie Zdrowie
 trybem edycji płótna (nie trzeba dodatkowo tapać ✏️). Potem wróć do Ustawień i wejdź na INNY
 ekran — sprawdź że poprzedni `pendingAutoEdit` nie "odpala się" przypadkowo gdzie indziej.
 
+## 391. Tryb "Dane" edytora — popup z zagnieżdżonym płótnem (2026-10-19)
+
+Druga faza z §387 ("drugi tryb to dane... po kliknięciu co się ma wyświetlać, jak ekran popup
+to dostajesz drugie canvas obok z tym do zaprojektowania co ma się wyświetlić i muszę mieć
+możliwość kliknięcia danych [i] wyświetlenia ich w dowolny sposób"). PEŁNY, działający kawałek
+od końca do końca (zgodnie z CLAUDE.md #7 — żadna połowa funkcji, żaden dead-end): można
+OZNACZYĆ dowolny item jako trigger, ZAPROJEKTOWAĆ co pokazuje, i ZOBACZYĆ to na żywym ekranie —
+wszystkie trzy kawałki w JEDNEJ fazie, nie osobno.
+
+**`CanvasItem.onTapAction?: 'none' | 'openPopup'`** (`canvasComponentsStore.ts`) — nowe,
+opcjonalne pole, UNIWERSALNE dla WSZYSTKICH typów komponentów (łącznie z kształtami/ikonami,
+które dotąd ignorowały tap). `undefined`/`'none'` = dotychczasowe zachowanie (nawigacja/picker
+per typ) — zero zmiany dla nikogo kto tego nie ustawi.
+
+**`screenKey = 'popup:' + item.id`** — ŚWIADOMA decyzja: zero nowego modelu danych. Popup to
+po prostu KOLEJNA, niezależna "podprzestrzeń" w TYM SAMYM `canvasComponentsStore.ts` — te same
+`items`/`addItem`/`updateItem`/grupowanie/warstwy/style, zero duplikacji mechanizmu.
+
+**`ScreenCanvasBase` dostał nowy, opcjonalny `viewOnly?: boolean`** (`ScreenCanvas.tsx`,
+przekazywany też przez cienki wrapper `ScreenCanvas`) — gdy `true`: chowa CAŁE chrome (nagłówek,
+odznaki pełnego ekranu/edycji) i ignoruje `pendingAutoEdit` (§390). Bez przycisku do włączenia
+`editing` (jedyne dwa miejsca, które to robią, są wyłączone w tej gałęzi) `editing` zostaje
+`false` na zawsze — CAŁA reszta renderowania itemów (switch po `componentType`) działa
+NIEZMIENIONA w gałęzi "nie-edycja", zero duplikacji logiki renderowania per-typ dla popupu.
+
+**Nowy `CanvasPopupModal.tsx`** — jedna prezentacja, dwa tryby:
+- `mode: 'view'` — tap na ŻYWYM ekranie (poza edycją, PRIORYTET nad całą resztą `onTap` w
+  `ScreenCanvas.tsx` — działa nawet dla kształtów/ikon). `<ScreenCanvas viewOnly />` — czysta
+  treść.
+- `mode: 'edit'` — przycisk "Edytuj zawartość popupu" w NOWEJ sekcji panelu właściwości
+  (`CanvasPropertiesModal.tsx` — segmentowany wybór "Zwykłe"/"Otwórz popup" + ten przycisk, gdy
+  wybrane "Otwórz popup"; uniwersalne, stąd w panelu właściwości, nie w modalu stylu per-typ).
+  Zwykłe `<ScreenCanvas>` BEZ `viewOnly` — PEŁNY edytor, zero nowego kodu.
+
+**`GestureHandlerRootView` wewnątrz `CanvasPopupModal.tsx`** — ten sam, udokumentowany fix co
+§388/§162: `Gesture.Pan()` (przeciąganie/resize w `mode: 'edit'`) wewnątrz zwykłego `Modal`
+wymaga własnego roota.
+
+**Świadomie NIE w tej fazie**: zagnieżdżanie popup-w-popupie nie jest explicite zbudowane, ale
+EMERGENTNIE działa (każda `ScreenCanvasBase` ma własny, lokalny stan `popup`) — nieprzetestowane
+na urządzeniu, niska priorytetowość (user nie prosił o to explicite).
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 2 nowe (`onTapAction` domyślnie
+`undefined`, `updateItem` ustawia bez ruszania innych pól). `tsc --noEmit` czyste, `jest
+--silent` 113/113 suite, 1471 testów (+2).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → dodaj kafel (np. kształt)
+→ panel właściwości (ikona ⚙️/slider) → "Po tapnięciu" → "Otwórz popup" → "Edytuj zawartość
+popupu" → zaprojektuj coś wewnątrz (np. kafel serii) → zamknij → WYJDŹ Z EDYCJI całego ekranu
+→ tapnij ten kafel na ŻYWO → sprawdź że pokazuje się popup z zaprojektowaną treścią, BEZ chrome
+edytora (bez przycisku "Dodaj"/pencil), i że zamyka się poprawnie (X/tap poza sheet).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -102,6 +102,16 @@ export interface CanvasItem {
   // na WSPÓLNE przesuwanie (patrz `moveGroupBy` niżej) — rozmiar/styl/podpięcie zostają w pełni
   // per-instancja nawet wewnątrz grupy (świadomie uproszczone na v1, patrz NEXT_STEPS.md).
   groupId: string | null;
+  // Akcja po tapnięciu na ŻYWYM ekranie (Faza §391, "tryb Dane" — user: "jak masz grupy itp to
+  // po kliknięciu co się ma wyświetlać, jak ekran popup to dostajesz drugie canvas obok").
+  // `undefined`/`'none'` = brak akcji (dotychczasowe zachowanie — nawigacja/picker per typ, bez
+  // zmian). `'openPopup'` = tapnięcie (TYLKO poza edycją — w edycji tap zawsze otwiera
+  // picker/właściwości jak dotąd) otwiera `CanvasPopupModal` z WŁASNYM, niezależnym płótnem
+  // (`screenKey = 'popup:' + item.id`, osobna "podprzestrzeń" w TYM SAMYM store'cie — ten sam
+  // mechanizm co każdy inny `screenKey`, zero nowego modelu danych) ZAMIAST normalnego
+  // zachowania typu — działa jednolicie dla WSZYSTKICH typów, łącznie z kształtami/ikonami
+  // (dotąd ignorowały tap, patrz `ScreenCanvas.tsx`'s `onTap`).
+  onTapAction?: 'none' | 'openPopup';
   // Warstwy (Faza 28, 2026-10-17, §359) — user, po AskUserQuestion o zakres "pełnego edytora":
   // "...grupowanie i wgle potem podpisanie danych itp itd" + wcześniej zbadane "panel
   // właściwości + warstwy". Wyższy `zIndex` = renderowany PÓŹNIEJ = wizualnie NA WIERCHU (ten
@@ -170,7 +180,7 @@ interface CanvasComponentsState {
   setPendingAutoEdit: (screenKey: string | null) => void;
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
-  updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
+  updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style' | 'onTapAction'>>) => void;
   removeItem: (id: string) => void;
   // Grupowanie (§349) — `groupItems` ignoruje id'ki spoza `screenKey` (obrona przed pomyłką
   // wołającego, nie powinno się zdarzyć bo `ScreenCanvas` zaznacza tylko WŁASNE itemy) i

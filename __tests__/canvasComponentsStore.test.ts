@@ -392,6 +392,28 @@ describe('canvasComponentsStore — pendingAutoEdit (§390)', () => {
   });
 });
 
+// Tryb "Dane"/popup (§391) — `onTapAction` domyślnie nieustawione (dotychczasowe zachowanie
+// per typ), ustawialne przez `updateItem` jak każde inne pole.
+describe('canvasComponentsStore — onTapAction (§391)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [] });
+  });
+
+  test('nowy item nie ma onTapAction (dotychczasowe zachowanie per typ)', () => {
+    const id = useCanvasComponentsStore.getState().addItem('health', 'rectShape');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.onTapAction).toBeUndefined();
+  });
+
+  test("updateItem(id, { onTapAction: 'openPopup' }) ustawia, nie rusza innych pól", () => {
+    const id = useCanvasComponentsStore.getState().addItem('health', 'rectShape');
+    useCanvasComponentsStore.getState().updateItem(id, { onTapAction: 'openPopup' });
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.onTapAction).toBe('openPopup');
+    expect(item.componentType).toBe('rectShape');
+  });
+});
+
 // Typ "Wykres" (§386) — siódmy componentType, bindingKey = klucz metryki z WIDGET_METRICS
 // (statWidgets.ts), style = { period, viz } (NIE pełny CustomTile z dashboardu).
 describe('canvasComponentsStore — addItem (statTile, §386)', () => {
