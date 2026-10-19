@@ -9,14 +9,24 @@
 // móc je zaimportować bez ciągnięcia drzewa komponentów RN za sobą (jest, `testEnvironment:
 // 'node'`).
 //
-// Świadomie uproszczone: kształty żyją w znormalizowanej przestrzeni `viewBox="0 0 100 100"` (+
-// `preserveAspectRatio="none"`) w komponencie renderującym (`ShapeTile.tsx`), nie w pikselach —
-// SVG rozciąga się 1:1 z flex-resize tego samego kontenera co pozostałe 3 typy kafli (żywa
-// animacja podczas przeciągania uchwytu resize w `CanvasPlacedItem.tsx`, bez potrzeby
-// `onLayout`/pomiaru). Efekt: `strokeWidth`/`cornerRadius` są względne do rozmiaru kształtu, nie
-// stałą liczbą pikseli (inaczej niż w prawdziwej Figmie) — przy bardzo małych/dużych instancjach
-// grubość obrysu będzie się skalować z boxem. Jeśli user zgłosi że to przeszkadza, v2 przejdzie
-// na pomiar `onLayout` + piksele absolutne.
+// Świadomie uproszczone: `ellipseShape`/`lineShape`/`textShape` żyją w znormalizowanej
+// przestrzeni `viewBox="0 0 100 100"` (+ `preserveAspectRatio="none"`) w komponencie renderującym
+// (`ShapeTile.tsx`), nie w pikselach — SVG rozciąga się 1:1 z flex-resize tego samego kontenera
+// co pozostałe typy kafli (żywa animacja podczas przeciągania uchwytu resize w
+// `CanvasPlacedItem.tsx`, bez potrzeby `onLayout`/pomiaru). Dla `ellipseShape` to jest GEOMETRYCZNIE
+// POPRAWNE (elipsa to z definicji okrąg rozciągnięty nierównomiernie — niekwadratowy box daje
+// poprawną elipsę). Efekt dla `lineShape`/`textShape`: `thickness`/`fontSize` są względne do
+// rozmiaru kształtu, nie stałą liczbą pikseli — przy bardzo małych/dużych instancjach będą się
+// skalować z boxem.
+//
+// `rectShape` jest WYJĄTKIEM od 2026-10-19 (§387, user: kształty "wydłużają się i wyglądają jak
+// gówno") — kwadratowy promień zaokrąglenia rogu (`cornerRadius`) w znormalizowanej przestrzeni
+// po nierównomiernym skalowaniu zamieniał się w rozciągniętą, eliptyczną ćwiartkę (widoczny,
+// zgłoszony bug — to NIE jest to samo co poprawna elipsa wyżej, bo tu user NIE chce rozciągnięcia,
+// chce geometrycznie okrągły róg niezależnie od proporcji). Fix: `ShapeTile.tsx` dla `rectShape`
+// używa `viewBox` = REALNE piksele instancji (`item.width`/`item.height` przekazane z
+// `ScreenCanvas.tsx`), więc `cornerRadius`/`strokeWidth` tego typu SĄ realnymi pikselami, nie
+// jednostkami 0-100 — zob. komentarz w `ShapeTile.tsx`.
 export type ShapeComponentType = 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape';
 
 export const SHAPE_TYPES: readonly ShapeComponentType[] = ['rectShape', 'ellipseShape', 'lineShape', 'textShape'];
@@ -25,8 +35,8 @@ export const isShapeType = (t: string): t is ShapeComponentType => (SHAPE_TYPES 
 export interface RectShapeStyle {
   fill: string;
   stroke: string | null; // null = brak obrysu
-  strokeWidth: number;    // jednostki viewBox 0-100 (patrz komentarz wyżej)
-  cornerRadius: number;   // 0-50
+  strokeWidth: number;    // REALNE piksele (§387, patrz komentarz wyżej) — nie jednostki 0-100
+  cornerRadius: number;   // REALNE piksele, klamrowane w ShapeTile.tsx do połowy krótszej krawędzi
   opacity: number;        // 0.1-1
 }
 export interface EllipseShapeStyle {

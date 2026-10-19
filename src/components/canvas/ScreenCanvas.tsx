@@ -459,6 +459,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                 <ShapeTile
                   kind={item.componentType as ShapeComponentType}
                   style={item.style as ShapeStyle}
+                  width={item.width}
+                  height={item.height}
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />

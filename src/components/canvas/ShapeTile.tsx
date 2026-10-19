@@ -13,20 +13,36 @@ import {
 // `viewBox="0 0 100 100"` + `preserveAspectRatio="none"` (patrz komentarz w
 // `shapeStyleDefaults.ts`) — SVG rozciąga się 1:1 z `sizeStyle` (flex 100%/100%), żywa animacja
 // podczas przeciągania uchwytu resize bez pomiaru `onLayout`.
-export function ShapeTile({ kind, style, onPress, sizeStyle }: {
+export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
   kind: ShapeComponentType;
   style: RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;
+  // Realny rozmiar (w px) instancji na płótnie — TYLKO dla `rectShape`, patrz fix niżej (§387).
+  width: number;
+  height: number;
   onPress: () => void;
   sizeStyle?: StyleProp<ViewStyle>;
 }) {
   if (kind === 'rectShape') {
     const st = style as RectShapeStyle;
     const half = st.strokeWidth / 2;
+    // Fix (§387, user: kształty "bez zaokrąglone bo tak to się wydłużają i wygląda jak gówno") —
+    // poprzednio `viewBox` był ZAWSZE znormalizowanym kwadratem 0-100 + `preserveAspectRatio=
+    // "none"`, więc dla niekwadratowego boxa (np. domyślny 140×90) skala X i Y po transformacie
+    // się różniły — kwadratowa "ćwiartka koła" promienia zaokrąglenia w lokalnej przestrzeni
+    // zamieniała się w rozciągniętą, eliptyczną ćwiartkę na ekranie (tym bardziej wyraźnie, im
+    // bardziej box odbiegał od kwadratu). Teraz viewBox = REALNE piksele boxa (scaleX=scaleY=1
+    // poza aktywnym gestem resize, gdzie `width`/`height` to ostatnie SKOMITOWANE wymiary ze
+    // store'u — chwilowa, niewielka nieścisłość TYLKO podczas samego przeciągania uchwytu, znika
+    // natychmiast po puszczeniu) — `rx`/`ry` liczone w prawdziwych pikselach, geometrycznie
+    // poprawne kółko w rogu niezależnie od proporcji boxa, klamrowane do połowy krótszej krawędzi
+    // (po odjęciu obrysu), żeby nie nałożyły się na siebie przy bardzo płaskich/wąskich kształtach.
+    const w = Math.max(1, width), h = Math.max(1, height);
+    const r = Math.max(0, Math.min(st.cornerRadius, w / 2 - half, h / 2 - half));
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-        <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ opacity: st.opacity }}>
-          <Rect x={half} y={half} width={100 - st.strokeWidth} height={100 - st.strokeWidth}
-            rx={st.cornerRadius} ry={st.cornerRadius}
+        <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ opacity: st.opacity }}>
+          <Rect x={half} y={half} width={w - st.strokeWidth} height={h - st.strokeWidth}
+            rx={r} ry={r}
             fill={st.fill} stroke={st.stroke ?? 'transparent'} strokeWidth={st.strokeWidth} />
         </Svg>
       </TouchableOpacity>

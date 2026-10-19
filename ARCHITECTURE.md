@@ -20578,6 +20578,54 @@ bindingKey=null dla `addItem(..., 'statTile')`). `tsc --noEmit` czyste, `jest --
 🎨. Na INNYM ekranie (np. Zdrowie) sprawdź że przycisk "Wykres" w ogóle się nie pojawia w
 rzędzie "Dodaj".
 
+## 387. Fix: zaokrąglenie rogów prostokąta na płótnie się rozciągało (2026-10-19)
+
+User po §386 (cały zamówiony "edytor" z §380-386 gotowy): "wgle ja pisałem... chcę dosłownie
+projektor jak Figma... [screeny] podsyłam bo coś zjebałeś że się dziwnie renderuje" + konkretny
+opis buga przy kształtach: "bez zaokrąglone bo tak to się wydłużają i wygląda jak gówno, trzeba
+korektora ten błąd". Trafiony, realny bug w `rectShape` (§357) — DOKŁADNIE ten scenariusz,
+który komentarz w `shapeStyleDefaults.ts` już wcześniej przewidywał ("jeśli user zgłosi że to
+przeszkadza, v2 przejdzie na piksele absolutne").
+
+**Root cause**: `ShapeTile.tsx` rysował `rectShape` w znormalizowanym `viewBox="0 0 100 100"` +
+`preserveAspectRatio="none"`. Dla NIEKWADRATOWEGO boxa (domyślny rozmiar kształtu to 140×90)
+transformacja viewBox→viewport skaluje X i Y RÓŻNYMI współczynnikami. `cornerRadius` (ten sam
+promień w obu osiach w lokalnej przestrzeni) po takiej nierównomiernej skali przestawał być
+kołem — zamieniał się w rozciągniętą, eliptyczną ćwiartkę w rogu. To NIE jest to samo co
+`ellipseShape` (tam rozciągnięcie okrągłego kształtu w elipsę jest GEOMETRYCZNIE POPRAWNE i
+zamierzone) — tu user chce okrągły róg, a dostawał rozciągnięty.
+
+**Fix**: `ShapeTile.tsx`'s `rectShape` dostał nowe, wymagane propy `width`/`height` (realny
+rozmiar instancji, `item.width`/`item.height` przekazane z jedynego miejsca wołającego —
+`ScreenCanvas.tsx`, `item` już było w zasięgu tego closure). `viewBox` dla `rectShape` to teraz
+`0 0 {width} {height}` (realne piksele, nie znormalizowany kwadrat) — `cornerRadius`/
+`strokeWidth` tego typu są od teraz REALNYMI pikselami (nie jednostkami 0-100), klamrowane do
+połowy krótszej krawędzi boxa (po odjęciu obrysu), żeby nie nałożyły się na siebie przy wąskich/
+płaskich kształtach. `ellipseShape`/`lineShape`/`textShape` BEZ ZMIAN (nie miały tego buga).
+
+**Konsekwencja podczas aktywnego resize**: `width`/`height` to ostatnie SKOMITOWANE wymiary ze
+store'u (nie live Reanimated shared value z `CanvasPlacedItem.tsx` — sam box nadal animuje się
+płynnie przez `sizeStyle`/flex 100%, bez `onLayout`). Przez moment aktywnego przeciągania uchwytu
+resize viewBox jest nieznacznie nieaktualny (stary rozmiar) — kosmetyczna, przejściowa
+niedokładność WYŁĄCZNIE podczas samego gestu, znika natychmiast po puszczeniu (`onEnd` →
+`onResize` → store → re-render z poprawnym `viewBox`). Nieporównywalnie lepsze od poprzedniego
+stanu, gdzie każdy niekwadratowy prostokąt był rozciągnięty NA STAŁE, zawsze.
+
+**Testy**: brak nowych (czysta geometria SVG, bez logiki do testowania w `testEnvironment:
+'node'` — `ShapeTile.tsx` to komponent RN, nieimportowany w żadnym teście). `tsc --noEmit`
+czyste, `jest --silent` 113/113 suite, 1463 testów (bez zmiany liczby — brak nowych testów).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem → dodaj "Prostokąt" →
+rozciągnij go w szeroki, płaski box (resize uchwytem) → w 🎨 ustaw duże "Zaokrąglenie rogów" →
+sprawdź że rogi wyglądają jak ćwiartki KOŁA (nie rozciągniętej elipsy) niezależnie od tego jak
+bardzo box jest niekwadratowy.
+
+**Status reszty zamówienia usera z tej samej wiadomości** (dużo większe, user: "wiem że to
+ciężkie... tylko się postaraj") — przeniesienie wejścia do edytora z ekranów do Ustawień +
+koncepcja "Projektów" (szablon/pusty canvas + wybór ekranu docelowego, w tym Navbar) + drugi,
+"Dane"-tryb edytora z zagnieżdżonym płótnem dla popupów — W TOKU, osobne, kolejne fazy. Patrz
+NEXT_STEPS.md.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
