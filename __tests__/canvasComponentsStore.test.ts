@@ -428,3 +428,36 @@ describe('canvasComponentsStore — addItem (statTile, §386)', () => {
     expect(item.height).toBeGreaterThan(0);
   });
 });
+
+// Navbar Pupila (§392) — user, po wyborze opcji "pełna przebudowa jak Figma": nowy typ
+// `navTab`, zamknięta lista opcji (4 stałe taby), i osobna, PERSYSTOWANA flaga
+// `customNavbarEnabled` (w przeciwieństwie do jednorazowego `pendingAutoEdit`).
+describe('canvasComponentsStore — addItem (navTab, §392)', () => {
+  test('navTab dostaje pusty styl i bindingKey=null (jeszcze nie podpięty do żadnego tabu)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('navbar', 'navTab');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.componentType).toBe('navTab');
+    expect(item.style).toEqual({});
+    expect(item.bindingKey).toBeNull();
+    expect(item.width).toBeGreaterThan(0);
+    expect(item.height).toBeGreaterThan(0);
+  });
+});
+
+describe('canvasComponentsStore — customNavbarEnabled (§392)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ customNavbarEnabled: false });
+  });
+
+  test('domyślnie wyłączony', () => {
+    expect(useCanvasComponentsStore.getState().customNavbarEnabled).toBe(false);
+  });
+
+  test('setCustomNavbarEnabled(true/false) ustawia flagę', () => {
+    useCanvasComponentsStore.getState().setCustomNavbarEnabled(true);
+    expect(useCanvasComponentsStore.getState().customNavbarEnabled).toBe(true);
+    useCanvasComponentsStore.getState().setCustomNavbarEnabled(false);
+    expect(useCanvasComponentsStore.getState().customNavbarEnabled).toBe(false);
+  });
+});

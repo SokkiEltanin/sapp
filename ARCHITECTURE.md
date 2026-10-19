@@ -20816,6 +20816,83 @@ popupu" → zaprojektuj coś wewnątrz (np. kafel serii) → zamknij → WYJDŹ 
 → tapnij ten kafel na ŻYWO → sprawdź że pokazuje się popup z zaprojektowaną treścią, BEZ chrome
 edytora (bez przycisku "Dodaj"/pencil), i że zamyka się poprawnie (X/tap poza sheet).
 
+## 392. Navbar Pupila jako cel projektowania — "pełna przebudowa jak Figma" (2026-10-19)
+
+Ostatni, najtrudniejszy kawałek z §387/§380 — user sam: "jak projektujesz navbar to nie wiem
+jak to rozwiązać xd". Zapytany `AskUserQuestion` o 3 opcje (tylko styl / dekoracje nad
+navbarem / pełna przebudowa), **wybrał pełną przebudowę** — najbliższą oryginalnej wizji, ale
+najwyższego ryzyka: `PupilNavbar.tsx` to PRAWDZIWA nawigacja (4 zakładki Pupila), nie tylko
+dekoracja — zepsucie jej zostawiłoby usera bez sposobu przełączania się między Pupilem/Bossami/
+Sklepem/Questami.
+
+**Projekt skoncentrowany na BEZPIECZEŃSTWIE PRZEZ KONSTRUKCJĘ, nie przez walidację w jednym
+miejscu**:
+1. **Zamknięta lista opcji** — nowy `CanvasComponentType` `'navTab'` podpina się WYŁĄCZNIE do
+   jednego z 4 STAŁYCH wpisów `PUPIL_NAV_TABS` (nowy `src/data/pupilNavTabs.ts`, wydzielone z
+   `PupilNavbar.tsx`'s dawnego prywatnego `TABS` — jedno źródło prawdy, zero zmiany
+   zachowania). Fizycznie NIE DA SIĘ skonfigurować przycisku prowadzącego do nieistniejącej/
+   złej trasy — to nie "walidacja", to brak możliwości błędu.
+2. **Osobna, persystowana flaga `customNavbarEnabled`** (`canvasComponentsStore.ts`) — ŚWIADOMIE
+   NIE reużyta `fullScreenScreens` (inny byt, inne miejsce odczytu, nazwa dzieląca znaczenie
+   groziłaby pomyłką w DWÓCH miejscach naraz). Samo `true` NIE WYSTARCZA.
+3. **PODWÓJNA walidacja kompletności** — `app/navbar-editor.tsx` (edycja) ORAZ `PupilNavbar.tsx`
+   (żywy render) OBA, NIEZALEŻNIE, sprawdzają że wszystkie 4 wymagane taby są podpięte PRZED
+   użyciem custom-renderu. `PupilNavbar.tsx` to OSTATNIA linia obrony — nawet gdyby
+   `customNavbarEnabled=true` z jakiegoś powodu (stary stan AsyncStorage, przyszły bug gdzie
+   indziej), żywy navbar i tak sam weryfikuje i BEZPIECZNIE WRACA do domyślnego, zaszytego na
+   sztywno JSX, jeśli walidacja nie przejdzie — nigdy nie ufa samej fladze.
+
+**Nowy `app/navbar-editor.tsx`** — dedykowany ekran (NIE jeden z 4 ekranów Pupila —
+`screenKey='navbar'` nie "należy" do żadnego z nich), hostujący ZWYKŁE `<ScreenCanvas
+screenKey="navbar">` — pełny istniejący edytor, zero nowego kodu renderowania dla SAMEGO
+budowania. Dodany do Ustawień → "Edytor płótna" → "Projekty" jako 14. wpis (`PROJECT_SCREENS`),
+`pendingAutoEdit` (§390) działa identycznie jak dla reszty. Pokazuje NA ŻYWO czy układ jest
+kompletny (lista brakujących tabów) i przełącznik "Użyj własnego navbaru" — **nie da się go
+WŁĄCZYĆ, gdy niekompletny** (próba pokazuje toast z listą brakujących), ale MOŻNA zawsze
+wyłączyć, nawet po fakcie usunięcia itemu.
+
+**Dispatch w `ScreenCanvas.tsx`** (ten sam, ustalony wzorzec co każdy inny typ) — `isNavTab`,
+`navTabOptions` (z `PUPIL_NAV_TABS`), nowy branch w `MetricPickerModal` dispatchu (ikona
+`Compass`, tytuł "Wybierz zakładkę"), `describeItem`, i renderTile → nowy `NavTabTile.tsx`
+(placeholder "?" gdy niepodpięty, inaczej ikona taba). Przycisk "Przycisk nawigacji" w
+toolbarze WYŁĄCZNIE gdy `screenKey === 'navbar'` (CLAUDE.md #7, nie pokazuj martwego przycisku
+gdzie indziej).
+
+**Żywy render — `CustomPupilNavbarContent`, NOWY, BESPOKE komponent w `PupilNavbar.tsx`, NIE
+reużywający `ScreenCanvas.tsx`/`viewOnly`** (w przeciwieństwie do popupów, §391) — bo potrzebuje
+WŁASNEGO zachowania tapnięcia: `navTab` → `router.replace()` do realnej trasy, nie
+metric-picker. Renderuje itemy `screenKey='navbar'` w ich zapisanych x/y/w/h, dysponując
+`ShapeTile`/`IconTile`/`NavTabTile` (te same komponenty co editor, inny kontekst — bez gestów/
+chrome). Inne typy (gdyby jakoś się tu znalazły) — defensywnie `null`, nie crash.
+
+**`NavTabStyle` — pułapka TS znaleziona PRZED wysłaniem**: pierwsza wersja `Record<string,
+never>` (pusty obiekt bez pól) dodała niejawny `[x: string]: never` index signature, który
+łamał ISTNIEJĄCE spready gdzie indziej w pliku operujące na CAŁEJ unii `CanvasItem['style']`
+(`{ ...styleItem.style, tierColorOverrides: next }` w obsłudze `CanvasStreakStyleModal`) — TS
+rozdziela spread po unii, a `never`-indeksowany człon wymuszał `never` na NOWYM polu w INNYCH,
+niepowiązanych miejscach. Fix: zwykły, pusty `interface NavTabStyle {}` (bez niejawnego index
+signature) — złapane przez `tsc --noEmit` PRZED commitem, nie na urządzeniu.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 3 nowe (`navTab` domyślny styl/rozmiar/
+bindingKey=null, `customNavbarEnabled` domyślnie `false`, `setCustomNavbarEnabled` ustawia).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1474 testów (+3). **Logika
+walidacji/custom-renderu w `PupilNavbar.tsx`/`navbar-editor.tsx` NIE jest testowana w jest**
+(komponenty RN, `testEnvironment: 'node'`) — stąd priorytet testu na urządzeniu poniżej jest
+WYJĄTKOWO wysoki, wyższy niż zwykle w tej serii.
+
+**Priorytet testu na urządzeniu — KRYTYCZNY (najwyższy w całej tej serii)**:
+1. Ustawienia → "Edytor płótna" → "Navbar Pupila" → dodaj WSZYSTKIE 4 "Przycisk nawigacji",
+   podepnij każdy do innego tabu → włącz "Użyj własnego navbaru" → wróć/przejdź na którykolwiek
+   z 4 ekranów Pupila (`/pet`, `/bosses`, `/pet-shop`, `/pet-quests`) → **sprawdź że navigacja
+   WCIĄŻ DZIAŁA** (wszystkie 4 przyciski prowadzą do właściwych ekranów, podświetlenie aktywnego
+   tabu działa).
+2. **Scenariusz bezpieczeństwa (NAJWAŻNIEJSZY)**: z włączonym custom navbarem, wróć do edytora
+   i USUŃ jeden z 4 przycisków (albo odepnij podpięcie) → natychmiast sprawdź na żywym ekranie
+   Pupila, że navbar **automatycznie wrócił do domyślnego, zaszytego wyglądu** (NIE zostajesz z
+   3 przyciskami/bez nawigacji).
+3. Dodaj też dekoracje (kształt/ikonę) do navbaru — sprawdź że się wyświetlają, ale NIE są
+   klikalne/nie przeszkadzają w tapnięciu przycisków nawigacji pod/nad nimi.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -88,12 +88,21 @@ ich w dowolny sposób. Wzoruje się na Canvie."
 3. ✅ **ZROBIONE (§390) — wybór ekranu docelowego**: lista `PROJECT_SCREENS` w `app/settings.tsx`
    WYBIERALNA (13 ekranów, nazwa + ikona + liczba komponentów/"Puste płótno"), nie dorozumiana
    z aktualnego ekranu.
-4. **Navbar jako cel projektowania** — NAJTRUDNIEJSZY kawałek, user sam: "nie wiem jak to
-   rozwiązać xd". `PupilNavbar`/`TabBar` dziś NIE są częścią systemu płótna w ogóle (to osobne,
-   zaszyte na sztywno komponenty renderowane jako ostatni sibling na każdym ekranie, patrz
-   §378). Potrzebny będzie nowy `screenKey='navbar'` + miejsce w `PupilNavbar.tsx`/`TabBar.tsx`,
-   które renderuje płótno TYLKO gdy jest ono "włączone" dla navbaru — czeka na własną fazę
-   projektową (jak go wyrenderować jako pasek na dole, nie pełny ekran).
+4. ✅ **ZROBIONE (§392) — Navbar Pupila jako cel projektowania**. Zapytany `AskUserQuestion` o 3
+   opcje (tylko styl / dekoracje nad navbarem / pełna przebudowa jak Figma) — user wybrał
+   **pełną przebudowę**. Nowy `CanvasComponentType` `'navTab'` (zamknięta lista 4 stałych
+   tabów, `src/data/pupilNavTabs.ts`), nowy `app/navbar-editor.tsx` (dedykowany ekran edycji,
+   dodany do Ustawień → "Edytor płótna" → "Projekty"), osobna persystowana flaga
+   `customNavbarEnabled` + PODWÓJNA walidacja kompletności (w edytorze i w żywym
+   `PupilNavbar.tsx` — żywy render NIGDY nie ufa samej fladze, zawsze sam weryfikuje i wraca do
+   domyślnego navbaru, jeśli układ niekompletny). Checklist w ARCHITECTURE.md §392.
+   **Priorytet testu KRYTYCZNY** — to prawdziwa nawigacja, nie dekoracja; scenariusz
+   bezpieczeństwa (usunięcie przycisku z włączonym custom navbarem → automatyczny powrót do
+   domyślnego) jest NAJWAŻNIEJSZYM testem w całej tej serii faz.
+   **TYLKO `PupilNavbar` (4 ekrany Pupila)** — główny `TabBar.tsx` (6 zakładek, dashboard/
+   zadania/kalendarz/finanse/zdrowie/jedzenie) świadomie NIE objęty tą fazą (wyższe ryzyko,
+   używany wszędzie) — jeśli user zechce to też dla `TabBar`, to osobna, kolejna faza, reużywa
+   DOKŁADNIE ten sam wzorzec (zamknięta lista tabów + osobna flaga + podwójna walidacja).
 5. ✅ **ZROBIONE (§391) — tryb "Dane" edytora — popup z drugim, zagnieżdżonym płótnem**.
    `CanvasItem.onTapAction?: 'none' | 'openPopup'` (uniwersalne dla wszystkich typów) +
    `screenKey = 'popup:' + itemId` (ta sama "podprzestrzeń" w `canvasComponentsStore.ts`, zero

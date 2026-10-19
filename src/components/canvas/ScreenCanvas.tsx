@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2 } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2, Compass } from 'lucide-react-native';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -46,6 +46,8 @@ import { StatCanvasTile } from './StatCanvasTile';
 import CanvasStatStyleModal from './CanvasStatStyleModal';
 import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 import { WIDGET_METRICS, StatCtx } from '@/utils/statWidgets';
+import { NavTabTile } from './NavTabTile';
+import { PUPIL_NAV_TABS } from '@/data/pupilNavTabs';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -209,6 +211,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     if (item.componentType === 'lineShape') return 'Linia';
     if (item.componentType === 'textShape') return 'Tekst';
     if (item.componentType === 'statTile') return item.bindingKey ? (WIDGET_METRICS.find(m => m.id === item.bindingKey)?.label ?? 'Wykres') : 'Wykres (brak podpięcia)';
+    if (item.componentType === 'navTab') return item.bindingKey ? (PUPIL_NAV_TABS.find(t => t.key === item.bindingKey)?.label ?? 'Przycisk nawigacji') : 'Przycisk nawigacji (brak podpięcia)';
     return 'Ikona';
   };
   // TOP-FIRST (odwrotność `orderedItems` — user intuicyjnie myśli "co jest na wierzchu" jako
@@ -282,6 +285,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // dała się choć trochę ogarnąć wzrokiem bez budowania osobnego, sekcjonowanego pickera.
   const statOptions: PickerOption[] = useMemo(
     () => WIDGET_METRICS.map(m => ({ key: m.id, label: m.label, meta: m.group })),
+    [],
+  );
+
+  // Szósty "widget z danymi" (§392) — ALE lista opcji to WYŁĄCZNIE 4 stałe taby Navbaru Pupila
+  // (`PUPIL_NAV_TABS`, ta sama tablica co w `PupilNavbar.tsx` — jedno źródło prawdy), nie
+  // dowolna trasa. Celowo zamknięta lista: nie da się skonfigurować przycisku prowadzącego do
+  // nieistniejącej strony.
+  const navTabOptions: PickerOption[] = useMemo(
+    () => PUPIL_NAV_TABS.map(t => ({ key: t.key, label: t.label, meta: t.path })),
     [],
   );
 
@@ -369,6 +381,11 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const isShape = isShapeType(item.componentType);
           const isIcon = item.componentType === 'iconTile';
           const isStat = item.componentType === 'statTile';
+          // Przycisk nawigacji dla Navbaru Pupila (Faza §392) — podpięcie do JEDNEGO z 4
+          // STAŁYCH, predefiniowanych tabów (`PUPIL_NAV_TABS`), NIE dowolnej trasy — niemożliwe
+          // skonfigurować "zepsuty" przycisk, bo lista opcji jest zamknięta.
+          const isNavTab = item.componentType === 'navTab';
+          const boundNavTab = isNavTab && item.bindingKey ? PUPIL_NAV_TABS.find(t => t.key === item.bindingKey) ?? null : null;
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
@@ -482,6 +499,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
+              ) : isNavTab ? (
+                <NavTabTile
+                  tab={boundNavTab}
+                  active={false}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                />
               ) : (
                 <ShapeTile
                   kind={item.componentType as ShapeComponentType}
@@ -569,6 +593,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                 <Text style={s.addTxt}>Wykres</Text>
               </TouchableOpacity>
             )}
+            {/* Przycisk nawigacji (§392) — WYŁĄCZNIE na `screenKey='navbar'` (edytor Navbaru
+                Pupila, `app/navbar-editor.tsx`) — na innych ekranach nie miałby sensu (CLAUDE.md
+                #7, nie zostawiaj martwego przycisku). */}
+            {screenKey === 'navbar' && (
+              <TouchableOpacity onPress={() => onAdd('navTab')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+                <Plus size={15} color="#fff" />
+                <Text style={s.addTxt}>Przycisk nawigacji</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {/* Kształty-primitywy (§357) i Ikona (§371) — osobny, wizualnie oddzielony wiersz
               (szary, nie niebieski jak "komponenty z danymi" wyżej) — inna kategoria: BEZ
@@ -619,9 +652,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
@@ -631,6 +664,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           ? 'Rejestr pól danych jest pusty — to nie powinno się zdarzyć.'
           : pickerItem?.componentType === 'statTile'
           ? 'Rejestr metryk jest pusty — to nie powinno się zdarzyć.'
+          : pickerItem?.componentType === 'navTab'
+          ? 'Lista zakładek jest pusta — to nie powinno się zdarzyć.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}

@@ -176,6 +176,11 @@ const PROJECT_SCREENS: { key: string; label: string; route: string; icon: Lucide
   { key: 'pet', label: 'Pupil', route: '/pet', icon: LucideIcons.PawPrint },
   { key: 'counters', label: 'Liczniki', route: '/counters', icon: LucideIcons.Hourglass },
   { key: 'exercises', label: 'Ćwiczenia', route: '/exercises', icon: LucideIcons.Dumbbell },
+  // Navbar Pupila (§392) — JEDYNY wpis bez własnego, "normalnego" ekranu-hosta: `/navbar-editor`
+  // to dedykowany, nowy ekran zbudowany SPECJALNIE dla tego celu (nie jeden z 4 ekranów
+  // Pupila — `screenKey='navbar'` nie "należy" do żadnego z nich). `pendingAutoEdit` działa tu
+  // identycznie jak dla reszty (ten sam generyczny mechanizm w `ScreenCanvasBase`).
+  { key: 'navbar', label: 'Navbar Pupila', route: '/navbar-editor', icon: LucideIcons.Compass },
 ];
 
 function EditorProjectsList() {
