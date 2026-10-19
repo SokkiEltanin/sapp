@@ -20977,6 +20977,46 @@ powód co `normalizeHex`/`hexToHsv`). `tsc --noEmit` czyste, `jest --silent` 114
 na kaflu (nie tylko w podglądzie modala), wszystkie 4 kierunki, i że przełączenie z powrotem na
 "Płasko" działa (wraca do pierwszego stopu jako kolor).
 
+## 395. Szablony projektów (2026-10-19)
+
+Czwarty, ostatni kawałek wiadomości usera o KWGT — "dodaj... szablony". Dopełnia §390: oryginalna
+wiadomość o "utwórz projekt (tam wybierasz szablon czy pusty canvas)" w końcu dostała swój
+drugi, odłożony krok.
+
+**Świadoma decyzja v1: kilka ZASZYTYCH NA STAŁE układów, NIE zapisywalna biblioteka usera** —
+prostsze, szybsze, zero nowego modelu trwałych danych do zarządzania (dodawanie/usuwanie/
+nazywanie własnych szablonów). Jeśli user zechce wersję "zapisz WŁASNY układ jako szablon", to
+osobna, kolejna faza (analogiczna do `colorLibraryStore`/`tileStylePresetsStore`, ale nie
+reużyta wprost — inny kształt danych).
+
+**Nowy `src/data/canvasTemplates.ts`** — `CANVAS_TEMPLATES: CanvasTemplate[]`, 3 szablony:
+"Nagłówek + separator" (textShape + lineShape), "Dwie karty w rzędzie" (2× rectShape), "Karta z
+paskiem progresu" (rectShape tło + textShape podpis + `progressBar` NIEPODPIĘTY — demonstracja
+dokładnie tego, o co user prosił: "wrzucić pasek... zamienić na pasek progresu z danymi").
+WSZYSTKIE itemy szablonów są BEZ `bindingKey` (świadomie — dostępne bindingi różnią się między
+14 ekranami, szablon nie może z góry wybrać za usera, ten sam powód co §393's decyzja o
+nie-konfigurowaniu zakresu z góry).
+
+**Nowa akcja store'u `applyTemplate(screenKey, templateId)`** (`canvasComponentsStore.ts`) —
+RÓŻNI się od `addItem` (stawia JEDEN item POD istniejącymi): stawia WSZYSTKIE itemy szablonu
+NARAZ, na ICH WŁASNYCH, zdefiniowanych współrzędnych (szablon sam definiuje swój layout,
+zakłada pusty/prawie pusty ekran). Styl = `DEFAULT_STYLE[componentType]` SCALONY z opcjonalnym
+`style` override ze specyfikacji (np. startowy tekst/kolor).
+
+**UI w Ustawieniach** — `EditorProjectsList` (§390) pyta "Szablon czy pusty canvas?" (nowy
+modal) TYLKO gdy project ma 0 itemów (prawdziwe "tworzenie"). Jeśli ekran już ma coś
+zbudowane, tapnięcie idzie wprost do edycji jak dotąd — pytanie "szablon czy pusty" nie ma
+sensu dla kontynuacji istniejącej pracy.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 3 nowe (`applyTemplate` stawia wszystkie
+itemy bez bindingu z rosnącym zIndex, scala styl z override nie zamienia, nieznane id nic nie
+robi). `tsc --noEmit` czyste, `jest --silent` 114/114 suite, 1481 testów (+3).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: Ustawienia → "Edytor płótna" → Projekty → tapnij
+PUSTY ekran (0 komponentów) → sprawdź że pojawia się wybór szablonu → wybierz "Karta z paskiem
+progresu" → sprawdź że ląduje w edycji z 3 postawionymi itemami, pasek progresu ma placeholder
+"Wybierz licznik" → podepnij licznik → sprawdź że działa jak zwykły, ręcznie dodany pasek.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
