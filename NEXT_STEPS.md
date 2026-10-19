@@ -198,6 +198,16 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
 (punkt 8, część druga) — wymaga doprecyzowania z userem przed startem (per-kafel na płótnie
 czy globalna zmiana `STREAK_TIERS`, która wpływa na ~5 miejsc appki poza edytorem).
 
+## ✅ Usunięcie odznak "Edytuj"/pełny ekran z żywych ekranów (2026-10-19, §396)
+
+User, po potwierdzeniu że §390 nie usunęło starej odznaki (tylko dodało Ustawienia jako drugą
+drogę): "wywal tamto było hujowe chcę mieć wszystko w ustawieniach". Zrobione — nagłówek
+"Twoje komponenty" na żywych ekranach renderuje się TERAZ TYLKO podczas aktywnej edycji (z
+przyciskiem "Gotowe", żeby wyjść w kontekście tego co się zbudowało), zero stałego przycisku
+gdy po prostu przeglądasz ekran. Przełącznik pełnego ekranu przeniesiony do wiersza projektu w
+Ustawieniach (ikona Maximize2/Minimize2 obok liczby komponentów). Checklist w ARCHITECTURE.md
+§396. **Priorytet testu WYSOKI.**
+
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 
 v1 typu "Wykres" na płótnie wspiera tylko `number`/`wave`. Jeśli user zechce więcej:

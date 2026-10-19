@@ -189,11 +189,19 @@ function EditorProjectsList() {
   const items = useCanvasComponentsStore(st => st.items);
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
   const applyTemplate = useCanvasComponentsStore(st => st.applyTemplate);
+  const fullScreenScreens = useCanvasComponentsStore(st => st.fullScreenScreens);
+  const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
   // Nowy projekt — Szablon vs Pusty canvas (Faza §395, 2026-10-19) — user: "dodaj... szablony".
   // Pytanie tylko dla PUSTYCH projektów (0 itemów) — jeśli ekran już ma coś zbudowane, pytanie
   // "szablon czy pusty" nie ma sensu (to już NIE jest "tworzenie", tylko kontynuacja edycji),
   // więc tapnięcie idzie wprost do edycji jak dotąd.
   const [newProjectFor, setNewProjectFor] = useState<{ key: string; route: string } | null>(null);
+  // Pełny ekran — przeniesione TUTAJ z żywych ekranów (Faza §396, 2026-10-19) — user: "wywal
+  // tamto było hujowe chcę mieć wszystko w ustawieniach". Ten sam `fullScreenScreens`/
+  // `setFullScreen` co dotąd, tylko przycisk-wejście żyje teraz w Ustawieniach, nie na samym
+  // ekranie. Potwierdzenie TYLKO przy włączaniu (ta sama treść co stary `ConfirmDialog` w
+  // `ScreenCanvas.tsx`) — wyłączenie zawsze bezpiecznie odwracalne, bez pytania.
+  const [confirmFullScreenFor, setConfirmFullScreenFor] = useState<string | null>(null);
 
   const goEdit = (key: string, route: string) => {
     haptic.tap();
@@ -206,6 +214,7 @@ function EditorProjectsList() {
       {PROJECT_SCREENS.map(p => {
         const count = items.filter(i => i.screenKey === p.key).length;
         const Icon = p.icon;
+        const fsOn = fullScreenScreens[p.key] ?? false;
         return (
           <PressableScale key={p.key} onPress={() => {
             if (count === 0) { haptic.tap(); setNewProjectFor({ key: p.key, route: p.route }); }
@@ -225,11 +234,37 @@ function EditorProjectsList() {
                   {count > 0 ? plPlural(count, 'komponent', 'komponenty', 'komponentów') : 'Puste płótno'}
                 </Text>
               </View>
+              {/* Navbar (§392) ma WŁASNY przełącznik "Użyj własnego navbaru" w `navbar-editor.
+                  tsx` (`customNavbarEnabled`, osobna flaga) — `fullScreenScreens` nie ma dla
+                  niego znaczenia, więc przycisk tu by był martwy (CLAUDE.md #7). */}
+              {p.key !== 'navbar' && (
+                <TouchableOpacity
+                  onPress={() => { haptic.tap(); if (fsOn) setFullScreen(p.key, false); else setConfirmFullScreenFor(p.key); }}
+                  style={{
+                    width: 30, height: 30, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
+                    borderWidth: 1, borderColor: fsOn ? c.accent.purple : c.border.default,
+                    backgroundColor: fsOn ? c.accent.purple + '18' : 'transparent',
+                  }}
+                >
+                  {fsOn ? <LucideIcons.Minimize2 size={14} color={c.accent.purple} /> : <LucideIcons.Maximize2 size={14} color={c.text.muted} />}
+                </TouchableOpacity>
+              )}
               <ChevronLeft size={14} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </View>
           </PressableScale>
         );
       })}
+
+      <ConfirmDialog
+        visible={!!confirmFullScreenFor}
+        title="Pełny ekran?"
+        message="To zastąpi całą wbudowaną zawartość tego ekranu Twoim płótnem — zobaczysz TYLKO
+to, co tu zbudujesz. Możesz to wyłączyć w każdej chwili (ten sam przycisk), nic z tego co
+masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
+        confirmLabel="Włącz pełny ekran"
+        onConfirm={() => { if (confirmFullScreenFor) setFullScreen(confirmFullScreenFor, true); setConfirmFullScreenFor(null); haptic.success(); }}
+        onCancel={() => setConfirmFullScreenFor(null)}
+      />
 
       <Modal visible={!!newProjectFor} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNewProjectFor(null)}>
         <Pressable style={ds.overlay} onPress={() => setNewProjectFor(null)}>
