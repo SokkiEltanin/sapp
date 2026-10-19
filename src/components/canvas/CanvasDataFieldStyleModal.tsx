@@ -53,9 +53,6 @@ export default function CanvasDataFieldStyleModal({ visible, style, onChange, on
               <Stepper label="Rozmiar wartości" value={style.fontSize} min={12} max={40} step={2}
                 onChange={v => onChange({ fontSize: v })} />
               <View style={s.divider} />
-              <Stepper label="Zaokrąglenie rogów" value={style.cornerRadius} min={0} max={32} step={2}
-                onChange={v => onChange({ cornerRadius: v })} />
-              <View style={s.divider} />
               <View style={s.row}>
                 <Text style={s.rowLabel}>Pogrubienie</Text>
                 <Switch value={style.bold} onValueChange={v => { haptic.tap(); onChange({ bold: v }); }}
@@ -68,6 +65,32 @@ export default function CanvasDataFieldStyleModal({ visible, style, onChange, on
                   trackColor={{ false: c.border.default, true: c.accent.blue }} />
               </View>
             </View>
+
+            {/* Tło (§401) — user: "jak dodaje datę to powinien być tekst sam a nie kafelek,
+                któremu nawet nie mogę nadać przezroczystych". Domyślnie "Karta" (dotychczasowy,
+                zawsze-włączony wygląd — `background` bywa `undefined` dla starych instancji,
+                `?? 'card'` w `DataFieldTile.tsx` dogania ten sam efekt). */}
+            <Text style={s.sectionLabel}>Tło</Text>
+            <View style={s.segmented}>
+              {([['card', 'Karta'], ['none', 'Brak (sam tekst)']] as [NonNullable<DataFieldTileStyle['background']>, string][]).map(([m, lbl]) => {
+                const on = (style.background ?? 'card') === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); onChange({ background: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {(style.background ?? 'card') === 'card' && (
+              <View style={s.innerCard}>
+                <Stepper label="Przezroczystość tła" value={Math.round((style.opacity ?? 1) * 100)} min={10} max={100} step={10}
+                  onChange={v => onChange({ opacity: v / 100 })} />
+                <View style={s.divider} />
+                <Stepper label="Zaokrąglenie rogów" value={style.cornerRadius} min={0} max={32} step={2}
+                  onChange={v => onChange({ cornerRadius: v })} />
+              </View>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>

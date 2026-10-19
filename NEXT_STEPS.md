@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Wyśrodkuj/duplikuj/wyrównaj na płótnie (§400) + rozszerzony rejestr pól danych (§401)
+
+User, dwa osobne zgłoszenia pod rząd: (1) "nie mam allign to center albo snapa... nie mam jak
+ustawić np 2 kafelków na tym samym poziomie lub nie mam opcji kopiuj"; (2) zrzutem pickera
+pól danych: "nie mam wszystkich danych do wyboru... Finanse, humor, wydatki nic zupełnie, tak
+samo jak dodaje datę to powinien być tekst sam a nie kafelek któremu nawet nie mogę nadać
+przezroczystych". Oba ZROBIONE w tej samej sesji — checklist w ARCHITECTURE.md §400/§401.
+
+**§400**: snap do środka płótna (działa nawet dla JEDYNEGO itemu na pustym ekranie, nie tylko
+między sąsiadami jak dotychczasowy §372), "Wyśrodkuj poziomo" w panelu właściwości, "Ten sam
+poziom"/"Ta sama kolumna" dla zaznaczonych (reużywa `selectMode` z grupowania), "Duplikuj".
+
+**§401**: rejestr pól danych 4→8 opcji (doszły finanse: wydatki dziś/w tym miesiącu; humor:
+dzisiejszy/średni z 7 dni) + naprawiony, wcześniej MARTWY `opacity` w stylu pola danych +
+nowy przełącznik "Tło: Karta/Brak" — pole daty (i każde inne) może teraz być czystym tekstem.
+
+**NIE zrobione — świadomie odłożone z §401**: scope finansów UPROSZCZONY (wszystkie wydatki,
+nie rozróżnia "moje"/"wspólne" z `statsScope.ts`) — jeśli user zgłosi potrzebę, mała, osobna
+zmiana w `useDataFieldRegistry.ts`. Kroki/saldo/nastrój pupila WCIĄŻ wykluczone (wymagają
+kosztownych hooków, nie prostych selektorów Zustand — patrz komentarz w pliku).
+
 ## ✅🆕 Reskin rosteru kampanii ZROBIONY (§399) — minibossy/raid/event WCIĄŻ CZEKAJĄ (user: "dosłownie wszystko")
 
 User wgrał `BOSSYNEW/` (23 nowe portrety stworzeń) + 6. arenę (`ARENA_BURZA.png`): "wywal

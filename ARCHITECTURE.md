@@ -21274,6 +21274,102 @@ Leniwiec/niebo → `ARENA_NIEBO.png`, nie stary GORSKILAS). Sprawdź KAŻDĄ z 5
 sprawdź że MAD wersja pokazuje TĘ SAMĄ arenę co normalna wersja tego samego bossa. Sprawdź że
 raid/event/quest WCIĄŻ pokazują stare tła (brak regresji dla niereskinowanych trybów).
 
+## 400. Wyśrodkuj/duplikuj/wyrównaj na płótnie (2026-10-19)
+
+User: "jak dodaje prostokąt do canvas to nadal nie mam allign to center albo snapa i nie
+widzę równo i nie mam jak ustawić np 2 kafelków na tym samym poziomie lub nie mam opcji
+kopiuj". Cztery osobne, konkretne braki w edytorze — żaden nie wymagał architekturalnej
+decyzji, czysto dociągnięcie brakujących narzędzi do istniejącego systemu (`CanvasPlacedItem.
+tsx`'s smart guides z §372, `CanvasPropertiesModal.tsx`'s panel z §359, `selectMode` z §349).
+
+**Snap do środka płótna** (`CanvasPlacedItem.tsx`) — smart guides z §372 snapowały WYŁĄCZNIE
+do krawędzi/centrum SĄSIADÓW podczas przeciągania — pojedynczy, pierwszy item na pustym
+ekranie nie miał absolutnie nic, do czego mógłby się przyciągnąć (`sibs.length===0`), stąd
+user: "nie widzę równo". Nowy check (środek szerokości X płótna) sprawdzany PRZED pętlą po
+sąsiadach, pierwszy dopasowany próg wygrywa jak dotąd. Celowo BEZ pionowego odpowiednika
+(środek WYSOKOŚCI płótna) — płótno rośnie w dół bez górnego ograniczenia, "środek" nie jest
+tu dobrze zdefiniowanym pojęciem jak przy stałej szerokości.
+
+**"Wyśrodkuj poziomo"** (`CanvasPropertiesModal.tsx`, nowy przycisk w sekcji "Pozycja i
+rozmiar") — jednorazowe, PRECYZYJNE wyśrodkowanie (nie zależne od trafienia progu snapu
+podczas przeciągania ręką) — `centerItemX(id, canvasWidth)` w `canvasComponentsStore.ts`.
+
+**"Ten sam poziom"/"Ta sama kolumna"** — user: "nie mam jak ustawić np 2 kafelków na tym
+samym poziomie". Reużyty ISTNIEJĄCY `selectMode`/`selectedIds` (§349, dotąd WYŁĄCZNIE do
+grupowania) jako druga, równoległa akcja nad tym samym zaznaczeniem — nowy rząd przycisków
+NAD "Anuluj"/"Grupuj" w `ScreenCanvas.tsx`. `alignItemsY`/`alignItemsX` (store) wyrównują
+WSZYSTKICH zaznaczonych do NAJMNIEJSZEGO Y/X wśród nich (najwyższy/najbardziej-lewy zaznaczony
+= "kotwica", przewidywalne, niezależne od kolejności zaznaczania) — JEDNORAZOWE przesunięcie,
+NIE trwały link jak grupa, więc zaznaczenie ZOSTAJE aktywne po wyrównaniu (można zrobić oba
+wyrównania pod rząd, albo dociągnąć ręcznie i dopiero potem zgrupować).
+
+**"Duplikuj"** (`CanvasPropertiesModal.tsx`, nowa sekcja na dole panelu) — `duplicateItem(id,
+canvasWidth)`: klon z NOWYM id, offset +16/+16 (klamrowany do granic płótna), `groupId: null`
+(kopia NIE wchodzi automatycznie do grupy oryginału — osobna, świadoma decyzja), `zIndex` na
+wierzch stosu jak nowo dodany item w `addItem`. Żyje w panelu właściwości, NIE jako czwarta
+ikonka w ciasnym rogu kafla (`CanvasPlacedItem.tsx`'s chrome) — ten sam powód co przeniesienie
+"Rozgrupuj" do panelu w §359 ("3 przyciski max, nie 4").
+
+**Testy**: 9 nowych w `canvasComponentsStore.test.ts` (`duplicateItem` — nowe id/offset/klam­
+rowanie/brak grupy/zIndex na wierzch, nieistniejące id→null; `centerItemX` — wyśrodkowanie,
+nie rusza innych; `alignItemsY`/`alignItemsX` — wyrównanie do najmniejszej wartości, <2
+zaznaczonych no-op, ignoruje spoza screenKey). `tsc --noEmit` czyste, `jest --silent` 115/115
+suite, 1501 testów (+9).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: dodaj pojedynczy prostokąt na pusty ekran, przeciągnij
+blisko środka szerokości → sprawdź że pojawia się różowa linia snapu i kafel się do niej
+przyciąga. Zaznacz 2+ komponenty (tryb grupowania) → "Ten sam poziom"/"Ta sama kolumna" →
+sprawdź że faktycznie się wyrównują, a zaznaczenie zostaje aktywne (nie znika po wyrównaniu).
+Otwórz panel właściwości (⚙) dowolnego itemu → "Wyśrodkuj poziomo" i "Duplikuj" → sprawdź
+efekt na płótnie.
+
+## 401. Rozszerzony rejestr pól danych (finanse/humor) + przezroczyste tło pola danych (2026-10-19)
+
+User zrzutem pickera "Wybierz pole danych" (tylko 4 opcje): "nie mam wszystkich danych do
+wyboru jakie obsługuje aplikacja. Finanse, humor, wydatki nic zupełnie, tak samo jak dodaje
+date to powinien być tekst sam a nie kafelek któremu nawet nie mogę nadać przezroczystych".
+Dwa osobne problemy w tym samym podsystemie (`dataField`, §358).
+
+**Rejestr rozszerzony o finanse/humor** (`useDataFieldRegistry.ts`) — dotychczasowy komentarz
+u góry pliku WYKLUCZAŁ niektóre pola (kroki/saldo/nastrój pupila) z dobrego powodu: te hooki
+SAME W SOBIE wykonują kosztowną pracę przy montowaniu (Health Connect sync, agregacja). Ale
+`useExpensesStore`/`useMoodStore` to PROSTE selektory Zustand (`persist` hydratuje RAZ przy
+starcie, czytanie `.expenses`/`.entries` tu NIE jest nowym fetchem) — TEN SAM koszt co już
+bezpiecznie używane `usePetStore`/`useCalendarStore`, więc dodanie ich nie łamie
+udokumentowanej zasady, tylko ją poprawnie stosuje. 4 nowe pola: `finance.spendToday`/
+`finance.spendMonth` (suma `amount` wydatków, `type !== 'income'`, `fmtStat(…, 'zł')`),
+`mood.today` (`MOOD_LABELS[mood]` dzisiejszego wpisu albo "Brak wpisu dziś"), `mood.weekAvg`
+(średnia z OSTATNICH 7 DNI KALENDARZOWYCH, nie "7 wpisów" — dni bez wpisu nie liczą się jako
+zero). Scope świadomie UPROSZCZONY (wszystkie wydatki, nie tylko "moje" z `statsScope.ts`) —
+jeśli user zgłosi potrzebę rozróżnienia, to mała, osobna zmiana.
+
+**Przezroczyste tło pola danych** (`DataFieldTile.tsx`/`dataFieldTileStyleDefaults.ts`/
+`CanvasDataFieldStyleModal.tsx`) — ZNALEZIONY PRZY OKAZJI bug: `boxed` (czy kafel w ogóle
+pokazuje tło-kartę) było ZASZYTE NA SZTYWNO (`<DataFieldTile boxed />`) w `ScreenCanvas.tsx`,
+zero sposobu, żeby user to wyłączył per-instancja — dokładnie to, na co user trafił z polem
+daty. Dodatkowo: pole `opacity` w stylu ISTNIAŁO już od §358, ale NIGDY nie było wystawione w
+`CanvasDataFieldStyleModal.tsx` — martwa konfiguracja, i tak zastosowana do CAŁEGO widoku
+(tekst+tło razem przez RN `opacity`), nie tylko tła. Fix: nowe, OPCJONALNE pole `background?:
+'card' | 'none'` (`?? 'card'` dla starych instancji = dotychczasowy wygląd, zero zmiany dla
+nikogo kto tego nie dotknie) + nowy segmentowany przełącznik "Tło" w modalu. `opacity` TERAZ
+realnie używane — wmieszane w hex `backgroundColor` (ten sam wzorzec co `c.accent.blue +
+'18'` wszędzie indziej), NIE w RN `opacity`, więc przezroczyste tło nie przyciemnia już
+tekstu. "Zaokrąglenie rogów" przeniesione do warunkowego bloku (pokazuje się TYLKO przy
+`background==='card'` — bez sensu dla czystego tekstu bez karty).
+
+**Testy**: brak nowych dedykowanych — `useDataFieldRegistry` to hook (nie czysta funkcja),
+ten sam, już ustalony brak pokrycia co siostrzane `useAllStreakItems`/`useAllCountdownItems`/
+`useAllNotesItems` (projekt testuje PURE funkcje w node env, nie hooki RN — patrz komentarz w
+`jest.config.js`). `tsc --noEmit` czyste, `jest --silent` 115/115 suite, 1501 testów (bez
+zmiany liczby).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Edytor płótna (dowolny ekran) → Dodaj "Pole
+danych" → sprawdź że picker POKAZUJE teraz 8 opcji, w tym "Wydatki dziś"/"Wydatki w tym
+miesiącu"/"Dzisiejszy nastrój"/"Średni nastrój (7 dni)" z realnymi wartościami. Podepnij
+"Dzisiejsza data" → 🎨 styl → "Tło" → "Brak (sam tekst)" → sprawdź że kafel renderuje się jako
+goły tekst, bez karty/paddingu. Przełącz z powrotem na "Karta" → zjedź suwakiem
+"Przezroczystość tła" → sprawdź że TŁO blaknie, ale TEKST zostaje w pełni czytelny.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
