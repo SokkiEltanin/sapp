@@ -186,20 +186,17 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
    `GradientFillEditor.tsx` wpięty w obie modale stylu. Checklist w ARCHITECTURE.md §394.
    **NIE zrobione**: więcej niż 2 stopy, gradient na `trackColor` paska progresu, gradient na
    `lineShape`/`textShape` (nie proszone, świadomie poza zakresem).
-10. **Szablony projektów — jeszcze NIE zrobione.** User: "dodaj... szablony". Z §390: wybór
-    Szablon vs Pusty canvas przy tworzeniu projektu w Ustawieniach. Szablony (gotowe zestawy
-    `CanvasItem[]` do skopiowania na dany `screenKey`) jeszcze NIE ISTNIEJĄ jako dane — trzeba
-    zaprojektować: czy to kilka ZASZYTYCH NA STAŁE, gotowych układów (prostsze, szybsze) czy
-    user może zapisać WŁASNY układ jako szablon do powtórnego użycia na innym ekranie
-    (trudniejsze — wymaga nowej, trwałej biblioteki szablonów, osobnej od `colorLibraryStore`/
-    `tileStylePresetsStore`, ale analogicznej). **Domyślnie idę w pierwszą (prostszą) wersję,
-    chyba że user doprecyzuje że chce drugą.**
+10. ✅ **ZROBIONE (§395) — szablony projektów.** Wybrana v1 = kilka ZASZYTYCH NA STAŁE układów
+    (`src/data/canvasTemplates.ts`, 3 szablony) + nowa akcja `applyTemplate` + modal "Szablon
+    czy pusty canvas" w Ustawieniach, pytany TYLKO dla pustych projektów. Checklist w
+    ARCHITECTURE.md §395.
+    **NIE zrobione**: zapisywalna biblioteka WŁASNYCH szablonów usera (trudniejsza wersja,
+    czeka na doprecyzowanie czy user tego chce).
 
-**Status**: §387-394 zrobione i wysłane (fix kształtów, color picker, zakres wykresu, Ustawienia/
-Projekty, tryb Dane/popup, Navbar, pasek progresu, gradienty). Reszta — szablony (10) i
-blokowane progi liczników (8, część druga) — W TOKU/czeka, budowane fazami bez przerywania
-(ten sam rytm co dotąd). **Kolejność planowana**: 10 (szablony, samodzielne) → 8/progi (wymaga
-doprecyzowania z userem).
+**Status**: §387-395 zrobione i wysłane — CAŁE zamówienie usera o "edytor jak KWGT Widgets"
+(gradienty, szablony, paski progresu) ZROBIONE. Jedyna pozycja wciąż blokowana: progi liczników
+(punkt 8, część druga) — wymaga doprecyzowania z userem przed startem (per-kafel na płótnie
+czy globalna zmiana `STREAK_TIERS`, która wpływa na ~5 miejsc appki poza edytorem).
 
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 

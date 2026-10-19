@@ -5,7 +5,7 @@ import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { computePayMonths } from '@/utils/workSummary';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share, BackHandler, Modal, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -73,6 +73,7 @@ import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef, LucideIcon } from '@/types/settings';
 import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
+import { CANVAS_TEMPLATES } from '@/data/canvasTemplates';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
 import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
@@ -187,13 +188,29 @@ function EditorProjectsList() {
   const c = useColors();
   const items = useCanvasComponentsStore(st => st.items);
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
+  const applyTemplate = useCanvasComponentsStore(st => st.applyTemplate);
+  // Nowy projekt — Szablon vs Pusty canvas (Faza §395, 2026-10-19) — user: "dodaj... szablony".
+  // Pytanie tylko dla PUSTYCH projektów (0 itemów) — jeśli ekran już ma coś zbudowane, pytanie
+  // "szablon czy pusty" nie ma sensu (to już NIE jest "tworzenie", tylko kontynuacja edycji),
+  // więc tapnięcie idzie wprost do edycji jak dotąd.
+  const [newProjectFor, setNewProjectFor] = useState<{ key: string; route: string } | null>(null);
+
+  const goEdit = (key: string, route: string) => {
+    haptic.tap();
+    setPendingAutoEdit(key);
+    router.push(route as any);
+  };
+
   return (
     <View style={{ gap: spacing[2] }}>
       {PROJECT_SCREENS.map(p => {
         const count = items.filter(i => i.screenKey === p.key).length;
         const Icon = p.icon;
         return (
-          <PressableScale key={p.key} onPress={() => { haptic.tap(); setPendingAutoEdit(p.key); router.push(p.route as any); }}>
+          <PressableScale key={p.key} onPress={() => {
+            if (count === 0) { haptic.tap(); setNewProjectFor({ key: p.key, route: p.route }); }
+            else goEdit(p.key, p.route);
+          }}>
             <View style={{
               flexDirection: 'row', alignItems: 'center', gap: spacing[3],
               backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
@@ -213,9 +230,54 @@ function EditorProjectsList() {
           </PressableScale>
         );
       })}
+
+      <Modal visible={!!newProjectFor} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNewProjectFor(null)}>
+        <Pressable style={ds.overlay} onPress={() => setNewProjectFor(null)}>
+          <Pressable style={[ds.card, { backgroundColor: c.bg.secondary, borderColor: c.border.default }]} onPress={() => {}}>
+            <View style={ds.head}>
+              <LucideIcons.Sparkles size={16} color={c.accent.blue} />
+              <Text style={[ds.title, { color: c.text.primary }]}>Nowy projekt</Text>
+              <TouchableOpacity onPress={() => setNewProjectFor(null)} hitSlop={10}><LucideIcons.X size={18} color={c.text.muted} /></TouchableOpacity>
+            </View>
+            <Text style={[ds.hint, { color: c.text.muted }]}>Zacznij od szablonu albo od pustego płótna — zawsze możesz dalej wszystko przestawić.</Text>
+            {CANVAS_TEMPLATES.map(t => (
+              <TouchableOpacity key={t.id} onPress={() => {
+                if (!newProjectFor) return;
+                haptic.success();
+                applyTemplate(newProjectFor.key, t.id);
+                const { key, route } = newProjectFor;
+                setNewProjectFor(null);
+                goEdit(key, route);
+              }} style={[ds.row, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
+                <Text style={[ds.rowLabel, { color: c.text.primary }]}>{t.label}</Text>
+                <Text style={[ds.rowSub, { color: c.text.muted }]}>{t.description}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => {
+              if (!newProjectFor) return;
+              const { key, route } = newProjectFor;
+              setNewProjectFor(null);
+              goEdit(key, route);
+            }} style={[ds.row, { backgroundColor: 'transparent', borderColor: c.border.default, alignItems: 'center' }]}>
+              <Text style={[ds.rowLabel, { color: c.text.secondary }]}>Pusty canvas</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
+
+const ds = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[5], paddingVertical: spacing[6] },
+  card: { width: '100%', maxWidth: 420, borderRadius: radius.xl, borderWidth: 1, padding: spacing[4], gap: spacing[2] },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title: { flex: 1, fontSize: 15, fontWeight: '800' },
+  hint: { fontSize: 12, lineHeight: 16, marginBottom: spacing[1] },
+  row: { borderRadius: radius.lg, borderWidth: 1, padding: spacing[3], gap: 2 },
+  rowLabel: { fontSize: 13.5, fontWeight: '700' },
+  rowSub: { fontSize: 11, lineHeight: 15 },
+});
 
 // Paleta koloru tła widgetu "Zadania" (2026-09-25, user: "koloru w razie czego") — domyślny
 // ciemny (dawny sztywny kolor widget_bg.xml) + ta sama paleta akcentów co swatche gdzie

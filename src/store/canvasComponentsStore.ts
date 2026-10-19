@@ -13,6 +13,7 @@ import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDef
 import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 import { NavTabStyle, DEFAULT_NAV_TAB_STYLE } from '@/store/navTabStyleDefaults';
 import { ProgressBarStyle, DEFAULT_PROGRESS_BAR_STYLE } from '@/store/progressBarStyleDefaults';
+import { CANVAS_TEMPLATES } from '@/data/canvasTemplates';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -211,6 +212,13 @@ interface CanvasComponentsState {
   setCustomNavbarEnabled: (on: boolean) => void;
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
+  // Szablony (Faza §395) — stawia WSZYSTKIE itemy szablonu naraz, na JEGO WŁASNYCH,
+  // zdefiniowanych współrzędnych (nie "pod istniejącymi", jak `addItem` — szablon ZAKŁADA
+  // pusty/prawie pusty ekran, sam definiuje swój layout). Styl = `DEFAULT_STYLE` tego typu
+  // SCALONY z opcjonalnym `style` override ze specyfikacji (np. inny kolor/tekst startowy).
+  // Zero podpięcia danych (`bindingKey: null` dla wszystkich) — dostępne bindingi różnią się
+  // między ekranami, szablon nie może z góry wybrać za usera, patrz `canvasTemplates.ts`.
+  applyTemplate: (screenKey: string, templateId: string) => void;
   updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style' | 'onTapAction'>>) => void;
   removeItem: (id: string) => void;
   // Grupowanie (§349) — `groupItems` ignoruje id'ki spoza `screenKey` (obrona przed pomyłką
@@ -290,6 +298,22 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         };
         set((s) => ({ items: [...s.items, item] }));
         return id;
+      },
+
+      applyTemplate: (screenKey, templateId) => {
+        const template = CANVAS_TEMPLATES.find(t => t.id === templateId);
+        if (!template) return;
+        const stamp = Date.now();
+        const newItems: CanvasItem[] = template.items.map((spec, i) => ({
+          id: `canvas:${stamp}-${Math.random().toString(36).slice(2, 8)}-${i}`,
+          screenKey, componentType: spec.componentType,
+          x: spec.x, y: spec.y, width: spec.width, height: spec.height,
+          bindingKey: null,
+          style: { ...DEFAULT_STYLE[spec.componentType], ...(spec.style ?? {}) },
+          groupId: null,
+          zIndex: i,
+        }));
+        set((s) => ({ items: [...s.items, ...newItems] }));
       },
 
       updateItem: (id, patch) => set((s) => ({

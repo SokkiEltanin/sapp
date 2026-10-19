@@ -461,6 +461,36 @@ describe('canvasComponentsStore — addItem (progressBar, §393)', () => {
   });
 });
 
+// Szablony (§395) — user: "dodaj... szablony". `applyTemplate` stawia WSZYSTKIE itemy
+// szablonu naraz, na ich własnych współrzędnych, bez podpięcia danych.
+describe('canvasComponentsStore — applyTemplate (§395)', () => {
+  test('stawia wszystkie itemy szablonu, bez bindingKey, z rosnącym zIndex', () => {
+    const { applyTemplate } = useCanvasComponentsStore.getState();
+    applyTemplate('health', 'header-divider');
+    const items = useCanvasComponentsStore.getState().items.filter(i => i.screenKey === 'health');
+    expect(items).toHaveLength(2);
+    expect(items[0].componentType).toBe('textShape');
+    expect(items[1].componentType).toBe('lineShape');
+    expect(items.every(i => i.bindingKey === null)).toBe(true);
+    expect(items[0].zIndex).toBe(0);
+    expect(items[1].zIndex).toBe(1);
+  });
+
+  test('scala styl szablonu z domyślnym stylem typu (override, nie zamiana)', () => {
+    const { applyTemplate } = useCanvasComponentsStore.getState();
+    applyTemplate('health', 'header-divider');
+    const text = useCanvasComponentsStore.getState().items.find(i => i.screenKey === 'health' && i.componentType === 'textShape')!;
+    expect((text.style as any).text).toBe('Nagłówek');
+    expect((text.style as any).color).toBeDefined(); // z DEFAULT_TEXT_SHAPE_STYLE, nie nadpisane
+  });
+
+  test('nieznane id szablonu nic nie robi', () => {
+    const { applyTemplate } = useCanvasComponentsStore.getState();
+    applyTemplate('health', 'nie-istnieje');
+    expect(useCanvasComponentsStore.getState().items).toHaveLength(0);
+  });
+});
+
 describe('canvasComponentsStore — customNavbarEnabled (§392)', () => {
   beforeEach(() => {
     useCanvasComponentsStore.setState({ customNavbarEnabled: false });
