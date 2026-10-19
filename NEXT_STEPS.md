@@ -3,6 +3,49 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Reskin rosteru kampanii ZROBIONY (§399) — minibossy/raid/event WCIĄŻ CZEKAJĄ (user: "dosłownie wszystko")
+
+User wgrał `BOSSYNEW/` (23 nowe portrety stworzeń) + 6. arenę (`ARENA_BURZA.png`): "wywal
+stare lokalizacje wszystkie i stare bossy wszystkie (z kampanii i inne)... każdy rodzaj
+bossów ma swoją arenę". Zapytany `AskUserQuestion`, user potwierdził zakres **"dosłownie
+wszystko"** (nie tylko kampania) — ale §399 zrobił TYLKO kampanię (22 bossów, `bosses.ts` +
+nowy system aren-per-żywioł w `bossIcons.ts`), reszta rozłożona na kolejne fazy (ten sam
+wzorzec co cała seria edytora §380-398, zbyt duże żeby zrobić jednym, bezpiecznie
+przeglądalnym PR-em). Checklist/pełne uzasadnienie w ARCHITECTURE.md §399.
+
+**NIE zrobione — wciąż czeka, user POTWIERDZIŁ że tego chce**:
+1. **Minibossy questowe** (`src/utils/minibosses.ts`, 10 zwierząt: capybara/ropucha/shark/
+   harpy/macaws/snake/wilk/grizzly/osa/lodowykrolik) — wciąż stare portrety. Tylko 1 z 23
+   nowych portretów zostaje NIEUŻYTY po §399 (`LV_Colossus Magmaticus.png`, zarezerwowany pod
+   raid/event niżej) — reszta musi zostać REUŻYTA (ten sam portret co jakiś boss kampanii pod
+   innym id) — user to zaakceptował wprost w odpowiedzi na pytanie o zakres ("będę musiał je
+   tam duplikować/reużyć" było w opisie opcji, user i tak ją wybrał).
+2. **Raid** (`src/utils/raid.ts`, 6 bossów: kraken/golem/phantom/behemoth/wyrm/siren) — 3 z
+   nich (behemoth/wyrm/siren) WCIĄŻ pożyczają stare pliki z `assets/bossy/kampania/`
+   (celowo zostawione przy życiu w §399 właśnie dla raidu — patrz komentarz w
+   `bossIcons.ts`). `LV_Colossus Magmaticus.png` (bezosobowy tytan lawy, już w `assets/bossy/
+   kampania/`) jest NATURALNYM kandydatem na jednego z nich (behemoth?) — "czysta siła bez
+   osobowości" pasuje do raidu lepiej niż jako nazwany NPC kampanii.
+3. **Wydarzenia sezonowe** (`src/utils/seasonalEvents.ts`, 8 bossów: mikolaj/wielkanoc/
+   wakacje/wiosna/jesien/zima/overtime/sweettooth) — 4 z nich (mikolaj/wielkanoc/overtime/
+   sweettooth) NIE MAJĄ dziś w ogóle wpisu w `BOSS_PNG` (spadają na emoji-fallback) — to
+   NAJNIŻSZA wisząca owoc z całej listy (dodanie portretu = czysty zysk, zero regresji).
+4. **Pełne skasowanie starych teł lokacji** (`LOKALIZACJA_GORKISLAS/JUNGLA/LODOWA`,
+   `LOKACJA_KAMPANIA.png`, `CAMPAIGN_ARENA_BG` eksport) — dopiero gdy WSZYSTKIE miejsca, które
+   ich dziś używają (miniboss `MISSION_LOCATION_BG`/fallback, raid/event fallback,
+   `app/battle-layout-lab.tsx`), dostaną areny per-żywioł. Nie kasować pojedynczo wcześniej —
+   `battle-layout-lab.tsx` i `DEFAULT_ARENA_BG` wciąż na nich polegają.
+5. **Arena "Mrok"** (`ARENA_MROK.png`, w kodzie jako `BossElement`/`ARENA_ELEMENT_BG['mrok']`)
+   — user: "6 aren, Mrok zostaje pusty na razie" — gotowa w systemie, ale ŻADEN boss jej dziś
+   nie używa. Jeśli user kiedyś dorysuje/wskaże mrocznego bossa (minibossy/raid/event są
+   dobrymi kandydatami — kampania już ma 22/22 slotów zajętych), to jedna linia w
+   `BOSS_ELEMENT` (`bossIcons.ts`).
+
+**Kolejność sugerowana** (nie wymagana): #3 (najmniej pracy, 4 bossy bez ŻADNEGO artu dziś)
+→ #2 (dociąga raid, uwalnia ostatnie 3 stare pliki kampanii) → #1 (najwięcej reużycia/
+duplikacji do rozstrzygnięcia, które z 22 kampanijnych portretów pasują do których 10
+minibossów) → #4 (sprzątanie, dopiero gdy #1-3 zrobione).
+
 ## 🆕 Edytor mapy bossów — zgodność stylu z prawdziwą mapą (2026-10-18, §379) — DO WERYFIKACJI
 
 User zrzutem dwóch ekranów: "coś zjebałeś, dziwnie się renderuje, porównaj edytor i normalny
