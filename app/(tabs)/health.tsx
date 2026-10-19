@@ -606,10 +606,15 @@ export default function HealthScreen() {
   // poniżej) nie montuje się wcale, zastąpiony samym płótnem na cały ekran. `ScreenHeader` tu
   // zostaje (ta sama orientacja "gdzie jestem" co zawsze) z dopiskiem "Pełny ekran" zamiast
   // "Dzisiaj", bo "Dzisiaj" sugerowałoby że user patrzy na prawdziwe dane zdrowia — nie patrzy.
+  // `edges={[]}` na `SafeAreaView` (jak w normalnym branchu niżej) NIE rezerwuje miejsca pod
+  // belkę statusu samo — stąd jawny `paddingTop: insets.top` tutaj (w normalnym branchu to
+  // samo robi `contentContainerStyle`'s `paddingTop: insets.top + spacing[3]` na ScrollView,
+  // ten branch nie ma scrolla nad ScreenHeader, więc musi to dodać sam). Bez ujemnych
+  // marginesów — te w normalnym branchu kasowały padding `styles.scroll`, którego tu nie ma.
   if (canvasFullScreen) {
     return (
       <SafeAreaView style={styles.container} edges={[]}>
-        <View style={{ marginHorizontal: -spacing[4], marginTop: -spacing[4] }}>
+        <View style={{ paddingTop: insets.top }}>
           <ScreenHeader title="Zdrowie" subtitle="Pełny ekran" style={{ borderBottomColor: T.cardBorder }} />
         </View>
         <ScreenCanvas screenKey="health" title="Twoje komponenty" />
