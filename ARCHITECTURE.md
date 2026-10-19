@@ -20934,6 +20934,49 @@ do aktywnego licznika "do" (z datą w przyszłości) → sprawdź że wypełnien
 który minął od stworzenia licznika do daty docelowej (to samo co pokazuje pierścień na kaflu
 "Odliczanie" tego samego licznika — powinny się zgadzać).
 
+## 394. Gradient wypełnienia — kształty + pasek progresu (2026-10-19)
+
+Drugi z czterech kawałków wiadomości usera o KWGT (po §393) — "dodaj gradienty na pewno".
+JEDNA zmiana modelu (`src/store/gradientFill.ts`, nowy plik) dla DWÓCH typów naraz —
+`rectShape`/`ellipseShape` (`shapeStyleDefaults.ts`) i `progressBar` (`progressBarStyleDefaults.
+ts`) — zamiast dwóch osobnych mechanizmów.
+
+**`Fill = string | GradientFill`** — POSZERZENIE typu, NIE rename/migracja. `RectShapeStyle.
+fill`/`EllipseShapeStyle.fill`/`ProgressBarStyle.fillColor` zmieniły typ z `string` na `Fill` —
+istniejące, persystowane itemy z płaskim hex-em DALEJ są poprawnym `Fill` bez żadnej zmiany
+danych (string jest członkiem unii). `GradientFill` ma ZAWSZE dokładnie 2 stopy (`stops:
+[string, string]`) — świadomie uproszczone, prostsza UI (dwa pickery koloru, nie lista o
+zmiennej długości) niż zmienna liczba stopów; naturalne rozszerzenie w przyszłości, jeśli user
+zechce więcej. `ProgressBarStyle.trackColor` ZOSTAJE płaski `string` (gradient na torze/tle
+rzadki, świadomie poza zakresem).
+
+**Dwa RÓŻNE renderery gradientu, bo dwa różne silniki rysowania**:
+- `ShapeTile.tsx` (SVG, `rectShape`/`ellipseShape`) — `<Defs><LinearGradient id="fillGrad">`
+  + `<Stop>` z `react-native-svg`, `fill="url(#fillGrad)"` na `<Rect>`/`<Ellipse>` gdy gradient.
+  Statyczny `id="fillGrad"` jest bezpieczny — każda instancja ma WŁASNE drzewo `<Svg>`, id są
+  skopowane per-dokument, zero kolizji między kaflami na tym samym ekranie.
+- `ProgressBarTile.tsx` (plain RN View, `progressBar`) — `<LinearGradient>` z
+  `expo-linear-gradient` (już używany w appce, m.in. `ColorPickerPanel.tsx`/§388) jako
+  `StyleSheet.absoluteFill` wewnątrz boxa wypełnienia, zamiast płaskiego `backgroundColor`.
+
+**Nowy, WSPÓLNY `GradientFillEditor.tsx`** (`src/components/canvas/`) — segmentowany wybór
+Płasko/Gradient; płasko = istniejący `ColorSwatchPicker` (z pickerem z §388); gradient = dwa
+`ColorSwatchPicker`y (po jednym na stop) + segmentowany wybór kierunku (→ ↓ ↘ ↗) + żywy podgląd
+(mały box z realnym `LinearGradient`). Wpięty w `CanvasShapeStyleModal.tsx` (zamienił goły
+`ColorSwatchPicker` dla "Wypełnienie") i `CanvasProgressBarStyleModal.tsx` — JEDNA zmiana w
+jednym komponencie naprawia/rozwija oba miejsca naraz, ten sam duch co `ColorSwatchPicker.tsx`
+będąc wspólnym dla wszystkich modali stylu.
+
+**Testy**: nowy `__tests__/gradientFill.test.ts` — 3 testy (rozróżnienie płaski/gradient,
+domyślny gradient, punkty dla 4 kierunków — pure TS, bez importu `'react-native'`, ten sam
+powód co `normalizeHex`/`hexToHsv`). `tsc --noEmit` czyste, `jest --silent` 114/114 suite
+(+1 plik), 1478 testów (+3).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: dowolny Prostokąt/Elipsa/Pasek progresu na płótnie
+→ 🎨 → "Gradient" → wybierz 2 kolory + kierunek → sprawdź że gradient faktycznie renderuje się
+na kaflu (nie tylko w podglądzie modala), wszystkie 4 kierunki, i że przełączenie z powrotem na
+"Płasko" działa (wraca do pierwszego stopu jako kolor).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

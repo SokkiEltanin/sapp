@@ -9,6 +9,7 @@ import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
 import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
+import GradientFillEditor from './GradientFillEditor';
 
 // Jeden adaptacyjny modal dla 4 typów kształtów (Faza 26, 2026-10-17, §357) — zamiast 4 osobnych,
 // prawie identycznych plików (każdy to i tak tylko kolor+kilka numerycznych pól). Branch wg
@@ -42,10 +43,7 @@ export default function CanvasShapeStyleModal({ visible, kind, style, onChange, 
               const st = style as RectShapeStyle | EllipseShapeStyle;
               return (
                 <>
-                  <View>
-                    <Text style={s.sectionLabel}>Wypełnienie</Text>
-                    <ColorSwatchPicker presets={SHAPE_COLOR_PRESETS} current={st.fill} onSelect={(hex) => onChange({ fill: hex })} />
-                  </View>
+                  <GradientFillEditor presets={SHAPE_COLOR_PRESETS} value={st.fill} onChange={(fill) => onChange({ fill })} />
                   <View>
                     <View style={s.rowBetween}>
                       <Text style={s.sectionLabel}>Obrys</Text>
