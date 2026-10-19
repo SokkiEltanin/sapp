@@ -20464,6 +20464,38 @@ własny custom header/bez headera jak dotąd).
 "Twoje komponenty" → odznaka pełnego ekranu → potwierdź. SZCZEGÓLNIE sprawdź Zdrowie ponownie
 (fix nagłówka) — ScreenHeader nie powinien być ucięty/nachodzić na belkę statusu.
 
+## 384. Tryb pełnoekranowy płótna — Faza 2c: Kalendarz (właściwy), Nastrój (2026-10-19)
+
+Kontynuacja §381-383 bez przerywania. Dwa ostatnie "zwykłe" ekrany przed główną fazą dashboardu:
+`(tabs)/calendar.tsx` (właściwy plik kalendarza — nie mylić z `(tabs)/stats.tsx`, które mimo
+nazwy pliku/`screenKey="stats"` pokazuje UI "Kalendarz", patrz §383) i `(tabs)/mood.tsx`.
+
+**`calendar.tsx` — jedyny ekran z WIELOMA montowaniami `ScreenCanvas` (3: tydzień/miesiąc-
+kompakt/miesiąc-rozwinięty), ale WSZYSTKIE trzy dzielą JEDEN `screenKey="calendar"`.** Jeden
+branch na samej górze funkcji (przed wyborem trybu widoku) zastępuje wszystkie trzy naraz —
+nie trzeba trzech osobnych branchy. Ten ekran, nietypowo, w ogóle nie czyta
+`useSafeAreaInsets()` w normalnym branchu (`ScreenHeader` renderuje się bez korekty paddingu
+mimo `edges={[]}`) — branch pełnoekranowy POWIELA dokładnie to samo, już działające
+zachowanie, zamiast dodawać nową, niepotrzebną korektę (ryzyko regresji zerowe, zachowanie
+zweryfikowane jako już poprawne na produkcji).
+
+**`mood.tsx`** — `ScreenCanvasBase` (jak notes/habits/pet/§382), `screenKey="mood"`. Jedyna
+drobna różnica: normalny `ScreenHeader` tu ma własny `style={{ paddingTop: insets.top +
+spacing[3] }}` (nie domyślne zachowanie) — branch pełnoekranowy powiela DOKŁADNIE ten sam
+inline-style, nie generyczny wzorzec z innych ekranów.
+
+**Status**: wszystkie ekrany-"liście" appki (13 z 14 miejsc montujących `ScreenCanvas`/
+`ScreenCanvasBase`) mają teraz tryb pełnoekranowy. Zostaje WYŁĄCZNIE `(tabs)/index.tsx`
+(główny dashboard) — osobna, ostrożniejsza faza (patrz NEXT_STEPS.md), bo to największy i
+najbardziej czuły na wydajność ekran appki.
+
+**Testy**: brak nowych (czysty JSX-rozgałęzienie). `tsc --noEmit` czyste, `jest --silent`
+113/113 suite, 1462 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kalendarz (wszystkie 3 tryby widoku — tydzień/
+miesiąc-kompakt/miesiąc-rozwinięty, każdy osobno) i Nastrój → "Twoje komponenty" → odznaka
+pełnego ekranu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

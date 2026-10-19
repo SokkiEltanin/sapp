@@ -35,15 +35,15 @@ po fazie, każda osobnym PR-em przez pełny rytuał (tsc/jest/ARCHITECTURE/commi
   Ćwiczeń** (5 kolejnych) — PRZY OKAZJI samo-znaleziony i naprawiony fix nagłówka z §381
   (Zdrowie: ujemne marginesy bez niczego do skasowania wypychały `ScreenHeader` pod belkę
   statusu w pełnym ekranie — zamienione na zwykły `paddingTop: insets.top`).
+- §384 (Faza 2c): **`calendar.tsx`** (właściwy plik kalendarza, 3 montowania `ScreenCanvas`,
+  jeden wspólny `screenKey` — jeden branch wystarczył) i **`mood.tsx`**. **Wszystkie 13
+  ekranów-"liści" appki mają teraz tryb pełnoekranowy.**
 
-**Zostaje (kolejne fazy, w trakcie budowania)**:
-- **`calendar.tsx`** (3 mutually-exclusive montowania `ScreenCanvas` — tydzień/miesiąc-kompakt/
-  miesiąc-rozwinięty — ale JEDEN wspólny `screenKey`, więc jeden branch na górze wystarczy).
-- **`mood.tsx`** (`ScreenCanvasBase`, podobny wzorzec co §382).
+**Zostaje (ostatnia faza tego kierunku, w trakcie budowania)**:
 - **`(tabs)/index.tsx`** (główny dashboard, `ScreenCanvasBase` — NAJWIĘKSZY i najbardziej czuły
-  na wydajność ekran appki, osobna, ostrożniejsza faza).
-- Po tych trzech: wszystkie ~13 ekranów z płótnem będą miały tryb pełnoekranowy — wtedy
-  następny typ komponentu "wykres" (user explicite wymienił), jeszcze nie zaczęty.
+  na wydajność ekran appki, osobna, ostrożniejsza faza — JEDYNY pozostały ekran bez trybu
+  pełnoekranowego).
+- Po tym: nowy typ komponentu "wykres" (user explicite wymienił), jeszcze nie zaczęty.
 - Nowy typ komponentu "wykres" (user explicite wymienił "wykresów") — NIE zbudowany, większa,
   osobna praca (wybór stylu/biblioteki wykresu, nowy `componentType`).
 - "robienie presetów" — JUŻ istnieje (`StylePresetBar`, §370/§377), nic dodatkowego nie

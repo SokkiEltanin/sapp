@@ -9,6 +9,7 @@ import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarDays, 
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -267,6 +268,11 @@ export default function CalendarScreen() {
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
   const { settings: workSettings } = useWorkStore();
+  // Tryb pełnoekranowy płótna (§381, Faza 2c) — ten sam wzorzec co health.tsx. Jeden wspólny
+  // `screenKey="calendar"` dla WSZYSTKICH trzech trybów widoku (tydzień/miesiąc-kompakt/
+  // miesiąc-rozwinięty) niżej — jeden branch na samej górze zastępuje wszystkie trzy naraz,
+  // niezależnie który tryb był akurat wybrany.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['calendar'] ?? false);
 
   const now = new Date();
   const [calMode, setCalMode]       = useState<CalMode>('month');
@@ -425,6 +431,20 @@ export default function CalendarScreen() {
       )}
     </View>
   );
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2c) — gdy włączony, cały kalendarz (we WSZYSTKICH
+  // trybach widoku) nie montuje się wcale. Bez dodatkowego `paddingTop: insets.top` — ten
+  // ekran w ogóle nie czyta `useSafeAreaInsets()` w normalnym branchu niżej (`ScreenHeader`
+  // renderuje się tam bezpośrednio pod `edges={[]}` bez korekty), więc ten branch powiela
+  // DOKŁADNIE to samo, już działające zachowanie, zamiast dodawać nowe.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.container} edges={[]}>
+        <ScreenHeader title="Kalendarz" subtitle="Pełny ekran" />
+        <ScreenCanvas screenKey="calendar" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>

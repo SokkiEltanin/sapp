@@ -39,6 +39,7 @@ import { useAllNotesItems } from '@/hooks/useAllNotesItems';
 import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -910,6 +911,8 @@ export default function MoodScreen() {
   const canvasNotesItems = useAllNotesItems();
   const canvasDataFieldRegistry = useDataFieldRegistry();
   const { color: canvasAccentColor } = useTimeAccent();
+  // Tryb pełnoekranowy płótna (§381, Faza 2c) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['mood'] ?? false);
 
   const todayColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : colors.text.muted;
 
@@ -926,6 +929,25 @@ export default function MoodScreen() {
     await moodService.remove(entry.id).catch(() => {});
     toast.info('Usunięto');
   };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2c) — gdy włączony, reszta ekranu Nastroju (wykresy/
+  // wpisy/statystyki) nie montuje się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.container} edges={[]}>
+        <ScreenHeader title="Nastrój" subtitle="Pełny ekran" accentColor={P.accent} style={{ paddingTop: insets.top + spacing[3] }} />
+        <ScreenCanvasBase
+          screenKey="mood"
+          title="Twoje komponenty"
+          allStreakItems={canvasStreakItems}
+          allCountdownItems={canvasCountdownItems}
+          allNotesItems={canvasNotesItems}
+          dataFieldRegistry={canvasDataFieldRegistry}
+          accentColor={canvasAccentColor}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
