@@ -156,6 +156,18 @@ interface CanvasComponentsState {
   // itemy zostają w `items`, tylko przestają być jedynym widokiem ekranu).
   fullScreenScreens: Record<string, boolean>;
   setFullScreen: (screenKey: string, on: boolean) => void;
+  // Wejście do edytora z Ustawień (Faza §390, user: "miała być możliwość kliknięcia w
+  // ustawieniach nie na ekranach"). Tranzjentny, NIEPERSYSTOWANY sygnał (patrz `partialize`
+  // niżej — nie w `partialize` = nie trafia do AsyncStorage) — Ustawienia wołają
+  // `setPendingAutoEdit(screenKey)` TUŻ PRZED `router.push()` na docelowy ekran;
+  // `ScreenCanvasBase` (`ScreenCanvas.tsx`) sprawdza przy montowaniu, czy `pendingAutoEdit`
+  // odpowiada JEJ WŁASNEMU `screenKey` — jeśli tak, włącza `editing` od razu i czyści flagę
+  // (jednorazowy "strzał", nie trwały stan). Dzięki temu Ustawienia mogą wylądować usera
+  // bezpośrednio W TRYBIE EDYCJI płótna, bez dodatkowego tapnięcia ✏️ na docelowym ekranie,
+  // BEZ dotykania wszystkich 14 ekranów hostujących — jedyne miejsce, które to czyta, to
+  // WSPÓLNY `ScreenCanvasBase`.
+  pendingAutoEdit: string | null;
+  setPendingAutoEdit: (screenKey: string | null) => void;
   _hydrated: boolean;
   addItem: (screenKey: string, componentType: CanvasComponentType) => string;
   updateItem: (id: string, patch: Partial<Pick<CanvasItem, 'x' | 'y' | 'width' | 'height' | 'bindingKey' | 'style'>>) => void;
@@ -205,6 +217,8 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
       setFullScreen: (screenKey, on) => set((s) => ({
         fullScreenScreens: { ...s.fullScreenScreens, [screenKey]: on },
       })),
+      pendingAutoEdit: null,
+      setPendingAutoEdit: (screenKey) => set({ pendingAutoEdit: screenKey }),
       _hydrated: false,
 
       // Nowa instancja ląduje POD najniżej leżącym elementem na TYM ekranie (nie w (0,0) na

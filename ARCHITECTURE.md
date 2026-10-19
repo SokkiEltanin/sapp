@@ -20712,6 +20712,58 @@ stylu kafla) — obie czekają na konkretniejszy przykład od usera, patrz NEXT_
 "Ile punktów" → sprawdź że linia na mini-wykresie faktycznie ma inną liczbę punktów (np. 3 vs
 24) i się nie psuje przy ekstremach zakresu.
 
+## 390. Wejście do edytora płótna z Ustawień ("Projekty") (2026-10-19)
+
+Pierwsza faza największej, wciąż nieukończonej części zamówienia usera z §387 ("miała być
+możliwość kliknięcia w ustawieniach nie na ekranach, utwórz projekt... później jak bierzesz
+pusty musisz wybrać gdzie to ma być"). Dotąd JEDYNYM sposobem wejścia w edycję płótna danego
+ekranu było odwiedzenie TEGO ekranu i tapnięcie małej odznaki ✏️ w jego nagłówku — user chciał
+scentralizowany punkt startowy w Ustawieniach.
+
+**Nowa sekcja "Edytor płótna" w `app/settings.tsx`** — jeden item `kind: 'custom'` renderujący
+`EditorProjectsList` (nowy lokalny komponent, ten sam wzorzec co inne "list builders" w tym
+pliku, np. `ConfirmedMonths`). Lista `PROJECT_SCREENS` (13 wpisów) — WSZYSTKIE ekrany hostujące
+`ScreenCanvas`/`ScreenCanvasBase` w `app/**`: Dashboard (`dashboard`, `/(tabs)`), Zdrowie
+(`health`), Jedzenie (`food`), Zadania (`tasks`), Finanse (`finances`), Kalendarz-zakładka
+(`stats`, UI tytuł "Kalendarz" mimo nazwy pliku/screenKey — historyczna niespójność, NIE błąd w
+tej fazie, zob. `stats.tsx`), Kalendarz-pełny-widok (`calendar`, osobny ekran, też UI "Kalendarz"
+— rozróżnione w etykiecie listy, żeby nie pomylić dwóch różnych ekranów o tej samej nazwie),
+Nastrój (`mood`), Nawyki (`habits`), Notatki (`notes`), Pupil (`pet`), Liczniki (`counters`),
+Ćwiczenia (`exercises`). Każdy wiersz pokazuje liczbę już postawionych komponentów (`items.
+filter(screenKey===...).length`) albo "Puste płótno".
+
+**"Projekt" = ISTNIEJĄCY mechanizm, NOWY launcher nad nim** — świadoma decyzja: NIE tworzymy
+nowego modelu danych "projektów" z własnym id/nazwą/wieloma-wariantami-per-ekran. "Projekt" to
+po prostu płótno DANEGO `screenKey`, które już istnieje jako dane (`items`/`fullScreenScreens`).
+Ta lista to tylko NOWA, scentralizowana droga DOTARCIA do niego, nie nowa warstwa abstrakcji.
+
+**`pendingAutoEdit` — zero dodatkowego tapnięcia na docelowym ekranie**: nowy, jednorazowy,
+NIEPERSYSTOWANY (nie w `partialize`) sygnał w `canvasComponentsStore.ts`. Tapnięcie wiersza w
+Ustawieniach woła `setPendingAutoEdit(screenKey)` TUŻ PRZED `router.push(route)`. `ScreenCanvasBase`
+(WSPÓLNY dla wszystkich 13 ekranów — `ScreenCanvas.tsx`) dostał nowy `useEffect`, który przy
+zmianie `pendingAutoEdit` sprawdza czy odpowiada WŁASNEMU `screenKey` — jeśli tak, włącza
+`editing` od razu i czyści flagę. Efekt: user wylądował z Ustawień DOKŁADNIE w trybie edycji,
+gotowy stawiać komponenty, bez szukania ✏️. Jedno miejsce zmiany (`ScreenCanvasBase`) obsługuje
+WSZYSTKIE 13 ekranów naraz — zero dotykania plików hostujących.
+
+**Świadomie NIE w tej fazie**:
+- **"Szablon vs pusty canvas"** — oryginalna wiadomość usera chciała wyboru przy tworzeniu.
+  Szablony (gotowe zestawy `CanvasItem[]` do skopiowania) jeszcze NIE ISTNIEJĄ jako dane —
+  dziś "Projekty" zawsze otwiera PUSTY (lub już-zbudowany) stan danego ekranu. Lista w
+  Ustawieniach pokazuje tylko ISTNIEJĄCE ekrany, nie ma kroku wyboru szablonu.
+- **Navbar jako cel** — najtrudniejszy kawałek z oryginalnej wiadomości, user sam: "nie wiem
+  jak to rozwiązać xd". Nie ma go na liście `PROJECT_SCREENS` — `PupilNavbar`/`TabBar` wciąż
+  nie są częścią systemu płótna (§378). Osobna, dalsza faza.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 2 nowe (`pendingAutoEdit` domyślnie
+`null`, `setPendingAutoEdit` ustawia/czyści). `tsc --noEmit` czyste, `jest --silent` 113/113
+suite, 1469 testów (+2).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → "Edytor płótna" → "Projekty" → tapnij
+dowolny wiersz (np. "Zdrowie") → sprawdź że appka ląduje na ekranie Zdrowie Z JUŻ WŁĄCZONYM
+trybem edycji płótna (nie trzeba dodatkowo tapać ✏️). Potem wróć do Ustawień i wejdź na INNY
+ekran — sprawdź że poprzedni `pendingAutoEdit` nie "odpala się" przypadkowo gdzie indziej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

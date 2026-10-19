@@ -373,6 +373,25 @@ describe('canvasComponentsStore — fullScreenScreens (§381)', () => {
   });
 });
 
+// Wejście do edytora z Ustawień (§390) — jednorazowy, NIEPERSYSTOWANY sygnał (patrz
+// `partialize` w store'cie — nie zawiera `pendingAutoEdit`).
+describe('canvasComponentsStore — pendingAutoEdit (§390)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [], fullScreenScreens: {}, pendingAutoEdit: null });
+  });
+
+  test('domyślnie null', () => {
+    expect(useCanvasComponentsStore.getState().pendingAutoEdit).toBeNull();
+  });
+
+  test('setPendingAutoEdit(key) ustawia, setPendingAutoEdit(null) czyści', () => {
+    useCanvasComponentsStore.getState().setPendingAutoEdit('health');
+    expect(useCanvasComponentsStore.getState().pendingAutoEdit).toBe('health');
+    useCanvasComponentsStore.getState().setPendingAutoEdit(null);
+    expect(useCanvasComponentsStore.getState().pendingAutoEdit).toBeNull();
+  });
+});
+
 // Typ "Wykres" (§386) — siódmy componentType, bindingKey = klucz metryki z WIDGET_METRICS
 // (statWidgets.ts), style = { period, viz } (NIE pełny CustomTile z dashboardu).
 describe('canvasComponentsStore — addItem (statTile, §386)', () => {

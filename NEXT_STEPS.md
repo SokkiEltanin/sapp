@@ -73,16 +73,21 @@ kliknięciu co się ma wyświetlać, jak ekran popup to dostajesz drugie canvas 
 zaprojektowania co ma się wyświetlić i muszę mieć możliwość kliknięcia danych [i] wyświetlenia
 ich w dowolny sposób. Wzoruje się na Canvie."
 
-**Rozłożone na kawałki (żadny jeszcze nie zrobiony poza fixem §387 wyżej)**:
-1. **Wejście do edytora z Ustawień, nie z ekranów** — nowa sekcja "Edytor"/"Projekty" w
-   `app/settings.tsx`, listująca istniejące "projekty" + "Nowy projekt". Prawdopodobnie
-   zastąpi/przykryje dzisiejszą odznakę pełnoekranową na każdym ekranie (ta odznaka była
-   dokładnie tym, co user nazwał "nie tak zrozumiałeś" — wejście z ekranu, nie z Ustawień).
-2. **Tworzenie projektu**: wybór Szablon (jeszcze nie istnieje — trzeba zdefiniować co to za
-   dane, prawdopodobnie zestaw gotowych `CanvasItem[]` do skopiowania) vs Pusty canvas.
-3. **Wybór ekranu docelowego dla pustego projektu** — Dashboard/Zdrowie/Nawyki/itd. (to już
-   istnieje jako `screenKey`, tylko trzeba to zrobić WYBIERALNYM z listy w Ustawieniach, nie
-   dorozumianym z aktualnego ekranu).
+**Rozłożone na kawałki**:
+1. ✅ **ZROBIONE (§390) — wejście do edytora z Ustawień, nie z ekranów**: nowa sekcja "Edytor
+   płótna" → "Projekty" w `app/settings.tsx`, lista 13 ekranów, tapnięcie nawiguje i od razu
+   włącza tryb edycji (`pendingAutoEdit` w `canvasComponentsStore.ts`). Odznaka ✏️/🔳 NA
+   ekranach ZOSTAŁA bez zmian (nie usunięta) — Ustawienia to DODATKOWA, szybsza droga wejścia,
+   nie zamiennik. Checklist w ARCHITECTURE.md §390.
+2. **NIE zrobione — "Szablon"**: wybór Szablon vs Pusty canvas przy tworzeniu. Szablony
+   (gotowe zestawy `CanvasItem[]` do skopiowania) jeszcze NIE ISTNIEJĄ jako dane — trzeba
+   zaprojektować co to konkretnie jest (jedna gotowa kompozycja? kilka do wyboru? skąd się
+   biorą — zaszyte na sztywno w kodzie, czy user może zapisać WŁASNY układ jako szablon do
+   powtórnego użycia na innym ekranie?) — **wymaga doprecyzowania z userem przed kodowaniem**,
+   żeby nie zbudować niepotrzebnej abstrakcji.
+3. ✅ **ZROBIONE (§390) — wybór ekranu docelowego**: lista `PROJECT_SCREENS` w `app/settings.tsx`
+   WYBIERALNA (13 ekranów, nazwa + ikona + liczba komponentów/"Puste płótno"), nie dorozumiana
+   z aktualnego ekranu.
 4. **Navbar jako cel projektowania** — NAJTRUDNIEJSZY kawałek, user sam: "nie wiem jak to
    rozwiązać xd". `PupilNavbar`/`TabBar` dziś NIE są częścią systemu płótna w ogóle (to osobne,
    zaszyte na sztywno komponenty renderowane jako ostatni sibling na każdym ekranie, patrz

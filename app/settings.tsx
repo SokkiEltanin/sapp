@@ -71,7 +71,8 @@ import { useBankRules, BankRule, BankRuleKind, ruleKind } from '@/store/bankRule
 import { parseBankNotification } from '@/utils/bankNotification';
 import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
-import { SettingsSectionDef } from '@/types/settings';
+import { SettingsSectionDef, LucideIcon } from '@/types/settings';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
 import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
@@ -143,6 +144,71 @@ function SettingsCategoryRow({ section, onPress }: { section: SettingsSectionDef
         <ChevronLeft size={16} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
       </View>
     </PressableScale>
+  );
+}
+
+// Edytor płótna — wejście z Ustawień (Faza §390, 2026-10-19) — user: "miała być możliwość
+// kliknięcia w ustawieniach nie na ekranach, utwórz projekt... później jak bierzesz pusty
+// musisz wybrać gdzie to ma być czyli czy to dashboard projektujesz czy zdrowie itp". Lista
+// WSZYSTKICH ekranów hostujących płótno (`screenKey` z `ScreenCanvas`/`ScreenCanvasBase` w
+// `app/**`, 13 dziś — patrz ARCHITECTURE.md §390 dla pełnej listy z route'ami). Tapnięcie
+// ustawia `pendingAutoEdit` (jednorazowy sygnał w `canvasComponentsStore.ts`) i nawiguje na
+// docelowy ekran, który sam włącza tryb edycji przy montowaniu — zero dodatkowego tapnięcia
+// ✏️ na docelowym ekranie. "Projekt" = per-ekranowe płótno, które już istnieje jako dane
+// (`items`/`fullScreenScreens` keyed po `screenKey`) — ta lista to NOWY, scentralizowany
+// launcher nad ISTNIEJĄCYM mechanizmem, nie nowy model danych "projektów" z własnym id/nazwą.
+// "Szablon vs pusty canvas" z oryginalnej wiadomości usera — ŚWIADOMIE NIE w tej fazie (żadne
+// szablony jeszcze nie istnieją jako dane do wyboru) — patrz NEXT_STEPS.md §390.
+const PROJECT_SCREENS: { key: string; label: string; route: string; icon: LucideIcon }[] = [
+  { key: 'dashboard', label: 'Dashboard', route: '/(tabs)', icon: LucideIcons.LayoutDashboard },
+  { key: 'health', label: 'Zdrowie', route: '/health', icon: LucideIcons.HeartPulse },
+  { key: 'food', label: 'Jedzenie', route: '/food', icon: LucideIcons.Apple },
+  { key: 'tasks', label: 'Zadania', route: '/tasks', icon: LucideIcons.ListTodo },
+  { key: 'finances', label: 'Finanse', route: '/finances', icon: LucideIcons.Wallet },
+  // `stats`/`calendar` — dwa RÓŻNE ekrany, oba z UI tytułem "Kalendarz" (nazwa pliku/screenKey
+  // "stats" to HISTORYCZNA niespójność, nie błąd — patrz `app/(tabs)/stats.tsx`'s nagłówek).
+  // Rozróżnione w etykiecie, żeby user nie trafił przez przypadek na złe z dwóch.
+  { key: 'stats', label: 'Kalendarz (zakładka)', route: '/stats', icon: LucideIcons.CalendarDays },
+  { key: 'calendar', label: 'Kalendarz (pełny widok)', route: '/calendar', icon: LucideIcons.Calendar },
+  { key: 'mood', label: 'Nastrój', route: '/mood', icon: LucideIcons.Smile },
+  { key: 'habits', label: 'Nawyki', route: '/habits', icon: LucideIcons.Flame },
+  { key: 'notes', label: 'Notatki', route: '/notes', icon: LucideIcons.FileText },
+  { key: 'pet', label: 'Pupil', route: '/pet', icon: LucideIcons.PawPrint },
+  { key: 'counters', label: 'Liczniki', route: '/counters', icon: LucideIcons.Hourglass },
+  { key: 'exercises', label: 'Ćwiczenia', route: '/exercises', icon: LucideIcons.Dumbbell },
+];
+
+function EditorProjectsList() {
+  const c = useColors();
+  const items = useCanvasComponentsStore(st => st.items);
+  const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
+  return (
+    <View style={{ gap: spacing[2] }}>
+      {PROJECT_SCREENS.map(p => {
+        const count = items.filter(i => i.screenKey === p.key).length;
+        const Icon = p.icon;
+        return (
+          <PressableScale key={p.key} onPress={() => { haptic.tap(); setPendingAutoEdit(p.key); router.push(p.route as any); }}>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+              backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
+              padding: spacing[3],
+            }}>
+              <View style={{ width: 30, height: 30, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: '#38BDF818' }}>
+                <Icon size={15} color="#38BDF8" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: c.text.primary }}>{p.label}</Text>
+                <Text style={{ fontSize: 11, color: c.text.muted, marginTop: 1 }}>
+                  {count > 0 ? plPlural(count, 'komponent', 'komponenty', 'komponentów') : 'Puste płótno'}
+                </Text>
+              </View>
+              <ChevronLeft size={14} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </View>
+          </PressableScale>
+        );
+      })}
+    </View>
   );
 }
 
@@ -954,6 +1020,19 @@ export default function SettingsScreen() {
           icon: Vibrate, accentColor: colors.accent.purple,
           keywords: ['wibracje', 'haptyka', 'dotyk', 'feedback', 'klik'],
           control: { kind: 'switch', value: hapticsOn, onChange: (v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); } },
+        },
+      ],
+    },
+    {
+      // Edytor płótna (§390) — scentralizowany launcher, patrz komentarz przy
+      // `PROJECT_SCREENS`/`EditorProjectsList` wyżej w tym pliku.
+      id: 'edytor-platna', title: 'Edytor płótna', icon: LucideIcons.PenTool, color: '#38BDF8', defaultOpen: false,
+      keywords: ['edytor', 'płótno', 'canvas', 'projekt', 'projekty', 'figma', 'canva', 'kafle', 'komponenty', 'wykresy'],
+      items: [
+        {
+          id: 'edytor-projekty', title: 'Projekty', subtitle: 'Wybierz ekran i zaprojektuj jego płótno',
+          keywords: ['projekt', 'nowy projekt', 'edytor', 'płótno', 'canvas', 'ekran'],
+          control: { kind: 'custom', render: () => <EditorProjectsList /> },
         },
       ],
     },

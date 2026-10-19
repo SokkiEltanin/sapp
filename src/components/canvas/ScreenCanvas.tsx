@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -139,6 +139,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const [confirmFullScreen, setConfirmFullScreen] = useState(false);
   const fullScreenOn = useCanvasComponentsStore(st => st.fullScreenScreens[screenKey] ?? false);
   const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
+  // Wejście do edytora z Ustawień (§390) — jednorazowy sygnał, patrz komentarz w
+  // `canvasComponentsStore.ts`. Sprawdzamy TYLKO raz, przy zmianie `pendingAutoEdit` (nie na
+  // każdy render) — jeśli dotyczy WŁASNEGO ekranu, włącz edycję i natychmiast wyczyść flagę
+  // (żeby np. nawigacja z powrotem na ten sam ekran później nie znowu-włączyła edycji).
+  const pendingAutoEdit = useCanvasComponentsStore(st => st.pendingAutoEdit);
+  const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
+  useEffect(() => {
+    if (pendingAutoEdit === screenKey) { setEditing(true); setPendingAutoEdit(null); }
+  }, [pendingAutoEdit, screenKey]);
 
   const allItems = useCanvasComponentsStore(st => st.items);
   const addItem = useCanvasComponentsStore(st => st.addItem);
