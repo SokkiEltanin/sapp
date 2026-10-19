@@ -3,6 +3,7 @@ import { DEFAULT_NOTES_TILE_STYLE } from '@/store/notesTileStyleDefaults';
 import { DEFAULT_RECT_SHAPE_STYLE, DEFAULT_LINE_SHAPE_STYLE } from '@/store/shapeStyleDefaults';
 import { DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
 import { DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
+import { DEFAULT_PROGRESS_BAR_STYLE } from '@/store/progressBarStyleDefaults';
 
 // Grupowanie (Faza 20, 2026-10-17, §349) — user, wcześniej w §333: "grupowanie komponentów".
 // Testowane bezpośrednio na store (ten sam wzorzec co battleLayoutDraftStore.test.ts) —
@@ -439,6 +440,21 @@ describe('canvasComponentsStore — addItem (navTab, §392)', () => {
     const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
     expect(item.componentType).toBe('navTab');
     expect(item.style).toEqual({});
+    expect(item.bindingKey).toBeNull();
+    expect(item.width).toBeGreaterThan(0);
+    expect(item.height).toBeGreaterThan(0);
+  });
+});
+
+// Pasek progresu (§393) — user: "dodaj... paski progresu... jak kiedyś w KWGT Widgets".
+// Podpięcie idzie do TEGO SAMEGO rejestru co countdownTile (zero nowej konfiguracji zakresu).
+describe('canvasComponentsStore — addItem (progressBar, §393)', () => {
+  test('progressBar dostaje domyślny styl i bindingKey=null (jeszcze nie podpięty)', () => {
+    const { addItem } = useCanvasComponentsStore.getState();
+    const id = addItem('health', 'progressBar');
+    const item = useCanvasComponentsStore.getState().items.find(i => i.id === id)!;
+    expect(item.componentType).toBe('progressBar');
+    expect(item.style).toEqual(DEFAULT_PROGRESS_BAR_STYLE);
     expect(item.bindingKey).toBeNull();
     expect(item.width).toBeGreaterThan(0);
     expect(item.height).toBeGreaterThan(0);

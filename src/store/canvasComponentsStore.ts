@@ -12,6 +12,7 @@ import { DataFieldTileStyle, DEFAULT_DATA_FIELD_TILE_STYLE } from '@/store/dataF
 import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
 import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
 import { NavTabStyle, DEFAULT_NAV_TAB_STYLE } from '@/store/navTabStyleDefaults';
+import { ProgressBarStyle, DEFAULT_PROGRESS_BAR_STYLE } from '@/store/progressBarStyleDefaults';
 
 // System kopiowania komponentów, Faza 15 (2026-10-16, §341) — user: "chce dosłownie tam od
 // zera zbudować z przesunięciem podpięcia itp", doprecyzowane: WOLNE PŁÓTNO (Figma/Canva-style
@@ -68,7 +69,12 @@ import { NavTabStyle, DEFAULT_NAV_TAB_STYLE } from '@/store/navTabStyleDefaults'
 // streakTile/itd., ale celowo WĄSKI rejestr opcji (bezpieczeństwo: nie da się skonfigurować
 // przycisku prowadzącego do nieistniejącej strony). Dostępny WYŁĄCZNIE dla `screenKey ===
 // 'navbar'` (patrz `ScreenCanvas.tsx`'s add-button) — na innych ekranach nie miałby sensu.
-export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile' | 'statTile' | 'navTab';
+// Faza §393 (2026-10-19) — dziewiąty typ, `'progressBar'` ("Pasek progresu"), user: "dodaj...
+// paski progresu... żeby podczas projektowania mógł wrzucić pasek... jak kiedyś w KWGT
+// Widgets". UŻYWA `bindingKey` z TEGO SAMEGO rejestru co `countdownTile` (`allCountdownItems`)
+// — procent liczy się z już istniejących funkcji `countersStore.ts`, zero nowej konfiguracji
+// zakresu (zakres to własny start/koniec licznika).
+export type CanvasComponentType = 'streakTile' | 'countdownTile' | 'notesTile' | 'dataField' | 'rectShape' | 'ellipseShape' | 'lineShape' | 'textShape' | 'iconTile' | 'statTile' | 'navTab' | 'progressBar';
 
 // Minimalny rozmiar itemu (Faza 28, 2026-10-17, §359) — PRZENIESIONE z `CanvasPlacedItem.tsx`
 // (gdzie żyły jako prywatne consty tego komponentu) — `resizeGroupBy` niżej potrzebuje TYCH
@@ -101,7 +107,7 @@ export interface CanvasItem {
   // nowego słownika identyfikatorów. `null` = jeszcze nieprzepięty (dla 4 typów kształtów: ZAWSZE
   // `null`, patrz komentarz wyżej).
   bindingKey: string | null;
-  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle;  // per-instancja, kopia
+  style: StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle | ProgressBarStyle;  // per-instancja, kopia
   // Grupowanie (Faza 20, 2026-10-17, §349) — user, dużo wcześniej w §333: "grupowanie
   // komponentów". `null` = nie w grupie. Dzielony losowy string = "ta sama grupa" — NIE osobna
   // encja/tabela (prościej: żaden grupowy byt do utrzymania w synchronizacji z członkami, grupa
@@ -151,8 +157,10 @@ const DEFAULT_SIZE: Record<CanvasComponentType, { width: number; height: number 
   // Przycisk nawigacji (§392) — kwadrat jak ikona (Faza 33), symetryczny box dla symetrycznej
   // ikony tabu.
   navTab: { width: 64, height: 64 },
+  // Pasek progresu (§393) — szeroki, płaski, jak typowy pasek postępu.
+  progressBar: { width: 220, height: 28 },
 };
-const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle> = {
+const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTileStyle | NotesTileStyle | DataFieldTileStyle | RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle | IconTileStyle | StatTileCanvasStyle | NavTabStyle | ProgressBarStyle> = {
   streakTile: DEFAULT_STREAK_TILE_STYLE,
   countdownTile: DEFAULT_COUNTDOWN_TILE_STYLE,
   notesTile: DEFAULT_NOTES_TILE_STYLE,
@@ -164,6 +172,7 @@ const DEFAULT_STYLE: Record<CanvasComponentType, StreakTileStyle | CountdownTile
   iconTile: DEFAULT_ICON_TILE_STYLE,
   statTile: DEFAULT_STAT_TILE_STYLE,
   navTab: DEFAULT_NAV_TAB_STYLE,
+  progressBar: DEFAULT_PROGRESS_BAR_STYLE,
 };
 
 interface CanvasComponentsState {

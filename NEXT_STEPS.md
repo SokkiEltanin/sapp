@@ -166,40 +166,43 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
    + lista stopów), i obsługę w `ShapeTile.tsx`'s SVG (`react-native-svg` ma `LinearGradient`/
    `Defs` — wspierane, niezbudowane).
 
-8. **Paski progresu — konfigurowalny zakres; liczniki/progi — konfigurowalne thresholdy**
-   (2026-10-19, kolejna wiadomość usera, "przemyśl to dobrze"): "tak samo z PASKAMI PROGRESU
-   muszę mieć [możliwość] ustawiać zakresy, tak samo z licznikami muszę mieć opcję dodania
-   progów co ile [i] jakie (czy liczba czy procent itp)". Dwa OSOBNE podsystemy, żaden jeszcze
-   nie zbadany na tyle, by zacząć kodować:
-   - **Paski progresu** (`showProgressBar` — `streakTileStyleStore.ts` i prawdopodobnie inne
-     tile style stores z podobnym polem) — dziś to WIZUALNY włącznik/wyłącznik, zakres
-     (co liczy się jako "pełny") jest dorozumiany z logiki danego typu kafla (np. dla serii:
-     pewnie % do następnego progu). User chce to USTAWIALNE — potrzebny konkretny przykład
-     PRZED kodowaniem: pasek progresu NA CZYM konkretnie (który typ kafla), zakres skąd-dokąd
-     (np. "0 do mojego dziennego celu kroków" — wtedy trzeba pola `rangeMin`/`rangeMax` albo
-     `targetValue` w stylu TEGO kafla + UI do wpisania).
-   - **Progi liczników** (`STREAK_TIERS` w `streakTiers.ts`, dziś sztywno zaszyte 8 progów ze
-     stałymi wartościami dni, importowane w ~5 miejscach appki — kalendarz, dashboard, kreator,
-     canvas). Dziś user może nadpisać TYLKO kolor progu (`tierColorOverrides`, keyed po
-     indeksie 0-7) — NIE wartości progów, NIE liczbę progów, NIE jednostkę. User chce: dodawać
-     własne progi, wybierać "co ile" (interwał) i jednostkę (liczba dni vs procent czegoś).
-     **To jest zmiana modelu danych, nie tylko UI** — `tierColorOverrides: Record<number,
-     string>` zakłada STAŁĄ listę indeksów 0-7; zmienna liczba/wartości progów per-user wymaga
-     innej struktury (np. `tiers: {min: number, color: string}[]` per-user, zamiast
-     nadpisań-na-sztywnej-liście), i trzeba rozstrzygnąć migrację istniejących
-     `tierColorOverrides` + wszystkich ~5 miejsc, które dziś czytają `STREAK_TIERS` jako
-     GLOBALNĄ, współdzieloną stałą (nie per-user). **Nie zaczynać kodować bez jasnego ustalenia
-     z userem**: czy to ma być per-typ-kafla (każda instancja na płótnie ma WŁASNE progi) czy
-     globalna zmiana `STREAK_TIERS` (wpływa na WSZYSTKIE miejsca appki, nie tylko płótno)? To
-     drugie jest dużo większą, inwazyjną zmianą niż "tryb Dane na płótnie" i prawdopodobnie
-     wykracza poza sam system canvas/edytora.
+8. **Paski progresu — ✅ CZĘŚCIOWO ZROBIONE (§393) jako NOWY, samodzielny typ komponentu**
+   "Pasek progresu" (`progressBar`) — podpięcie do liczników (`allCountdownItems`), procent z
+   już istniejących `untilProgress`/`eventProgress`. To rozwiązało "zakres" dla TEGO konkretnego
+   przypadku bez nowej konfiguracji (zakres = start/koniec licznika). Checklist w
+   ARCHITECTURE.md §393.
+   **Progi liczników (`STREAK_TIERS`) — WCIĄŻ BLOKOWANE, nie wyjaśnione przez kolejne
+   wiadomości usera**: dziś sztywno zaszyte 8 progów ze stałymi wartościami dni, importowane w
+   ~5 miejscach appki (kalendarz, dashboard, kreator, canvas). User może nadpisać TYLKO kolor
+   progu (`tierColorOverrides`, keyed po indeksie 0-7) — NIE wartości/liczbę progów/jednostkę.
+   **To jest zmiana modelu danych, nie tylko UI** — zmienna liczba/wartości progów per-user
+   wymaga innej struktury (np. `tiers: {min: number, color: string}[]`), migracji istniejących
+   `tierColorOverrides`, i rozstrzygnięcia WSZYSTKICH ~5 miejsc czytających `STREAK_TIERS` jako
+   globalną stałą. **Nie zaczynać kodować bez jasnego ustalenia z userem**: per-kafel na płótnie
+   czy globalna zmiana `STREAK_TIERS` (wpływa na WSZYSTKIE miejsca appki)? To drugie jest dużo
+   większą, inwazyjną zmianą i prawdopodobnie wykracza poza sam system canvas/edytora.
+9. **Gradienty — jeszcze NIE zrobione.** User (2026-10-19, kolejna wiadomość): "dodaj gradienty
+   na pewno". Potrzebne dla: `rectShape`/`ellipseShape` (`shapeStyleDefaults.ts`, dziś płaski
+   `fill: string`) ORAZ nowy `progressBar` (§393, dziś płaski `fillColor`/`trackColor`). Plan:
+   discriminated union `fill: string | { type: 'gradient'; stops: string[]; angle?: number }`,
+   UI wyboru stopów (prawdopodobnie 2+ instancje `ColorPickerPanel`, §388 + lista stopów),
+   render przez `react-native-svg`'s `LinearGradient`/`Defs` dla shapes, `expo-linear-gradient`
+   (już używany w appce, np. `ColorPickerPanel.tsx`) dla `progressBar` (plain RN View, nie SVG).
+   **Jedna, spójna zmiana modelu dla OBU typów naraz**, nie dwa osobne mechanizmy.
+10. **Szablony projektów — jeszcze NIE zrobione.** User: "dodaj... szablony". Z §390: wybór
+    Szablon vs Pusty canvas przy tworzeniu projektu w Ustawieniach. Szablony (gotowe zestawy
+    `CanvasItem[]` do skopiowania na dany `screenKey`) jeszcze NIE ISTNIEJĄ jako dane — trzeba
+    zaprojektować: czy to kilka ZASZYTYCH NA STAŁE, gotowych układów (prostsze, szybsze) czy
+    user może zapisać WŁASNY układ jako szablon do powtórnego użycia na innym ekranie
+    (trudniejsze — wymaga nowej, trwałej biblioteki szablonów, osobnej od `colorLibraryStore`/
+    `tileStylePresetsStore`, ale analogicznej). **Domyślnie idę w pierwszą (prostszą) wersję,
+    chyba że user doprecyzuje że chce drugą.**
 
-**Status**: §387 (fix kształtów) i §388 (color picker) zrobione i wysłane. Reszta (punkty 1-6,
-8) W TOKU, budowane fazami bez przerywania (ten sam rytm co §381-388), z własnymi numerami
-ARCHITECTURE.md i checklistami testowymi per faza. **Kolejność planowana**: 6/zakres
-(najniższe zwisające owoce w statTile, samodzielne) → 1-3 (Ustawienia/Projekty/wybór ekranu) →
-5 (tryb Dane/popup) → 8 (paski/progi, wymaga doprecyzowania z userem przed startem) → 4
-(Navbar, najtrudniejsze, na koniec).
+**Status**: §387-393 zrobione i wysłane (fix kształtów, color picker, zakres wykresu, Ustawienia/
+Projekty, tryb Dane/popup, Navbar, pasek progresu). Reszta — gradienty (9), szablony (10), i
+blokowane progi liczników (8, część druga) — W TOKU/czeka, budowane fazami bez przerywania
+(ten sam rytm co dotąd). **Kolejność planowana**: 9 (gradienty, wysoka wartość, jedna zmiana
+dla dwóch typów naraz) → 10 (szablony, samodzielne) → 8/progi (wymaga doprecyzowania z userem).
 
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 

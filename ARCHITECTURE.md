@@ -20893,6 +20893,47 @@ WYJĄTKOWO wysoki, wyższy niż zwykle w tej serii.
 3. Dodaj też dekoracje (kształt/ikonę) do navbaru — sprawdź że się wyświetlają, ale NIE są
    klikalne/nie przeszkadzają w tapnięciu przycisków nawigacji pod/nad nimi.
 
+## 393. Typ komponentu "Pasek progresu" (2026-10-19)
+
+Pierwszy z czterech kawałków następnej wiadomości usera ("dodaj gradienty na pewno, szablony,
+paski progresu itp... i te liczniki ogólnie... jak kiedyś w KWGT WIDGETs" — KWGT/Kustom Widget,
+popularna appka Android na dokładnie ten model: gotowe, stylowalne elementy — pasek/łuk/tekst —
+podpięte do dowolnych danych). Dziesiąty `CanvasComponentType`, `'progressBar'`.
+
+**Reużyty rejestr I matematyka, nie zbudowane od zera**: `bindingKey` idzie do TEGO SAMEGO
+rejestru co `countdownTile` (`allCountdownItems`/`Counter`, WYŁĄCZNIE `kind='until'` —
+`useAllCountdownItems()` już filtruje 'since', więc KAŻDY wpis w tej liście ma dobrze
+zdefiniowaną, policzalną frakcję 0..1). Procent wypełnienia liczy TE SAME, już sprawdzone
+funkcje `countersStore.ts` (`untilProgress`/`eventProgress`/`untilProgressStepped`) co
+`CountdownTile.tsx`'s `RingCountdown` — **zero nowej konfiguracji "zakresu"**, bo zakres to
+własny start/koniec licznika, ustawiony już przy jego tworzeniu w Licznikach. To rozwiązuje
+wcześniejszą niejasność z NEXT_STEPS.md (punkt "zakresy pasków progresu") — nie trzeba było
+wymyślać nowego mechanizmu range/target, istniejący już dawał dokładnie to, czego trzeba.
+
+**`ProgressBarTile.tsx`** — wypełnienie jako PLAIN RN `View` (NIE SVG) wewnątrz `overflow:
+'hidden'` toru — RN `borderRadius` jest geometrycznie poprawny niezależnie od proporcji BOXA
+(bez pułapki §387, która dotyczyła WYŁĄCZNIE SVG `rx`/`ry` w znormalizowanym viewBoxie) — tor
+obcina wypełnienie do swojego zaokrąglonego kształtu, zero osobnego zaokrąglenia na samym
+wypełnieniu. Orientacja pozioma/pionowa (prosty przełącznik w stylu).
+
+**Styl (`CanvasProgressBarStyleModal.tsx`)** — kolor wypełnienia/toru (via `ColorSwatchPicker`,
+więc od razu z nowym pickerem §388), zaokrąglenie, orientacja. **ŚWIADOMIE BEZ gradientu w tej
+fazie** — gradient to OSOBNY, większy kawałek (patrz NEXT_STEPS.md), zrobiony w NASTĘPNEJ fazie
+dla WSZYSTKICH typów z kolorem naraz (shapes + ten pasek), nie dwa razy osobno.
+
+**Nawigacja po tapnięciu** — identyczna jak `countdownTile` (`router.push('/counters/:id')`),
+bo dzieli TEN SAM rejestr — `onTap` w `ScreenCanvas.tsx` dostał `isCountdown || isProgressBar`
+w tej samej gałęzi, z `bound = isProgressBar ? boundProgressCounter : boundCountdown`.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 1 nowy (`addItem('progressBar')`
+domyślny styl/rozmiar/bindingKey=null). `tsc --noEmit` czyste, `jest --silent` 113/113 suite,
+1475 testów (+1).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: dowolny ekran z płótnem → "Pasek progresu" → podepnij
+do aktywnego licznika "do" (z datą w przyszłości) → sprawdź że wypełnienie odpowiada % czasu
+który minął od stworzenia licznika do daty docelowej (to samo co pokazuje pierścień na kaflu
+"Odliczanie" tego samego licznika — powinny się zgadzać).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

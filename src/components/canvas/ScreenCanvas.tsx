@@ -48,6 +48,9 @@ import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileSt
 import { WIDGET_METRICS, StatCtx } from '@/utils/statWidgets';
 import { NavTabTile } from './NavTabTile';
 import { PUPIL_NAV_TABS } from '@/data/pupilNavTabs';
+import { ProgressBarTile } from './ProgressBarTile';
+import CanvasProgressBarStyleModal from './CanvasProgressBarStyleModal';
+import { ProgressBarStyle, DEFAULT_PROGRESS_BAR_STYLE } from '@/store/progressBarStyleDefaults';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -212,6 +215,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     if (item.componentType === 'textShape') return 'Tekst';
     if (item.componentType === 'statTile') return item.bindingKey ? (WIDGET_METRICS.find(m => m.id === item.bindingKey)?.label ?? 'Wykres') : 'Wykres (brak podpięcia)';
     if (item.componentType === 'navTab') return item.bindingKey ? (PUPIL_NAV_TABS.find(t => t.key === item.bindingKey)?.label ?? 'Przycisk nawigacji') : 'Przycisk nawigacji (brak podpięcia)';
+    if (item.componentType === 'progressBar') return item.bindingKey ? (allCountdownItems.find(x => x.id === item.bindingKey)?.name ?? 'Pasek progresu') : 'Pasek progresu (brak podpięcia)';
     return 'Ikona';
   };
   // TOP-FIRST (odwrotność `orderedItems` — user intuicyjnie myśli "co jest na wierzchu" jako
@@ -386,6 +390,10 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           // skonfigurować "zepsuty" przycisk, bo lista opcji jest zamknięta.
           const isNavTab = item.componentType === 'navTab';
           const boundNavTab = isNavTab && item.bindingKey ? PUPIL_NAV_TABS.find(t => t.key === item.bindingKey) ?? null : null;
+          // Pasek progresu (§393) — TEN SAM rejestr co countdownTile (`allCountdownItems`),
+          // więc tapnięcie/opcje pickera też się reużywają.
+          const isProgressBar = item.componentType === 'progressBar';
+          const boundProgressCounter = isProgressBar && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
@@ -402,8 +410,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             if (isStreak) {
               if (boundStreak) navigateForStreakItem(boundStreak, item.style as StreakTileStyle);
               else setPickerForId(item.id);
-            } else if (isCountdown) {
-              if (boundCountdown) { haptic.tap(); router.push(`/counters/${boundCountdown.id}` as any); }
+            } else if (isCountdown || isProgressBar) {
+              const bound = isProgressBar ? boundProgressCounter : boundCountdown;
+              if (bound) { haptic.tap(); router.push(`/counters/${bound.id}` as any); }
               else setPickerForId(item.id);
             } else if (isNote) {
               if (boundNote) { haptic.tap(); router.navigate(`/notes?noteId=${boundNote.id}` as any); }
@@ -506,6 +515,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
+              ) : isProgressBar ? (
+                <ProgressBarTile
+                  counter={boundProgressCounter}
+                  style={item.style as ProgressBarStyle}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                />
               ) : (
                 <ShapeTile
                   kind={item.componentType as ShapeComponentType}
@@ -572,6 +588,10 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             <TouchableOpacity onPress={() => onAdd('countdownTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
               <Plus size={15} color="#fff" />
               <Text style={s.addTxt}>Odliczanie</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onAdd('progressBar')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" />
+              <Text style={s.addTxt}>Pasek progresu</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => onAdd('notesTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
               <Plus size={15} color="#fff" />
@@ -652,11 +672,11 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : pickerItem?.componentType === 'progressBar' ? 'Wybierz licznik' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : pickerItem?.componentType === 'progressBar' ? CalendarClock : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : pickerItem?.componentType === 'progressBar' ? countdownOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
-        emptyHint={pickerItem?.componentType === 'countdownTile'
+        emptyHint={pickerItem?.componentType === 'countdownTile' || pickerItem?.componentType === 'progressBar'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
           : pickerItem?.componentType === 'notesTile'
           ? 'Brak notatek na koncie — dodaj jedną w Notatkach.'
@@ -735,6 +755,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         visible={!!styleItem && styleItem.componentType === 'statTile'}
         style={(styleItem && styleItem.componentType === 'statTile' ? styleItem.style : DEFAULT_STAT_TILE_STYLE) as StatTileCanvasStyle}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as StatTileCanvasStyle), ...patch } }); }}
+        onClose={() => setStyleForId(null)}
+      />
+
+      <CanvasProgressBarStyleModal
+        visible={!!styleItem && styleItem.componentType === 'progressBar'}
+        style={(styleItem && styleItem.componentType === 'progressBar' ? styleItem.style : DEFAULT_PROGRESS_BAR_STYLE) as ProgressBarStyle}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as ProgressBarStyle), ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
 
