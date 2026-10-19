@@ -10,12 +10,15 @@ import { AttackKind } from '@/utils/bosses';
 //
 // Foldery (2026-09-02, posegregowane analogicznie do `assets/ekwipunek/<slot>/` —
 // user: "wszystkie bossy posegregować na kampanie/questy/eventy-rajdy, umiejętności"):
-//   assets/bossy/kampania/      — 22 bossów kampanii (samurai...wizard) + 3 martwe
-//                                 pliki zostawione na wypadek przyszłego użycia
-//                                 (BOSS_atakfire_adventure.png — brak odpowiadającego
-//                                 id w BOSSES; BOSS_reaperatack_reaper.png/BOSS_
-//                                 pazurattack_cerberus.png — zastąpione customowym
-//                                 artem burnout/doubt 2026-09-23).
+//   assets/bossy/kampania/      — 22 bossów kampanii, od §399 (2026-10-19) NOWE portrety
+//                                 (prefiks pliku = żywioł: LV_=lawa, W_=woda, BRZ_=burza,
+//                                 BS_=niebo, L_=las) + `LV_Colossus Magmaticus.png`
+//                                 ZAREZERWOWANY (6. z grupy lawa, nieużyty w kampanii —
+//                                 kandydat pod przyszły reskin raidu/eventu, patrz
+//                                 NEXT_STEPS.md) + 3 STARE pliki wciąż pożyczane przez raid
+//                                 (behemoth/wyrm/siren w `BOSS_PNG` niżej, dopóki raid nie
+//                                 dostanie własnego reskinu) + 1 martwy (BOSS_reaperatack_
+//                                 reaper.png, osierocony już wcześniej, 2026-09-23).
 //   assets/bossy/questy/        — minibossy questowe (mb_*, dawne assets/minibosses/ +
 //                                 wilk/grizzly/osa) + 3 martwe (goat/whale, wycofane
 //                                 z rotacji 2026-08-26; MINIBOSS_duck.png, zastąpiony
@@ -28,37 +31,40 @@ import { AttackKind } from '@/utils/bosses';
 //                                 (BOSSATTACK_bomb.png, po usuniętym efekcie z 2026-08-18).
 //   assets/lokalizacje/         — tła areny (LOKACJA_*.png), patrz `arenaBgFor()` niżej.
 // ─────────────────────────────────────────────────────────────────────────────
+// Pełny reskin rosteru kampanii (Faza §399, 2026-10-19) — user: "wywal stare lokalizacje
+// wszystkie i stare bossy wszystkie (z kampanii i inne)... dopasować areny dobrze do bosów bo
+// każdy rodzaj bossów ma swoją arenę". 22 nowych portretów, pogrupowanych PREFIKSEM pliku wg
+// żywiołu (patrz `BOSS_ELEMENT` niżej dla przypisania arena↔boss) — WSZYSTKIE stare,
+// w większości pożyczone/stockowe pliki (łącznie z dwoma custom-artami z 2026-09-23,
+// burnout/doubt — patrz komentarz w `bosses.ts`) USUNIĘTE z dysku. `id`→plik mapowanie
+// dobrane tak, by charakter/żywioł nowego stworzenia pasował do `weakness`/nazwy bossa tam,
+// gdzie to naturalne (pełne uzasadnienie w ARCHITECTURE.md §399), ale NIE jest to twarda
+// reguła — nazwa/portret to WYŁĄCZNIE flavor, nie wpływa na balans (patrz komentarz nad `Boss`
+// w bosses.ts).
 export const BOSS_PNG: Record<string, ImageSourcePropType> = {
-  sloth:     require('../../assets/bossy/kampania/BOSS_atakpazury_frog.png'),
-  sugar:     require('../../assets/bossy/kampania/BOSS_handattack_pumpkin.png'),
-  snake:     require('../../assets/bossy/kampania/BOSS_atakukąszenie_snake.png'),
-  dragon:    require('../../assets/bossy/kampania/BOSS_fireattack_dragon.png'),
-  scroll:    require('../../assets/bossy/kampania/BOSS_atakreka_thief.png'),
-  stress:    require('../../assets/bossy/kampania/BOSS_atakukaszenie_tarantula.png'),
-  junk:      require('../../assets/bossy/kampania/BOSS_maczukaatack_cyclops.png'),
-  // Custom art (2026-09-23, user #7: "wrzuciłem Ci nowe bossy, zamieniamy te stare...
-  // moje są customowe") — pierwsze 2 z 22 kampanijnych bossów dostają własny art zamiast
-  // pożyczonego stockowego; dawne `BOSS_reaperatack_reaper.png`/`BOSS_pazurattack_
-  // cerberus.png` zostają na dysku nieużywane, ten sam wzorzec co pozostałe "martwe"
-  // pliki w tym folderze (patrz komentarz przy definicji `BOSS_PNG` wyżej). Oba źródłowe
-  // pliki (i `MINIBOSS_ROPUCHA.png` niżej) przeskalowane 1536×1024/~2MB → 600×400/~290KB
-  // (Pillow LANCZOS, alfa zachowana) — ten sam próg co `mb_lodowykrolik` (§94).
-  burnout:   require('../../assets/bossy/kampania/BOSS_DYMNYNIEDZWIEDZ.png'),
-  insomnia:  require('../../assets/bossy/kampania/BOSS_atakbone_skeleton.png'),
-  compare:   require('../../assets/bossy/kampania/BOSS_atakmagicrod_magician.png'),
-  drought:   require('../../assets/bossy/kampania/BOSS_ataksoundwave_mermaid.png'),
-  procrast:  require('../../assets/bossy/kampania/BOSS_BOLTATTACK_zeus.png'),
-  doubt:     require('../../assets/bossy/kampania/BOSS_MROCZNYKRUK.png'),
-  devourer:  require('../../assets/bossy/kampania/BOSS_axeattack_executioner.png'),
+  sloth:     require('../../assets/bossy/kampania/BS_Vulpes Solaris.png'),
+  sugar:     require('../../assets/bossy/kampania/BS_Draculus Caelestis.png'),
+  snake:     require('../../assets/bossy/kampania/BRZ_Serpens Tempestatis.png'),
+  dragon:    require('../../assets/bossy/kampania/LV_Draco Vulcanicus.png'),
+  scroll:    require('../../assets/bossy/kampania/W_Scylla.png'),
+  stress:    require('../../assets/bossy/kampania/BS_Anima Lactea.png'),
+  junk:      require('../../assets/bossy/kampania/LV_Ursus Vulcanicus.png'),
+  burnout:   require('../../assets/bossy/kampania/LV_Lupus Magmaticus.png'),
+  insomnia:  require('../../assets/bossy/kampania/BRZ_Elementum Fulguris.png'),
+  compare:   require('../../assets/bossy/kampania/BS_Essentia Aetheris.png'),
+  drought:   require('../../assets/bossy/kampania/W_Sanguis Vorax.png'),
+  procrast:  require('../../assets/bossy/kampania/BRZ_Draco Fulguris.png'),
+  doubt:     require('../../assets/bossy/kampania/BRZ_Corvus Fulguris.png'),
+  devourer:  require('../../assets/bossy/kampania/L_Golem Fungalus.png'),
   // ── prestiż (2026-08-09) ──
-  samurai:       require('../../assets/bossy/kampania/BOSS_atakkatana_samurai.png'),
-  jaguar:        require('../../assets/bossy/kampania/BOSS_atakpazurty_jaguar.png'),
-  dinosaur:      require('../../assets/bossy/kampania/BOSS_atakpazury_dinosaur.png'),
-  piratecapitan: require('../../assets/bossy/kampania/BOSS_attaksword_piratecapitan.png'),
-  hades:         require('../../assets/bossy/kampania/BOSS_fireattack_hades.png'),
-  clown:         require('../../assets/bossy/kampania/BOSS_handattack_clown.png'),
-  princess:      require('../../assets/bossy/kampania/BOSS_handattack_princess.png'),
-  wizard:        require('../../assets/bossy/kampania/BOSS_magicattack_wizard.png'),
+  samurai:       require('../../assets/bossy/kampania/L_Custos Nemoris.png'),
+  jaguar:        require('../../assets/bossy/kampania/LV_Mantis Ignivora.png'),
+  dinosaur:      require('../../assets/bossy/kampania/W_Carcharos.png'),
+  piratecapitan: require('../../assets/bossy/kampania/W_Tempestas.png'),
+  hades:         require('../../assets/bossy/kampania/LV_Vulpes Ignivorus.png'),
+  clown:         require('../../assets/bossy/kampania/L_Ferox Floralis.png'),
+  princess:      require('../../assets/bossy/kampania/L_Cornipes Silvae.png'),
+  wizard:        require('../../assets/bossy/kampania/L_Silvanus.png'),
   // ── sezonowe wydarzenia (seasonalEvents.ts) — TEN SAM plik/mapa co kampania,
   // id-e się nie kolidują, więc BossArt działa 1:1 bez osobnego komponentu (2026-08-10) ──
   wakacje:       require('../../assets/bossy/eventy-rajdy/BOSS_WAKACYJNYSŁONECZNYBOSS_pegasus.png'),
@@ -199,12 +205,53 @@ export function missionLocationBg(minibossId: string | undefined): ImageSourcePr
   return minibossId ? MISSION_LOCATION_BG[minibossId] : undefined;
 }
 
+// Areny PER ŻYWIOŁ bossa (Faza §399, 2026-10-19) — user: "każdy rodzaj bossów ma swoją arenę
+// (wodne / mroczne / lavowe / boskie / leśne)". W ODRÓŻNIENIU od `ARENA_BG_BY_KIND` wyżej
+// (które klucze po TRYBIE WALKI: kampania/raid/event/...), to klucze po TOŻSAMOŚCI bossa —
+// ten sam wymiar co `MISSION_LOCATION_BG` (per-konkretny-miniboss), tylko uogólniony na
+// WSZYSTKIE tryby, nie tylko quest/misję. `BOSS_ELEMENT` dziś wypełniony TYLKO dla 22 bossów
+// kampanii (§399) — raid/event/questy nadal spadają na `arenaBgFor(kind)`/`missionLocationBg`
+// jak dotąd, dopóki nie dostaną własnego reskinu (patrz NEXT_STEPS.md). `mrok` CELOWO bez
+// żadnego wpisu w `BOSS_ELEMENT` — user wybrał "6 aren, Mrok zostaje pusty na razie" (żadne z
+// 23 nowych artów nie pasowało tematycznie) — plik `ARENA_MROK.png` i tak jest tu wystawiony,
+// gotowy na pierwszego bossa, który go dostanie.
+export type BossElement = 'woda' | 'las' | 'lawa' | 'burza' | 'niebo' | 'mrok';
+export const ARENA_ELEMENT_BG: Record<BossElement, ImageSourcePropType> = {
+  woda:  require('../../assets/lokalizacje/BOSS ARENY/ARENA_WODA.png'),
+  las:   require('../../assets/lokalizacje/BOSS ARENY/ARENA_LAS.png'),
+  lawa:  require('../../assets/lokalizacje/BOSS ARENY/ARENA_PIEKLO.png'),
+  burza: require('../../assets/lokalizacje/BOSS ARENY/ARENA_BURZA.png'),
+  niebo: require('../../assets/lokalizacje/BOSS ARENY/ARENA_NIEBO.png'),
+  mrok:  require('../../assets/lokalizacje/BOSS ARENY/ARENA_MROK.png'),
+};
+// Przypisanie wprost z prefiksu pliku portretu w `BOSS_PNG` wyżej (LV_=lawa, W_=woda,
+// BRZ_=burza, BS_=niebo, L_=las) — jedno źródło prawdy, nie osobne zgadywanie.
+export const BOSS_ELEMENT: Partial<Record<string, BossElement>> = {
+  sloth: 'niebo', sugar: 'niebo', stress: 'niebo', compare: 'niebo',
+  snake: 'burza', insomnia: 'burza', procrast: 'burza', doubt: 'burza',
+  dragon: 'lawa', junk: 'lawa', burnout: 'lawa', jaguar: 'lawa', hades: 'lawa',
+  scroll: 'woda', drought: 'woda', dinosaur: 'woda', piratecapitan: 'woda',
+  devourer: 'las', samurai: 'las', clown: 'las', princess: 'las', wizard: 'las',
+};
+// `mad_<id>` (madBosses.ts) strips to jej BAZOWY id, ten sam wzorzec co `bossPng` wyżej —
+// MAD wersja bossa pożycza TEN SAM portret I TĘ SAMĄ arenę co jego normalna wersja.
+export function bossArenaBg(bossId: string | undefined): ImageSourcePropType | undefined {
+  if (!bossId) return undefined;
+  const baseId = bossId.startsWith('mad_') ? bossId.slice(4) : bossId;
+  const el = BOSS_ELEMENT[baseId];
+  return el ? ARENA_ELEMENT_BG[el] : undefined;
+}
+
 // Tło CAŁEGO ekranu walki (2026-09-14, user: "dodałem Ci całoekranowe lokacje GORSKILAS oraz
-// JUNGLA, one są na cały ekran... trzeba je ładnie zrobić" — boss-fight.tsx). Quest/misja mają
+// JUNGLA, one są na cały ekran... trzeba je ładnie zrobić" — boss-fight.tsx). Priorytet
+// (§399): (1) arena PER ŻYWIOŁ bossa (`bossArenaBg`, dziś: kampania) — NAJBARDZIEJ
+// specyficzna, działa dla KAŻDEGO `kind`, nie tylko quest/misja; (2) quest/misja mają
 // PER-MINIBOSS lokację (`MISSION_LOCATION_BG`, ta sama scena co pet.tsx dla spójności — user
-// widzi to samo miejsce w drodze I w walce); pozostałe tryby (kampania/raid/event/MAD) trzymają
+// widzi to samo miejsce w drodze I w walce); (3) pozostałe tryby bez własnego wpisu trzymają
 // się PER-KIND `arenaBgFor`. Jedna funkcja zamiast duplikowania fallback-chain w boss-fight.tsx.
 export function fightArenaBg(kind: ArenaKind, targetId: string | undefined): ImageSourcePropType {
+  const elementBg = bossArenaBg(targetId);
+  if (elementBg) return elementBg;
   if ((kind === 'quest' || kind === 'mission') && targetId) {
     const loc = missionLocationBg(targetId);
     if (loc) return loc;

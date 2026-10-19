@@ -21183,6 +21183,97 @@ wdrożyłeś. Wróć do edytora draftu, zmień coś, wdróż PONOWNIE → sprawd
 zaktualizował, a draft nie zniknął. Sprawdź że Navbar Pupila w liście Projektów zachował
 STARE zachowanie (bez trybu Edytor/Symulator, wprost na `navbar-editor`).
 
+## 399. Pełny reskin rosteru kampanii — 22 nowych bossów + areny per żywioł (2026-10-19)
+
+User wgrał bezpośrednio na `master` (poza tą sesją, "Add files via upload") nowy folder
+`BOSSYNEW/` — 23 customowe, spójne stylistycznie portrety stworzeń — oraz 6. tło areny
+(`ARENA_BURZA.png`, dokładające się do istniejących 5 w `assets/lokalizacje/BOSS ARENY/`:
+LAS/MROK/NIEBO/PIEKŁO/WODA, wgranych wcześniej pod osobnym komitem "nowe areny do
+zaimplementowania"), z wiadomością: "dodałem bossy i nowe lokalizacje... wywal stare
+lokalizacje wszystkie i stare bossy wszystkie (z kampanii i inne)... żeby dopasować areny
+dobrze do bosów bo każdy rodzaj bossów ma swoją arenę (wodne/mroczne/lavowe/boskie/leśne)".
+`AskUserQuestion` rozstrzygnął dwie kluczowe niejasności PRZED kodowaniem (nieodwracalne:
+kasowanie 20+ starych assetów + przepisanie danych bojowych):
+1. **Zakres** — "dosłownie wszystko" (campania + minibossy questowe + raid/event, nie TYLKO
+   kampania) — ta faza robi WYŁĄCZNIE kampanię (patrz "Świadomie poza zakresem" niżej),
+   minibossy/raid/event to jawnie zaplanowany następny krok w NEXT_STEPS.md.
+2. **Arena "Mrok"** — żaden z 23 nowych portretów nie pasował tematycznie (grupy to
+   lawa/woda/burza/niebo/las, nie mrok) — user wybrał "6 aren, Mrok zostaje pusty na razie"
+   (system gotowy na przyszłego mrocznego bossa, ale żaden dziś go nie używa).
+
+**Wybór 22 z 23 portretów dla rosteru kampanii** — prefiks nazwy pliku = żywioł/grupa:
+`LV_`=lawa (6 obrazów, w tym rezerwowy), `W_`=woda (4), `BRZ_`=burza (4), `BS_`=niebo/boskie
+(4), `L_`=las (5) → 23 razem. `LV_Colossus Magmaticus.png` (bezgłowy, bezosobowy tytan lawy)
+ŚWIADOMIE POMINIĘTY w kampanii — zarezerwowany pod przyszły raid/event (NEXT_STEPS.md), gdzie
+"czysta siła bez osobowości" pasuje lepiej niż jako nazwany NPC kampanii. Reszta (22)
+przypisana do 22 ISTNIEJĄCYCH slotów (`sloth`...`wizard`) z lekkim doborem tematycznym (np.
+`drought`/Hydra Odwodnienia dostał wodnego "Sanguis Vorax" — `weakness: 'water'` TRAFIA w
+żywioł portretu niejako przez przypadek, ale to tylko estetyczny bonus, nie reguła — `jaguar`/
+dawny ssak dostał np. lawową modliszkę bez żadnego związku z `weakness: 'habits'`).
+
+**Co ZOSTAJE nietknięte (ten sam powód co custom-art swap burnout/doubt z 2026-09-23 — te pola
+są "trwałym kluczem" gry)**: `id` (klucz w `defeatedBosses`/mapie kampanii), `order`/
+`unlockLevel`/`hp` (setki godzin kalibracji balansu udokumentowanej w `bosses.ts`), `loot.id`
+(klucz w `ownedItems`), `weakness`/`weaknessLabel`/`coins`/`xp`/`taunt`/`guard`/`regenPct`/
+`attackKind`. Żaden taunt nie wymagał zmiany — wszystkie mówią o SAMEJ słabości ("Po co dziś
+wstawać…"), nie o starym gatunku bossa, więc pasują do nowej tożsamości bez modyfikacji.
+**Zmienia się WYŁĄCZNIE**: `name`/`emoji` (nowe, 2-słowowe polskie nazwy w tym samym stylu co
+reszta rosteru, np. "Złoty Leniwiec", "Kruk Zwątpienia" — `doubt` świadomie ZOSTAJE krukiem,
+ciągłość motywu mimo zmiany konkretnego portretu) + portret w `bossIcons.ts`'s `BOSS_PNG` +
+NOWE przypisanie areny.
+
+**Nowy system aren PER ŻYWIOŁ bossa** (`bossIcons.ts`) — DODATKOWY wymiar obok istniejącego
+`arenaBgFor(kind)` (który klucze po TRYBIE walki: kampania/raid/event/quest/mad), nie jego
+zamiana: `BossElement` (`'woda'|'las'|'lawa'|'burza'|'niebo'|'mrok'`), `ARENA_ELEMENT_BG`
+(6 wpisów, wszystkie 6 nowych plików z `BOSS ARENY/`, `mrok`→`ARENA_MROK.png` mimo braku
+bossa — gotowe na przyszłość), `BOSS_ELEMENT` (boss id → żywioł, dziś wypełniony TYLKO dla 22
+bossów kampanii) i `bossArenaBg(bossId)` (resolver, `mad_<id>` zdejmuje prefiks jak `bossPng` —
+MAD wersja bossa dostaje TĘ SAMĄ arenę co normalna). `fightArenaBg(kind, targetId)`
+PRIORYTETYZUJE teraz `bossArenaBg(targetId)` PRZED dotychczasowym `missionLocationBg`/
+`arenaBgFor(kind)` — działa dla KAŻDEGO `kind`, nie tylko quest/misja (stary mechanizm był
+per-tryb LUB per-konkretny-miniboss, nigdy per-konkretny-boss-kampanii). Boss bez wpisu w
+`BOSS_ELEMENT` (dziś: wszystko poza kampanią) zachowuje się DOKŁADNIE jak dotąd — zero
+regresji dla niereskinowanych jeszcze trybów.
+
+**Assety**: 23 nowych plików przeniesione z `BOSSYNEW/` do `assets/bossy/kampania/`
+(konwencja folderów z §13/2026-09-02). 21 starych, teraz w pełni osieroconych portretów
+kampanii USUNIĘTE z dysku. 3 stare pliki ŚWIADOMIE ZOSTAJĄ (`BOSS_handattack_pumpkin.png`/
+`BOSS_fireattack_dragon.png`/`BOSS_ataksoundwave_mermaid.png`) — wciąż pożyczane przez raid
+(`behemoth`/`wyrm`/`siren` w `BOSS_PNG`), dopóki raid nie dostanie własnego reskinu. Stare
+tła lokacji (`LOKALIZACJA_GORKISLAS/JUNGLA/LODOWA`, `LOKACJA_KAMPANIA`) też ŚWIADOMIE
+NIETKNIĘTE — wciąż żywe jako `DEFAULT_ARENA_BG`/`MISSION_LOCATION_BG`/w `battle-layout-lab.tsx`
+dla trybów spoza kampanii.
+
+**Świadomie poza zakresem tej fazy** (user potwierdził "dosłownie wszystko" jako docelowy
+zakres, ale to ZA DUŻO na jeden, bezpiecznie przeglądalny PR — rozłożone na fazy, ten sam
+wzorzec co cała seria edytora §380-398):
+- **Minibossy questowe** (`minibosses.ts`, 10 zwierząt) — wciąż stare portrety/`destination`.
+- **Raid** (`raid.ts`, 6 bossów) i **wydarzenia sezonowe** (`seasonalEvents.ts`, 8 bossów) —
+  wciąż stare/częściowo brakujące portrety.
+- Pełne skasowanie starych teł lokacji (GORSKILAS/JUNGLA/LODOWA/KAMPANIA) — dopiero gdy
+  WSZYSTKIE miejsca, które ich dziś używają (miniboss fallback, raid/event fallback,
+  battle-layout-lab), dostaną nowe areny.
+Pełny plan w NEXT_STEPS.md.
+
+**Testy**: nowy `__tests__/bossIcons.test.ts` (6 testów — każdy z 22 bossów ma portret I
+żywioł, żaden nie jest w "mrok", `bossArenaBg` zwraca poprawne tło per żywioł, `mad_`
+pożycza arenę bazowego bossa, boss bez przypisania zwraca `undefined`). Zaktualizowany 1
+istniejący test (`bossProgressReport.test.ts` — asercja na `name`/`emoji` żywego `sloth`
+dogoniła nowy "Złoty Leniwiec"/🌞). WSZYSTKIE pozostałe testy bossowe (`bosses.test.ts`,
+`madBosses.test.ts`, `bossMapLayout.test.ts`) przeszły BEZ zmian — asercje opierają się na
+`id`/`order`/`hp`/`guard`/`regenPct`/`attackKind`, nie na `name`, dokładnie jak zamierzono.
+`tsc --noEmit` czyste, `jest --silent` 115/115 suite, 1492 testów (+6).
+
+**Priorytet testu na urządzeniu — WYSOKI** (pełna wymiana wizualnej tożsamości kampanii,
++ nowy, nigdy wcześniej nieużyty kod ścieżki `bossArenaBg`): wejdź w mapę kampanii (`app/
+bosses.tsx`) → sprawdź że WSZYSTKIE węzły pokazują nowe portrety, nie puste/emoji-fallback
+(błąd w `require()` ścieżce z spacją w nazwie pliku objawiłby się tu). Stocz walkę z pierwszym
+bossem → sprawdź że tło areny faktycznie pokazuje NOWĄ grafikę pasującą do żywiołu (np. Złoty
+Leniwiec/niebo → `ARENA_NIEBO.png`, nie stary GORSKILAS). Sprawdź KAŻDĄ z 5 używanych aren
+(niebo/burza/lawa/woda/las) na odpowiednim bosie. Jeśli masz dostęp do MAD bossa (Lv50+) —
+sprawdź że MAD wersja pokazuje TĘ SAMĄ arenę co normalna wersja tego samego bossa. Sprawdź że
+raid/event/quest WCIĄŻ pokazują stare tła (brak regresji dla niereskinowanych trybów).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

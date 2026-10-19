@@ -152,13 +152,33 @@ export interface Boss {
 // zmiana realizuje "2x HP i 2x dmg" naraz. Zgodnie z udokumentowanym wyżej mechanizmem
 // (hits × dmgPerHit ~ hp², kwadratowo) łączne ryzyko walki rośnie o WIĘCEJ niż 2x (bliżej ~4x,
 // jak przy poprzedniej naiwnej próbie) — to spełnia "minimum 2x", ale warto zweryfikować na
-// urządzeniu, czy to nie za dużo (łatwo cofnąć, to tylko liczby). Bossy order 1-10 (Kanapowy
-// Leniwiec → Widmo Porównań) ŚWIADOMIE NIETKNIĘTE — user wskazał konkretnie "OD Hydry
-// Odwodnienia" (order 11), nie całego rosteru.
+// urządzeniu, czy to nie za dużo (łatwo cofnąć, to tylko liczby). Bossy order 1-10 (dawny
+// "Kanapowy Leniwiec" → "Widmo Porównań") ŚWIADOMIE NIETKNIĘTE — user wskazał konkretnie "OD
+// Hydry Odwodnienia" (order 11), nie całego rosteru.
+//
+// PEŁNY RESKIN ROSTERU (Faza §399, 2026-10-19) — user: "dodałem bossy i nowe lokalizacje...
+// wywal stare lokalizacje wszystkie i stare bossy wszystkie (z kampanii i inne)... żeby
+// dopasować areny dobrze do bosów bo każdy rodzaj bossów ma swoją arenę (wodne/mroczne/
+// lavowe/boskie/leśne)". 22 nowych, customowych portretów (`assets/bossy/kampania/`,
+// pogrupowane prefiksem pliku wg żywiołu: `LV_`=lawa, `W_`=woda, `BRZ_`=burza, `BS_`=niebo/
+// boskie, `L_`=las) ZASTĘPUJĄ WSZYSTKIE stare, w większości pożyczone/stockowe artworki —
+// `id`/`order`/`unlockLevel`/`hp`/`weakness`/`weaknessLabel`/`loot`/`coins`/`xp`/`taunt`/
+// `guard`/`regenPct`/`attackKind` ŚWIADOMIE NIETKNIĘTE (ten sam powód co custom-art swap
+// burnout/doubt z 2026-09-23 — te pola są "trwałym kluczem" gry: `id` w zapisanym postępie
+// (`defeatedBosses`), `loot.id` w `ownedItems`, `order`/`hp`/balans w setkach godzin
+// kalibracji udokumentowanej wyżej w tym pliku, `order`/`id` też w pozycjach mapy kampanii z
+// `boss-map-editor.tsx`). Zmienia się WYŁĄCZNIE `name`/`emoji` (tożsamość wizualna) + portret w
+// `bossIcons.ts` + przypisanie areny (nowy `BOSS_ELEMENT` w `bossIcons.ts`) — reszta gry
+// (balans, mapa, zapisany postęp) działa dalej dokładnie tak samo. Taunty ZOSTAJĄ nietknięte —
+// żaden z nich nie odnosi się literalnie do starego artu/gatunku bossa, wszystkie mówią o
+// SAMEJ słabości (np. "Po co dziś wstawać…" nie wymaga "leniwca"), więc pasują do nowej
+// tożsamości bez zmian. Pełne uzasadnienie wyboru 22 z 23 nowych portretów (jeden, `LV_
+// Colossus Magmaticus`, zarezerwowany pod przyszłą fazę — raid/event) i mapowania
+// portret→slot → ARCHITECTURE.md §399.
 export const BOSSES: Boss[] = [
   {
-    id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 540,
-    attackKind: 'claw', // atakpazury_frog.png
+    id: 'sloth', name: 'Złoty Leniwiec', emoji: '🌞', order: 1, unlockLevel: 2, hp: 540,
+    attackKind: 'claw',
     weakness: 'steps', weaknessLabel: 'kroki',
     // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
     // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
@@ -168,95 +188,91 @@ export const BOSSES: Boss[] = [
     coins: 8, xp: 60, taunt: 'Po co dziś wstawać…',
   },
   {
-    id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 585,
+    id: 'sugar', name: 'Słodki Smoczek', emoji: '🐉', order: 2, unlockLevel: 4, hp: 585,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
     coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
   },
   {
-    id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 634,
+    id: 'snake', name: 'Wąż Nawałnicy', emoji: '🐍', order: 3, unlockLevel: 6, hp: 634,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
     coins: 18, xp: 160, taunt: 'Odpuść dziś nawyki…',
-    attackKind: 'claw', // atakukąszenie_snake.png — user (2026-08-26): "wąż możemy też pazury"
+    attackKind: 'claw', // user (2026-08-26): "wąż możemy też pazury"
   },
   {
-    id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 700,
+    id: 'dragon', name: 'Smok Wulkaniczny', emoji: '🌋', order: 4, unlockLevel: 9, hp: 700,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Łuska Chaosu', emoji: '🐲', desc: '+2% uniku, +3% siły ataku', bonus: { dodge: 0.02, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
-    attackKind: 'fire', // fireattack_dragon.png — user (2026-08-26): "SMOK niech ogniem lub kulą ognia rzuca"
+    attackKind: 'fire', // user (2026-08-26): "SMOK niech ogniem lub kulą ognia rzuca"
   },
   {
-    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 769,
+    id: 'scroll', name: 'Lodowa Złodziejka', emoji: '❄️', order: 5, unlockLevel: 12, hp: 769,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
     coins: 45, xp: 450, taunt: 'Jeszcze tylko jeden filmik…',
   },
   {
-    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 841,
+    id: 'stress', name: 'Zjawa Niepokoju', emoji: '👻', order: 6, unlockLevel: 15, hp: 841,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+2% uniku', bonus: { dodge: 0.02 } },
     coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
   },
   {
-    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 915,
+    id: 'junk', name: 'Lawowy Obżartuch', emoji: '🐻', order: 7, unlockLevel: 18, hp: 915,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
     coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: true,
   },
   {
-    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 1010,
+    id: 'burnout', name: 'Wilk Wypalenia', emoji: '🐺', order: 8, unlockLevel: 22, hp: 1010,
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +2% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.02, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
-    // Custom art (2026-09-23, user #7: "wrzuciłem CI nowe bossy, zamieniamy te stare...
-    // moje są customowe") — niedźwiedź z dymu/pustki pasuje 1:1 do "Pustki Wypalenia"
-    // dosłownie lepiej niż stary, pożyczony reaper. Dawny `BOSS_reaperatack_reaper.png`
-    // zostaje na dysku nieużywany (ten sam wzorzec co pozostałe "martwe" pliki w
-    // bossIcons.ts — nic go już nie czyta, ale nie kasujemy na wypadek przyszłego użycia).
-    attackKind: 'claw', // BOSS_DYMNYNIEDZWIEDZ.png — wyraźne pazury w nowym arcie
+    // Custom art z 2026-09-23 (niedźwiedź z dymu/pustki, "Pustka Wypalenia") ZASTĄPIONA
+    // pełnym reskinem rosteru §399 — patrz komentarz na górze pliku.
+    attackKind: 'claw',
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
-    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 1356,
+    id: 'insomnia', name: 'Żywiołak Bezsenności', emoji: '🌪️', order: 9, unlockLevel: 26, hp: 1356,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
     coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true,
   },
   {
-    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 1481,
-    attackKind: 'magic', // atakmagicrod_magician.png
+    id: 'compare', name: 'Esencja Porównań', emoji: '✨', order: 10, unlockLevel: 30, hp: 1481,
+    attackKind: 'magic',
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+3% uniku, +3% atak', bonus: { dodge: 0.03, atk: 0.03 } },
     coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
   {
-    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 3266,
+    id: 'drought', name: 'Krwiożercza Hydra', emoji: '🐙', order: 11, unlockLevel: 35, hp: 3266,
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
     coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
   },
   {
-    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 3582,
-    attackKind: 'magic', // BOLTATTACK_zeus.png (piorun — elementarny/magiczny, nie fizyczny cios)
+    id: 'procrast', name: 'Tytan Nawałnicy', emoji: '⚡', order: 12, unlockLevel: 40, hp: 3582,
+    attackKind: 'magic', // piorun — elementarny/magiczny, nie fizyczny cios
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
     coins: 380, xp: 3800, taunt: 'Zrobisz to jutro… na pewno…',
   },
   {
-    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 3956,
-    // Custom art (2026-09-23, user #7 — patrz komentarz przy `burnout` wyżej) — mroczny,
-    // widmowy kruk pasuje do "Cienia Zwątpienia" (kruk = klasyczny symbol złego omenu/
-    // zwątpienia) wyraźnie lepiej niż stary, pożyczony cerberus. Dawny
-    // `BOSS_pazurattack_cerberus.png` zostaje na dysku nieużywany.
-    attackKind: 'claw', // BOSS_MROCZNYKRUK.png — wyraźne szpony w nowym arcie
+    id: 'doubt', name: 'Kruk Zwątpienia', emoji: '🐦‍⬛', order: 13, unlockLevel: 46, hp: 3956,
+    // Custom art z 2026-09-23 (mroczny kruk, "Cień Zwątpienia") ZASTĄPIONA pełnym reskinem
+    // rosteru §399 (NOWY kruk — patrz komentarz na górze pliku) — kruk jako motyw PRZETRWAŁ
+    // obie zmiany, tylko konkretny portret/nazwa się zmieniły.
+    attackKind: 'claw',
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +3% uniku', bonus: { atk: 0.08, dodge: 0.03 } },
     coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
   },
   {
-    id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 4260,
+    id: 'devourer', name: 'Grzybny Pożeracz', emoji: '🍄', order: 14, unlockLevel: 52, hp: 4260,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +3% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.03, energyMult: 0.08, crit: 0.05 } },
     coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true,
@@ -265,54 +281,54 @@ export const BOSSES: Boss[] = [
   // HP już NIE kontynuuje starej krzywej devourera (~×1.4/krok) — patrz balance-review
   // komentarz nad BOSSES.
   {
-    id: 'samurai', name: 'Duch Perfekcjonizmu', emoji: '🥷', order: 15, unlockLevel: 58, hp: 4572,
-    attackKind: 'sword', // atakkatana_samurai.png
+    id: 'samurai', name: 'Mszysty Strażnik', emoji: '🌲', order: 15, unlockLevel: 58, hp: 4572,
+    attackKind: 'sword',
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
     coins: 1300, xp: 13500, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
   },
   {
-    id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 4920,
-    attackKind: 'claw', // atakpazurty_jaguar.png
+    id: 'jaguar', name: 'Lawowa Modliszka', emoji: '🔥', order: 16, unlockLevel: 65, hp: 4920,
+    attackKind: 'claw',
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+4% uniku', bonus: { dodge: 0.04 } },
     coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
   },
   {
-    id: 'dinosaur', name: 'Skamieniały Nawyk', emoji: '🦖', order: 17, unlockLevel: 72, hp: 5682,
-    attackKind: 'claw', // atakpazury_dinosaur.png
+    id: 'dinosaur', name: 'Skamieniały Rekin', emoji: '🦈', order: 17, unlockLevel: 72, hp: 5682,
+    attackKind: 'claw',
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_fossil', name: 'Skamielina Mocy', emoji: '🦴', desc: '+10% atak, +3% kryt', bonus: { atk: 0.10, crit: 0.03 } },
     coins: 3000, xp: 30000, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
   },
   {
-    id: 'piratecapitan', name: 'Kapitan Zachłanności', emoji: '🏴‍☠️', order: 18, unlockLevel: 80, hp: 6132,
-    attackKind: 'sword', // attaksword_piratecapitan.png
+    id: 'piratecapitan', name: 'Kapitan Nawałnicy', emoji: '🌊', order: 18, unlockLevel: 80, hp: 6132,
+    attackKind: 'sword',
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_treasuremap', name: 'Mapa Skarbów', emoji: '🗺️', desc: '+10% energii, +4% atak', bonus: { energyMult: 0.10, atk: 0.04 } },
     coins: 4500, xp: 45000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
   },
   {
-    id: 'hades', name: 'Władca Katastrof', emoji: '🔥', order: 19, unlockLevel: 88, hp: 7066,
+    id: 'hades', name: 'Lisek Zagłady', emoji: '🦊', order: 19, unlockLevel: 88, hp: 7066,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+5% uniku, +4% atak', bonus: { dodge: 0.05, atk: 0.04 } },
     coins: 6800, xp: 68000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
   },
   {
-    id: 'clown', name: 'Maska Uśmiechu', emoji: '🤡', order: 20, unlockLevel: 97, hp: 7586,
+    id: 'clown', name: 'Kolczasta Maska', emoji: '🌹', order: 20, unlockLevel: 97, hp: 7586,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_truthmask', name: 'Maska Prawdy', emoji: '🎭', desc: '+9% kryt, +5% atak', bonus: { crit: 0.09, atk: 0.05 } },
     coins: 10000, xp: 100000, taunt: 'Uśmiechnij się, nikt nie musi wiedzieć…',
   },
   {
-    id: 'princess', name: 'Czekanie Na Ratunek', emoji: '👸', order: 21, unlockLevel: 106, hp: 8106,
+    id: 'princess', name: 'Leśna Łania', emoji: '🦌', order: 21, unlockLevel: 106, hp: 8106,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +2% uniku', bonus: { energyMult: 0.12, dodge: 0.02 } },
     coins: 15000, xp: 150000, taunt: 'Ktoś w końcu to za ciebie naprawi…',
   },
   {
-    id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 9318,
-    attackKind: 'magic', // magicattack_wizard.png
+    id: 'wizard', name: 'Jesienny Feniks', emoji: '🍂', order: 22, unlockLevel: 116, hp: 9318,
+    attackKind: 'magic',
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +4% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.04, energyMult: 0.10, crit: 0.08 } },
     coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
