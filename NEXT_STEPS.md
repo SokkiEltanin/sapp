@@ -114,13 +114,12 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
 6. **Bogatsza konfiguracja zakresu/formatowania danych per kafel** — user: "wybierać ile tych
    dni, jakie zakresy dniowe/tyg./miesięczne itp. oraz jakie zaokrąglenia danych, zkąd i kiedy
    mają się resetować". Rozkłada się na cztery, OSOBNE podsystemy (różny stan dojrzałości):
-   - **Zakres/okres** (ile dni, dzień/tydzień/miesiąc) — `statTile` już ma `period: 'week'|
-     'month'` (`statTileStyleDefaults.ts`) i `metricSeries(metric, ctx, period, n=6, tag?)`
-     (`statWidgets.ts:400`) JUŻ PRZYJMUJE `n` (liczbę punktów) — dziś na płótnie zahardkodowane
-     na `6` w wywołaniu z `StatCanvasTile.tsx`, nie wystawione w `CanvasStatStyleModal.tsx`.
-     **Najniższe zwisające owoce** — dodać Stepper "Ile dni/tygodni/miesięcy" w tym modalu,
-     przekazać do `metricSeries`. Dla `dataField`/innych typów bez periodu — trzeba sprawdzić
-     per-pole w `useDataFieldRegistry()`, czy dane źródłowe to w ogóle wspierają.
+   - ✅ **ZROBIONE (§389) — zakres/okres** (ile dni, dzień/tydzień/miesiąc) dla `statTile`:
+     `StatTileCanvasStyle.rangeN` (opcjonalne, `?? 6`) + Stepper "Ile punktów na wykresie" w
+     `CanvasStatStyleModal.tsx` (widoczny tylko dla `viz: 'wave'`), przekazywane do
+     `metricSeries`. Checklist w ARCHITECTURE.md §389. Dla `dataField`/innych typów bez periodu
+     — NIE zrobione, trzeba sprawdzić per-pole w `useDataFieldRegistry()`, czy dane źródłowe to
+     w ogóle wspierają (żaden konkretny przykład od usera jeszcze nie padł).
    - **Zaokrąglenie (precyzja wyświetlania)** — dziś `fmtStat()` (`statWidgets.ts`) ma WŁASNĄ,
      zaszytą logikę liczby miejsc po przecinku per metryka (nie konfigurowalną). Żeby user mógł
      to zmienić per-instancja na płótnie, trzeba dodać pole (np. `decimals?: number`) do

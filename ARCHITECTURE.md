@@ -20686,6 +20686,32 @@ wpisanie hex ręcznie nadal wymaga "✓". **Szczególnie ważne: sprawdzić że 
 dotyk** (znany, udokumentowany wcześniej bug klasy "RNGH w Modalu bez własnego roota", §162) —
 jeśli przeciąganie nic nie robi, to dokładnie ten scenariusz.
 
+## 389. Konfigurowalny zakres (ile punktów) serii na "Wykresie" płótna (2026-10-19)
+
+Kontynuacja §386/§388 — pierwszy, najniżej zwisający owoc z NEXT_STEPS.md punktu 6 (user:
+"wybierać ile tych dni, jakie zakresy dniowe/tyg./miesięczne"). `metricSeries(metric, ctx,
+period, n=6, tag?)` w `statWidgets.ts` już PRZYJMOWAŁ `n` od samego początku (§386) — tylko
+nigdzie w UI nie było to wystawione, `StatCanvasTile.tsx` wołał je z zahardkodowanym `6`.
+
+**Zmiana**: `StatTileCanvasStyle` dostał nowe, OPCJONALNE pole `rangeN?: number` (opcjonalne —
+stare, persystowane instancje sprzed tej fazy nie mają tego pola, `?? 6` na miejscu odczytu w
+`StatCanvasTile.tsx` dogania ich dotychczasowe zachowanie, ten sam wzorzec co `CanvasItem.
+zIndex`). `CanvasStatStyleModal.tsx` dostał nowy `Stepper` "Ile punktów na wykresie" (3-24),
+widoczny TYLKO gdy `style.viz === 'wave'` (jedyny wariant, który w ogóle rysuje serię —
+`'number'` woła `metricNumber`, nie `metricSeries`, `rangeN` dla niego nie ma znaczenia).
+
+**Świadomie NIE w tym kroku**: "zaokrąglenie/precyzja" (`fmtStat()` ma własną, zaszytą logikę
+miejsc po przecinku per-metryka, nie konfigurowalną) i "reset" (własność ŹRÓDŁA danych, nie
+stylu kafla) — obie czekają na konkretniejszy przykład od usera, patrz NEXT_STEPS.md punkt 6.
+
+**Testy**: brak nowych (czyste dociągnięcie istniejącego, już przetestowanego parametru
+`metricSeries`'s `n` do UI — sama funkcja nie zmieniła się). `tsc --noEmit` czyste, `jest
+--silent` 113/113 suite, 1467 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: Dashboard → "Wykres" → viz "Wykres fali" → zmień
+"Ile punktów" → sprawdź że linia na mini-wykresie faktycznie ma inną liczbę punktów (np. 3 vs
+24) i się nie psuje przy ekstremach zakresu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

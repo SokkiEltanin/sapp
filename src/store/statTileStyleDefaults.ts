@@ -11,6 +11,15 @@
 export interface StatTileCanvasStyle {
   period: 'week' | 'month';
   viz: 'number' | 'wave';
+  // Zakres punktów serii dla `viz: 'wave'` (Faza §389, user: "wybierać ile tych dni, jakie
+  // zakresy dniowe/tyg./miesięczne") — `metricSeries(metric, ctx, period, n, tag?)` w
+  // `statWidgets.ts` już PRZYJMOWAŁ `n` (domyślnie 6), tylko nigdzie nie było to wystawione.
+  // Opcjonalne (`?`), nie wymagane — stare, persystowane itemy sprzed tej fazy nie mają tego
+  // pola (shallow `persist` merge nie dogania pól WEWNĄTRZ elementów tablicy, ten sam powód co
+  // `CanvasItem.zIndex`) — `?? 6` na miejscu odczytu w `StatCanvasTile.tsx` dogania domyślną
+  // wartość, którą miały wszystkie instancje PRZED tą fazą. Nieużywane dla `viz: 'number'`
+  // (ta wariacja nie rysuje serii, tylko jedną wartość z `metricNumber`).
+  rangeN?: number;
 }
 
 export const DEFAULT_STAT_TILE_STYLE: StatTileCanvasStyle = { period: 'month', viz: 'number' };

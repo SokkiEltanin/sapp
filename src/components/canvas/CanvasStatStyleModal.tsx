@@ -5,6 +5,7 @@ import { StatTileCanvasStyle } from '@/store/statTileStyleDefaults';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import Stepper from '@/components/ui/Stepper';
 
 // Styl instancji "Wykres" (Faza 4, §386) — najprostszy modal w rodzinie (tylko dwa
 // przełączniki, period/viz — żadnych kolorów/fontów, kolor akcentu idzie z czasu dnia jak
@@ -55,6 +56,13 @@ export default function CanvasStatStyleModal({ visible, style, onChange, onClose
                 );
               })}
             </View>
+
+            {style.viz === 'wave' && (
+              <View style={s.innerCard}>
+                <Stepper label="Ile punktów na wykresie" value={style.rangeN ?? 6} min={3} max={24} step={1}
+                  onChange={v => onChange({ rangeN: v })} />
+              </View>
+            )}
             <Text style={s.hint}>Tapnij kafel na płótnie, żeby wybrać/zmienić metrykę.</Text>
           </ScrollView>
         </Pressable>
@@ -72,6 +80,7 @@ const makeS = (c: any) => StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { flex: 1, fontSize: 15, fontWeight: '800', color: c.text.primary },
   sectionLabel: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[1] },
+  innerCard: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.card, padding: spacing[3] },
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   segTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
