@@ -20435,6 +20435,35 @@ symetrycznym odstępem po prawej (zamiast realnych akcji, które normalny header
 Pupil/Bossy/Sklep/Questy NADAL działa (można przejść na inną zakładkę huba) mimo pełnego
 ekranu płótna.
 
+## 383. Tryb pełnoekranowy płótna — Faza 2b: Kalendarz, Jedzenie, Zadania, Finanse, Ćwiczenia + fix §381 (2026-10-18)
+
+Kontynuacja §381/§382 bez przerywania. Pięć kolejnych ekranów: `(tabs)/stats.tsx` (realnie
+"Kalendarz", patrz UI), `(tabs)/food.tsx`, `(tabs)/tasks.tsx`, `(tabs)/finances.tsx`,
+`exercises.tsx` — identyczny wzorzec co §381/§382. Wszystkie pięć — domyślny `ScreenCanvas`
+(żaden z nich nie montuje `ScreenCanvasBase` bezpośrednio).
+
+**Samo-znaleziony fix §381, PRZED wysłaniem** (ten sam standard co §376 — przegląd własnego
+kodu krytycznym okiem zanim zgłoszę gotowe): `health.tsx`'s branch pełnoekranowy miał
+`marginHorizontal: -spacing[4], marginTop: -spacing[4]` na wrapperze `ScreenHeader` — ten
+trik w NORMALNYM branchu kasuje padding `styles.scroll` (bo header siedzi WEWNĄTRZ paddingowanego
+`ScrollView`), ale branch pełnoekranowy NIE MA takiego scrolla nad headerem — ujemny margines
+bez niczego do skasowania wypychał header POZA górną krawędź ekranu (pod belkę statusu,
+częściowo ucięty). Naprawione: zwykłe `paddingTop: insets.top` zamiast ujemnych marginesów —
+`ScreenHeader` ma już WŁASNY `paddingHorizontal` wbudowany (patrz `ScreenHeader.tsx`), więc
+nie potrzebuje korekty w poziomie wcale. Ten sam poprawny wzorzec zastosowany od razu we
+WSZYSTKICH pięciu nowych ekranach tej fazy — błąd był tylko w §381's Zdrowiu, nie powielony.
+
+**Ekrany bez `ScreenHeader` dotąd** (`tasks.tsx`, `food.tsx`) — dodany import, pierwszy raz
+użyty na tych ekranach (tylko w branchu pełnoekranowym — normalna treść zostaje bez zmian,
+własny custom header/bez headera jak dotąd).
+
+**Testy**: brak nowych (czysty JSX-rozgałęzienie). `tsc --noEmit` czyste, `jest --silent`
+113/113 suite, 1462 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Kalendarz/Jedzenie/Zadania/Finanse/Ćwiczenia →
+"Twoje komponenty" → odznaka pełnego ekranu → potwierdź. SZCZEGÓLNIE sprawdź Zdrowie ponownie
+(fix nagłówka) — ScreenHeader nie powinien być ucięty/nachodzić na belkę statusu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

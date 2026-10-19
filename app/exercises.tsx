@@ -17,6 +17,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 
 // Ikony per-ekran (lucide fallbacki, `EXERCISE_META` — exerciseMeta.ts — trzyma tylko label/
 // jednostkę/cel, współdzielone z builderem planów i hookiem nagród).
@@ -48,6 +49,8 @@ export default function ExercisesScreen() {
   const { logs, targets, streak, today, logAmount: logAmountRaw, removeLog, updateLog } = useExerciseLogging();
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['exercises'] ?? false);
 
   const logAmount = (ex: typeof EXERCISE_META[number], amount: number) => {
     logAmountRaw({ exercise: ex.id, linkedExercise: ex.id, label: ex.label, unit: ex.unit, amount });
@@ -62,6 +65,21 @@ export default function ExercisesScreen() {
   };
 
   const quickAdd = (ex: typeof EXERCISE_META[number], amount: number) => logAmount(ex, amount);
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, reszta ekranu Ćwiczeń nie
+  // montuje się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.header}>
+          <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
+          <Text style={s.headerTitle}>Ćwiczenia</Text>
+          <View style={s.backBtn} />
+        </View>
+        <ScreenCanvas screenKey="exercises" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>

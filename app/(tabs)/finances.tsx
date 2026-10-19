@@ -23,6 +23,7 @@ export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import DisplayText from '@/components/ui/DisplayText';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -70,6 +71,8 @@ function monthDates(): string[] {
 export default function FinancesScreen() {
   const insets = useSafeAreaInsets();
   const kb = useKeyboardHeight();
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['finances'] ?? false);
   // Theme-reactive: shadow module colors/F so the screen + its StyleSheet flip.
   const colors = useColors();
   const F = useMemo(() => ({
@@ -408,6 +411,19 @@ export default function FinancesScreen() {
     }
     return map;
   }, [expenses]);
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cała lista finansów nie
+  // montuje się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={st.root} edges={[]}>
+        <View style={{ paddingTop: insets.top }}>
+          <ScreenHeader title="Finanse" subtitle="Pełny ekran" />
+        </View>
+        <ScreenCanvas screenKey="finances" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={st.root} edges={[]}>

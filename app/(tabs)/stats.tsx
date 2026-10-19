@@ -13,6 +13,7 @@ import {
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -287,6 +288,8 @@ export default function CalendarTabScreen() {
   // zamontowany ekran kalendarza na każdy zapis nastroju gdziekolwiek w appce.
   const moodEntries = useMoodStore(s => s.entries);
   const { expenses } = useExpensesStore();
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['stats'] ?? false);
 
   const now = new Date();
   const [viewYear, setViewYear]         = useState(now.getFullYear());
@@ -505,6 +508,19 @@ export default function CalendarTabScreen() {
     if (mode === 'month-mini')     return CalendarDays;
     return AlignJustify;
   };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cały kalendarz/widgety statystyk
+  // nie montują się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.container} edges={[]}>
+        <View style={{ paddingTop: insets.top }}>
+          <ScreenHeader title="Kalendarz" subtitle="Pełny ekran" style={{ borderBottomColor: VP.cardBorder }} />
+        </View>
+        <ScreenCanvas screenKey="stats" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
