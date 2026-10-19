@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2 } from 'lucide-react-native';
+import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2 } from 'lucide-react-native';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -41,6 +41,10 @@ import { usePressGuard } from '@/hooks/usePressGuard';
 import { IconTile } from './IconTile';
 import CanvasIconStyleModal from './CanvasIconStyleModal';
 import { IconTileStyle, DEFAULT_ICON_TILE_STYLE } from '@/store/iconTileStyleDefaults';
+import { StatCanvasTile } from './StatCanvasTile';
+import CanvasStatStyleModal from './CanvasStatStyleModal';
+import { StatTileCanvasStyle, DEFAULT_STAT_TILE_STYLE } from '@/store/statTileStyleDefaults';
+import { WIDGET_METRICS, StatCtx } from '@/utils/statWidgets';
 
 // Domyślny styl per typ kształtu (Faza 26, §357) — fallback dla modala stylu kiedy
 // `styleItem` jeszcze nie jest kształtem (modal musi dostać JAKIŚ `style`, nawet gdy
@@ -94,7 +98,7 @@ const EDIT_BOTTOM_PAD = 76; // miejsce na przyciski "Dodaj" pod najniższą inst
 // `ScreenCanvasBase` BEZPOŚREDNIO i przekazuje SWOJE już wyliczone dane (`streakWall` 1:1 jako
 // `allStreakItems` — zero dodatkowego kodu, `counters`/`allNotes` już w pamięci dla pozostałych
 // dwóch — tani dodatkowy `.filter()`, NIE drugi fetch).
-export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor }: {
+export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdownItems, allNotesItems, dataFieldRegistry, accentColor, statCtx }: {
   screenKey: string;
   title?: string;
   allStreakItems: StreakItem[];
@@ -102,6 +106,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   allNotesItems: Note[];
   dataFieldRegistry: DataFieldValue[];
   accentColor: string;
+  // Typ "Wykres" (§386) — TYLKO dashboard dostarcza to dziś (ma już policzone, droższe dane:
+  // wydatki/nastrój/pracę/zadania/itd., patrz `index.tsx`'s `statCtx`). Pozostałe ekrany nie
+  // przekazują tego propa wcale (`undefined`) — świadomie: fetchowanie TYCH danych na KAŻDYM
+  // ekranie z płótnem byłoby drogie i w większości niepotrzebne. Brak = przycisk "Wykres" w
+  // ogóle się nie pokazuje w trybie edycji (patrz niżej), więc user nie trafia na martwy,
+  // niedziałający przycisk.
+  statCtx?: StatCtx;
 }) {
   const c = useColors();
   const s = makeS(c);
@@ -177,6 +188,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     if (item.componentType === 'ellipseShape') return 'Elipsa';
     if (item.componentType === 'lineShape') return 'Linia';
     if (item.componentType === 'textShape') return 'Tekst';
+    if (item.componentType === 'statTile') return item.bindingKey ? (WIDGET_METRICS.find(m => m.id === item.bindingKey)?.label ?? 'Wykres') : 'Wykres (brak podpięcia)';
     return 'Ikona';
   };
   // TOP-FIRST (odwrotność `orderedItems` — user intuicyjnie myśli "co jest na wierzchu" jako
@@ -244,6 +256,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const dataFieldOptions: PickerOption[] = useMemo(
     () => dataFieldRegistry.map(f => ({ key: f.id, label: f.label, meta: f.value })),
     [dataFieldRegistry],
+  );
+  // Piąty "widget z danymi" (§386) — rejestr z `statWidgets.ts` (29 metryk, 4 grupy, TEN SAM
+  // rejestr co dashboardowe "Dodaj widget") — `meta` pokazuje grupę, żeby długa, płaska lista
+  // dała się choć trochę ogarnąć wzrokiem bez budowania osobnego, sekcjonowanego pickera.
+  const statOptions: PickerOption[] = useMemo(
+    () => WIDGET_METRICS.map(m => ({ key: m.id, label: m.label, meta: m.group })),
+    [],
   );
 
   const canvasHeight = Math.max(
@@ -327,6 +346,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           // `CanvasPlacedItem` (przeciąganie/resize/przycisk 🎨 stylu).
           const isShape = isShapeType(item.componentType);
           const isIcon = item.componentType === 'iconTile';
+          const isStat = item.componentType === 'statTile';
           const boundStreak = isStreak && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
@@ -345,8 +365,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               if (boundNote) { haptic.tap(); router.navigate(`/notes?noteId=${boundNote.id}` as any); }
               else setPickerForId(item.id);
             } else {
-              // dataField (§358) — statyczna wartość, nie strona: brak miejsca nawigacji.
-              // Tapnięcie ZAWSZE otwiera picker (zmiana podpięcia), podpięte czy nie.
+              // dataField (§358)/statTile (§386) — statyczna wartość, nie strona: brak miejsca
+              // nawigacji. Tapnięcie ZAWSZE otwiera picker (zmiana podpięcia), podpięte czy nie.
               setPickerForId(item.id);
             }
           };
@@ -426,6 +446,15 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   onPress={onPress}
                   sizeStyle={sizeStyle}
                 />
+              ) : isStat ? (
+                <StatCanvasTile
+                  metric={item.bindingKey}
+                  style={item.style as StatTileCanvasStyle}
+                  statCtx={statCtx}
+                  accentColor={timeAccentColor}
+                  onPress={onPress}
+                  sizeStyle={sizeStyle}
+                />
               ) : (
                 <ShapeTile
                   kind={item.componentType as ShapeComponentType}
@@ -501,6 +530,16 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               <Plus size={15} color="#fff" />
               <Text style={s.addTxt}>Pole danych</Text>
             </TouchableOpacity>
+            {/* Wykres (§386) — piąty "widget z danymi", TYLKO gdy host dostarczył `statCtx`
+                (dziś: wyłącznie dashboard) — nie pokazuj przycisku, który i tak nic by nie
+                zrobił sensownie na ekranie bez tych danych (CLAUDE.md #7, nie zostawiaj
+                martwych przycisków). */}
+            {!!statCtx && (
+              <TouchableOpacity onPress={() => onAdd('statTile')} style={[s.addBtn, { flex: 1, minWidth: 100, backgroundColor: c.accent.blue }]} activeOpacity={0.85}>
+                <Plus size={15} color="#fff" />
+                <Text style={s.addTxt}>Wykres</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {/* Kształty-primitywy (§357) i Ikona (§371) — osobny, wizualnie oddzielony wiersz
               (szary, nie niebieski jak "komponenty z danymi" wyżej) — inna kategoria: BEZ
@@ -551,9 +590,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
@@ -561,6 +600,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           ? 'Brak notatek na koncie — dodaj jedną w Notatkach.'
           : pickerItem?.componentType === 'dataField'
           ? 'Rejestr pól danych jest pusty — to nie powinno się zdarzyć.'
+          : pickerItem?.componentType === 'statTile'
+          ? 'Rejestr metryk jest pusty — to nie powinno się zdarzyć.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
@@ -623,6 +664,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         visible={!!styleItem && styleItem.componentType === 'iconTile'}
         style={(styleItem && styleItem.componentType === 'iconTile' ? styleItem.style : DEFAULT_ICON_TILE_STYLE) as IconTileStyle}
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as IconTileStyle), ...patch } }); }}
+        onClose={() => setStyleForId(null)}
+      />
+
+      <CanvasStatStyleModal
+        visible={!!styleItem && styleItem.componentType === 'statTile'}
+        style={(styleItem && styleItem.componentType === 'statTile' ? styleItem.style : DEFAULT_STAT_TILE_STYLE) as StatTileCanvasStyle}
+        onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as StatTileCanvasStyle), ...patch } }); }}
         onClose={() => setStyleForId(null)}
       />
 
