@@ -100,7 +100,21 @@ export default function CanvasPlacedItem({
 
       let vx: number | null = null, vy1 = 0, vy2 = 0;
       let snapDX = 0;
-      for (let i = 0; i < sibs.length; i++) {
+
+      // Snap do ŚRODKA PŁÓTNA (Faza §400, 2026-10-19) — user: "jak dodaje prostokąt do
+      // canvas to nadal nie mam allign to center albo snapa". Sprawdzane PRZED pętlą po
+      // sąsiadach — bez tego pojedynczy, pierwszy item na pustym ekranie nie miał ABSOLUTNIE
+      // NIC, do czego mógłby się przyciągnąć (sibs.length===0). Pionowego odpowiednika
+      // (środek WYSOKOŚCI płótna) celowo brak — płótno rośnie w dół bez górnego ograniczenia,
+      // "środek" nie jest tu dobrze zdefiniowanym pojęciem jak przy stałej szerokości.
+      const canvasCenterX = canvasWidth / 2;
+      const myCenterX = rawX + myW / 2;
+      if (Math.abs(myCenterX - canvasCenterX) < THRESH) {
+        vx = canvasCenterX; snapDX = canvasCenterX - myCenterX;
+        vy1 = rawY; vy2 = rawY + myH;
+      }
+
+      for (let i = 0; vx == null && i < sibs.length; i++) {
         const r = sibs[i];
         const myLeft = rawX, myRight = rawX + myW, myCenter = rawX + myW / 2;
         const sLeft = r.x, sRight = r.x + r.width, sCenter = r.x + r.width / 2;

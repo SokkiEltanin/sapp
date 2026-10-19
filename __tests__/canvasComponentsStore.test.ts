@@ -562,6 +562,117 @@ describe('canvasComponentsStore — deployDraft (§398)', () => {
   });
 });
 
+// Wyśrodkuj/duplikuj/wyrównaj (§400) — user: "nie mam allign to center albo snapa... nie
+// mam jak ustawić np 2 kafelków na tym samym poziomie lub nie mam opcji kopiuj".
+describe('canvasComponentsStore — duplicateItem (§400)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [] });
+  });
+
+  test('tworzy kopię z NOWYM id, offsetem +16/+16, bez grupy, na wierzchu stosu', () => {
+    const { addItem, groupItems, duplicateItem } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    const b = addItem('food', 'rectShape');
+    groupItems('food', [a, b]);
+    const original = useCanvasComponentsStore.getState().items.find(i => i.id === a)!;
+    const newId = duplicateItem(a, 500);
+    expect(newId).not.toBeNull();
+    expect(newId).not.toBe(a);
+    const copy = useCanvasComponentsStore.getState().items.find(i => i.id === newId)!;
+    expect(copy.x).toBe(original.x + 16);
+    expect(copy.y).toBe(original.y + 16);
+    expect(copy.componentType).toBe('rectShape');
+    expect(copy.style).toEqual(original.style);
+    expect(copy.groupId).toBeNull(); // kopia NIE wchodzi automatycznie do grupy oryginału
+    expect(copy.zIndex).toBeGreaterThan(original.zIndex);
+  });
+
+  test('klamruje X kopii do granic płótna, nie wypycha jej poza prawą krawędź', () => {
+    const { addItem, updateItem, duplicateItem } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    updateItem(a, { x: 490, width: 100 });
+    const newId = duplicateItem(a, 500)!;
+    const copy = useCanvasComponentsStore.getState().items.find(i => i.id === newId)!;
+    expect(copy.x).toBe(400); // 500 - 100, nie 490+16=506
+  });
+
+  test('nieistniejące id zwraca null, nic nie dodaje', () => {
+    const { duplicateItem } = useCanvasComponentsStore.getState();
+    expect(duplicateItem('brak-takiego', 500)).toBeNull();
+    expect(useCanvasComponentsStore.getState().items).toHaveLength(0);
+  });
+});
+
+describe('canvasComponentsStore — centerItemX (§400)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [] });
+  });
+
+  test('ustawia X tak, by item był wyśrodkowany w podanej szerokości płótna', () => {
+    const { addItem, updateItem, centerItemX } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    updateItem(a, { width: 100 });
+    centerItemX(a, 500);
+    expect(useCanvasComponentsStore.getState().items.find(i => i.id === a)!.x).toBe(200); // (500-100)/2
+  });
+
+  test('nie rusza innych itemów', () => {
+    const { addItem, updateItem, centerItemX } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    const b = addItem('food', 'rectShape');
+    updateItem(b, { x: 10 });
+    centerItemX(a, 500);
+    expect(useCanvasComponentsStore.getState().items.find(i => i.id === b)!.x).toBe(10);
+  });
+});
+
+describe('canvasComponentsStore — alignItemsY/alignItemsX (§400)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [] });
+  });
+
+  test('alignItemsY ustawia WSZYSTKICH zaznaczonych na NAJMNIEJSZY (najwyższy) Y wśród nich', () => {
+    const { addItem, updateItem, alignItemsY } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    const b = addItem('food', 'rectShape');
+    const c = addItem('food', 'rectShape');
+    updateItem(a, { y: 300 }); updateItem(b, { y: 50 }); updateItem(c, { y: 500 });
+    alignItemsY('food', [a, b]); // c celowo NIE zaznaczony
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === a)!.y).toBe(50);
+    expect(items.find(i => i.id === b)!.y).toBe(50);
+    expect(items.find(i => i.id === c)!.y).toBe(500); // niezaznaczony, bez zmian
+  });
+
+  test('alignItemsX ustawia WSZYSTKICH zaznaczonych na NAJMNIEJSZY (najbardziej lewy) X, klamrując per-item', () => {
+    const { addItem, updateItem, alignItemsX } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    const b = addItem('food', 'rectShape');
+    updateItem(a, { x: 300, width: 100 }); updateItem(b, { x: 50, width: 200 });
+    alignItemsX('food', [a, b], 500);
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === a)!.x).toBe(50);
+    expect(items.find(i => i.id === b)!.x).toBe(50);
+  });
+
+  test('mniej niż 2 zaznaczone — no-op', () => {
+    const { addItem, updateItem, alignItemsY } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    updateItem(a, { y: 77 });
+    alignItemsY('food', [a]);
+    expect(useCanvasComponentsStore.getState().items.find(i => i.id === a)!.y).toBe(77);
+  });
+
+  test('ignoruje id spoza podanego screenKey', () => {
+    const { addItem, updateItem, alignItemsY } = useCanvasComponentsStore.getState();
+    const a = addItem('food', 'rectShape');
+    const x = addItem('exercises', 'rectShape');
+    updateItem(a, { y: 300 }); updateItem(x, { y: 50 });
+    alignItemsY('food', [a, x]); // tylko 1 id realnie należy do 'food' → poniżej progu 2, no-op
+    expect(useCanvasComponentsStore.getState().items.find(i => i.id === a)!.y).toBe(300);
+  });
+});
+
 describe('canvasComponentsStore — customNavbarEnabled (§392)', () => {
   beforeEach(() => {
     useCanvasComponentsStore.setState({ customNavbarEnabled: false });

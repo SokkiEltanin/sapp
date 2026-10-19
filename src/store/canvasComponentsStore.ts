@@ -269,6 +269,32 @@ interface CanvasComponentsState {
   // filtrowane przez PARĘ (screenKey, groupId) wszędzie (`moveGroupBy`/`resizeGroupBy`/
   // `groupItems` wyżej), a wdrożone itemy dostają WSZYSTKIE ten sam, nowy `screenKey = target`.
   deployDraft: (target: string) => void;
+  // Duplikuj/wyrównaj (Faza §400, 2026-10-19) — user: "jak dodaje prostokąt do canvas to
+  // nadal nie mam allign to center albo snapa... nie mam jak ustawić np 2 kafelków na tym
+  // samym poziomie lub nie mam opcji kopiuj". Trzy braki, trzy osobne akcje:
+  // `duplicateItem` — klon z NOWYM id (offset +16/+16, `groupId: null` — kopia NIE wchodzi
+  // automatycznie do grupy oryginału, `zIndex` na wierzch jak nowo dodany item w `addItem`).
+  // `canvasWidth` jako parametr (NIE czytany ze store'u — store nie zna realnej szerokości
+  // renderu, ten sam wzorzec co `moveGroupBy`/`resizeGroupBy` wyżej), żeby offset nie
+  // wypchnął kopii poza płótno.
+  duplicateItem: (id: string, canvasWidth: number) => string | null;
+  // `centerItemX` — "Wyśrodkuj poziomo" w panelu właściwości, jednorazowe wyrównanie do
+  // ŚRODKA PŁÓTNA (nie względem sąsiadów jak smart guides w `CanvasPlacedItem.tsx` — tamto
+  // działa TYLKO podczas przeciągania i TYLKO gdy jest czego dotknąć; to działa zawsze, nawet
+  // dla jedynego itemu na pustym ekranie, czego user dokładnie nie miał).
+  centerItemX: (id: string, canvasWidth: number) => void;
+  // `alignItemsY`/`alignItemsX` — reużywają ISTNIEJĄCY tryb zaznaczania (`selectMode`/
+  // `selectedIds`, §349, dotąd WYŁĄCZNIE do grupowania) jako drugą, równoległą akcję nad tym
+  // samym zaznaczeniem: "ten sam poziom" (wspólne Y) / "ta sama kolumna" (wspólne X).
+  // Wyrównanie do NAJMNIEJSZEGO Y/X wśród zaznaczonych (najwyższy/najbardziej na lewo
+  // zaznaczony item jest "kotwicą") — przewidywalne, nie zależy od kolejności zaznaczania.
+  // Jednorazowe przesunięcie (NIE trwały link jak grupa) — zaznaczenie zostaje aktywne po
+  // wyrównaniu, można zrobić oba wyrównania pod rząd albo dociągnąć ręcznie i dopiero
+  // zgrupować. `alignItemsX` klamruje per-item do `canvasWidth` (ten sam powód co
+  // `moveGroupBy`/`resizeGroupBy`) — `alignItemsY` nie klamruje (płótno rośnie w pionie bez
+  // górnego ograniczenia, ten sam powód co brak klamrowania Y wszędzie indziej w tym pliku).
+  alignItemsY: (screenKey: string, ids: string[]) => void;
+  alignItemsX: (screenKey: string, ids: string[], canvasWidth: number) => void;
 }
 
 export const useCanvasComponentsStore = create<CanvasComponentsState>()(
@@ -447,6 +473,51 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         // nie jest filtrowany tutaj, więc oryginał projektu roboczego zostaje nietknięty.
         const rest = s.items.filter(i => i.screenKey !== target && i.screenKey !== backupKey);
         return { items: [...rest, ...backedUp, ...deployed] };
+      }),
+
+      duplicateItem: (id, canvasWidth) => {
+        const target = get().items.find(i => i.id === id);
+        if (!target) return null;
+        const newId = `canvas:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const siblings = get().items.filter(i => i.screenKey === target.screenKey);
+        const maxZ = siblings.reduce((m, i) => Math.max(m, i.zIndex ?? 0), 0);
+        const OFFSET = 16;
+        const item: CanvasItem = {
+          ...target,
+          id: newId,
+          x: clampItemX(target.x + OFFSET, target.width, canvasWidth),
+          y: target.y + OFFSET,
+          groupId: null,
+          zIndex: maxZ + 1,
+        };
+        set((s) => ({ items: [...s.items, item] }));
+        return newId;
+      },
+
+      centerItemX: (id, canvasWidth) => set((s) => ({
+        items: s.items.map(i => i.id === id
+          ? { ...i, x: clampItemX(Math.round((canvasWidth - i.width) / 2), i.width, canvasWidth) }
+          : i),
+      })),
+
+      alignItemsY: (screenKey, ids) => set((s) => {
+        const members = s.items.filter(i => i.screenKey === screenKey && ids.includes(i.id));
+        if (members.length < 2) return s;
+        const targetY = Math.min(...members.map(i => i.y));
+        const memberIds = new Set(members.map(i => i.id));
+        return { items: s.items.map(i => memberIds.has(i.id) ? { ...i, y: targetY } : i) };
+      }),
+
+      alignItemsX: (screenKey, ids, canvasWidth) => set((s) => {
+        const members = s.items.filter(i => i.screenKey === screenKey && ids.includes(i.id));
+        if (members.length < 2) return s;
+        const targetX = Math.min(...members.map(i => i.x));
+        const memberIds = new Set(members.map(i => i.id));
+        return {
+          items: s.items.map(i => memberIds.has(i.id)
+            ? { ...i, x: clampItemX(targetX, i.width, canvasWidth) }
+            : i),
+        };
       }),
     }),
     {

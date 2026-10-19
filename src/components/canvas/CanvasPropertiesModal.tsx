@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
-import { X, SlidersHorizontal, ArrowUpToLine, ArrowDownToLine, Link2Off, SquareStack } from 'lucide-react-native';
+import { X, SlidersHorizontal, ArrowUpToLine, ArrowDownToLine, Link2Off, SquareStack, AlignCenterHorizontal, Copy } from 'lucide-react-native';
 import { MIN_ITEM_WIDTH, MIN_ITEM_HEIGHT } from '@/store/canvasComponentsStore';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
@@ -18,6 +18,7 @@ import Stepper from '@/components/ui/Stepper';
 // jednocześnie zwalniając miejsce w ciasnym rogu kafla (3 przyciski max, nie 4).
 export default function CanvasPropertiesModal({
   visible, x, y, width, height, canvasWidth, grouped, onChange, onBringToFront, onSendToBack, onUngroup,
+  onCenterHorizontal, onDuplicate,
   onTapAction, onChangeTapAction, onEditPopup, onClose,
 }: {
   visible: boolean;
@@ -28,6 +29,12 @@ export default function CanvasPropertiesModal({
   onBringToFront: () => void;
   onSendToBack: () => void;
   onUngroup: () => void;
+  // Wyśrodkuj/duplikuj (Faza §400, 2026-10-19) — user: "nie mam allign to center... nie mam
+  // opcji kopiuj". `onCenterHorizontal` — jednorazowe wyrównanie X do środka płótna (zero
+  // potrzeby ręcznego liczenia/wpisywania). `onDuplicate` zamyka panel po kliknięciu (tak jak
+  // `onUngroup` niżej) — user widzi nową kopię na płótnie i może od razu nią pokierować.
+  onCenterHorizontal: () => void;
+  onDuplicate: () => void;
   // Tryb "Dane"/popup (§391) — akcja po tapnięciu na ŻYWYM ekranie, uniwersalna dla WSZYSTKICH
   // typów (stąd tutaj, nie w modalu stylu per-typ). `onEditPopup` otwiera `CanvasPopupModal` w
   // trybie edycji — żyje tu, nie w `ScreenCanvas.tsx` wprost, bo to naturalne miejsce "ustawień"
@@ -65,6 +72,10 @@ export default function CanvasPropertiesModal({
               <Stepper label="Wysokość" value={height} min={MIN_ITEM_HEIGHT} max={2000} step={8}
                 onChange={v => onChange({ height: v })} />
             </View>
+            <TouchableOpacity onPress={() => { haptic.tap(); onCenterHorizontal(); }} style={s.layerBtn} activeOpacity={0.85}>
+              <AlignCenterHorizontal size={14} color={c.text.secondary} />
+              <Text style={s.layerBtnTxt}>Wyśrodkuj poziomo</Text>
+            </TouchableOpacity>
 
             <Text style={s.sectionLabel}>Warstwa</Text>
             <View style={{ flexDirection: 'row', gap: spacing[2] }}>
@@ -106,6 +117,11 @@ export default function CanvasPropertiesModal({
                 </TouchableOpacity>
               </>
             )}
+
+            <TouchableOpacity onPress={() => { haptic.success(); onDuplicate(); onClose(); }} style={[s.layerBtn, { backgroundColor: c.accent.blue + '18', borderColor: c.accent.blue }]} activeOpacity={0.85}>
+              <Copy size={14} color={c.accent.blue} />
+              <Text style={[s.layerBtnTxt, { color: c.accent.blue }]}>Duplikuj</Text>
+            </TouchableOpacity>
           </ScrollView>
         </Pressable>
       </Pressable>

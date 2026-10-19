@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, BarChart2, Compass } from 'lucide-react-native';
+import { Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, BarChart2, Compass, AlignStartHorizontal, AlignStartVertical } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -175,6 +175,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const sendToBack = useCanvasComponentsStore(st => st.sendToBack);
   const resizeGroupBy = useCanvasComponentsStore(st => st.resizeGroupBy);
   const moveLayer = useCanvasComponentsStore(st => st.moveLayer);
+  // Wyśrodkuj/duplikuj/wyrównaj (§400) — user: "nie mam allign to center albo snapa... nie
+  // mam jak ustawić np 2 kafelków na tym samym poziomie lub nie mam opcji kopiuj".
+  const duplicateItem = useCanvasComponentsStore(st => st.duplicateItem);
+  const centerItemX = useCanvasComponentsStore(st => st.centerItemX);
+  const alignItemsY = useCanvasComponentsStore(st => st.alignItemsY);
+  const alignItemsX = useCanvasComponentsStore(st => st.alignItemsX);
   const myItems = useMemo(() => allItems.filter(i => i.screenKey === screenKey), [allItems, screenKey]);
   // Warstwy (§359) — porządek RENDEROWANIA (który decyduje co jest "na wierzchu" wizualnie w
   // RN) sortowany po `zIndex`, NIE po kolejności w tablicy `items` (ta odzwierciedla kolejność
@@ -334,6 +340,13 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     setSelectMode(false);
     setSelectedIds([]);
   };
+  // Wyrównaj zaznaczone (§400) — user: "nie mam jak ustawić np 2 kafelków na tym samym
+  // poziomie". JEDNORAZOWE przesunięcie (NIE trwały link jak grupa) — zaznaczenie ZOSTAJE
+  // aktywne po wyrównaniu (świadomie `setSelectMode`/`setSelectedIds` NIE są tu czyszczone,
+  // w przeciwieństwie do `doGroup`), żeby można było zrobić oba wyrównania pod rząd albo
+  // dociągnąć ręcznie i dopiero potem zgrupować.
+  const doAlignY = () => { if (selectedIds.length < 2) return; haptic.success(); alignItemsY(screenKey, selectedIds); };
+  const doAlignX = () => { if (selectedIds.length < 2) return; haptic.success(); alignItemsX(screenKey, selectedIds, canvasWidth); };
 
   const content = (
     <View style={s.wrap}>
@@ -559,6 +572,22 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       {editing && selectMode && (
         <>
+          {/* Wyrównaj zaznaczone (§400) — osobny rząd od Anuluj/Grupuj niżej: to JEDNORAZOWE
+              przesunięcie (nie trwały link), więc wizualnie inna kategoria akcji nad tym samym
+              zaznaczeniem — ten sam niebiesko-obrysowy, "akcja narzędziowa" styl co kształty/
+              ikony niżej w pliku, nie fioletowy "grupowanie". */}
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <TouchableOpacity onPress={doAlignY} disabled={selectedIds.length < 2}
+              style={[s.addBtn, s.shapeAddBtn, { flex: 1, opacity: selectedIds.length < 2 ? 0.4 : 1 }]} activeOpacity={0.85}>
+              <AlignStartHorizontal size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Ten sam poziom</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={doAlignX} disabled={selectedIds.length < 2}
+              style={[s.addBtn, s.shapeAddBtn, { flex: 1, opacity: selectedIds.length < 2 ? 0.4 : 1 }]} activeOpacity={0.85}>
+              <AlignStartVertical size={15} color={c.text.secondary} />
+              <Text style={[s.addTxt, { color: c.text.secondary }]}>Ta sama kolumna</Text>
+            </TouchableOpacity>
+          </View>
           <View style={{ flexDirection: 'row', gap: spacing[2] }}>
             <TouchableOpacity onPress={cancelSelect} style={[s.addBtn, { flex: 1, backgroundColor: c.bg.elevated }]} activeOpacity={0.85}>
               <X size={15} color={c.text.secondary} />
@@ -570,7 +599,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
               <Text style={s.addTxt}>Grupuj ({selectedIds.length})</Text>
             </TouchableOpacity>
           </View>
-          <Text style={s.hintText}>Zaznacz co najmniej 2 komponenty, które mają poruszać się razem.</Text>
+          <Text style={s.hintText}>Zaznacz co najmniej 2 komponenty — "Ten sam poziom"/"Ta sama kolumna" wyrównuje je raz (bez trwałego powiązania), "Grupuj" sprawia że poruszają się razem na stałe.</Text>
         </>
       )}
 
@@ -787,6 +816,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         }}
         onBringToFront={() => { if (propsItem) bringToFront(propsItem.id); }}
         onSendToBack={() => { if (propsItem) sendToBack(propsItem.id); }}
+        onCenterHorizontal={() => { if (propsItem) centerItemX(propsItem.id, canvasWidth); }}
+        onDuplicate={() => { if (propsItem) duplicateItem(propsItem.id, canvasWidth); }}
         onUngroup={() => { if (propsItem?.groupId) ungroupItems(propsItem.groupId); }}
         onTapAction={propsItem?.onTapAction === 'openPopup' ? 'openPopup' : 'none'}
         onChangeTapAction={(v) => { if (propsItem) updateItem(propsItem.id, { onTapAction: v }); }}
