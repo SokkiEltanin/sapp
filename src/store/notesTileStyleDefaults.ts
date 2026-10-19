@@ -21,6 +21,11 @@ export interface NotesTileStyle {
   cornerRadius: number;
   showBody: boolean;
   showTags: boolean;
+  // Tło/przezroczystość (Faza §402, 2026-10-19) — user: "daj żeby edycja kafelka była z jego
+  // transparentością... nie ma wielu opcji edycji". OPCJONALNE (stare instancje bez tego pola
+  // = `?? 'card'`/`?? 1` w `NotesTile.tsx` = dzisiejszy wygląd, zero zmiany bez dotknięcia).
+  background?: 'card' | 'none';
+  opacity?: number; // przezroczystość SAMEGO TŁA — wmieszana w hex, patrz NotesTile.tsx
 }
 
 export const DEFAULT_NOTES_TILE_STYLE: NotesTileStyle = {
@@ -28,4 +33,6 @@ export const DEFAULT_NOTES_TILE_STYLE: NotesTileStyle = {
   cornerRadius: 16,
   showBody: true,
   showTags: true,
+  background: 'card',
+  opacity: 1,
 };

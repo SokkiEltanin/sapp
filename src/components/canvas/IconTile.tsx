@@ -37,12 +37,16 @@ export function IconTile({ style, onPress, sizeStyle }: {
 }) {
   const Icon = ICON_TILE_MAP[style.iconKey] ?? Star;
   const justify = style.align === 'left' ? 'flex-start' : style.align === 'right' ? 'flex-end' : 'center';
+  // Przezroczystość tła (§402) — wmieszana w hex `backgroundColor`, NIE w RN `opacity` (który
+  // przyciemniłby też samą ikonę) — ten sam wzorzec co `DataFieldTile.tsx`/`CountdownTile.tsx`/
+  // `NotesTile.tsx`.
+  const bgAlphaHex = Math.round(Math.max(0, Math.min(1, style.backgroundOpacity ?? 1)) * 255).toString(16).padStart(2, '0');
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
       <View style={{
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: justify,
         paddingHorizontal: 8,
-        backgroundColor: style.backgroundColor ?? 'transparent',
+        backgroundColor: style.backgroundColor ? style.backgroundColor + bgAlphaHex : 'transparent',
         borderRadius: style.backgroundColor ? style.cornerRadius : 0,
       }}>
         <Icon size={style.size} color={style.color} />

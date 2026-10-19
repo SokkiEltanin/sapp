@@ -42,6 +42,14 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
 }) {
   const c = useColors();
   const s = makeS(c);
+  // Tło/przezroczystość (§402) — JEDNO miejsce liczące dynamiczne tło-kartę, reużyte we
+  // WSZYSTKICH 5 gałęziach renderu niżej (zamiast statycznego `s.tileBoxed`'s `backgroundColor`
+  // wszędzie). `null` = brak tła (ani `boxed=false` z dashboardu, ani user wybrał "Brak" per
+  // instancja na płótnie) — spada na zwykły `s.tile*` bez dodatkowego stylu, dokładnie jak
+  // `boxed=false` zachowywało się dotąd.
+  const hasBg = boxed && (tileStyle.background ?? 'card') === 'card';
+  const bgAlphaHex = Math.round(Math.max(0, Math.min(1, tileStyle.opacity ?? 1)) * 255).toString(16).padStart(2, '0');
+  const boxedStyle = hasBg ? { backgroundColor: c.bg.elevated + bgAlphaHex, padding: spacing[3] } : null;
 
   if (!item) {
     return (
@@ -69,7 +77,7 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
   if (preset === 'bar') {
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-        <View style={[s.barTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+        <View style={[s.barTile, boxedStyle, { borderRadius: tileStyle.cornerRadius }]}>
           <View style={s.barHeadRow}>
             <Text style={s.name} numberOfLines={1}>{item.name}</Text>
             <Text style={[s.status, { color: ringColor, marginTop: 0 }]} numberOfLines={1}>{label}</Text>
@@ -86,7 +94,7 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
   if (preset === 'compact') {
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-        <View style={[s.compactTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+        <View style={[s.compactTile, boxedStyle, { borderRadius: tileStyle.cornerRadius }]}>
           <CalendarClock size={14} color={ringColor} />
           <Text style={s.compactTxt} numberOfLines={1}>
             <Text style={s.compactName}>{item.name}</Text>
@@ -100,7 +108,7 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
   if (preset === 'hero') {
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-        <View style={[s.heroTile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+        <View style={[s.heroTile, boxedStyle, { borderRadius: tileStyle.cornerRadius }]}>
           <DisplayText style={[s.heroNum, { color: ringColor, fontSize: 28 * tileStyle.numberScale, lineHeight: 30 * tileStyle.numberScale }]}>{ringDays}</DisplayText>
           <Text style={s.heroLabel} numberOfLines={1}>{during ? 'dni do końca' : 'dni'}</Text>
           <Text style={s.name} numberOfLines={1}>{item.name}</Text>
@@ -111,7 +119,7 @@ export function CountdownTile({ item, tileStyle, accentColor, onPress, sizeStyle
 
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-      <View style={[s.tile, boxed && s.tileBoxed, { borderRadius: tileStyle.cornerRadius }]}>
+      <View style={[s.tile, boxedStyle, { borderRadius: tileStyle.cornerRadius }]}>
         <RingCountdown progress={progress} color={ringColor} days={ringDays} size={tileStyle.ringSize} strokeWidth={tileStyle.ringStrokeWidth} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.name} numberOfLines={1}>{item.name}</Text>

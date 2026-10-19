@@ -3,6 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Gradient na tekście + przezroczystość tła Countdown/Notatki/Ikony (§402) — blur ŚWIADOMIE NIE zrobiony
+
+User: "Teraz wszystko mogę? I dodawać i tekst normalnie i gradient na tekście, i robić blur
+background kafelka? Żeby był glassmorphism itp?". Po zbadaniu `expo-blur` (martwy import w
+`index.tsx`/`finances.tsx`, `TabBar.tsx`/`pet-shop.tsx` jawnie unikają go "czyściej + płynniej
+na Androidzie") i pytaniu `AskUserQuestion`, user odpowiedział: **"To bez tego ale daj żeby
+edycja kafelka była z jego transparentością itp itd bo mam wrażenie że nie ma wielu opcji
+edycji"**. Blur/glassmorphism NIE WDROŻONY — **nie proponować tego ponownie bez nowej,
+wyraźnej prośby usera**. Zamiast tego: gradient na tekście + szeroki audyt przezroczystości.
+Checklist/pełne uzasadnienie w ARCHITECTURE.md §402.
+
+**Zrobione**: gradient na `textShape` (SVG, jednolinijkowy — ten sam mechanizm co
+`GradientText.tsx`) + naprawiony martwy `TextShapeStyle.opacity` w modalu; `background: 'card'
+| 'none'` + `opacity` dla Countdown/Notatki na płótnie (ten sam wzorzec co §401's DataFieldTile);
+`backgroundOpacity` dla tła Ikony.
+
+**NIE zrobione — świadomie odłożone, flagowane jako follow-up**: `StreakTile` (4 layouty z
+poprzeplataną logiką gradient/flame, zbyt ryzykowne na tę fazę), `ProgressBar` (fill/track nie
+mapuje się czysto na "tło karty"), `StatTile`/Wykres (ZERO customizacji kolorów/opacity w
+ogóle — osobny, większy temat redesignu). Jeśli user poprosi o przezroczystość na którymś z
+tych trzech, to NOWA, osobna faza, nie przeoczenie tej.
+
 ## ✅🆕 Wyśrodkuj/duplikuj/wyrównaj na płótnie (§400) + rozszerzony rejestr pól danych (§401)
 
 User, dwa osobne zgłoszenia pod rząd: (1) "nie mam allign to center albo snapa... nie mam jak

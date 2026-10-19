@@ -84,6 +84,11 @@ export default function CanvasIconStyleModal({ visible, style, onChange, onClose
                   <View style={s.divider} />
                   <Stepper label="Zaokrąglenie rogów" value={style.cornerRadius} min={0} max={32} step={2}
                     onChange={v => onChange({ cornerRadius: v })} />
+                  <View style={s.divider} />
+                  {/* Przezroczystość tła (§402) — user: "daj żeby edycja kafelka była z jego
+                      transparentością". Tylko tło, ikona sama zostaje w pełni czytelna. */}
+                  <Stepper label="Przezroczystość tła" value={Math.round((style.backgroundOpacity ?? 1) * 100)} min={10} max={100} step={10}
+                    onChange={v => onChange({ backgroundOpacity: v / 100 })} />
                 </>
               )}
             </View>

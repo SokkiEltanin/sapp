@@ -33,6 +33,11 @@ export interface IconTileStyle {
   backgroundColor: string | null; // null = brak tła, goła ikona
   cornerRadius: number;           // tylko gdy backgroundColor !== null
   align: IconAlign;               // "justować" (user) — pozycja ikony w boxie w poziomie
+  // Przezroczystość TŁA (Faza §402, 2026-10-19) — user: "daj żeby edycja kafelka była z jego
+  // transparentością". OPCJONALNE (`?? 1` w `IconTile.tsx` dla starych instancji = dzisiejszy,
+  // pełny kolor). Tylko gdy `backgroundColor !== null` — bez tła nie ma czego robić
+  // przezroczystym (ikona SAMA nie blednie, tylko jej tło).
+  backgroundOpacity?: number;
 }
 
 export const DEFAULT_ICON_TILE_STYLE: IconTileStyle = {
@@ -42,6 +47,7 @@ export const DEFAULT_ICON_TILE_STYLE: IconTileStyle = {
   backgroundColor: null,
   cornerRadius: 16,
   align: 'center',
+  backgroundOpacity: 1,
 };
 
 // Ta sama paleta co kształty (§357) — reużyta, nie zduplikowana.

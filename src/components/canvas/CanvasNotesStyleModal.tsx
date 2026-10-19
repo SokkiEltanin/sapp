@@ -72,6 +72,27 @@ export default function CanvasNotesStyleModal({ visible, style, onChange, onClos
                 </>
               )}
             </View>
+
+            {/* Tło (§402) — user: "daj żeby edycja kafelka była z jego transparentością...
+                nie ma wielu opcji edycji". Ten sam wzorzec co `CanvasDataFieldStyleModal`. */}
+            <Text style={s.sectionLabel}>Tło</Text>
+            <View style={s.segmented}>
+              {([['card', 'Karta'], ['none', 'Brak']] as [NonNullable<NotesTileStyle['background']>, string][]).map(([m, lbl]) => {
+                const on = (style.background ?? 'card') === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); onChange({ background: m }); }}
+                    style={[s.segBtn, { flex: 1, alignItems: 'center' }, on && { backgroundColor: c.accent.blue + '22', borderColor: c.accent.blue }]}>
+                    <Text style={[s.segTxt, on && { color: c.accent.blue }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {(style.background ?? 'card') === 'card' && (
+              <View style={s.innerCard}>
+                <Stepper label="Przezroczystość tła" value={Math.round((style.opacity ?? 1) * 100)} min={10} max={100} step={10}
+                  onChange={v => onChange({ opacity: v / 100 })} />
+              </View>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>
