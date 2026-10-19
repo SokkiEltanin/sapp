@@ -20496,6 +20496,47 @@ najbardziej czuły na wydajność ekran appki.
 miesiąc-kompakt/miesiąc-rozwinięty, każdy osobno) i Nastrój → "Twoje komponenty" → odznaka
 pełnego ekranu.
 
+## 385. Tryb pełnoekranowy płótna — Faza 3 (OSTATNIA): główny dashboard — rollout zakończony (2026-10-19)
+
+Kontynuacja §381-384 bez przerywania — ostatni, najbardziej czuły na wydajność ekran appki:
+`(tabs)/index.tsx`. **Wszystkie 14 miejsc montujących `ScreenCanvas`/`ScreenCanvasBase` w
+całej appce mają teraz tryb pełnoekranowy — rollout tego kierunku jest KOMPLETNY.**
+
+**Ten sam wzorzec co §381-384, z JEDNĄ dodatkową, realną korzyścią** — dashboard buduje swoją
+treść jako ogromny, NIEPAMIĘTANY (nie `useMemo`) blok `const nodes: Record<string,
+React.ReactNode> = {}` wewnątrz samego JSX (dziesiątki kart, IIFE, patrz komentarz przy
+`nodes['custom-canvas']`), przeliczany na KAŻDY render. Rozgałęzienie na samym `return` (ten
+sam, już ustalony wzorzec — hook wołany bezwarunkowo, branch dopiero na końcu, PO wszystkich
+hookach) oznacza, że w trybie pełnoekranowym ten blok w ogóle się NIE WYKONUJE, nie tylko się
+nie renderuje — czysty zysk wydajnościowy na ekranie, którego komentarze w tym pliku
+wielokrotnie opisują jako najbardziej czuły na wydajność w appce, nie tylko neutralny refaktor.
+
+**Dane dla `ScreenCanvasBase`** (`streakWall`/`allCountdownItemsForCanvas`/`allNotes`/
+`dataFieldRegistry`/`accentColor`) — te same, już obliczone wartości, które normalny branch
+PRZEKAZUJE do `nodes['custom-canvas']` niżej (dashboard "ma je już w pamięci", nie montuje
+`useHabits()`/liczników/notatek drugi raz — ten sam powód co zawsze w tym systemie, §356).
+Wszystkie cztery zweryfikowane jako zadeklarowane DUŻO wcześniej w komponencie (linie
+422/572/578/650), długo przed nowym branchem na ~2577 — bezpieczne do użycia.
+
+**Brak `ScreenHeader` na dashboardzie dotąd** (ma własny, custom hero/greeting) — dodany
+import, użyty TYLKO w branchu pełnoekranowym, tytuł "Dashboard" (brak ustalonej polskiej nazwy
+tego ekranu gdzie indziej w repo — `screenKey="dashboard"` już istniał).
+
+**Status całego kierunku "jeden edytor jak Figma, obejmie wszystko" (§380-385)**: tryb
+pełnoekranowy na WSZYSTKICH 14 ekranach — zrobiony. Zostaje: nowy typ komponentu "wykres" (user
+explicite wymienił w §380, jeszcze nie zaczęty) — "budowanie kafelków" i "robienie presetów"
+już istniały przed tym kierunkiem (system kopiowania komponentów §341-377 i `StylePresetBar`
+§370/§377) i nie wymagały dodatkowej pracy.
+
+**Testy**: brak nowych (czysty JSX-rozgałęzienie, logika płótna już przetestowana w §381).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1462 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — KRYTYCZNY, to GŁÓWNY ekran appki**: Dashboard → przewiń na
+sam dół do "Twoje komponenty" → odznaka pełnego ekranu → potwierdź → CAŁY dashboard (hero,
+wszystkie karty) znika, zostaje tylko płótno. Sprawdź że appka się nie crashuje, że wyłączenie
+("zmniejsz") przywraca dashboard DOKŁADNIE jak był (żadna karta nie zniknęła/nie przesunęła
+się). To najważniejszy test tej całej serii faz — jeśli coś miało się zepsuć, to tu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
