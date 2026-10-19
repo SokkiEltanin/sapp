@@ -1,5 +1,5 @@
 import { Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
-import Svg, { Rect, Ellipse, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Ellipse, Line, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
   ShapeComponentType, RectShapeStyle, EllipseShapeStyle, LineShapeStyle, TextShapeStyle,
 } from '@/store/shapeStyleDefaults';
@@ -92,13 +92,41 @@ export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
     );
   }
   const st = style as TextShapeStyle;
+  const shownText = st.text || 'Dwa kliknięcia na 🎨, żeby wpisać tekst';
+  // Gradient na tekście (§402, user: "gradient na tekście") — RN <Text> nie ma natywnego
+  // gradientowego wypełnienia (ten sam ograniczenie udokumentowane w `GradientText.tsx`), więc
+  // gradient renderuje się jako PRAWDZIWE SVG (`<SvgText fill="url(#...)">`, reużyte
+  // `FillDefs`/`fillPaint` z góry pliku — te same co rect/ellipse). ŚWIADOMY kompromis:
+  // SVG-owy tekst NIE zawija się automatycznie jak RN `<Text numberOfLines>` — gradient jest
+  // więc JEDNOLINIJKOWY (skalowany w dół, żeby zmieścić się w szerokości boxa, ten sam
+  // fit-scale co `GradientText.tsx`). Płaski kolor (zdecydowana większość przypadków) zostaje
+  // DOKŁADNIE jak dotąd — zero zmiany zachowania dla istniejących, wieloliniowych instancji.
+  if (isGradientFill(st.color)) {
+    const w = Math.max(1, width), h = Math.max(1, height);
+    const estCharW = st.fontSize * 0.58; // przybliżenie szerokości znaku (brak pomiaru tekstu w RN)
+    const fit = shownText.length > 0 ? Math.min(1, w / Math.max(1, shownText.length * estCharW)) : 1;
+    const size = st.fontSize * fit;
+    const x = st.align === 'left' ? 0 : st.align === 'right' ? w : w / 2;
+    const anchor = st.align === 'left' ? 'start' : st.align === 'right' ? 'end' : 'middle';
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
+        <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} style={{ opacity: st.opacity }}>
+          <FillDefs fill={st.color} />
+          <SvgText x={x} y={h / 2 + size * 0.35} fontSize={size} fontWeight={st.bold ? '800' : '500'}
+            textAnchor={anchor} fill={fillPaint(st.color)}>
+            {shownText}
+          </SvgText>
+        </Svg>
+      </TouchableOpacity>
+    );
+  }
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[sizeStyle, s.textWrap]}>
       <Text
         style={[s.text, { color: st.color, fontSize: st.fontSize, fontWeight: st.bold ? '800' : '500', textAlign: st.align, opacity: st.opacity }]}
         numberOfLines={6}
       >
-        {st.text || 'Dwa kliknięcia na 🎨, żeby wpisać tekst'}
+        {shownText}
       </Text>
     </TouchableOpacity>
   );

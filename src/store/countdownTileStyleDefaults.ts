@@ -28,6 +28,14 @@ export interface CountdownTileStyle {
   ringSize: number;
   ringStrokeWidth: number;
   numberScale: number; // tylko 'hero' — rozmiar dużej liczby dni
+  // Tło/przezroczystość (Faza §402, 2026-10-19) — user: "daj żeby edycja kafelka była z jego
+  // transparentością... nie ma wielu opcji edycji". OPCJONALNE (stare instancje bez tego pola
+  // = `?? 'card'`/`?? 1` w `CountdownTile.tsx` = DOKŁADNIE dzisiejszy wygląd, zero zmiany dla
+  // nikogo kto tego nie dotknie). `background` i tak działa TYLKO gdy wołający przekazał
+  // `boxed` (na płótnie zawsze `true`, na dashboardzie `CountdownsCard.tsx` zawsze `false` —
+  // ten drugi kontekst nigdy nie widzi karty w ogóle, więc te pola tam nie mają znaczenia).
+  background?: 'card' | 'none';
+  opacity?: number; // przezroczystość SAMEGO TŁA (nie całego kafla) — wmieszana w hex, patrz CountdownTile.tsx
 }
 
 export const DEFAULT_COUNTDOWN_TILE_STYLE: CountdownTileStyle = {
@@ -36,4 +44,6 @@ export const DEFAULT_COUNTDOWN_TILE_STYLE: CountdownTileStyle = {
   ringSize: 56,
   ringStrokeWidth: 6,
   numberScale: 1,
+  background: 'card',
+  opacity: 1,
 };

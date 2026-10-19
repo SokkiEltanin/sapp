@@ -57,7 +57,15 @@ export interface LineShapeStyle {
 }
 export interface TextShapeStyle {
   text: string;
-  color: string;
+  // `color: Fill` (Faza §402, 2026-10-19) — user: "gradient na tekście". POSZERZENIE typu
+  // (`string | GradientFill`, ten sam, już ustalony wzorzec co `RectShapeStyle.fill`/§394) —
+  // stare, persystowane instancje z płaskim hex-em dalej są poprawnym `Fill`, zero migracji.
+  // Pole NIE przemianowane na `fill` (mimo że to by pasowało do reszty kształtów) — zmiana
+  // KLUCZA, nie tylko typu, złamałaby persystowane dane (`persist` merge nie przemianowuje
+  // pól). Renderowane jako SVG `<SvgText fill="url(#...)">` TYLKO gdy gradient (patrz
+  // `ShapeTile.tsx`) — płaski kolor renderuje się jak dotąd, zwykłym RN `<Text>` (wieloliniowe,
+  // bez zmiany zachowania).
+  color: Fill;
   fontSize: number;
   bold: boolean;
   align: 'left' | 'center' | 'right';

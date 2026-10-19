@@ -108,10 +108,11 @@ export default function CanvasShapeStyleModal({ visible, kind, style, onChange, 
                       multiline maxLength={80} style={s.textInput}
                     />
                   </View>
-                  <View>
-                    <Text style={s.sectionLabel}>Kolor</Text>
-                    <ColorSwatchPicker presets={SHAPE_COLOR_PRESETS} current={st.color} onSelect={(hex) => onChange({ color: hex })} />
-                  </View>
+                  {/* Gradient na tekście (§402, user: "gradient na tekście") — reużyty
+                      `GradientFillEditor` (Płasko/Gradient), ten sam co rectShape/ellipseShape
+                      wyżej. Renderowane jako SVG TYLKO gdy gradient wybrany — patrz
+                      `ShapeTile.tsx`. */}
+                  <GradientFillEditor label="Kolor" presets={SHAPE_COLOR_PRESETS} value={st.color} onChange={(color) => onChange({ color })} />
                   <Text style={s.sectionLabel}>Wyrównanie</Text>
                   <View style={s.segmented}>
                     {([['left', 'Do lewej'], ['center', 'Środek'], ['right', 'Do prawej']] as [TextShapeStyle['align'], string][]).map(([m, lbl]) => {
@@ -135,6 +136,12 @@ export default function CanvasShapeStyleModal({ visible, kind, style, onChange, 
                         <Text style={[s.tinyBtnTxt, st.bold && { color: c.accent.blue }]}>{st.bold ? 'Włączone' : 'Wyłączone'}</Text>
                       </TouchableOpacity>
                     </View>
+                    <View style={s.divider} />
+                    {/* Przezroczystość (§402, fix) — `opacity` ISTNIAŁ w `TextShapeStyle`/
+                        renderowany w `ShapeTile.tsx` od §357, ale NIGDY nie był tu wystawiony —
+                        martwa kontrolka UI, user nie miał jak jej dotknąć. */}
+                    <Stepper label="Przezroczystość" value={st.opacity} min={0.1} max={1} step={0.1} decimals={1}
+                      onChange={v => onChange({ opacity: v })} />
                   </View>
                 </>
               );

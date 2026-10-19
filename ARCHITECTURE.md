@@ -21370,6 +21370,80 @@ miesiącu"/"Dzisiejszy nastrój"/"Średni nastrój (7 dni)" z realnymi wartości
 goły tekst, bez karty/paddingu. Przełącz z powrotem na "Karta" → zjedź suwakiem
 "Przezroczystość tła" → sprawdź że TŁO blaknie, ale TEKST zostaje w pełni czytelny.
 
+## 402. Gradient na tekście + przezroczystość tła kafli (bez blur) (2026-10-19)
+
+User po §401: "Teraz wszystko mogę? I dodawać i tekst normalnie i gradient na tekście, i robić
+blur background kafelka? Żeby był glassmorphism itp?". Zbadano `expo-blur` — `BlurView` jest
+zaimportowany w `app/(tabs)/index.tsx`/`finances.tsx`, ale NIGDZIE renderowany (martwy
+import) — `TabBar.tsx`/`pet-shop.tsx` mają explicit komentarze: rgba BEZ `BlurView`, "czyściej
++ płynniej na Androidzie". Realny blur na kaflach canvasu, przeciąganych przez Reanimated 60fps
+na gestach, to najgorszy case dla tej samej jank-ryzyka — zasugerowano pominięcie. User po
+`AskUserQuestion`: **"To bez tego ale daj żeby edycja kafelka była z jego transparentością itp
+itd bo mam wrażenie że nie ma wielu opcji edycji"** — blur/glassmorphism ŚWIADOMIE NIE
+zbudowany (nie proponować ponownie bez nowej prośby), zamiast tego szeroki audyt przezroczystości
+na kaflach canvasu + gradient na tekście (druga, wciąż żywa część oryginalnego pytania).
+
+**Gradient na tekście** (`textShape`, `shapeStyleDefaults.ts`/`ShapeTile.tsx`/
+`CanvasShapeStyleModal.tsx`) — `TextShapeStyle.color` POSZERZONE z `string` na `Fill`
+(`string | GradientFill`, ten sam, już ustalony wzorzec co `RectShapeStyle.fill`/§394 —
+POSZERZENIE typu, nie rename, stare persystowane instancje z płaskim hex-em dalej są poprawnym
+`Fill` bez migracji). RN `<Text>` nie ma natywnego gradientowego wypełnienia — reużyto
+ISTNIEJĄCĄ technikę z `GradientText.tsx` (dashboard hero/nazwy rzadkości przedmiotów): gradient
+renderuje się jako prawdziwe SVG (`<SvgText fill="url(#...)">`, reużyte `fillPaint`/`FillDefs` z
+góry `ShapeTile.tsx`, te same co rect/ellipse). ŚWIADOMY kompromis: SVG-owy tekst NIE zawija się
+automatycznie jak RN `<Text numberOfLines>` — gradient jest więc JEDNOLINIJKOWY, skalowany w dół
+żeby zmieścić się w szerokości boxa (`estCharW = fontSize * 0.58`, ten sam fit-scale co
+`GradientText.tsx`). Płaski kolor (zdecydowana większość instancji) renderuje się DOKŁADNIE jak
+dotąd, zwykłym RN `<Text>`, wieloliniowo — zero zmiany zachowania. `CanvasShapeStyleModal.tsx`:
+plain `ColorSwatchPicker` zamieniony na `GradientFillEditor` (Płasko/Gradient toggle, ten sam co
+rectShape/ellipseShape). Przy tej samej okazji ZNALEZIONY i naprawiony kolejny "martwe pole"
+bug: `TextShapeStyle.opacity` istniał i był renderowany w `ShapeTile.tsx` od §357, ale nigdy nie
+był wystawiony w modalu — dodany `Stepper "Przezroczystość"`.
+
+**Przezroczystość tła: Countdown/Notatki/Ikona** — ten sam "martwe pole"/`boxed`-hardcoding
+bug co `DataFieldTile` w §401, znaleziony przy systematycznym audycie WSZYSTKICH typów kafli
+canvasu po szerokiej skardze usera ("nie ma wielu opcji edycji"):
+- `CountdownTile.tsx`/`countdownTileStyleDefaults.ts`, `NotesTile.tsx`/
+  `notesTileStyleDefaults.ts` — dodane `background?: 'card' | 'none'` + `opacity?: number`
+  (`?? 'card'`/`?? 1` dla starych instancji = zero zmiany domyślnego wyglądu). `boxed` prop
+  (dotąd kontekstowa flaga dashboard-lista=`false` vs canvas=ZAWSZE `true`) ZOSTAJE jako
+  context-gate — `ScreenCanvas.tsx` bez zmian — ale teraz wewnątrz komponentu liczony JEDEN
+  `hasBg = boxed && (tileStyle.background ?? 'card') === 'card'` + `boxedStyle` użyty we
+  wszystkich branchach layoutu (CountdownTile: bar/compact/hero/ring; NotesTile: row/compact/
+  card), z `opacity` wmieszanym w hex `backgroundColor` (ten sam `+ '18'`-alpha-suffix wzorzec
+  co §401, NIE przez RN `opacity` na całym View — tekst/ikony zostają w pełni czytelne).
+  `CanvasCountdownStyleModal.tsx`/`CanvasNotesStyleModal.tsx`: nowa sekcja "Tło" (segmented
+  Karta/Brak + warunkowy Stepper "Przezroczystość tła"), ten sam layout co
+  `CanvasDataFieldStyleModal.tsx` z §401.
+- `IconTile.tsx`/`iconTileStyleDefaults.ts` — inny przypadek: `backgroundColor: string | null`
+  JUŻ służył jako przełącznik tła (`null` = brak), więc brakowało tylko przezroczystości SAMEGO
+  tła przy włączonym tle. Dodane `backgroundOpacity?: number` (osobna nazwa, bo `background`
+  jako toggle już zajęte przez `backgroundColor`), wmieszane w hex tak jak wyżej.
+  `CanvasIconStyleModal.tsx`: nowy Stepper "Przezroczystość tła" wewnątrz istniejącego
+  `backgroundColor != null` bloku.
+
+**Świadomie wykluczone z tej fazy** (brak w scope, NIE przeoczenie — flagowane jako follow-up):
+`StreakTileStyle` (4 strukturalnie różne layouty — classic/ring/stripe/compact — każdy z już
+poprzeplatana logiką `gradientMode`/`showFlame`/`flameOnTop`, zbyt ryzykowne do bezpiecznego
+dociągnięcia w tej fazie); `ProgressBarStyle` (słupek wypełnienia/tor nie mapuje się tak czysto
+na koncepcję "tła karty"); `StatTileCanvasStyle`/"Wykres" (ZERO customizacji kolorów/opacity w
+ogóle — osobny, większy temat redesignu, nie szybka dopiska).
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + rendering, zero nowej logiki czystych
+funkcji wymagającej osobnych testów (zweryfikowano: jedyny test dotykający `textShape.color`,
+`canvasComponentsStore.test.ts`, sprawdza tylko `toBeDefined()`, nie typ/kształt — poszerzenie
+`string → Fill` go nie łamie; szablony w `canvasTemplates.ts` nie ustawiają `color` explicit,
+więc dziedziczą `DEFAULT_TEXT_SHAPE_STYLE` bez zmian). `tsc --noEmit` czyste, `jest --silent`
+115/115 suite, 1501 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Dodaj kształt "Tekst" na płótnie → 🎨 styl → "Kolor"
+→ przełącz na "Gradient" → sprawdź że tekst renderuje się z gradientem (jednolinijkowo,
+skalowany żeby zmieścić się w boxie). Zjedź "Przezroczystość" tekstu → sprawdź że blednie.
+Dodaj Countdown/Notatkę/Ikonę na płótnie → 🎨 styl → "Tło" → "Brak" → sprawdź że kafel traci
+kartę (tylko treść). Przełącz z powrotem na "Karta" → zjedź "Przezroczystość tła" → sprawdź że
+TŁO blaknie, treść zostaje w pełni czytelna. Potwierdź że NIGDZIE nie pojawił się blur/
+rozmycie tła (świadomie pominięte).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
