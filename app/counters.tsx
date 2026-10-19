@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import DisplayText from '@/components/ui/DisplayText';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import RingCountdown from '@/components/counters/RingCountdown';
 import { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, untilProgressStepped, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
@@ -45,6 +46,8 @@ export default function Counters() {
   const expenses = useExpensesStore((st) => st.expenses);
   const meals = useFoodStore(st => st.meals);
   const foodProducts = useFoodStore(st => st.products);
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['counters'] ?? false);
 
   type UiKind = 'until' | 'since' | 'avoid';
   const [editing, setEditing] = useState<Counter | null>(null);
@@ -112,6 +115,24 @@ export default function Counters() {
   };
   const [confirmDel, setConfirmDel] = useState<Counter | null>(null);
   const del = (cn: Counter) => { haptic.tap(); setConfirmDel(cn); };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — gdy włączony, lista liczników nie montuje się
+  // wcale. `ScreenCanvas` (nie `ScreenCanvasBase`) — ten ekran nie montuje `useHabits()`/
+  // notatek sam, więc domyślny, samowystarczalny wariant jest bezpieczny (jak dotąd niżej).
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.header}>
+          <PressableScale onPress={() => router.back()} style={s.backBtn}>
+            <ChevronLeft size={22} color={c.text.primary} />
+          </PressableScale>
+          <Text style={s.headerTitle}>Liczniki</Text>
+          <View style={s.backBtn} />
+        </View>
+        <ScreenCanvas screenKey="counters" title="Twoje komponenty" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>

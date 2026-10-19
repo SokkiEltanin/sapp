@@ -20401,6 +20401,40 @@ CAŁY ekran Zdrowia znika, zostaje tylko nagłówek + płótno na cały ekran. D
 się przewija, że TabBar na dole nie zasłania ostatniego itemu/przycisków "Dodaj". Wyłącz tą samą
 ikonką (teraz "zmniejsz") — Zdrowie wraca dokładnie takie jak było, nic nie zniknęło.
 
+## 382. Tryb pełnoekranowy płótna — Faza 2a: Notatki, Nawyki, Pupil, Liczniki (2026-10-18)
+
+Kontynuacja §381 bez przerywania (user: "czekam"). Mechaniczne podłączenie IDENTYCZNEGO wzorca
+(hook `fullScreenScreens[screenKey]` wołany bezwarunkowo + rozgałęzienie na samym `return`) do
+czterech kolejnych ekranów: `app/notes.tsx`, `app/habits.tsx`, `app/pet.tsx`, `app/counters.tsx`.
+
+**Dwa warianty, oba już istniejące w §381**:
+- `counters.tsx` używa DOMYŚLNEGO `ScreenCanvas` (sam fetchuje dane) — branch pełnoekranowy to
+  tylko nagłówek + `<ScreenCanvas screenKey="counters" />`, nic więcej.
+- `notes.tsx`/`habits.tsx`/`pet.tsx` używają `ScreenCanvasBase` (host dostarcza
+  `allStreakItems`/`allCountdownItems`/`allNotesItems`/`dataFieldRegistry`/`accentColor` z
+  WŁASNYCH, już-zamontowanych hooków, patrz §356/§368 — unika drugiego `useHabits()`/fetchu
+  notatek) — branch pełnoekranowy przekazuje TE SAME, już obliczone wartości, które normalny
+  branch i tak przekazuje niżej w tym samym pliku.
+
+**`pet.tsx` — jedyna różnica względem Zdrowia/Nawyków/Notatek**: `<PupilNavbar current="pet"/>`
+ZOSTAJE w branchu pełnoekranowym. To ekran-hub (Pupil/Bossy/Sklep/Questy, §376-doc w
+`PupilNavbar.tsx`), nie ekran typu "wróć" jak reszta — user musi dalej móc przejść do innej
+zakładki huba nawet w pełnym ekranie płótna.
+
+**Nagłówki** — każdy ekran ma swój WŁASNY styl headera (różne komponenty, różne propsy) —
+branch pełnoekranowy powiela IDENTYCZNY wzorzec JSX co normalny header tego samego ekranu
+(ten sam `PressableScale`/wstecz, ten sam tytuł), z pustym `<View style={s.backBtn}/>` jako
+symetrycznym odstępem po prawej (zamiast realnych akcji, które normalny header ma) — ten sam
+"placeholder dla symetrii" trik co `editMapBtn`-owa strona `boss-map-editor.tsx`'s nagłówka.
+
+**Testy**: brak nowych (czysty JSX-rozgałęzienie, logika płótna już przetestowana w §381).
+`tsc --noEmit` czyste, `jest --silent` 113/113 suite, 1462 testów (bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Notatki/Nawyki/Pupil/Liczniki → "Twoje komponenty"
+→ odznaka pełnego ekranu → potwierdź → reszta ekranu znika. Na Pupilu sprawdź że pasek
+Pupil/Bossy/Sklep/Questy NADAL działa (można przejść na inną zakładkę huba) mimo pełnego
+ekranu płótna.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

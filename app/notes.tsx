@@ -17,6 +17,7 @@ import { useCounters } from '@/store/countersStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
+import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { useAllStreakItems } from '@/hooks/useAllStreakItems';
 import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
 import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
@@ -712,6 +713,9 @@ export default function NotesScreen() {
   const canvasCountdownItems = useAllCountdownItems();
   const canvasDataFieldRegistry = useDataFieldRegistry();
   const { color: canvasAccentColor } = useTimeAccent();
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx: wołany
+  // bezwarunkowo razem z resztą hooków, rozgałęzienie JSX dopiero na samym `return`.
+  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['notes'] ?? false);
   const counterName = (counterId?: string) => counterId ? counters.find(cn => cn.id === counterId)?.name : undefined;
 
   const loadAll = useCallback(async () => {
@@ -848,6 +852,34 @@ export default function NotesScreen() {
     if (activeFolder === name) setActiveFolder(null);
     loadAll();
   };
+
+  // Tryb pełnoekranowy płótna (§381, Faza 2) — identyczny wzorzec co health.tsx: gdy
+  // włączony, cała reszta ekranu (lista notatek/foldery/wyszukiwanie) nie montuje się wcale.
+  if (canvasFullScreen) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.iconBtn}>
+            <ArrowLeft size={20} color={colors.text.secondary} />
+          </PressableScale>
+          <View style={styles.headerCenter}>
+            <Text style={styles.title}>Notatki</Text>
+            <Text style={styles.subtitle}>Pełny ekran</Text>
+          </View>
+          <View style={styles.iconBtn} />
+        </View>
+        <ScreenCanvasBase
+          screenKey="notes"
+          title="Twoje komponenty"
+          allStreakItems={canvasStreakItems}
+          allCountdownItems={canvasCountdownItems}
+          allNotesItems={notes}
+          dataFieldRegistry={canvasDataFieldRegistry}
+          accentColor={canvasAccentColor}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
