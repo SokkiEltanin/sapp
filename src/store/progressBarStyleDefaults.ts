@@ -1,3 +1,5 @@
+import { Fill } from '@/store/gradientFill';
+
 // Pasek progresu na wolnym płótnie (Faza §393, 2026-10-19) — user: "dodaj... paski progresu
 // itp... żeby podczas projektowania mógł wrzucić pasek, zmienić mu wygląd... jak kiedyś w
 // KWGT Widgets" (Kustom Widget — Android, dokładnie ten model: gotowy "pasek progresu" jako
@@ -8,8 +10,11 @@
 // `eventProgress`/`untilProgressStepped`, TE SAME co `CountdownTile.tsx`'s `RingCountdown`),
 // zero nowej matematyki zakresu — zakres liczника to jego własny start/koniec, ustawiony już
 // przy tworzeniu licznika w Licznikach, nie coś co trzeba konfigurować osobno na pasku.
+// `fillColor: Fill` (Faza §394, 2026-10-19, user: "dodaj gradienty na pewno") — POSZERZENIE typu
+// (`string | GradientFill`, `gradientFill.ts`), nie rename/migracja. `trackColor` ZOSTAJE
+// `string` (zawsze płaski) — gradient na torze/tle paska jest rzadki, świadomie poza zakresem.
 export interface ProgressBarStyle {
-  fillColor: string;
+  fillColor: Fill;
   trackColor: string;
   cornerRadius: number; // realne piksele (zwykły RN `borderRadius`, nie SVG — bez pułapki §387)
   orientation: 'horizontal' | 'vertical';

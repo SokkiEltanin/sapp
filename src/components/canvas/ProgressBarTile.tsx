@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Counter, isDuringEvent, eventProgress, untilProgress, untilProgressStepped } from '@/store/countersStore';
 import { ProgressBarStyle } from '@/store/progressBarStyleDefaults';
+import { isGradientFill, gradientPoints } from '@/store/gradientFill';
 
 // Renderer paska progresu (Faza §393) — sygnatura `(…, onPress, sizeStyle)` jak reszta typów.
 // `counter=null` (niepodpięty) rysuje placeholder — ten sam duch co `boundStreak`/
@@ -29,15 +31,21 @@ export function ProgressBarTile({ counter, style, onPress, sizeStyle }: {
     : (counter.fillStyle === 'stepped' ? untilProgressStepped(counter) : untilProgress(counter));
   const pct = Math.min(1, Math.max(0, progress));
   const horizontal = style.orientation !== 'vertical';
+  const fillBoxStyle = horizontal
+    ? { width: `${pct * 100}%` as const, height: '100%' as const }
+    : { position: 'absolute' as const, left: 0, right: 0, bottom: 0, height: `${pct * 100}%` as const };
+  const gradient = isGradientFill(style.fillColor) ? style.fillColor : null;
 
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
       <View style={[s.track, { backgroundColor: style.trackColor, borderRadius: style.cornerRadius }]}>
-        <View
-          style={horizontal
-            ? { width: `${pct * 100}%`, height: '100%', backgroundColor: style.fillColor }
-            : { position: 'absolute', left: 0, right: 0, bottom: 0, height: `${pct * 100}%`, backgroundColor: style.fillColor }}
-        />
+        <View style={fillBoxStyle}>
+          {gradient ? (
+            <LinearGradient colors={gradient.stops} {...gradientPoints(gradient.direction)} style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: style.fillColor as string }]} />
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );

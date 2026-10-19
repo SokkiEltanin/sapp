@@ -1,3 +1,5 @@
+import { Fill } from '@/store/gradientFill';
+
 // Gołe kształty-primitywy na wolnym płótnie (Faza 26, 2026-10-17, §357) — user: "na pewno pełny
 // edytor z dodawaniem kształtów od zera... żeby było jak Figma". Dotychczasowe 3 typy
 // (`streakTile`/`countdownTile`/`notesTile`, `canvasComponentsStore.ts`) to gotowe WIDGETY z
@@ -32,15 +34,18 @@ export type ShapeComponentType = 'rectShape' | 'ellipseShape' | 'lineShape' | 't
 export const SHAPE_TYPES: readonly ShapeComponentType[] = ['rectShape', 'ellipseShape', 'lineShape', 'textShape'];
 export const isShapeType = (t: string): t is ShapeComponentType => (SHAPE_TYPES as readonly string[]).includes(t);
 
+// `fill: Fill` (Faza §394, 2026-10-19, user: "dodaj gradienty na pewno") — POSZERZENIE typu
+// (`string | GradientFill`, `gradientFill.ts`), nie rename/migracja: stare, persystowane itemy
+// z płaskim hex-em dalej są poprawnym `Fill` bez żadnej zmiany danych.
 export interface RectShapeStyle {
-  fill: string;
+  fill: Fill;
   stroke: string | null; // null = brak obrysu
   strokeWidth: number;    // REALNE piksele (§387, patrz komentarz wyżej) — nie jednostki 0-100
   cornerRadius: number;   // REALNE piksele, klamrowane w ShapeTile.tsx do połowy krótszej krawędzi
   opacity: number;        // 0.1-1
 }
 export interface EllipseShapeStyle {
-  fill: string;
+  fill: Fill;
   stroke: string | null;
   strokeWidth: number;
   opacity: number;

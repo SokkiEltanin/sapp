@@ -8,6 +8,7 @@ import { spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import Stepper from '@/components/ui/Stepper';
 import ColorSwatchPicker from '@/components/ui/ColorSwatchPicker';
+import GradientFillEditor from './GradientFillEditor';
 
 // Styl paska progresu (Faza §393) — ten sam wzorzec co `CanvasShapeStyleModal.tsx` (kolor
 // wypełnienia/tła + zaokrąglenie), plus orientacja. Który LICZNIK pokazać to podpięcie
@@ -31,10 +32,7 @@ export default function CanvasProgressBarStyleModal({ visible, style, onChange, 
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ gap: spacing[3] }}>
-            <View>
-              <Text style={s.sectionLabel}>Wypełnienie</Text>
-              <ColorSwatchPicker presets={SHAPE_COLOR_PRESETS} current={style.fillColor} onSelect={(hex) => onChange({ fillColor: hex })} />
-            </View>
+            <GradientFillEditor presets={SHAPE_COLOR_PRESETS} value={style.fillColor} onChange={(fillColor) => onChange({ fillColor })} />
             <View>
               <Text style={s.sectionLabel}>Tło (tor)</Text>
               <ColorSwatchPicker presets={SHAPE_COLOR_PRESETS} current={style.trackColor} onSelect={(hex) => onChange({ trackColor: hex })} />

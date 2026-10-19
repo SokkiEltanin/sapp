@@ -181,14 +181,11 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
    globalną stałą. **Nie zaczynać kodować bez jasnego ustalenia z userem**: per-kafel na płótnie
    czy globalna zmiana `STREAK_TIERS` (wpływa na WSZYSTKIE miejsca appki)? To drugie jest dużo
    większą, inwazyjną zmianą i prawdopodobnie wykracza poza sam system canvas/edytora.
-9. **Gradienty — jeszcze NIE zrobione.** User (2026-10-19, kolejna wiadomość): "dodaj gradienty
-   na pewno". Potrzebne dla: `rectShape`/`ellipseShape` (`shapeStyleDefaults.ts`, dziś płaski
-   `fill: string`) ORAZ nowy `progressBar` (§393, dziś płaski `fillColor`/`trackColor`). Plan:
-   discriminated union `fill: string | { type: 'gradient'; stops: string[]; angle?: number }`,
-   UI wyboru stopów (prawdopodobnie 2+ instancje `ColorPickerPanel`, §388 + lista stopów),
-   render przez `react-native-svg`'s `LinearGradient`/`Defs` dla shapes, `expo-linear-gradient`
-   (już używany w appce, np. `ColorPickerPanel.tsx`) dla `progressBar` (plain RN View, nie SVG).
-   **Jedna, spójna zmiana modelu dla OBU typów naraz**, nie dwa osobne mechanizmy.
+9. ✅ **ZROBIONE (§394) — gradienty** dla `rectShape`/`ellipseShape` i `progressBar`. Nowy
+   `Fill = string | GradientFill` (`gradientFill.ts`), 2 stopy + kierunek (→↓↘↗), wspólny
+   `GradientFillEditor.tsx` wpięty w obie modale stylu. Checklist w ARCHITECTURE.md §394.
+   **NIE zrobione**: więcej niż 2 stopy, gradient na `trackColor` paska progresu, gradient na
+   `lineShape`/`textShape` (nie proszone, świadomie poza zakresem).
 10. **Szablony projektów — jeszcze NIE zrobione.** User: "dodaj... szablony". Z §390: wybór
     Szablon vs Pusty canvas przy tworzeniu projektu w Ustawieniach. Szablony (gotowe zestawy
     `CanvasItem[]` do skopiowania na dany `screenKey`) jeszcze NIE ISTNIEJĄ jako dane — trzeba
@@ -198,11 +195,11 @@ zachowania, które już istnieje, nie nowy wymóg. Dodał jednak DWA konkretne, 
     `tileStylePresetsStore`, ale analogicznej). **Domyślnie idę w pierwszą (prostszą) wersję,
     chyba że user doprecyzuje że chce drugą.**
 
-**Status**: §387-393 zrobione i wysłane (fix kształtów, color picker, zakres wykresu, Ustawienia/
-Projekty, tryb Dane/popup, Navbar, pasek progresu). Reszta — gradienty (9), szablony (10), i
+**Status**: §387-394 zrobione i wysłane (fix kształtów, color picker, zakres wykresu, Ustawienia/
+Projekty, tryb Dane/popup, Navbar, pasek progresu, gradienty). Reszta — szablony (10) i
 blokowane progi liczników (8, część druga) — W TOKU/czeka, budowane fazami bez przerywania
-(ten sam rytm co dotąd). **Kolejność planowana**: 9 (gradienty, wysoka wartość, jedna zmiana
-dla dwóch typów naraz) → 10 (szablony, samodzielne) → 8/progi (wymaga doprecyzowania z userem).
+(ten sam rytm co dotąd). **Kolejność planowana**: 10 (szablony, samodzielne) → 8/progi (wymaga
+doprecyzowania z userem).
 
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 

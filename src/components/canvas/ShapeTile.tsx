@@ -1,8 +1,28 @@
 import { Text, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
-import Svg, { Rect, Ellipse, Line } from 'react-native-svg';
+import Svg, { Rect, Ellipse, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
   ShapeComponentType, RectShapeStyle, EllipseShapeStyle, LineShapeStyle, TextShapeStyle,
 } from '@/store/shapeStyleDefaults';
+import { Fill, isGradientFill, gradientPoints } from '@/store/gradientFill';
+
+// Gradient wypełnienia (§394) — jedna mała pomoc, dwa użycia (`rectShape`/`ellipseShape`
+// niżej). `id="fillGrad"` jest bezpieczny statyczny — każda instancja ma WŁASNE drzewo `<Svg>`,
+// id SVG są skopowane per-dokument w react-native-svg, zero kolizji między kaflami.
+function fillPaint(fill: Fill): string {
+  return isGradientFill(fill) ? 'url(#fillGrad)' : fill;
+}
+function FillDefs({ fill }: { fill: Fill }) {
+  if (!isGradientFill(fill)) return null;
+  const { start, end } = gradientPoints(fill.direction);
+  return (
+    <Defs>
+      <LinearGradient id="fillGrad" x1={`${start.x * 100}%`} y1={`${start.y * 100}%`} x2={`${end.x * 100}%`} y2={`${end.y * 100}%`}>
+        <Stop offset="0" stopColor={fill.stops[0]} />
+        <Stop offset="1" stopColor={fill.stops[1]} />
+      </LinearGradient>
+    </Defs>
+  );
+}
 
 // Renderer gołych kształtów-primitywów (Faza 26, 2026-10-17, §357) — siostrzany komponent
 // `StreakTile`/`CountdownTile`/`NotesTile`, ta sama sygnatura `(…, onPress, sizeStyle)`, więc
@@ -41,9 +61,10 @@ export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
         <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ opacity: st.opacity }}>
+          <FillDefs fill={st.fill} />
           <Rect x={half} y={half} width={w - st.strokeWidth} height={h - st.strokeWidth}
             rx={r} ry={r}
-            fill={st.fill} stroke={st.stroke ?? 'transparent'} strokeWidth={st.strokeWidth} />
+            fill={fillPaint(st.fill)} stroke={st.stroke ?? 'transparent'} strokeWidth={st.strokeWidth} />
         </Svg>
       </TouchableOpacity>
     );
@@ -54,7 +75,8 @@ export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
     return (
       <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
         <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ opacity: st.opacity }}>
-          <Ellipse cx={50} cy={50} rx={r} ry={r} fill={st.fill} stroke={st.stroke ?? 'transparent'} strokeWidth={st.strokeWidth} />
+          <FillDefs fill={st.fill} />
+          <Ellipse cx={50} cy={50} rx={r} ry={r} fill={fillPaint(st.fill)} stroke={st.stroke ?? 'transparent'} strokeWidth={st.strokeWidth} />
         </Svg>
       </TouchableOpacity>
     );
