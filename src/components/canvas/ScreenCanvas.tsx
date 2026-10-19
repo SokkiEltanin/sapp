@@ -2,8 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent } from 'react-native';
 import Reanimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Pencil, Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, Maximize2, Minimize2, BarChart2, Compass } from 'lucide-react-native';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { Check, Plus, LayoutGrid, Flame, CalendarClock, FileText, Group, X, Square, Circle, Minus, Type, Database, Layers, Smile, BarChart2, Compass } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -152,9 +151,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   // (np. health.tsx) czyta TEN SAM store'owy klucz niezależnie, żeby zdecydować czy w ogóle
   // montować swoją wbudowaną treść. Dwa niezależne odczyty tego samego Zustand selektora, nie
   // prop-drilling — oba re-renderują się razem, Zustand gwarantuje spójność.
-  const [confirmFullScreen, setConfirmFullScreen] = useState(false);
+  // Przełącznik pełnego ekranu żyje TERAZ wyłącznie w Ustawieniach (§396) — tu tylko ODCZYT,
+  // żeby zdecydować jak renderować (branch `if (fullScreenOn)` niżej w pliku).
   const fullScreenOn = useCanvasComponentsStore(st => st.fullScreenScreens[screenKey] ?? false);
-  const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
   // Wejście do edytora z Ustawień (§390) — jednorazowy sygnał, patrz komentarz w
   // `canvasComponentsStore.ts`. Sprawdzamy TYLKO raz, przy zmianie `pendingAutoEdit` (nie na
   // każdy render) — jeśli dotyczy WŁASNEGO ekranu, włącz edycję i natychmiast wyczyść flagę
@@ -338,38 +337,38 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
   const content = (
     <View style={s.wrap}>
-      {!viewOnly && (
+      {/* Odznaki "Edytuj"/pełny ekran USUNIĘTE z żywych ekranów (Faza §396, 2026-10-19) — user:
+          "wywal tamto było hujowe chcę mieć wszystko w ustawieniach". Wejście w edycję/pełny
+          ekran idzie TERAZ WYŁĄCZNIE z Ustawień → "Edytor płótna" → "Projekty" (§390/§396) —
+          żywy ekran nie pokazuje już ŻADNEGO przycisku, gdy nie edytujesz (zero stałego
+          "zaśmiecenia" nagłówka). `editing`/`fullScreenOn` same w sobie ZOSTAJĄ nietknięte (ten
+          sam mechanizm, `pendingAutoEdit` wciąż włącza `editing` zdalnie) — usunięty jest
+          TYLKO lokalny przycisk-wejście na samym ekranie. Gdy już edytujesz, nagłówek nadal się
+          pokazuje (tytuł + Warstwy + "Gotowe", żeby można było WYJŚĆ z edycji na tym samym
+          ekranie, na którym ją zaczęto) — asymetria "wejście z Ustawień, wyjście tu" jest
+          świadoma: Ustawienia to dobre miejsce na start, ale user kończy edycję W KONTEKŚCIE
+          tego, co właśnie zbudował, nie chce w tym celu wracać do Ustawień. */}
+      {!viewOnly && editing && (
       <View style={s.header}>
         <LayoutGrid size={13} color={c.text.secondary} />
         <Text style={s.title}>{title ?? 'Twoje komponenty'}</Text>
         <View style={{ flex: 1 }} />
-        {editing && myItems.length >= 2 && (
+        {myItems.length >= 2 && (
           <TouchableOpacity onPress={() => { haptic.tap(); setLayersOpen(true); }} style={s.layersBtn}>
             <Layers size={13} color={c.text.secondary} />
           </TouchableOpacity>
         )}
-        {/* Tryb pełnoekranowy (§381) — ZAWSZE widoczny (nie tylko w `editing`), żeby dało się go
-            wyłączyć bez najpierw wchodzenia w edycję. Włączenie pyta o potwierdzenie (chowa
-            wbudowaną treść ekranu — realna zmiana, nie kosmetyka), wyłączenie nie (zawsze
-            bezpiecznie odwracalne, dane w `items` nietknięte). */}
-        <TouchableOpacity
-          onPress={() => { haptic.tap(); if (fullScreenOn) setFullScreen(screenKey, false); else setConfirmFullScreen(true); }}
-          style={[s.layersBtn, fullScreenOn && { borderColor: c.accent.purple, backgroundColor: c.accent.purple + '18' }]}
-        >
-          {fullScreenOn ? <Minimize2 size={13} color={c.accent.purple} /> : <Maximize2 size={13} color={c.text.secondary} />}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { haptic.tap(); setEditing(v => !v); setSelectMode(false); setSelectedIds([]); }}
-          style={[s.editBtn, editing && { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' }]}>
-          {editing ? <Check size={13} color={c.accent.blue} /> : <Pencil size={13} color={c.text.secondary} />}
-          <Text style={[s.editTxt, editing && { color: c.accent.blue }]}>{editing ? 'Gotowe' : 'Edytuj'}</Text>
+        <TouchableOpacity onPress={() => { haptic.tap(); setEditing(false); setSelectMode(false); setSelectedIds([]); }}
+          style={[s.editBtn, { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' }]}>
+          <Check size={13} color={c.accent.blue} />
+          <Text style={[s.editTxt, { color: c.accent.blue }]}>Gotowe</Text>
         </TouchableOpacity>
       </View>
       )}
 
       {myItems.length === 0 && !editing && !viewOnly && (
         <Text style={s.hintText}>
-          Brak własnych komponentów tutaj. Włącz edycję, żeby dodać kafel serii albo odliczania
-          z inną metryką — np. ten sam kafel co na dashboardzie, przepięty na inny nawyk/licznik.
+          Brak własnych komponentów tutaj. Dodaj je z Ustawień → "Edytor płótna" → "Projekty".
         </Text>
       )}
 
@@ -810,16 +809,6 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         onClose={() => setLayersOpen(false)}
       />
 
-      <ConfirmDialog
-        visible={confirmFullScreen}
-        title="Pełny ekran?"
-        message="To zastąpi całą wbudowaną zawartość tego ekranu Twoim płótnem — zobaczysz TYLKO
-to, co tu zbudujesz. Możesz to wyłączyć w każdej chwili (ten sam przycisk), nic z tego co
-masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
-        confirmLabel="Włącz pełny ekran"
-        onConfirm={() => { setFullScreen(screenKey, true); setConfirmFullScreen(false); haptic.success(); }}
-        onCancel={() => setConfirmFullScreen(false)}
-      />
     </View>
   );
 

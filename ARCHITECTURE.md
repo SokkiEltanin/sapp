@@ -21017,6 +21017,52 @@ PUSTY ekran (0 komponentów) → sprawdź że pojawia się wybór szablonu → w
 progresu" → sprawdź że ląduje w edycji z 3 postawionymi itemami, pasek progresu ma placeholder
 "Wybierz licznik" → podepnij licznik → sprawdź że działa jak zwykły, ręcznie dodany pasek.
 
+## 396. Usunięcie odznak "Edytuj"/pełny ekran z żywych ekranów — wszystko w Ustawieniach (2026-10-19)
+
+Po zakończeniu całego zamówienia KWGT (§393-395), user: "wywal tamto było hujowe chcę mieć
+wszystko w ustawieniach" — w odpowiedzi na pytanie, czy wie, że §390 NIE usunęło starej odznaki
+✏️/🔲 z żywych ekranów (tylko dodało Ustawienia jako DRUGĄ drogę wejścia, zgodnie z pierwotną
+decyzją §390). Teraz: tak, usuń — Ustawienia mają być JEDYNĄ drogą.
+
+**Usunięte z `ScreenCanvas.tsx`'s nagłówka (gdy `editing === false`)**: przycisk pełnego ekranu
+(Maximize2/Minimize2, zawsze widoczny) i przycisk "Edytuj" (Pencil, zawsze widoczny). Cały
+nagłówek (`<View style={s.header}>`) renderuje się TERAZ TYLKO gdy `editing === true` — żywy
+ekran, gdy go po prostu przeglądasz, nie pokazuje ŻADNEGO przycisku edytora.
+
+**Asymetria wejście/wyjście, świadoma**: WEJŚCIE w edycję idzie WYŁĄCZNIE z Ustawień
+(`pendingAutoEdit`, §390, bez zmian). WYJŚCIE ("Gotowe") zostaje NA ŻYWYM EKRANIE — nagłówek z
+przyciskiem "Gotowe" (+ Warstwy, jeśli ≥2 itemy) wciąż się pokazuje, ale TYLKO podczas aktywnej
+edycji. Powód: user kończy edycję w kontekście tego, co właśnie zbudował, na tym samym ekranie
+— zmuszanie do powrotu do Ustawień żeby "wyjść" byłoby gorszym UX niż to, co miało zniknąć.
+
+**Pełny ekran — kontrolka przeniesiona, NIE usunięta funkcja**: nowy przycisk Maximize2/
+Minimize2 w każdym wierszu `EditorProjectsList` (`app/settings.tsx`), obok liczby komponentów,
+przed chevronem. Ten sam `fullScreenScreens`/`setFullScreen` store, to samo `ConfirmDialog`
+(treść 1:1 skopiowana) przy WŁĄCZANIU — wyłączenie bez pytania, jak dotąd. Zagnieżdżony
+`TouchableOpacity` WEWNĄTRZ `PressableScale` całego wiersza — RN-owy responder system poprawnie
+oddaje dotyk najgłębszemu touchable'owi, zero kolizji z tapnięciem w resztę wiersza (ten sam,
+standardowy wzorzec "wiersz + osobny przycisk na końcu" co gdzie indziej w appce).
+
+**Navbar WYŁĄCZONY z tego przycisku** — `fullScreenScreens` nie ma znaczenia dla
+`screenKey='navbar'` (własna, osobna flaga `customNavbarEnabled` zarządzana w
+`navbar-editor.tsx`, §392) — pokazanie tu przycisku byłoby martwe (CLAUDE.md #7).
+
+**Martwy kod usunięty przy tej samej okazji**: `ConfirmDialog` (import), `confirmFullScreen`
+stan i `setFullScreen` odczyt w `ScreenCanvas.tsx` — WSZYSTKIE trzy straciły swoje JEDYNE
+miejsce użycia razem z usuniętym przyciskiem. `Pencil`/`Maximize2`/`Minimize2` z importu ikon —
+też martwe, usunięte.
+
+**Testy**: brak nowych (czyste przesunięcie UI, logika flag/stanu bez zmian — `tsc --noEmit`
+łapie wszystkie martwe importy od razu, bez potrzeby osobnych testów na to). `jest --silent`
+114/114 suite, 1481 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — WYSOKI**: dowolny ekran z płótnem w trybie ZWYKŁYM (nie
+edycja) → sprawdź że NIE widać żadnego przycisku edytora w nagłówku "Twoje komponenty" (sekcja
+w ogóle się nie pokazuje). Ustawienia → Projekty → tapnij ikonę pełnego ekranu na wierszu → tap
+NIE otwiera edytora (to osobna akcja od tapnięcia całego wiersza) → potwierdź → wejdź na ten
+ekran → sprawdź że faktycznie pokazuje tryb pełnoekranowy. Włącz edycję (z Ustawień) →
+sprawdź że "Gotowe" poprawnie wychodzi z edycji na żywym ekranie.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
