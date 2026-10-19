@@ -74,11 +74,12 @@ zaprojektowania co ma się wyświetlić i muszę mieć możliwość kliknięcia 
 ich w dowolny sposób. Wzoruje się na Canvie."
 
 **Rozłożone na kawałki**:
-1. ✅ **ZROBIONE (§390) — wejście do edytora z Ustawień, nie z ekranów**: nowa sekcja "Edytor
-   płótna" → "Projekty" w `app/settings.tsx`, lista 13 ekranów, tapnięcie nawiguje i od razu
-   włącza tryb edycji (`pendingAutoEdit` w `canvasComponentsStore.ts`). Odznaka ✏️/🔳 NA
-   ekranach ZOSTAŁA bez zmian (nie usunięta) — Ustawienia to DODATKOWA, szybsza droga wejścia,
-   nie zamiennik. Checklist w ARCHITECTURE.md §390.
+1. ✅ **ZROBIONE (§390), potem ZASTĄPIONE (§396 odznaka, §398 cały mechanizm)** — wejście do
+   edytora z Ustawień, nie z ekranów: pierwotnie (§390) nowa sekcja "Edytor płótna" → "Projekty"
+   w `app/settings.tsx` nawigowała WPROST na żywy ekran i włączała tam edycję. Po stanowczej
+   korekcie usera ("to nie tak miało być, miałem mieć jak w FIGMIE odzielne OKNO EDYTORA") §398
+   zastąpiło to CAŁKOWICIE modelem draft/symulator/wdrożenie — patrz nowa sekcja §398 niżej,
+   PRZED sekcją "Wykres". Checklist w ARCHITECTURE.md §398 (nie §390 — ten jest już historyczny).
 2. **NIE zrobione — "Szablon"**: wybór Szablon vs Pusty canvas przy tworzeniu. Szablony
    (gotowe zestawy `CanvasItem[]` do skopiowania) jeszcze NIE ISTNIEJĄ jako dane — trzeba
    zaprojektować co to konkretnie jest (jedna gotowa kompozycja? kilka do wyboru? skąd się
@@ -206,6 +207,34 @@ przyciskiem "Gotowe", żeby wyjść w kontekście tego co się zbudowało), zero
 gdy po prostu przeglądasz ekran. Przełącznik pełnego ekranu przeniesiony do wiersza projektu w
 Ustawieniach (ikona Maximize2/Minimize2 obok liczby komponentów). Checklist w ARCHITECTURE.md
 §396. **Priorytet testu WYSOKI.**
+
+## ✅ Draft/Symulator/Wdrożenie — osobne okno edytora, jak w Figmie (2026-10-19, §398)
+
+User, stanowczą korektą: "KLIKAM EDYTOR PŁÓTNA i mnie przenosi tylko na ekran i nic nie mogę
+klikać to nie tak miało być... miałem mieć jak w FIGMIE odzielne OKNO EDYTORA... projektuje tam
+od zera... potem w symulatorze testuje na danych prawdziwych a dopiero jak działa WDROŻENIE
+ROBIĘ". Model §390/§396 (tapnięcie w Ustawieniach = edycja NA ŻYWYM ekranie) zastąpiony
+kompletnie: projekt roboczy pod `screenKey='draft:'+target` (zero zmian w `CanvasItem`/
+`ScreenCanvas`/`ScreenCanvasBase` — reużyty namespacing-trik §391/§392 + `pendingAutoEdit`/
+`viewOnly` §390/§391) → nowy ekran `app/canvas-draft-editor.tsx` (zakładki Edytor/Symulator,
+Symulator = prawdziwe dane za darmo dzięki `viewOnly`) → przycisk "Wdróż" woła nową akcję
+`deployDraft(target)` (kopiuje draft→target z nowymi id, backupuje starą zawartość do
+`backup:<target>`, draft zostaje nietknięty). `EditorProjectsList` w Ustawieniach przebudowane
+(liczy komponenty z drafta, nawiguje na nowy ekran z parametrem `target`). Navbar Pupila
+CELOWO POZA tym modelem (ma już własny bezpieczny system walidacji). `PROJECT_SCREENS`
+wydzielone do `src/data/canvasProjectScreens.ts`. Checklist w ARCHITECTURE.md §398.
+**Priorytet testu WYSOKI — to kompletna przebudowa głównego wejścia do edytora.**
+
+**NIE zrobione, świadomie odłożone**:
+- Symulator dashboardu nie pokazuje realnych danych "Wykresu" (`statTile`) — `statCtx` liczy
+  TYLKO `index.tsx` (drogie, dashboard-specyficzne dane), cienki `ScreenCanvas` wrapper używany
+  przez `canvas-draft-editor.tsx` go nie dostaje. To NIE nowa regresja (identyczny gap istnieje
+  od §386 na KAŻDYM żywym ekranie poza dashboardem) — ale żeby symulator dashboardu faktycznie
+  pokazywał wykresy, trzeba wydzielić liczenie `statCtx` do współdzielonego hooka. Zgłosić
+  userowi jeśli zechce wykresy w symulatorze dashboardu.
+- Brak UI przywracania z `backup:<target>` — dane tam realnie trafiają przy każdym wdrożeniu,
+  ale nic ich jeszcze nie czyta/nie pokazuje. Czysta siatka bezpieczeństwa w samych danych, nie
+  kompletna funkcja "historia wersji".
 
 ## 🟡 Wykres (§386) — świadomie odłożone warianty wizualizacji
 

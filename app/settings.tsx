@@ -71,9 +71,10 @@ import { useBankRules, BankRule, BankRuleKind, ruleKind } from '@/store/bankRule
 import { parseBankNotification } from '@/utils/bankNotification';
 import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
-import { SettingsSectionDef, LucideIcon } from '@/types/settings';
+import { SettingsSectionDef } from '@/types/settings';
 import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { CANVAS_TEMPLATES } from '@/data/canvasTemplates';
+import { PROJECT_SCREENS } from '@/data/canvasProjectScreens';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
 import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
@@ -148,42 +149,24 @@ function SettingsCategoryRow({ section, onPress }: { section: SettingsSectionDef
   );
 }
 
-// Edytor płótna — wejście z Ustawień (Faza §390, 2026-10-19) — user: "miała być możliwość
-// kliknięcia w ustawieniach nie na ekranach, utwórz projekt... później jak bierzesz pusty
-// musisz wybrać gdzie to ma być czyli czy to dashboard projektujesz czy zdrowie itp". Lista
-// WSZYSTKICH ekranów hostujących płótno (`screenKey` z `ScreenCanvas`/`ScreenCanvasBase` w
-// `app/**`, 13 dziś — patrz ARCHITECTURE.md §390 dla pełnej listy z route'ami). Tapnięcie
-// ustawia `pendingAutoEdit` (jednorazowy sygnał w `canvasComponentsStore.ts`) i nawiguje na
-// docelowy ekran, który sam włącza tryb edycji przy montowaniu — zero dodatkowego tapnięcia
-// ✏️ na docelowym ekranie. "Projekt" = per-ekranowe płótno, które już istnieje jako dane
-// (`items`/`fullScreenScreens` keyed po `screenKey`) — ta lista to NOWY, scentralizowany
-// launcher nad ISTNIEJĄCYM mechanizmem, nie nowy model danych "projektów" z własnym id/nazwą.
-// "Szablon vs pusty canvas" z oryginalnej wiadomości usera — ŚWIADOMIE NIE w tej fazie (żadne
-// szablony jeszcze nie istnieją jako dane do wyboru) — patrz NEXT_STEPS.md §390.
-const PROJECT_SCREENS: { key: string; label: string; route: string; icon: LucideIcon }[] = [
-  { key: 'dashboard', label: 'Dashboard', route: '/(tabs)', icon: LucideIcons.LayoutDashboard },
-  { key: 'health', label: 'Zdrowie', route: '/health', icon: LucideIcons.HeartPulse },
-  { key: 'food', label: 'Jedzenie', route: '/food', icon: LucideIcons.Apple },
-  { key: 'tasks', label: 'Zadania', route: '/tasks', icon: LucideIcons.ListTodo },
-  { key: 'finances', label: 'Finanse', route: '/finances', icon: LucideIcons.Wallet },
-  // `stats`/`calendar` — dwa RÓŻNE ekrany, oba z UI tytułem "Kalendarz" (nazwa pliku/screenKey
-  // "stats" to HISTORYCZNA niespójność, nie błąd — patrz `app/(tabs)/stats.tsx`'s nagłówek).
-  // Rozróżnione w etykiecie, żeby user nie trafił przez przypadek na złe z dwóch.
-  { key: 'stats', label: 'Kalendarz (zakładka)', route: '/stats', icon: LucideIcons.CalendarDays },
-  { key: 'calendar', label: 'Kalendarz (pełny widok)', route: '/calendar', icon: LucideIcons.Calendar },
-  { key: 'mood', label: 'Nastrój', route: '/mood', icon: LucideIcons.Smile },
-  { key: 'habits', label: 'Nawyki', route: '/habits', icon: LucideIcons.Flame },
-  { key: 'notes', label: 'Notatki', route: '/notes', icon: LucideIcons.FileText },
-  { key: 'pet', label: 'Pupil', route: '/pet', icon: LucideIcons.PawPrint },
-  { key: 'counters', label: 'Liczniki', route: '/counters', icon: LucideIcons.Hourglass },
-  { key: 'exercises', label: 'Ćwiczenia', route: '/exercises', icon: LucideIcons.Dumbbell },
-  // Navbar Pupila (§392) — JEDYNY wpis bez własnego, "normalnego" ekranu-hosta: `/navbar-editor`
-  // to dedykowany, nowy ekran zbudowany SPECJALNIE dla tego celu (nie jeden z 4 ekranów
-  // Pupila — `screenKey='navbar'` nie "należy" do żadnego z nich). `pendingAutoEdit` działa tu
-  // identycznie jak dla reszty (ten sam generyczny mechanizm w `ScreenCanvasBase`).
-  { key: 'navbar', label: 'Navbar Pupila', route: '/navbar-editor', icon: LucideIcons.Compass },
-];
-
+// Edytor płótna — Draft/Symulator/Wdrożenie (Faza §398, 2026-10-19) — user, stanowcza
+// korekta architektury: "miałem mieć jak w FIGMIE odzielne OKNO EDYTORA wybieram tylko dla
+// jakiego szablonu wydaję wersje beta, projektuje tam od zera... potem w symulatorze testuje
+// na danych prawdziwych a dopiero jak działa WDROŻENIE ROBIĘ". Poprzedni model (§390/§396 —
+// tapnięcie tu włączało edycję NA ŻYWYM ekranie) zastąpiony: tapnięcie teraz nawiguje na
+// DEDYKOWANY `app/canvas-draft-editor.tsx` z parametrem `target` (oryginalny `screenKey`), a
+// liczba komponentów w wierszu to liczba itemów w PROJEKCIE ROBOCZYM (`screenKey =
+// 'draft:' + key`), NIE na żywym ekranie — ten ekran dalej pokazuje to, co było WDROŻONE
+// ostatnio, zupełnie niezależnie od tego, co user właśnie projektuje. `PROJECT_SCREENS`
+// WYDZIELONE do `src/data/canvasProjectScreens.ts` (ten sam powód co `pupilNavTabs.ts`) —
+// nowy `canvas-draft-editor.tsx` też go potrzebuje, żeby pokazać etykietę celu w nagłówku.
+//
+// Navbar Pupila (§392) — JEDYNY wyjątek, CELOWO poza tym modelem: ma WŁASNY, już bezpieczny
+// system (`customNavbarEnabled` + walidacja 4 podpiętych tabów w `navbar-editor.tsx`, patrz
+// komentarz tam) — dodanie draft/symulator/wdrożenie tam byłoby DRUGĄ, nadmiarową warstwą
+// bezpieczeństwa nad już istniejącą. Dla navbaru tapnięcie zachowuje STARE zachowanie:
+// `pendingAutoEdit('navbar')` + nawigacja prosto na `/navbar-editor`, a liczba komponentów
+// liczy się z ŻYWEGO `screenKey='navbar'` (tam nigdy nie było draftu).
 function EditorProjectsList() {
   const c = useColors();
   const items = useCanvasComponentsStore(st => st.items);
@@ -192,33 +175,43 @@ function EditorProjectsList() {
   const fullScreenScreens = useCanvasComponentsStore(st => st.fullScreenScreens);
   const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
   // Nowy projekt — Szablon vs Pusty canvas (Faza §395, 2026-10-19) — user: "dodaj... szablony".
-  // Pytanie tylko dla PUSTYCH projektów (0 itemów) — jeśli ekran już ma coś zbudowane, pytanie
-  // "szablon czy pusty" nie ma sensu (to już NIE jest "tworzenie", tylko kontynuacja edycji),
-  // więc tapnięcie idzie wprost do edycji jak dotąd.
-  const [newProjectFor, setNewProjectFor] = useState<{ key: string; route: string } | null>(null);
+  // Pytanie tylko dla PUSTYCH projektów (0 itemów w draft/navbar — patrz `isDraftable` niżej) —
+  // jeśli projekt roboczy już ma coś zbudowane, pytanie "szablon czy pusty" nie ma sensu (to
+  // już NIE jest "tworzenie", tylko kontynuacja edycji), więc tapnięcie idzie wprost do
+  // edytora jak dotąd.
+  const [newProjectFor, setNewProjectFor] = useState<string | null>(null);
   // Pełny ekran — przeniesione TUTAJ z żywych ekranów (Faza §396, 2026-10-19) — user: "wywal
   // tamto było hujowe chcę mieć wszystko w ustawieniach". Ten sam `fullScreenScreens`/
-  // `setFullScreen` co dotąd, tylko przycisk-wejście żyje teraz w Ustawieniach, nie na samym
-  // ekranie. Potwierdzenie TYLKO przy włączaniu (ta sama treść co stary `ConfirmDialog` w
-  // `ScreenCanvas.tsx`) — wyłączenie zawsze bezpiecznie odwracalne, bez pytania.
+  // `setFullScreen` co dotąd, ORTOGONALNY do draft/symulator/wdrożenie (§398) — działa na
+  // ŻYWYM ekranie niezależnie od tego, czy user akurat projektuje coś nowego dla niego.
+  // Potwierdzenie TYLKO przy włączaniu — wyłączenie zawsze bezpiecznie odwracalne.
   const [confirmFullScreenFor, setConfirmFullScreenFor] = useState<string | null>(null);
 
-  const goEdit = (key: string, route: string) => {
+  const isDraftable = (key: string) => key !== 'navbar';
+
+  const goEdit = (p: typeof PROJECT_SCREENS[number]) => {
     haptic.tap();
-    setPendingAutoEdit(key);
-    router.push(route as any);
+    if (isDraftable(p.key)) {
+      setPendingAutoEdit(`draft:${p.key}`);
+      router.push(`/canvas-draft-editor?target=${p.key}` as any);
+    } else {
+      setPendingAutoEdit(p.key);
+      router.push(p.route as any);
+    }
   };
 
   return (
     <View style={{ gap: spacing[2] }}>
       {PROJECT_SCREENS.map(p => {
-        const count = items.filter(i => i.screenKey === p.key).length;
+        const draftable = isDraftable(p.key);
+        const countKey = draftable ? `draft:${p.key}` : p.key;
+        const count = items.filter(i => i.screenKey === countKey).length;
         const Icon = p.icon;
         const fsOn = fullScreenScreens[p.key] ?? false;
         return (
           <PressableScale key={p.key} onPress={() => {
-            if (count === 0) { haptic.tap(); setNewProjectFor({ key: p.key, route: p.route }); }
-            else goEdit(p.key, p.route);
+            if (count === 0) { haptic.tap(); setNewProjectFor(p.key); }
+            else goEdit(p);
           }}>
             <View style={{
               flexDirection: 'row', alignItems: 'center', gap: spacing[3],
@@ -278,11 +271,12 @@ masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
             {CANVAS_TEMPLATES.map(t => (
               <TouchableOpacity key={t.id} onPress={() => {
                 if (!newProjectFor) return;
+                const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
+                if (!p) return;
                 haptic.success();
-                applyTemplate(newProjectFor.key, t.id);
-                const { key, route } = newProjectFor;
+                applyTemplate(isDraftable(p.key) ? `draft:${p.key}` : p.key, t.id);
                 setNewProjectFor(null);
-                goEdit(key, route);
+                goEdit(p);
               }} style={[ds.row, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
                 <Text style={[ds.rowLabel, { color: c.text.primary }]}>{t.label}</Text>
                 <Text style={[ds.rowSub, { color: c.text.muted }]}>{t.description}</Text>
@@ -290,9 +284,10 @@ masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
             ))}
             <TouchableOpacity onPress={() => {
               if (!newProjectFor) return;
-              const { key, route } = newProjectFor;
+              const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
+              if (!p) return;
               setNewProjectFor(null);
-              goEdit(key, route);
+              goEdit(p);
             }} style={[ds.row, { backgroundColor: 'transparent', borderColor: c.border.default, alignItems: 'center' }]}>
               <Text style={[ds.rowLabel, { color: c.text.secondary }]}>Pusty canvas</Text>
             </TouchableOpacity>

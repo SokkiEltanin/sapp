@@ -21090,6 +21090,99 @@ obiektu, identyczne jak nigdy nieustawione.
 "Zaokrąglenie" → "Własne" → zmień miejsca po przecinku → sprawdź że liczba na kaflu faktycznie
 pokazuje ustawioną precyzję, "Automatyczne" wraca do dotychczasowego formatowania.
 
+## 398. Draft/Symulator/Wdrożenie — osobne okno edytora, jak w Figmie (2026-10-19)
+
+Po §396-397 user przyszedł ze stanowczą, emocjonalną korektą architektury: "i zupełnie nie
+działa to tak jak chciałem KLIKAM EDYTOR PŁÓTNA i mnie przenosi tylko na ekran i nic nie mogę
+klikać to nie tak miało być XDD miałem mieć jak w FIGMIE odzielne OKNO EDYTORA wybieram tylko
+dla jakiego szablonu wydaję wersje beta, projektuje tam od zera wszsytko KAFELKI UKŁAD
+PRZYCISKI DANE itp potem w symulatorze testuje na danych prawdziwych a dopiero jak działa
+WDROŻENIE ROBIĘ i podmieniam aktualny DASHBOARD na ten co stworzyłem". Model §390/§396
+(tapnięcie w Ustawieniach włączało edycję NA ŻYWYM ekranie, bez żadnego rozdzielenia
+roboczy/produkcyjny) zastąpiony kompletnie innym modelem: **projekt roboczy → symulacja na
+żywych danych → jawne "Wdróż"**.
+
+**Zero zmian w `CanvasItem`/`ScreenCanvas.tsx`/`ScreenCanvasBase`** — reużyty w 100% ISTNIEJĄCY
+namespacing-trik `screenKey` (ten sam co `popup:<id>` z §391, `navbar` z §392): projekt roboczy
+dla celu `X` żyje pod `screenKey = 'draft:' + X`, zupełnie niezależna lista itemów od żywego
+`X`. Reużyty w 100% ISTNIEJĄCY `pendingAutoEdit`/`viewOnly` (§390/§391) — oba mechanizmy są
+agnostyczne na to, JAKI string jest screenKey'em, więc przekierowanie ich na `draft:X` zamiast
+`X` nie wymagało żadnej zmiany w `ScreenCanvasBase`. Kluczowa konsekwencja: WSZYSTKIE 13
+istniejących, żywych ekranów-hostów (`<ScreenCanvas screenKey="health" .../>` itp.) nie
+dostały ŻADNEJ zmiany kodu — odkąd Ustawienia przestały wołać `setPendingAutoEdit('health')`
+(wołają teraz wyłącznie `setPendingAutoEdit('draft:health')`), nie istnieje już ŻADNA ścieżka
+kodu ustawiająca `editing=true` dla żywego, nieprefiksowanego `screenKey` (odznaka wejścia na
+samym ekranie i tak zniknęła w §396) — żywe ekrany renderują się więc zawsze w swojej
+dotychczasowej "poza edycją" gałęzi, treściowo tożsamej z `viewOnly=true`.
+
+**Nowa akcja store'u — `deployDraft(target: string)`** (`canvasComponentsStore.ts`): KOPIUJE
+(nie przenosi) wszystkie itemy `draft:<target>` → `<target>` z NOWYMI id (`groupId` kopiowany
+1:1 — bezpiecznie, bo grupowanie filtruje zawsze przez PARĘ screenKey+groupId, a wszystkie
+wdrożone itemy dostają TEN SAM nowy `screenKey=target`). PRZED nadpisaniem robi snapshot
+BIEŻĄCEJ zawartości `<target>` do `backup:<target>` (nadpisując poprzedni backup — czysta
+siatka bezpieczeństwa w danych, bez UI przywracania w tej fazie, patrz NEXT_STEPS.md). Draft
+NIGDY nie jest filtrowany/usuwany — zostaje w pełni nietknięty, gotowy do dalszej
+iteracji/ponownego wdrożenia.
+
+**Nowy ekran `app/canvas-draft-editor.tsx`** (param `target` = oryginalny `screenKey`, np.
+"health"): segmentowany przełącznik "Edytor"/"Symulator" nad JEDNYM zamontowanym
+`<ScreenCanvas screenKey={'draft:'+target} viewOnly={mode==='simulate'} />` (nie dwa osobne
+drzewa — przełącznik zmienia TYLKO `viewOnly`, więc lokalny `editing` stan WEWNĄTRZ
+`ScreenCanvasBase` przeżywa przełączanie zakładek). Zakładka "Edytor" PONOWNIE woła
+`setPendingAutoEdit(draftKey)` przy KAŻDYM wejściu (nie tylko przy pierwszym montowaniu) — jeśli
+user wyszedł z edycji "Gotowe" na płótnie i wrócił z Symulatora, "Edytor" i tak wsadza go z
+powrotem w edycję, zero dodatkowego tapnięcia ✏️. Zakładka "Symulator" to PRAWDZIWE dane ZA
+DARMO — `viewOnly` (§391) nigdy nie zmieniało ŹRÓDŁA danych, tylko chowa chrome edycji, więc
+podgląd = dokładnie to, co będzie po wdrożeniu. Przycisk "Wdróż" (zablokowany z toastem, gdy
+draft jest pusty) otwiera `ConfirmDialog` tłumaczący backup i nietykalność draftu, wywołuje
+`deployDraft(target)`.
+
+**`EditorProjectsList` (`app/settings.tsx`) przebudowane**: liczba komponentów w wierszu
+liczy się teraz z `draft:<key>` (NIE z żywego ekranu — wiersz pokazuje stan PROJEKTU
+ROBOCZEGO, niezależnie od tego, co jest akurat wdrożone na żywo). Tapnięcie nawiguje na
+`/canvas-draft-editor?target=<key>` (zamiast wprost na żywy ekran); modal szablonu/pustego
+canvasu (§395) aplikuje teraz do `draft:<key>`. Pełny ekran (§396, `fullScreenScreens`) zostaje
+BEZ ZMIAN — ORTOGONALNY do draftów, działa na żywym ekranie niezależnie od tego, co user akurat
+projektuje.
+
+**Jedyny, świadomy wyjątek — Navbar Pupila (§392) CAŁKOWICIE POZA tym modelem**: ma już WŁASNY,
+bezpieczny system (`customNavbarEnabled` + walidacja 4 podpiętych tabów w `navbar-editor.tsx`)
+— dodanie draft/symulator/wdrożenie byłoby drugą, nadmiarową warstwą bezpieczeństwa.
+`isDraftable(key) = key !== 'navbar'` w `EditorProjectsList` — dla navbaru STARE zachowanie
+(`pendingAutoEdit('navbar')` + nawigacja prosto na `/navbar-editor`, liczba z żywego
+`screenKey='navbar'`) zostaje 1:1.
+
+**`PROJECT_SCREENS` wydzielone do `src/data/canvasProjectScreens.ts`** (ten sam powód co
+`pupilNavTabs.ts`, §392) — teraz DWA miejsca potrzebują tej listy: `EditorProjectsList` i
+nowy `canvas-draft-editor.tsx` (do pokazania etykiety celu w nagłówku).
+
+**Świadomie POZA zakresem tej fazy**: podgląd typu "Wykres" (`statTile`) w symulatorze dla
+celu `dashboard` nie pokazuje realnych danych wykresu (`statCtx` nie jest przekazywane do
+cienkiego `ScreenCanvas` wrappera, tylko do `ScreenCanvasBase` wołanego WPROST przez
+`index.tsx` z jego własnymi, drogimi, dashboard-specyficznymi danymi — wydatki/nastrój/praca/
+itd.) — kafel pokaże placeholder "tylko na Dashboardzie", **identycznie jak dziś na KAŻDYM
+innym żywym ekranie poza samym dashboardem** (NIE nowa regresja, ten sam, istniejący od §386
+gap, patrz tam). Wydzielenie `statCtx`-liczenia do współdzielonego hooka, żeby symulator
+dashboardu mógł pokazać prawdziwe wykresy, jest większym, osobnym zadaniem — patrz
+NEXT_STEPS.md. Brak UI przywracania z `backup:<target>` (dane tam ŻYJĄ, ale nic ich jeszcze nie
+czyta) — też odłożone.
+
+**Testy**: `__tests__/canvasComponentsStore.test.ts` — 5 nowych testów `deployDraft` (kopiuje z
+nowymi id/draft nietknięty, backup PRZED nadpisaniem, drugie wdrożenie NADPISUJE backup nie
+kumuluje, nie rusza innych ekranów, pusty draft czyści żywy ekran do zera + wciąż robi backup).
+`tsc --noEmit` czyste, `jest --silent` 114/114 suite, 1486 testów (+5).
+
+**Priorytet testu na urządzeniu — WYSOKI** (to kompletna przebudowa głównego wejścia do
+edytora): Ustawienia → Projekty → tapnij pustą "Zdrowie" → wybierz szablon/pusty canvas →
+powinieneś wylądować w NOWYM ekranie `canvas-draft-editor` z zakładką "Edytor" już aktywną i
+płótnem w trybie edycji. Dodaj kafel, przełącz na "Symulator" → sprawdź że pokazuje
+PRAWDZIWE dane bez chrome edycji i nic nie reaguje na tap. Wróć na "Edytor", dodaj coś jeszcze
+→ sprawdź że Symulator też to widzi (to samo źródło danych). Tapnij "Wdróż" → potwierdź →
+wyjdź i wejdź na faktyczny ekran "Zdrowie" (poza Ustawieniami) → sprawdź że pokazuje TO, co
+wdrożyłeś. Wróć do edytora draftu, zmień coś, wdróż PONOWNIE → sprawdź że żywy ekran się
+zaktualizował, a draft nie zniknął. Sprawdź że Navbar Pupila w liście Projektów zachował
+STARE zachowanie (bez trybu Edytor/Symulator, wprost na `navbar-editor`).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

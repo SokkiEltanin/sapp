@@ -491,6 +491,77 @@ describe('canvasComponentsStore — applyTemplate (§395)', () => {
   });
 });
 
+// Draft/Symulator/Wdrożenie (§398) — user: "miałem mieć jak w FIGMIE... potem w symulatorze
+// testuje na danych prawdziwych a dopiero jak działa WDROŻENIE ROBIĘ". `deployDraft` kopiuje
+// `draft:<target>` → `<target>` (nowe id, draft nietknięty) i backupuje starą zawartość
+// `<target>` do `backup:<target>` (nadpisując poprzedni backup).
+describe('canvasComponentsStore — deployDraft (§398)', () => {
+  beforeEach(() => {
+    useCanvasComponentsStore.setState({ items: [] });
+  });
+
+  test('kopiuje itemy z draft:<target> do <target> z NOWYMI id, draft zostaje nietknięty', () => {
+    const { addItem, deployDraft } = useCanvasComponentsStore.getState();
+    const draftId = addItem('draft:health', 'rectShape');
+    deployDraft('health');
+    const items = useCanvasComponentsStore.getState().items;
+    const live = items.filter(i => i.screenKey === 'health');
+    const draft = items.filter(i => i.screenKey === 'draft:health');
+    expect(live).toHaveLength(1);
+    expect(draft).toHaveLength(1);
+    expect(draft[0].id).toBe(draftId); // draft nietknięty, ten sam id
+    expect(live[0].id).not.toBe(draftId); // wdrożona kopia ma NOWE id
+    expect(live[0].componentType).toBe('rectShape');
+  });
+
+  test('backupuje STARĄ zawartość <target> do backup:<target> PRZED nadpisaniem', () => {
+    const { addItem, deployDraft } = useCanvasComponentsStore.getState();
+    const oldLiveId = addItem('health', 'iconTile');
+    addItem('draft:health', 'rectShape');
+    deployDraft('health');
+    const items = useCanvasComponentsStore.getState().items;
+    const backup = items.filter(i => i.screenKey === 'backup:health');
+    const live = items.filter(i => i.screenKey === 'health');
+    expect(backup).toHaveLength(1);
+    expect(backup[0].componentType).toBe('iconTile'); // to co BYŁO żywe, teraz w backupie
+    expect(live).toHaveLength(1);
+    expect(live[0].componentType).toBe('rectShape'); // żywe = teraz to, co wdrożono
+    expect(items.find(i => i.id === oldLiveId)).toBeUndefined(); // stare id nie przetrwało 1:1
+  });
+
+  test('drugie wdrożenie NADPISUJE poprzedni backup, nie kumuluje go', () => {
+    const { addItem, deployDraft } = useCanvasComponentsStore.getState();
+    addItem('health', 'iconTile'); // v0, pierwszy live
+    addItem('draft:health', 'rectShape');
+    deployDraft('health'); // backup = v0 (iconTile), live = rectShape
+    useCanvasComponentsStore.getState().addItem('draft:health', 'textShape');
+    deployDraft('health'); // backup powinien teraz = v1 (rectShape), nie v0+v1
+    const items = useCanvasComponentsStore.getState().items;
+    const backup = items.filter(i => i.screenKey === 'backup:health');
+    expect(backup).toHaveLength(1);
+    expect(backup[0].componentType).toBe('rectShape');
+  });
+
+  test('nie rusza itemów innych ekranów (inny target/draft/backup)', () => {
+    const { addItem, deployDraft } = useCanvasComponentsStore.getState();
+    const foodId = addItem('food', 'iconTile');
+    addItem('draft:health', 'rectShape');
+    deployDraft('health');
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.find(i => i.id === foodId)).toBeDefined();
+    expect(items.filter(i => i.screenKey === 'food')).toHaveLength(1);
+  });
+
+  test('pusty draft wdraża "nic" — czyści żywy ekran do zera, ale wciąż robi backup', () => {
+    const { addItem, deployDraft } = useCanvasComponentsStore.getState();
+    addItem('health', 'iconTile');
+    deployDraft('health'); // draft:health jest puste
+    const items = useCanvasComponentsStore.getState().items;
+    expect(items.filter(i => i.screenKey === 'health')).toHaveLength(0);
+    expect(items.filter(i => i.screenKey === 'backup:health')).toHaveLength(1);
+  });
+});
+
 describe('canvasComponentsStore — customNavbarEnabled (§392)', () => {
   beforeEach(() => {
     useCanvasComponentsStore.setState({ customNavbarEnabled: false });
