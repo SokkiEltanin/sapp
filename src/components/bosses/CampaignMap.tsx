@@ -175,8 +175,23 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           </Defs>
           <Rect x={0} y={0} width={canvasW} height={canvasH} fill={isMad ? '#1E0A0C' : '#0B0E14'} />
           <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-          {!!fullPathD && <Path d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-          {!!litPathD && <Path d={litPathD} stroke={litColor} strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {/* `key={fullPathD}`/`key={litPathD}` (§403, user zrzutem: "mapa kampanii rozjechana
+              względem tego jak ustawiłem... bossy rozjechane od tej linii wgle nie tak jak
+              trzeba mimo że w edytorze wszystko pięknie") — węzły (`View`, zwykłe RN-owe
+              `left`/`top`) i ścieżka (`<Path d=...>`, native-SVG prop) pochodzą z DOKŁADNIE
+              TEJ SAMEJ tablicy `nodes` w TYM SAMYM renderze (patrz `n = nodes[i]` niżej) —
+              więc jeśli węzły i linia wizualnie się rozjeżdżają mimo to, jedyne logiczne
+              wytłumaczenie to natywna nie-aktualizacja samego `<Path>` (`d` prop na Androidzie
+              bywa "sklejony" po pierwszym montażu, ten sam problem klasy co udokumentowane w
+              CLAUDE.md "SVG-propy stutterują" i ten sam fix co `key` na `ScrollView` wyżej w
+              tym pliku) — np. po asynchronicznej hydratacji `bossMapLayoutStore` (nadpisania
+              pozycji z edytora wczytują się PO pierwszym montażu). `key` na stringu `d`
+              wymusza REMOUNT świeżego natywnego węzła Path zamiast update-w-miejscu za każdym
+              razem, gdy geometria faktycznie się zmienia — gwarancja zgodności z węzłami
+              kosztem rzadkiego remountu taniego elementu (ścieżka zmienia się tylko przy
+              zmianie rosteru/nadpisań/rozmiaru viewportu, nie co klatkę). */}
+          {!!fullPathD && <Path key={fullPathD} d={fullPathD} stroke="rgba(4,5,8,0.9)" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+          {!!litPathD && <Path key={litPathD} d={litPathD} stroke={litColor} strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
         </Svg>
 
         {/* MAD: scrim lekko czerwony zamiast neutralnie-ciemnego. */}

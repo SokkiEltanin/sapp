@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Fix: wymyślone nazwy bossów + mapa rozjechana od ścieżki (§403) — DO WERYFIKACJI (mapa)
+
+User, wściekle: "czemu ty sobie wymyśliłeś nazwy tam one miały nazwy te boss i takie miały
+być" + zrzutem mapy: "bossy rozjechane od tej linii wgle nie tak jak trzeba mimo że w
+edytorze wszystko pięknie". Dwa fixy, checklist w ARCHITECTURE.md §403.
+
+**Nazwy bossów** — §399 zignorowało, że 22 nowe portrety w `BOSSYNEW/` miały nazwy WPROST w
+nazwie pliku (łacińskie, np. `Vulpes Solaris`, `Scylla`, `Corvus Fulguris`) i wymyśliło
+własne polskie zamiast nich. `bosses.ts`: `name`/`emoji` wszystkich 22 bossów kampanii
+poprawione na realne nazwy z plików (reszta pól balansu nietknięta). ZROBIONE, nie wymaga
+testu na urządzeniu (czysta zmiana stringów).
+
+**Mapa kampanii** — domknięcie niepewności z §379 ("czy to wyjaśnia CAŁĄ różnicę, czy zostaje
+coś w pomiarze viewportu"). Diagnoza: węzły i ścieżka w `CampaignMap.tsx` biorą się z TEJ
+SAMEJ tablicy w TYM SAMYM renderze, więc rozjazd MUSI być bugiem natywnego renderu `<Path>`
+na Androidzie (SVG-prop "sklejony" po montażu), nie bugiem danych. Fix: `key={d}` na obu
+`<Path>` w `CampaignMap.tsx` + defensywnie w `boss-map-editor.tsx`, wymuszający remount przy
+zmianie geometrii. **NIE POTWIERDZONE NA URZĄDZENIU** (logicznie wymuszone z kodu, ale nie
+zaobserwowane bezpośrednio) — **priorytet WYSOKI**: otwórz mapę kampanii PO ZIMNYM STARCIE
+appki (żeby złapać moment hydratacji `bossMapLayoutStore`) i porównaj z edytorem. Jeśli bossy
+DALEJ są poza linią, to NIE jest ten sam bug — zgłoś to, będzie trzeba szukać realnej różnicy
+w zmierzonej szerokości viewportu między ekranami (ten fix tego nie adresuje).
+
 ## ✅🆕 Gradient na tekście + przezroczystość tła Countdown/Notatki/Ikony (§402) — blur ŚWIADOMIE NIE zrobiony
 
 User: "Teraz wszystko mogę? I dodawać i tekst normalnie i gradient na tekście, i robić blur
@@ -89,18 +112,18 @@ przeglądalnym PR-em). Checklist/pełne uzasadnienie w ARCHITECTURE.md §399.
 duplikacji do rozstrzygnięcia, które z 22 kampanijnych portretów pasują do których 10
 minibossów) → #4 (sprzątanie, dopiero gdy #1-3 zrobione).
 
-## 🆕 Edytor mapy bossów — zgodność stylu z prawdziwą mapą (2026-10-18, §379) — DO WERYFIKACJI
+## 🆕 Edytor mapy bossów — zgodność stylu z prawdziwą mapą (2026-10-18, §379) — CIĄG DALSZY W §403
 
 User zrzutem dwóch ekranów: "coś zjebałeś, dziwnie się renderuje, porównaj edytor i normalny
 ekran". Naprawione, POTWIERDZONE przyczyny: edytor czytał zaszyte na sztywno stałe (rozmiar
 węzła 56, grubość ścieżki 5) zamiast `campaignMapStyleStore`'s `live` — każda zmiana w
 Ustawienia → Personalizacja → "Kreator mapy bossów" była niewidoczna w edytorze. Też
 ujednolicone: klucze nadpisań pozycji (`baseBossId`, zgodnie z `CampaignMap.tsx`).
-**NIE w pełni potwierdzone**: czy to wyjaśnia CAŁĄ różnicę, czy zostaje coś w pomiarze
-szerokości viewportu — nie dało się tego jednoznacznie zweryfikować bez urządzenia. **Priorytet
-testu WYSOKI** — po tej poprawce porównaj jeszcze raz edytor vs prawdziwy ekran Bossów; jeśli
-KSZTAŁT ścieżki (nie tylko grubość/rozmiar węzłów) wciąż wygląda wyraźnie inaczej, zgłoś to —
-będzie kolejny trop do szukania. Checklist w ARCHITECTURE.md §379.
+**Niepewność z tego wpisu ("coś zostaje w pomiarze viewportu") POTWIERDZIŁA SIĘ** —
+user 2026-10-20 zgłosił dokładnie ten scenariusz ponownie ("bossy rozjechane od tej linii...
+mimo że w edytorze wszystko pięknie"). Nowy fix (natywny remount `<Path>` przez `key`) w
+§403 wyżej — ten wpis zostaje jako historia diagnozy, **priorytet testu na urządzeniu
+przeniesiony do wpisu §403**.
 
 ## 🆕🆕 "Jeden edytor jak Figma" — rollout trybu pełnoekranowego ZAKOŃCZONY, zostaje "wykresy" (2026-10-18/19, §380-385)
 

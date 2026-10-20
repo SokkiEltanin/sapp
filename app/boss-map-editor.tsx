@@ -201,7 +201,11 @@ export default function BossMapEditorScreen() {
               </Defs>
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="#0B0E14" />
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-              {!!pathD && <Path d={pathD} stroke="#38BDF8" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+              {/* `key={pathD}` (§403) — ten sam defensywny fix co `CampaignMap.tsx` (prawdziwa
+                  mapa): wymusza remount natywnego `<Path>` przy każdej zmianie geometrii,
+                  zamiast liczyć na to że update-w-miejscu `d` propu zawsze się odda na
+                  Androidzie. */}
+              {!!pathD && <Path key={pathD} d={pathD} stroke="#38BDF8" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
             </Svg>
 
             {BOSSES.map((b, i) => {
