@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Ustawienie: opóźnienie odświeżania dashboardu (§405) — DO WERYFIKACJI
+
+User: "ustaw mi opcję żeby na dashboardzie aktualizowało się tylko raz na jakiś czas z
+opóźnieniem... żeby nie lagowało, zwłaszcza te mniej wymagające typu wydatki itp". Nowe
+ustawienie w Ustawienia → Personalizacja → "Odświeżanie dashboardu" (Normalnie/Rzadziej/
+Oszczędnie, domyślnie Normalnie = dotychczasowe 300ms, zero zmiany dla nikogo kto nie
+dotknie). Dotyczy TYLKO trigera "coś zmieniło się w tle podczas gdy user i tak siedzi na
+dashboardzie" (np. auto-book z banku) — wejście na zakładkę i powrót appki z tła ZAWSZE
+odświeżają natychmiast, niezależnie od trybu. Checklist w ARCHITECTURE.md §405.
+
+**Świadomie poza zakresem**: inne widgety (`moodByDay` i pochodne) liczą się wprost z żywych
+store'ów, nie mają własnego snapshotu jak `expenses` — nie objęte tym ustawieniem. Jeśli user
+zgłosi że TEN tryb dalej laguje przy innych widgetach, to osobna, większa faza.
+
+**DO ZWERYFIKOWANIA na urządzeniu** (priorytet ŚREDNI): przełącznik działa i trzyma się po
+restarcie appki; "Oszczędnie" realnie opóźnia odświeżenie po zmianie w tle (~15s), ale wejście
+na zakładkę/powrót z tła dalej są natychmiastowe.
+
 ## ✅🆕 Rejestr pól danych: kroki/saldo/nastrój pupila odblokowane (§404) — DO WERYFIKACJI
 
 User: "dlaczego do edytora nie dajesz wszystkich danych tylko część, jaki to problem huh?" —

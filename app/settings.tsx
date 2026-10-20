@@ -39,6 +39,7 @@ import MarketLayoutLabSection from '@/components/settings/MarketLayoutLabSection
 import BankHistorySection from '@/components/settings/BankHistorySection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
+import { useUiPrefs, DashboardRefreshMode } from '@/store/uiPrefs';
 import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
 import { ageFrom, DAILY_EXERCISE_COUNT } from '@/utils/personalQuests';
 import { CATEGORY_META } from '@/utils/categories';
@@ -326,6 +327,7 @@ export default function SettingsScreen() {
   const { tasks, events, gcalEvents } = useCalendarStore(useShallow(s => ({ tasks: s.tasks, events: s.events, gcalEvents: s.gcalEvents })));
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore(useShallow(s => ({ settings: s.settings, setSettings: s.setSettings })));
   const themeMode = useThemeStore(s => s.mode);
+  const dashboardRefreshMode = useUiPrefs(s => s.dashboardRefreshMode);
   const { birthdate, gender, trainingLevel, setBirthdate, setGender, setTrainingLevel } = useProfileStore();
   const age = ageFrom(birthdate);
 
@@ -416,6 +418,7 @@ export default function SettingsScreen() {
     setRuleTagsText((r.tags ?? []).join(', '));
   };
   const setThemeMode = useThemeStore(s => s.setMode);
+  const setDashboardRefreshMode = useUiPrefs(s => s.setDashboardRefreshMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
   const heroSize = useHeroFont(s => s.sizeScale);
@@ -2164,6 +2167,44 @@ export default function SettingsScreen() {
           ) },
         },
         {
+          // Odświeżanie dashboardu (§405, 2026-10-20) — user: "ustaw mi opcję żeby na
+          // dashboardzie aktualizowało się tylko raz na jakiś czas z opóźnieniem... żeby nie
+          // lagowało, zwłaszcza te mniej wymagające typu wydatki itp". Dashboard już miał
+          // mechanizm snapshotu (ARCHITECTURE.md §4), ale debounce był zaszyty na sztywno —
+          // teraz user sam dostraja, ten sam segmented-control wzorzec co "Motyw" wyżej.
+          id: 'dashboard-refresh', title: 'Odświeżanie dashboardu', subtitle: 'Jak szybko dashboard łapie zmiany w tle, gdy już na nim jesteś',
+          keywords: ['dashboard', 'odświeżanie', 'opóźnienie', 'lag', 'wydajność', 'snapshot'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#6C9EFF18' }]}>
+                  <LucideIcons.Gauge size={16} color="#6C9EFF" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Odświeżanie dashboardu</Text>
+                  <Text style={styles.rowSub}>Jak szybko dashboard łapie zmiany w tle (np. z banku), gdy już na nim jesteś. Rzadziej = mniej przeliczania = płynniej.</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['normal', 'Normalnie'], ['relaxed', 'Rzadziej'], ['eco', 'Oszczędnie']] as [DashboardRefreshMode, string][]).map(([m, lbl]) => {
+                  const on = dashboardRefreshMode === m;
+                  return (
+                    <PressableScale key={m} onPress={() => { haptic.tap(); setDashboardRefreshMode(m); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#6C9EFF22' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#6C9EFF' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#6C9EFF' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          ) },
+        },
+        {
           id: 'dashboard-edit', title: 'Edytuj dashboard', subtitle: 'Przesuwaj kafelki, ukrywaj, dodawaj widgety statystyk',
           icon: LucideIcons.LayoutDashboard, accentColor: '#6C9EFF',
           keywords: ['dashboard', 'kafelki', 'widgety', 'edytuj', 'układ', 'sekcje'],
@@ -2784,7 +2825,7 @@ export default function SettingsScreen() {
     accountNet, activateEmployer, addBankRule, addEmployer, age, applyWidgetAppearance,
     backfillBusy, backfillDone, balanceInput, balanceOffset, bankAutoAll, bankEnabled,
     bankPending, bankRules, bankTest, briefingEnabled, briefingHour, briefingMin, budgetInputs,
-    budgetThr, classPrefix, clearNotifications, doBackfill, doSelfTest, employers,
+    budgetThr, classPrefix, clearNotifications, dashboardRefreshMode, doBackfill, doSelfTest, employers,
     eveningHour, eveningMin, googleLinking, googleUser, habitHour, habitMin, habitNotifEnabled,
     handleAddTagRule, handleDeleteTagRule, handleGoogleSignIn, handleSaveBudgets, hapticsOn,
     hoursOvrField, manualHoursField, manualSalaryField, moodEnabled, morningEnabled,
@@ -2795,7 +2836,7 @@ export default function SettingsScreen() {
     saveManualHours, saveManualSalary, saveOverride, savePayday, saveReminders, saveWorkMode,
     saveWorkPrefix, selfTestBusy, setBalanceInput, setBankAutoAll, setBankEnabled, setBankTest,
     setBriefingEnabled, setBriefingHour, setBriefingMin, setBudgetInputs, setClassPrefix,
-    setEveningHour, setEveningMin, setHabitHour, setHabitMin, setHabitNotifEnabled,
+    setDashboardRefreshMode, setEveningHour, setEveningMin, setHabitHour, setHabitMin, setHabitNotifEnabled,
     setHapticsOn, setHoursOvrField, setManualHoursField, setManualSalaryField,
     setMorningEnabled, setMorningHour, setMorningMin, setNewEmployerName, setNewTag,
     setNewTagLimit, setNewTagPeriod, setNewTagPerson, setOwnNameField, setPaydayDay,
