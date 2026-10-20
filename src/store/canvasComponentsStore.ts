@@ -269,6 +269,17 @@ interface CanvasComponentsState {
   // filtrowane przez PARĘ (screenKey, groupId) wszędzie (`moveGroupBy`/`resizeGroupBy`/
   // `groupItems` wyżej), a wdrożone itemy dostają WSZYSTKIE ten sam, nowy `screenKey = target`.
   deployDraft: (target: string) => void;
+  // Przywrócenie kopii zapasowej (§407, 2026-10-20) — user: "na wszelki przycisk restart
+  // dashboardu samego graficznego jak przez przypadek wdrożę coś czego nie chciałem".
+  // ODWROTNOŚĆ `deployDraft` wyżej: kopiuje `backup:<target>` → `<target>` (NOWE id, ten sam
+  // trik namespacingu), BEZ kasowania samego backupu (można przywrócić wielokrotnie —
+  // idempotentne, kolejne wywołania po prostu nadpisują `target` tą samą kopią). Backup sam
+  // w sobie już istniał od §398 ("czysta siatka bezpieczeństwa w samych danych, bez UI
+  // przywracania w tej fazie" — ten komentarz jest teraz nieaktualny, UI dołączone tutaj).
+  // Zwraca `false` gdy nie ma czego przywracać (user jeszcze nic nie wdrożył dla tego
+  // ekranu) — UI chowa przycisk w tym wypadku, zamiast dawać coś co wygląda jak działa, a
+  // nic nie robi.
+  restoreBackup: (target: string) => boolean;
   // Duplikuj/wyrównaj (Faza §400, 2026-10-19) — user: "jak dodaje prostokąt do canvas to
   // nadal nie mam allign to center albo snapa... nie mam jak ustawić np 2 kafelków na tym
   // samym poziomie lub nie mam opcji kopiuj". Trzy braki, trzy osobne akcje:
@@ -474,6 +485,18 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         const rest = s.items.filter(i => i.screenKey !== target && i.screenKey !== backupKey);
         return { items: [...rest, ...backedUp, ...deployed] };
       }),
+
+      restoreBackup: (target) => {
+        const backupKey = `backup:${target}`;
+        const backupItems = get().items.filter(i => i.screenKey === backupKey);
+        if (backupItems.length === 0) return false;
+        const stamp = Date.now();
+        const restored: CanvasItem[] = backupItems.map((i, idx) => ({
+          ...i, id: `canvas:${stamp}-res-${idx}-${Math.random().toString(36).slice(2, 8)}`, screenKey: target,
+        }));
+        set((s) => ({ items: [...s.items.filter(i => i.screenKey !== target), ...restored] }));
+        return true;
+      },
 
       duplicateItem: (id, canvasWidth) => {
         const target = get().items.find(i => i.id === id);

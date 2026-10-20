@@ -58,7 +58,7 @@ const FLAME_CORNER_POS: Record<FlameCorner, { top?: number; bottom?: number; lef
 // przekazuje `position:'absolute'`+`width`+`height`; sam komponent nie zakłada ŻADNEJ sztywnej
 // wielkości, wnętrze (`tile`/`ringTile`/`stripeTile`/`compactTile`) ma `flex:1` i wypełnia
 // dowolny box, jaki dostanie od wołającego).
-export function StreakTile({ item, tileStyle, onPress, sizeStyle }: {
+export function StreakTile({ item: rawItem, tileStyle, onPress, sizeStyle }: {
   item: StreakItem;
   tileStyle: StreakTileStyle;
   onPress: () => void;
@@ -66,6 +66,23 @@ export function StreakTile({ item, tileStyle, onPress, sizeStyle }: {
 }) {
   const c = useColors();
   const s = makeS(c);
+
+  // Twarda ochrona (§408, user zrzutem: "buguje się chyba streak ćwiczeń" — pełny, poprawnie
+  // ukolorowany kafelek, ale ZUPEŁNIE bez liczby/etykiety). Statyczna analiza całej ścieżki
+  // danych (`exerciseStreakFrom`/`streakTier`/`streakColor`) nie znalazła KONKRETNEGO miejsca,
+  // które mogłoby wyprodukować złą wartość — ale to i tak poprawny, bezkosztowy hardening:
+  // `item.days` było dotąd renderowane WPROST jako `{item.days}`, ufając że to zawsze
+  // skończona, nieujemna liczba. Gdyby kiedykolwiek nie było (NaN/Infinity z jakiegoś upstream
+  // buga), RN potrafi po cichu NIE wyrenderować tekstu zamiast pokazać "NaN"/się wywalić —
+  // dokładnie pasujący objaw. Klamrowanie TUTAJ (jedno miejsce, `item` cieniuje oryginał więc
+  // reszta pliku poniżej jest nietknięta) gwarantuje że kafelek ZAWSZE pokaże poprawną,
+  // skończoną liczbę (0 w najgorszym wypadku — poprawny, "wygaszony" wygląd), niezależnie od
+  // tego co dostarczy wołający. `name` dostaje ten sam fallback z tego samego powodu.
+  const item: StreakItem = {
+    ...rawItem,
+    days: Number.isFinite(rawItem.days) ? Math.max(0, Math.round(rawItem.days)) : 0,
+    name: rawItem.name || '—',
+  };
 
   // streakTier() domyślnie zwraca indeks 0 (Bordo) gdy ŻADEN próg nie jest spełniony — też przy
   // 0 dniach. streakColor() ma osobny, poprawny fallback (szary) dla days<1 — patrz oryginalny

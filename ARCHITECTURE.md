@@ -21675,6 +21675,115 @@ zegarka i "Ciekawostka dnia" same się odświeżają, bez wymuszania focusu/resu
 przetestowania szybko — alternatywnie: zmień ręcznie zegar systemowy telefonu na następny
 dzień, zostając na dashboardzie, i poczekaj ~60s.
 
+## 407. Przycisk "Przywróć poprzednią wersję" w edytorze Draft/Symulator/Wdrożenie (2026-10-20)
+
+User: "na wszelki przycisk restart dashboardu samego graficznego jak przez przypadek wdrożę
+coś czego nie chciałem?". Mechanizm backupu już ISTNIAŁ od §398 (`deployDraft(target)`
+automatycznie kopiuje bieżącą, żywą zawartość ekranu do `backup:<target>` PRZED nadpisaniem
+jej projektem roboczym) — ale komentarz tam wprost mówił: "czysta siatka bezpieczeństwa w
+samych danych, bez UI przywracania w tej fazie". Ten UI brakujący element.
+
+**Fix** — `canvasComponentsStore.ts`: nowa akcja `restoreBackup(target): boolean`,
+ODWROTNOŚĆ `deployDraft` (kopiuje `backup:<target>` → `<target>` z NOWYMI id, BEZ kasowania
+samego backupu — można przywrócić wielokrotnie, idempotentne). Zwraca `false` gdy nie ma
+czego przywracać (user jeszcze nic nie wdrożył dla tego ekranu) — UI chowa przycisk w tym
+wypadku zamiast dawać coś co wygląda jak działa, a nic nie robi.
+
+`app/canvas-draft-editor.tsx` — nowy przycisk w nagłówku (`RotateCcw`, ten sam wzorzec co
+`boss-map-editor.tsx`'s `resetBtn`), widoczny TYLKO gdy `items.some(i => i.screenKey ===
+\`backup:${target}\`)` (realny backup istnieje). Podmienia dotychczasowy pusty `{width:40}`
+spacer po prawej stronie nagłówka (symetria z `backBtn` po lewej zachowana w obu stanach).
+Osobny `ConfirmDialog` ("Przywrócić poprzednią wersję?" — jasno mówi że to przywraca stan
+SPRZED ostatniego wdrożenia, nie "fabryczny" stan, i że projekt roboczy w edytorze NIE jest
+ruszany).
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + jedna funkcja w store'cie
+analogiczna do już nietestowanego `deployDraft`. `tsc --noEmit` czyste, `jest --silent`
+115/115 suite, 1501/1501 testów.
+
+**Priorytet testu na urządzeniu — ŚREDNI**: w Kreatorze dowolnego ekranu, PRZED pierwszym
+"Wdróż" sprawdź że przycisk w nagłówku jest NIEWIDOCZNY (sam pusty spacer). Wdróż cokolwiek →
+przycisk powinien się pojawić → tapnij → potwierdź → sprawdź że żywy ekran wrócił do stanu
+sprzed wdrożenia, a projekt roboczy w edytorze (zakładka "Edytor") został nietknięty.
+
+## 408. Fix kafla serii ćwiczeń + bindowanie "Tekstu" (kształt) do żywych danych (2026-10-20)
+
+User zrzutem: "dodatkowo buguje się chyba streak ćwiczeń" (trzeci kafelek "Twoje serie" —
+pełny, poprawnie ukolorowany kolor progu, ale ZUPEŁNIE bez liczby/etykiety). Tej samej
+wiadomości, drugie pytanie: "jak chcemy to rozwiązać że jak ja dodam kafelek z wody (że np
+zrobię od zera design) albo z treningu to jak będę niby podłączał to żeby liczyło dane np
+jako trening_pompki w innych miejscach typu pupil lub w historii treningów? I jak z innymi
+dniami wtedy". Po `AskUserQuestion` user wybrał WIĘKSZĄ opcję: "chcę też surowe kształty
+bindowalne do danych" (nie tylko warstwowanie gotowego `DataFieldTile` NA kształtach, co już
+działało bez zmian dzięki istniejącemu grupowaniu/z-order).
+
+**Fix 1 — pusty kafel ćwiczeń.** Statyczna analiza całej ścieżki (`exerciseStreakFrom` →
+`streakTier`/`streakColor` → `StreakTile.tsx`) NIE znalazła konkretnego miejsca mogącego
+wyprodukować złą wartość — kolor (bordo) pasuje do realnej, niskiej, DODATNIEJ liczby dni
+(nie zerowej — ten stan ma OSOBNY, szary/przerywany wygląd, inny niż zaobserwowany). Mimo
+braku pewności co do przyczyny, dodany bezkosztowy, defensywny hardening w `StreakTile.tsx`:
+`item` (prop) cieniowany lokalną, klamrowaną kopią — `days` zawsze skończona, nieujemna
+liczba całkowita (0 w najgorszym wypadku — poprawny "wygaszony" wygląd zamiast niewidocznego
+tekstu), `name` dostaje fallback `'—'` gdy pusty string. **NIE POTWIERDZONE jako root cause**
+— flagowane w NEXT_STEPS.md, user poproszony o zgłoszenie czy problem wraca mimo fixa.
+
+**Fix 2 (duży) — bindowanie `textShape` do żywych danych.** `textShape` to JEDYNY z 4 gołych
+kształtów-prymitywów, który dostał tę zdolność (rect/ellipse/line zostają czysto wizualne —
+"pokazać liczbę" bez mechanizmu wypełnienia-progresu to osobna, większa zmiana, odłożona).
+Reużyte W CAŁOŚCI dwa JUŻ ISTNIEJĄCE rejestry (zero nowej infrastruktury danych):
+- `allStreakItems` (ten sam co `streakTile`/`progressBar` binding — habit/counter/zbiorczy
+  "ex:exercises" streak) — już dostępne jako prop w `ScreenCanvasBase`, zero dodatkowego
+  fetchu.
+- `dataFieldRegistry` (`useDataFieldRegistry()`, ten sam co `dataField` binding) —
+  ROZSZERZONY o DYNAMICZNE pola per-ćwiczenie: `exercise:<nazwa>` → "`<Nazwa>` — dzisiaj",
+  jedno dla KAŻDEGO ćwiczenia jakie user kiedykolwiek zalogował (nie zahardkodowana lista —
+  `exercise: string` w `ExerciseLogEntry` i tak jest wolnym tekstem). Źródło:
+  `useExercisesStore(s => s.logs)` (prosty, tani selektor Zustand, ten sam koszt co
+  `useExpensesStore`/`useMoodStore` już w rejestrze) + już istniejąca czysta funkcja
+  `amountLoggedOn`. To bezpośrednia odpowiedź na "trening_pompki... w historii treningów" —
+  TO SAMO źródło (`exercisesStore`) karmi `/exercises-history` i zbiorczy streak na
+  dashboardzie, więc kafel podpięty tutaj automatycznie zgadza się z obiema stronami.
+
+`ScreenCanvas.tsx`: `textBindOptions = [...streakOptions, ...dataFieldOptions]` (klucze z
+różnych namespace'ów — `h:`/`c:`/`ex:` vs kropkowane ścieżki — zero ryzyka kolizji, jeden
+picker z OBOMA rejestrami naraz). `isShape && !isTextShape` wyjątek w guardzie tapnięcia
+(dotąd WSZYSTKIE kształty ignorowały tap — teraz `textShape` zachowuje się jak
+`dataField`/`statTile`: tap otwiera picker). Resolver sprawdza najpierw `allStreakItems`,
+potem `dataFieldRegistry` (brak kolizji nazw pozwala bezpiecznie próbować oba po kolei).
+"Brak (wyczyść)" w `MetricPickerModal.tsx` już było generyczne — odpięcie textShape działa
+od razu, zero zmian tam.
+
+`ShapeTile.tsx`: nowy prop `boundValue?: string | null` — gdy podane, ZASTĘPUJE `st.text` W
+CAŁOŚCI (nie dokleja) w OBU gałęziach renderu (płaski kolor ORAZ gradient z §402 — gradient
+text teraz też może być live-bound, bonus bez dodatkowej pracy, bo `shownText` jest
+WSPÓLNE dla obu ścieżek).
+
+`CanvasShapeStyleModal.tsx`: nowy wiersz statusu nad "Treść" ("Podpięte: X" / "Podepnij do
+żywych danych…", `Link2` ikona) — tap zamyka modal stylu i otwiera picker (ten sam co
+tapnięcie kafla na płótnie, nie nowy mechanizm). Pole "Treść" ZABLOKOWANE (`editable={false}`,
+wyszarzone) gdy podpięte — user widzi NA CZYM stoi zamiast wpisywać tekst który i tak zostanie
+zignorowany przez `ShapeTile.tsx`.
+
+**"I jak z innymi dniami wtedy"** — bound textShape ZAWSZE pokazuje DZISIEJSZĄ wartość (ten
+sam konwencja co istniejące pola typu "Wydatki dziś") — dla HISTORII wielodniowej to zadanie
+`statTile`/"Wykres" (już bindowalny do `WIDGET_METRICS`, osobny komponent do tego
+stworzony) albo dedykowanego ekranu `/exercises-history` (do którego nawiguje tapnięcie
+zbiorczego streaka "Ćwiczenia") — świadomie NIE próbowano upychać wielodniowej historii w
+pojedynczy, statyczny kafel tekstu.
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + rozszerzenie już nietestowanego
+rejestru (hook, nie czysta funkcja — ten sam, ustalony brak pokrycia co reszta
+`useDataFieldRegistry.ts`). `tsc --noEmit` czyste, `jest --silent` 115/115 suite, 1501/1501
+testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — WYSOKI**: sprawdź czy trzeci kafel serii (ćwiczenia) dalej
+jest pusty po tym fixie — jeśli TAK, to NIE był to problem z `item.days`/`item.name`, trzeba
+szukać dalej (zgłoś to). Dodaj kształt "Tekst" na dowolnym ekranie → tapnij go (tryb edycji)
+→ picker powinien pokazać ZARÓWNO serie (Woda/Bez słodyczy/Ćwiczenia) JAK I pola danych
+(w tym nowe "`<ćwiczenie>` — dzisiaj" dla każdego zalogowanego ćwiczenia) → wybierz dowolne →
+kafel powinien pokazać ŻYWĄ wartość, zachowując własny font/kolor/gradient. 🎨 styl → pole
+"Treść" powinno być zablokowane z notatką "podpięte — pokazuje: X".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

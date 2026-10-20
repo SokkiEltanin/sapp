@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Pencil, Eye, Rocket } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Eye, Rocket, RotateCcw } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
@@ -43,9 +43,16 @@ export default function CanvasDraftEditorScreen() {
   const items = useCanvasComponentsStore(st => st.items);
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
   const deployDraft = useCanvasComponentsStore(st => st.deployDraft);
+  const restoreBackup = useCanvasComponentsStore(st => st.restoreBackup);
   const draftCount = items.filter(i => i.screenKey === draftKey).length;
+  // Przycisk "na wszelki wypadek" (§407, user: "na wszelki przycisk restart dashboardu
+  // samego graficznego jak przez przypadek wdrożę coś czego nie chciałem") — widoczny TYLKO
+  // gdy backup realnie istnieje (user wdrożył już COŚ przynajmniej raz dla tego ekranu),
+  // zamiast dawać przycisk który wygląda jak działa, a nic nie robi.
+  const hasBackup = items.some(i => i.screenKey === `backup:${target}`);
   const [mode, setMode] = useState<'edit' | 'simulate'>('edit');
   const [confirmDeploy, setConfirmDeploy] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
 
   const enterEdit = () => { haptic.tap(); setPendingAutoEdit(draftKey); setMode('edit'); };
   const enterSimulate = () => { haptic.tap(); setMode('simulate'); };
@@ -59,7 +66,13 @@ export default function CanvasDraftEditorScreen() {
           <ChevronLeft size={22} color={c.text.primary} />
         </PressableScale>
         <Text style={s.headerTitle} numberOfLines={1}>{screen?.label ?? target}</Text>
-        <View style={{ width: 40 }} />
+        {hasBackup ? (
+          <PressableScale onPress={() => { haptic.tap(); setConfirmRestore(true); }} style={s.backBtn}>
+            <RotateCcw size={18} color={c.text.secondary} />
+          </PressableScale>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <View style={s.modeRow}>
@@ -105,6 +118,21 @@ export default function CanvasDraftEditorScreen() {
         destructive={false}
         onConfirm={() => { deployDraft(target); setConfirmDeploy(false); haptic.success(); toast.success('Wdrożono!'); }}
         onCancel={() => setConfirmDeploy(false)}
+      />
+
+      <ConfirmDialog
+        visible={confirmRestore}
+        title="Przywrócić poprzednią wersję?"
+        message={`To ZASTĄPI aktualną zawartość ekranu „${screen?.label ?? target}” tym, co było tam TUŻ PRZED ostatnim wdrożeniem. Projekt roboczy w edytorze (nad którym teraz pracujesz) NIE zostanie ruszony.`}
+        confirmLabel="Przywróć"
+        destructive
+        onConfirm={() => {
+          const ok = restoreBackup(target);
+          setConfirmRestore(false);
+          haptic.success();
+          toast.success(ok ? 'Przywrócono poprzednią wersję' : 'Nie było czego przywracać');
+        }}
+        onCancel={() => setConfirmRestore(false)}
       />
     </SafeAreaView>
   );
