@@ -6,6 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
+import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
 import { useStatsScope, isMine, inScope, countsForConsumption, MY_PAYER } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
@@ -139,16 +140,26 @@ export default function FinancesScreen() {
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
   }, []);
+  // Snapshot dla `useDataFieldRegistry.ts` (§404) — ten sam wzorzec co `app/pet.tsx` dla
+  // kroków/nastroju pupila: zapisuje do małego, persystowanego store'u PO KAŻDYM realnym
+  // odczycie `getBalanceOffset()` (nie na starcie z domyślnym `useState(0)` — stąd osobna
+  // funkcja zamiast efektu zależnego od `balanceOffset`, który oznaczyłby "zsynchronizowane"
+  // ZANIM prawdziwa wartość w ogóle się wczyta). Kafel "Pole danych" na płótnie czyta stąd,
+  // zamiast ciągnąć surowy `getBalanceOffset()` per-instancja.
+  const applyBalanceOffset = useCallback((v: number) => {
+    setBalanceOffset(v);
+    useLiveStatsSnapshotStore.getState().update({ cardBalanceOffset: v, balanceSynced: true });
+  }, []);
   // Re-read the offset on focus so a value set in Settings shows immediately.
   useFocusEffect(useCallback(() => {
-    getBalanceOffset().then(setBalanceOffset).catch(() => {});
-  }, []));
+    getBalanceOffset().then(applyBalanceOffset).catch(() => {});
+  }, [applyBalanceOffset]));
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
   useEffect(() => {
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') getBalanceOffset().then(setBalanceOffset).catch(() => {}); });
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') getBalanceOffset().then(applyBalanceOffset).catch(() => {}); });
     return () => sub.remove();
-  }, []);
+  }, [applyBalanceOffset]);
 
   const availableTags = useMemo(() => {
     const freq: Record<string, number> = {};

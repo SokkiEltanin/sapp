@@ -24,6 +24,7 @@ import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp, gearAtkFlat, gearById, gearSellValue, isBetterThanEquipped } from '@/utils/gear';
 import { computePetState, PetInput } from '@/utils/petState';
+import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
 import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
@@ -346,6 +347,16 @@ export default function Pet() {
   }, [health, stepGoal, todayDone.length, habits.length, moodEntries, overBudget]);
 
   const pet = useMemo(() => computePetState(input), [input]);
+  // Snapshot dla `useDataFieldRegistry.ts` (§404) — kroki/sen/nastrój pupila są JUŻ policzone
+  // tutaj (ten sam `health`/`pet` co reszta ekranu), więc jedna linia zapisu do małego,
+  // persystowanego store'u wystarcza, żeby kafel "Pole danych" na płótnie mógł je pokazać bez
+  // montowania własnego `usePetHealthSync()`/`computePetState()` per instancja.
+  useEffect(() => {
+    useLiveStatsSnapshotStore.getState().update({
+      stepsToday: health.steps, sleepMinutesToday: health.sleep,
+      petMoodLabel: pet.label, petWellbeing: pet.wellbeing, petSynced: true,
+    });
+  }, [health.steps, health.sleep, pet.label, pet.wellbeing]);
   const stage = growthStage(lvl.level);
   // Kotek NIE MOŻE być szerszy niż faktycznie dostępna kolumna między slotami ekwipunku
   // (2026-09-12, user: "obszar głaskania pupila nie wchodził na itemy" — `STAGE_SIZE[stage]

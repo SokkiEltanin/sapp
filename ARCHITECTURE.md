@@ -21508,6 +21508,66 @@ viewportu między ekranami, czego ten fix nie adresuje).
 --noEmit` czyste, `jest --silent` 115/115 suite, 1501/1501 testów (bez zmiany liczby — oba
 fixy to dane/JSX, nie nowa logika czystych funkcji).
 
+## 404. Rejestr pól danych: kroki/saldo/nastrój pupila odblokowane przez snapshot (2026-10-20)
+
+User, po wyjaśnieniu w §401 dlaczego kroki/saldo/nastrój pupila były wykluczone z rejestru
+pól danych na płótnie: "dlaczego do edytora nie dajesz wszystkich danych tylko część, jaki to
+problem huh?". Słuszna presja — powód wykluczenia był REALNY (patrz niżej), ale "wymaga
+innej architektury" ≠ "nie da się zrobić", więc zamiast powtórzyć wyjaśnienie, zbudowany fix.
+
+**Realny problem** (zweryfikowany w kodzie, nie domysł): `useDataFieldRegistry()` montuje się
+OSOBNO dla KAŻDEJ instancji kafla "Pole danych" na płótnie (user może dodać to samo pole
+wielokrotnie, na różnych ekranach) — więc każdy hook użyty w rejestrze mnoży się przez liczbę
+instancji. `usePetHealthSync()` (kroki) robi realny async I/O na montowaniu (Health Connect
+sync + kilka odczytów AsyncStorage, `useFocusEffect`+`AppState` listener). `getBalanceOffset()`
+(saldo) to surowy `AsyncStorage.getItem`, nie Zustand — nie da się go czytać SYNCHRONICZNIE w
+selektorze. `computePetState()` (nastrój pupila) agreguje kroki+sen+nawyki+nastrój — w tym
+WŁASNY, już udokumentowany jako kosztowny `useHabits()` (371-dniowe wczytywanie +
+harmonogram powiadomień). Podpięcie któregokolwiek z nich wprost do rejestru pomnożyłoby ten
+koszt przez liczbę kafli na płótnie — dokładnie ten sam błąd co `useHabits()` double-fetch
+hazard z §356.
+
+**Fix — `src/store/liveStatsSnapshotStore.ts`** — nowy, mały, persystowany store (TEN SAM
+wzorzec co "Dashboard czyta snapshot `expenses`, nie żywy store", CLAUDE.md reguła #3/
+ARCHITECTURE.md §4 "Snapshot statystyk"). Pola: `stepsToday`/`sleepMinutesToday`/
+`petMoodLabel`/`petWellbeing`/`petSynced` (jedna grupa, zapisywana razem), `cardBalanceOffset`/
+`balanceSynced`. Zamiast ciągnąć kosztowne hooki DO rejestru, dwa ekrany które i tak JUŻ liczą
+te wartości dopisują JEDNĄ linię zapisu:
+- `app/pet.tsx` — `useEffect` po `computePetState(input)`, zapisuje
+  `health.steps`/`health.sleep`/`pet.label`/`pet.wellbeing` + `petSynced: true`.
+- `app/(tabs)/finances.tsx` — nowy `applyBalanceOffset` wrapper wokół `setBalanceOffset`
+  (zastępuje gołe `setBalanceOffset` w OBU miejscach, gdzie `getBalanceOffset()` się
+  rozwiązuje: `useFocusEffect` i `AppState` listener), zapisuje `cardBalanceOffset` +
+  `balanceSynced: true` TYLKO gdy realna wartość się wczyta (świadomie NIE jako efekt
+  zależny od `balanceOffset` stanu — to oznaczyłoby "zsynchronizowane" już przy domyślnym
+  `useState(0)`, zanim prawdziwa wartość w ogóle dotrze).
+
+Rejestr czyta ze store'u zwykłymi, tanimi selektorami Zustand — zero nowych fetchy
+wywołanych przez sam fakt dodania kafla na płótnie. **Saldo** liczone DOKŁADNIE tą samą
+formułą co "Saldo NA KARCIE" w `finances.tsx` (`cardBalanceOffset + allInc - allExp`, filtr
+`isMine(e) && paymentMethod !== 'cash'`, self-transfery WLICZONE — zduplikowany jednolinijkowy
+filtr `!e.type || e.type === 'expense'`, który i tak jest już niezależnie zduplikowany w 6+
+miejscach w repo, patrz `statWidgets.ts`/`monthlyReports.ts`/`monthCards.ts`/`bankCommit.ts`
+— nie nowy wzorzec). `*Synced` flagi odróżniają "user nigdy nie odwiedził ekranu źródłowego w
+tej instalacji" (pokazuje "Otwórz zakładkę X") od realnego zera/braku danych.
+
+**Kompromis, świadomy i udokumentowany**: wartość jest tak świeża jak ostatnia wizyta na
+ekranie źródłowym (Pupil/Finanse), NIE "na żywo" przy każdym otwarciu płótna. Zaakceptowane —
+oba ekrany należą do najczęściej odwiedzanych w appce (rdzeń pętli gamifikacji/finansów), więc
+w praktyce staleness rzadko jest realnym problemem; alternatywa (osobny, współdzielony fetch
+dla całego ekranu canvas) to osobna, większa zmiana, nieproporcjonalna do tego zgłoszenia.
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + jeden prosty store bez logiki
+wymagającej osobnych testów (sam `liveStatsSnapshotStore.ts` to merge-setter, ten sam,
+nietestowany dotąd wzorzec co inne proste stores w projekcie). `tsc --noEmit` czyste, `jest
+--silent` 115/115 suite, 1501/1501 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: świeża instalacja (albo wyczyść dane) → od razu
+wejdź w edytor płótna → "Pole danych" → sprawdź że "Kroki dzisiaj"/"Saldo (karta)"/"Nastrój
+pupila" pokazują "Otwórz zakładkę X" (nie 0/pusty string). Otwórz zakładkę Pupila → wróć do
+edytora → te same pola powinny teraz pokazywać realne wartości. To samo dla zakładki Finanse
+→ "Saldo (karta)".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
