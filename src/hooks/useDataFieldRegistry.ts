@@ -3,6 +3,8 @@ import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
+import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
+import { isMine } from '@/store/statsScope';
 import { MOOD_LABELS } from '@/types';
 import { fmtStat } from '@/utils/dashboard/format';
 
@@ -19,33 +21,45 @@ export interface DataFieldValue {
 // apki", zebrane w JEDNĄ listę `PickerOption`-kompatybilną (ScreenCanvas.tsx mapuje identycznie
 // jak streakOptions/countdownOptions/notesOptions).
 //
-// ŚWIADOMIE MAŁY, startowy zestaw — WYŁĄCZNIE pola czytane przez lekki, czysty selektor Zustand
-// (zero AsyncStorage, zero Health Connect sync). Zbadane przy projektowaniu, ale ŚWIADOMIE
-// WYKLUCZONE z v1: kroki dzisiaj (`usePetHealthSync()` — kosztowny hook, AsyncStorage + sync),
-// saldo (`accountBalance.ts`'s `balanceOffset` — AsyncStorage, nie Zustand), nastrój pupila
-// (`computePetState()` — agreguje kroki+sen+nawyki+nastrój, kosztowne). Montowanie KTÓREGOKOLWIEK
-// z nich OSOBNO PER INSTANCJA na płótnie (user może dodać wiele kafli tego samego pola) byłoby
-// dokładnie tym błędem architektonicznym, którego ta sesja już dwa razy unikała (`useHabits()`
-// double-fetch hazard, patrz komentarz w `useAllStreakItems.ts`/§356 w ARCHITECTURE.md). Jeśli
-// user zgłosi potrzebę tych pól, wymagają OSOBNEGO, wspólnego cache'u (jeden fetch dla całego
-// ekranu, nie per-instancja) — nie proste dopisanie do tej listy.
+// ŚWIADOMIE MAŁY zestaw — WYŁĄCZNIE pola czytane przez lekki, czysty selektor Zustand (zero
+// AsyncStorage, zero Health Connect sync TUTAJ). Montowanie kosztownego hooka OSOBNO PER
+// INSTANCJA na płótnie (user może dodać wiele kafli tego samego pola) byłoby dokładnie tym
+// błędem architektonicznym, którego ta sesja już dwa razy unikała (`useHabits()` double-fetch
+// hazard, patrz komentarz w `useAllStreakItems.ts`/§356 w ARCHITECTURE.md).
 //
 // Faza §401 (2026-10-19) — user zrzutem pickera: "nie mam wszystkich danych do wyboru jakie
 // obsługuje aplikacja. Finanse, humor, wydatki nic zupełnie". Dołożone `useExpensesStore`/
 // `useMoodStore` — OBA to PROSTE selektory Zustand (`persist` middleware hydratuje RAZ przy
 // starcie appki, czytanie `.expenses`/`.entries` tu nie robi NOWEGO fetchu/syncu) — TEN SAM
-// koszt co już bezpiecznie używane `usePetStore`/`useCalendarStore` wyżej, NIE ten sam problem
-// co wykluczone wyżej `usePetHealthSync()`/`computePetState()` (które same W SOBIE wykonują
-// kosztowną pracę przy montowaniu, nie tylko czytają gotowy stan). Scope świadomie UPROSZCZONY
-// — sumuje WSZYSTKIE wydatki (nie tylko "moje", patrz `statsScope.ts`), żeby nie ciągnąć
-// dodatkowego store'u/przełącznika do tego małego rejestru; jeśli user zgłosi potrzebę
+// koszt co już bezpiecznie używane `usePetStore`/`useCalendarStore` wyżej. Scope świadomie
+// UPROSZCZONY — sumuje WSZYSTKIE wydatki (nie tylko "moje", patrz `statsScope.ts`), żeby nie
+// ciągnąć dodatkowego store'u/przełącznika do tego małego rejestru; jeśli user zgłosi potrzebę
 // rozróżnienia, to osobna, mała zmiana (dodać `useStatsScope()` tutaj).
+//
+// Faza §404 (2026-10-20) — user: "dlaczego do edytora nie dajesz wszystkich danych tylko
+// część, jaki to problem huh?". Trzy pola odłożone w §358/§401 (kroki dzisiaj/saldo/nastrój
+// pupila) źródłowo wymagają kosztownych hooków (`usePetHealthSync()` — Health Connect sync,
+// `getBalanceOffset()` — surowy AsyncStorage, `computePetState()` — agreguje kroki+sen+nawyki+
+// nastrój, w tym WŁASNY ciężki `useHabits()`) — realny powód wykluczenia z tego pliku, nie
+// lenistwo. Fix: `liveStatsSnapshotStore.ts` — NOWY, mały, persystowany store, do którego
+// ekrany JUŻ liczące te wartości (`app/pet.tsx`, `app/(tabs)/finances.tsx`) dopisują JEDNĄ
+// linię zapisu (ten sam wzorzec co "Dashboard czyta snapshot `expenses`" z CLAUDE.md reguły
+// #3/ARCHITECTURE.md §4). Ten rejestr czyta stąd zwykłym, tanim selektorem — zero nowych
+// fetchy wywołanych przez sam fakt dodania kafla na płótnie, kosztem świeżości: wartość jest
+// tak aktualna jak ostatnia wizyta na ekranie źródłowym (Pupil/Finanse), nie "na żywo" przy
+// każdym otwarciu płótna. `*Synced` flagi w store'u odróżniają "jeszcze nie wiadomo" (user
+// nigdy nie odwiedził ekranu źródłowego w tej instalacji) od realnego zera.
 export function useDataFieldRegistry(): DataFieldValue[] {
   const petName = usePetStore(s => s.name);
   const petXp = usePetStore(s => s.xp);
   const tasks = useCalendarStore(s => s.tasks);
   const expenses = useExpensesStore(s => s.expenses);
   const moodEntries = useMoodStore(s => s.entries);
+  const stepsToday = useLiveStatsSnapshotStore(s => s.stepsToday);
+  const petSynced = useLiveStatsSnapshotStore(s => s.petSynced);
+  const petMoodLabel = useLiveStatsSnapshotStore(s => s.petMoodLabel);
+  const cardBalanceOffset = useLiveStatsSnapshotStore(s => s.cardBalanceOffset);
+  const balanceSynced = useLiveStatsSnapshotStore(s => s.balanceSynced);
 
   return useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -70,6 +84,18 @@ export function useDataFieldRegistry(): DataFieldValue[] {
     const recentMoods = moodEntries.filter(e => e.date >= weekAgo && e.date <= today).map(e => e.mood);
     const moodWeekAvg = recentMoods.length > 0 ? recentMoods.reduce((s, m) => s + m, 0) / recentMoods.length : null;
 
+    // Saldo na karcie (§404) — TA SAMA formuła co `balance` w `app/(tabs)/finances.tsx`
+    // ("Saldo NA KARCIE"): offset (ze snapshotu) + wszystkie moje przychody/wydatki NA
+    // KARCIE (gotówka świadomie wykluczona, ten sam filtr `paymentMethod !== 'cash'`).
+    // Self-transfery ZOSTAJĄ wliczone (realnie ruszają kartę) — tak samo jak tam.
+    let allInc = 0, allExp = 0;
+    for (const e of expenses) {
+      if (!isMine(e) || e.paymentMethod === 'cash') continue;
+      if (e.type === 'income') allInc += e.amount;
+      else if (!e.type || e.type === 'expense') allExp += e.amount;
+    }
+    const balance = cardBalanceOffset + allInc - allExp;
+
     return [
       { id: 'pet.name', label: 'Imię pupila', value: petName },
       { id: 'pet.level', label: 'Poziom pupila', value: String(levelFromXp(petXp).level) },
@@ -79,6 +105,9 @@ export function useDataFieldRegistry(): DataFieldValue[] {
       { id: 'finance.spendMonth', label: 'Wydatki w tym miesiącu', value: fmtStat(spendMonth, 'zł') },
       { id: 'mood.today', label: 'Dzisiejszy nastrój', value: todayMood ? MOOD_LABELS[todayMood.mood] : 'Brak wpisu dziś' },
       { id: 'mood.weekAvg', label: 'Średni nastrój (7 dni)', value: moodWeekAvg != null ? moodWeekAvg.toFixed(1) : 'Brak danych' },
+      { id: 'health.stepsToday', label: 'Kroki dzisiaj', value: petSynced ? stepsToday.toLocaleString('pl-PL') : 'Otwórz zakładkę Pupila' },
+      { id: 'finance.balance', label: 'Saldo (karta)', value: balanceSynced ? fmtStat(balance, 'zł') : 'Otwórz zakładkę Finanse' },
+      { id: 'pet.mood', label: 'Nastrój pupila', value: petSynced ? petMoodLabel : 'Otwórz zakładkę Pupila' },
     ];
-  }, [petName, petXp, tasks, expenses, moodEntries]);
+  }, [petName, petXp, tasks, expenses, moodEntries, stepsToday, petSynced, petMoodLabel, cardBalanceOffset, balanceSynced]);
 }

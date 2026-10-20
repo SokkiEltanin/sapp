@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Rejestr pól danych: kroki/saldo/nastrój pupila odblokowane (§404) — DO WERYFIKACJI
+
+User: "dlaczego do edytora nie dajesz wszystkich danych tylko część, jaki to problem huh?" —
+trzy pola wykluczone w §358/§401 (kroki dzisiaj, saldo na karcie, nastrój pupila) wymagały
+kosztownych hooków (Health Connect sync, surowy AsyncStorage, `useHabits()`), których nie dało
+się bezpiecznie podpiąć bezpośrednio do rejestru (montuje się OSOBNO per instancja kafla na
+płótnie). Fix: nowy `liveStatsSnapshotStore.ts` — `app/pet.tsx`/`app/(tabs)/finances.tsx`
+(ekrany które i tak już liczą te wartości) dopisują zapis do małego, persystowanego store'u;
+rejestr czyta stąd tanim selektorem. Ten sam wzorzec co "Dashboard czyta snapshot expenses"
+(CLAUDE.md #3). Checklist w ARCHITECTURE.md §404.
+
+**Kompromis**: świeżość = ostatnia wizyta na ekranie źródłowym (Pupil/Finanse), nie "na żywo".
+**DO ZWERYFIKOWANIA na urządzeniu** (priorytet ŚREDNI): świeża instalacja → edytor płótna →
+"Pole danych" → "Kroki dzisiaj"/"Saldo (karta)"/"Nastrój pupila" powinny pokazać "Otwórz
+zakładkę X" zanim user odwiedzi Pupila/Finanse, a realne wartości po.
+
 ## ✅🆕 Fix: wymyślone nazwy bossów + mapa rozjechana od ścieżki (§403) — DO WERYFIKACJI (mapa)
 
 User, wściekle: "czemu ty sobie wymyśliłeś nazwy tam one miały nazwy te boss i takie miały
