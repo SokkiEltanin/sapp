@@ -126,6 +126,7 @@ import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, applyEarnedFl
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
+import { useUiPrefs, DASHBOARD_REFRESH_DELAY_MS } from '@/store/uiPrefs';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import { getLastBackup } from '@/services/backupService';
@@ -348,6 +349,13 @@ export default function DashboardScreen() {
   // blocks on the recompute. "Aktualizacja raz, na wejściu / po dodaniu paragonu."
   const [expenses, setStatsExpenses] = useState(() => useExpensesStore.getState().expenses);
   const refreshStatsSnapshot = useCallback(() => setStatsExpenses(useExpensesStore.getState().expenses), []);
+  // Opóźnienie trigera (B) niżej — user: "ustaw mi opcję żeby aktualizowało się rzadziej, z
+  // opóźnieniem, żeby nie lagowało" (Ustawienia → Personalizacja → "Odświeżanie dashboardu").
+  // Dotyczy TYLKO trigera "coś zmieniło się w tle, podczas gdy user siedzi na dashboardzie" —
+  // triggery (A)/(C) (wejście na zakładkę / powrót appki z tła) zostają natychmiastowe,
+  // niezależnie od tego trybu — patrz komentarz w `uiPrefs.ts`.
+  const dashboardRefreshMode = useUiPrefs(s => s.dashboardRefreshMode);
+  const statsRefreshDelayMs = DASHBOARD_REFRESH_DELAY_MS[dashboardRefreshMode];
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
   // Consumption stats (food, sweets, spending charts) use this scoped view;
@@ -993,9 +1001,9 @@ export default function DashboardScreen() {
   //    the next focus (A) — the frozen screen shouldn't recompute in the background.
   useEffect(() => {
     if (!screenFocused) return;
-    const t = setTimeout(refreshStatsSnapshot, 300);
+    const t = setTimeout(refreshStatsSnapshot, statsRefreshDelayMs);
     return () => clearTimeout(t);
-  }, [liveExpenses, screenFocused, refreshStatsSnapshot]);
+  }, [liveExpenses, screenFocused, refreshStatsSnapshot, statsRefreshDelayMs]);
 
   const [appActive, setAppActive] = useState(true);
   // Pull fresh calendar + work data when the app returns to the foreground (screens

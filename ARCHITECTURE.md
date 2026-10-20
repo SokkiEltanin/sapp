@@ -21568,6 +21568,53 @@ pupila" pokazują "Otwórz zakładkę X" (nie 0/pusty string). Otwórz zakładk�
 edytora → te same pola powinny teraz pokazywać realne wartości. To samo dla zakładki Finanse
 → "Saldo (karta)".
 
+## 405. Ustawienie: opóźnienie odświeżania dashboardu (Normalnie/Rzadziej/Oszczędnie) (2026-10-20)
+
+User: "ustaw mi opcję żeby na dashboardzie aktualizowało się tylko raz na jakiś czas z
+opóźnieniem jak mamy, żeby nie lagowało, zwłaszcza te mniej wymagające typu wydatki itp".
+Dashboard JUŻ MIAŁ mechanizm "snapshot statystyk" (§4 wyżej) — ciężkie widgety czytają
+zamrożony snapshot `expenses`, nie żywy store, a snapshot odświeża się tylko na trigerach.
+Po `AskUserQuestion` (dociągnąć tylko opóźnienie w kodzie vs dodać widoczne ustawienie) user
+wybrał **widoczne ustawienie w Ustawienia → Personalizacja**.
+
+**Trzy triggery istniejącego mechanizmu, tylko JEDEN z nich dotyczy tej zmiany**:
+- (A) wejście na zakładkę dashboardu — `InteractionManager.runAfterInteractions`, NATYCHMIASTOWE
+  (tylko odroczone do końca przejścia ekranu).
+- (B) **dane zmieniły się W TLE, podczas gdy user I TAK już siedzi na dashboardzie** (np.
+  auto-book z banku) — `setTimeout(refreshStatsSnapshot, 300)`, ZASZYTE NA SZTYWNO. **TO JEST
+  pole, które user chciał dostroić.**
+- (C) powrót appki z tła — `InteractionManager.runAfterInteractions`, NATYCHMIASTOWE.
+
+(A)/(C) to świadome momenty "user właśnie chce świeże dane" — zostają bez zmian. Tylko (B)
+("coś się zmieniło, ale user i tak już patrzy na dashboard") jest tym, co realnie powoduje
+częste przeliczanie ciężkich widgetów w tle bez wyraźnej potrzeby — stąd dostrajalne.
+
+**Fix**: `src/store/uiPrefs.ts` — nowe pole `dashboardRefreshMode: 'normal' | 'relaxed' |
+'eco'` (`_hydrated`/`throttledPersistStorage` jak reszta pliku) + eksportowana mapa
+`DASHBOARD_REFRESH_DELAY_MS` (normal=300ms — DOTYCHCZASOWE zachowanie, zero zmiany dla
+nikogo kto nie dotknie ustawienia; relaxed=4000ms; eco=15000ms). `app/(tabs)/index.tsx`:
+trigger (B)'s `setTimeout` czyta opóźnienie z tej mapy zamiast literału `300`. `app/
+settings.tsx`: nowy wpis "Odświeżanie dashboardu" w sekcji Personalizacja, TUŻ nad "Edytuj
+dashboard" — segmentowany 3-przyciskowy kontroler (Normalnie/Rzadziej/Oszczędnie), DOKŁADNIE
+ten sam wzorzec co istniejący "Motyw" (jasny/ciemny/system) wyżej w tej samej sekcji.
+
+**Świadomie poza zakresem**: inne widgety dashboardu (`moodByDay` i pochodne) liczą się
+WPROST z żywych store'ów w `useMemo`, NIE mają własnego osobnego mechanizmu snapshotu jak
+`expenses` — retrofitowanie ich do tego samego wzorca to osobna, większa zmiana (wymagałaby
+audytu każdego miejsca użycia), nieproporcjonalna do tego zgłoszenia. Jeśli user zgłosi że
+TEN konkretny tryb dalej laguje przy innych widgetach, to kolejna, bardziej ukierunkowana
+faza — nie przeoczenie.
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + jedno pole w już istniejącym, prostym
+store bez logiki wymagającej testów. `tsc --noEmit` czyste, `jest --silent` 115/115 suite,
+1501/1501 testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: Ustawienia → Personalizacja → "Odświeżanie
+dashboardu" → sprawdź że segmenty się przełączają i zostają po restarcie appki (persist).
+Ustaw "Oszczędnie" → zostań na dashboardzie, dodaj paragon z innego miejsca (np. skrót/bank)
+→ sprawdź że dashboard NIE przelicza natychmiast (poczekaj ~15s, powinien dogonić). Przełącz
+zakładkę i wróć → sprawdź że ZAWSZE odświeża się od razu (trigger A, niezależny od trybu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
