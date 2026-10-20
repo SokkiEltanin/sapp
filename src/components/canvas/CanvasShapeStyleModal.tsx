@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, ScrollView, TextInput } from 'react-native';
-import { X, Palette } from 'lucide-react-native';
+import { X, Palette, Link2 } from 'lucide-react-native';
 import {
   ShapeComponentType, RectShapeStyle, EllipseShapeStyle, LineShapeStyle, TextShapeStyle, SHAPE_COLOR_PRESETS,
 } from '@/store/shapeStyleDefaults';
@@ -17,12 +17,18 @@ import GradientFillEditor from './GradientFillEditor';
 // `onChange` przyjmuje `Partial<any>` (nie osobny generyk per typ) — wołający (`ScreenCanvas.
 // tsx`) i tak zawęża przez `item.componentType` PRZED wywołaniem, bezpieczeństwo typów żyje tam
 // (ta sama, już udokumentowana decyzja co `CanvasItem.style` w `canvasComponentsStore.ts`).
-export default function CanvasShapeStyleModal({ visible, kind, style, onChange, onClose }: {
+export default function CanvasShapeStyleModal({ visible, kind, style, onChange, onClose, boundLabel, onOpenBindingPicker }: {
   visible: boolean;
   kind: ShapeComponentType;
   style: RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;
   onChange: (patch: Record<string, unknown>) => void;
   onClose: () => void;
+  // Podpięcie danych DLA `textShape` (§408) — `boundLabel` to już wyliczona nazwa podpiętego
+  // źródła (seria/pole danych) albo `null` gdy niepodpięte; wołający (`ScreenCanvas.tsx`) zna
+  // OBA rejestry, ten modal nie musi ich importować. `onOpenBindingPicker` zamyka TEN modal i
+  // otwiera picker (ten sam, co tapnięcie kafla na płótnie) — wygoda, nie nowy mechanizm.
+  boundLabel?: string | null;
+  onOpenBindingPicker?: () => void;
 }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -100,12 +106,26 @@ export default function CanvasShapeStyleModal({ visible, kind, style, onChange, 
               const st = style as TextShapeStyle;
               return (
                 <>
+                  {/* Podpięcie danych (§408, user: "chcę surowe kształty bindowalne do
+                      danych") — JEDYNY z 4 gołych kształtów z tą zdolnością. Gdy podpięte,
+                      pole "Treść" poniżej jest ZABLOKOWANE (ignorowane przez `ShapeTile.tsx`
+                      i tak), żeby nie sugerować że wpisanie czegoś tam cokolwiek zmieni.
+                      Odpięcie żyje w samym pickerze ("Brak (wyczyść)", już generyczne,
+                      `MetricPickerModal.tsx`) — tu tylko wejście do niego. */}
+                  <TouchableOpacity onPress={onOpenBindingPicker} disabled={!onOpenBindingPicker} style={s.bindRow} activeOpacity={0.75}>
+                    <Link2 size={14} color={boundLabel ? c.accent.blue : c.text.muted} />
+                    <Text style={[s.bindTxt, boundLabel && { color: c.accent.blue }]} numberOfLines={1}>
+                      {boundLabel ? `Podpięte: ${boundLabel}` : 'Podepnij do żywych danych…'}
+                    </Text>
+                  </TouchableOpacity>
                   <View>
                     <Text style={s.sectionLabel}>Treść</Text>
                     <TextInput
-                      value={st.text} onChangeText={(v) => onChange({ text: v })}
+                      value={boundLabel ? `(podpięte — pokazuje: ${boundLabel})` : st.text}
+                      onChangeText={(v) => onChange({ text: v })}
+                      editable={!boundLabel}
                       placeholder="Wpisz tekst…" placeholderTextColor={c.text.muted}
-                      multiline maxLength={80} style={s.textInput}
+                      multiline maxLength={80} style={[s.textInput, !!boundLabel && { opacity: 0.5 }]}
                     />
                   </View>
                   {/* Gradient na tekście (§402, user: "gradient na tekście") — reużyty
@@ -175,4 +195,9 @@ const makeS = (c: any) => StyleSheet.create({
     minHeight: 60, fontSize: 14, fontWeight: '600', color: c.text.primary, backgroundColor: c.bg.card,
     borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.card, padding: spacing[3], textAlignVertical: 'top',
   },
+  bindRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: spacing[3],
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated,
+  },
+  bindTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary, flex: 1 },
 });

@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Przycisk "Przywróć poprzednią wersję" w Kreatorze (§407) + fix streaka ćwiczeń i bindowanie Tekstu (§408)
+
+**§407**: user: "na wszelki przycisk restart dashboardu... jak przez przypadek wdrożę coś
+czego nie chciałem". Backup już istniał od §398 (robiony automatycznie przy każdym "Wdróż"),
+tylko bez UI przywracania — teraz jest (nagłówek edytora, `RotateCcw`, widoczny tylko gdy
+backup realnie istnieje).
+
+**§408, dwie rzeczy**:
+1. Pusty kafel streaka ćwiczeń (zrzutem: trzeci kafelek "Twoje serie", kolorowy ale bez
+   liczby) — **NIE W PEŁNI POTWIERDZONY root cause**, dodany defensywny hardening (klamrowanie
+   `days`/`name` w `StreakTile.tsx`) jako bezkosztowy safety net. **Priorytet testu WYSOKI —
+   sprawdź czy problem WRACA mimo tego fixa; jeśli tak, zgłoś, bo prawdziwa przyczyna jest
+   wciąż nieznana.**
+2. Bindowanie kształtu "Tekst" na płótnie do żywych danych (user: "chcę też surowe kształty
+   bindowalne do danych") — picker łączy serie (nawyki/liczniki/ćwiczenia) i pola danych
+   (w tym nowe, dynamiczne "`<ćwiczenie>` — dzisiaj" per każde zalogowane ćwiczenie). Tekst
+   zachowuje własny design (font/kolor/gradient), tylko treść staje się żywa.
+
+Checklist obu w ARCHITECTURE.md §407/§408.
+
+**Świadomie poza zakresem §408**: `rectShape`/`ellipseShape`/`lineShape` NIE dostały
+bindowania (brak oczywistego "jak pokazać liczbę" bez mechanizmu wypełnienia-progresu) —
+jeśli user zgłosi potrzebę (np. "pasek wody jako wypełnienie prostokąta"), to osobna,
+większa faza.
+
 ## ✅🆕 Fix: dashboard nie łapał nowego dnia bez focus/resume (§406) — DO WERYFIKACJI (trudne, czasowe)
 
 User: "jest już 8:33 a ani woda z zegarka ani ciekawostka się nie odświeżyło" — NIE

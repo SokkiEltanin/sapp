@@ -4,6 +4,8 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
+import { useExercisesStore } from '@/store/exercisesStore';
+import { amountLoggedOn } from '@/utils/personalQuests';
 import { isMine } from '@/store/statsScope';
 import { MOOD_LABELS } from '@/types';
 import { fmtStat } from '@/utils/dashboard/format';
@@ -49,6 +51,14 @@ export interface DataFieldValue {
 // tak aktualna jak ostatnia wizyta na ekranie źródłowym (Pupil/Finanse), nie "na żywo" przy
 // każdym otwarciu płótna. `*Synced` flagi w store'u odróżniają "jeszcze nie wiadomo" (user
 // nigdy nie odwiedził ekranu źródłowego w tej instalacji) od realnego zera.
+//
+// Faza §408 (2026-10-20) — user: "jak dodam kafelek z treningu... jak będę niby podłączał
+// to żeby liczyło dane np jako trening_pompki w innych miejscach typu... historii
+// treningów?". Dołożone DYNAMICZNE pola per-ćwiczenie (`exercise:<nazwa>`) — jedno dla
+// KAŻDEGO ćwiczenia jakie user kiedykolwiek zalogował, nie zahardkodowana lista. Ten sam
+// rejestr jest teraz czytany też przez bindowalny `textShape` (patrz `ScreenCanvas.tsx`/
+// `ShapeTile.tsx`), więc własno-zaprojektowany kafel tekstu może pokazywać "Pompki —
+// dzisiaj" jako ŻYWĄ wartość, czytaną z TEGO SAMEGO `exercisesStore` co `/exercises-history`.
 export function useDataFieldRegistry(): DataFieldValue[] {
   const petName = usePetStore(s => s.name);
   const petXp = usePetStore(s => s.xp);
@@ -60,6 +70,7 @@ export function useDataFieldRegistry(): DataFieldValue[] {
   const petMoodLabel = useLiveStatsSnapshotStore(s => s.petMoodLabel);
   const cardBalanceOffset = useLiveStatsSnapshotStore(s => s.cardBalanceOffset);
   const balanceSynced = useLiveStatsSnapshotStore(s => s.balanceSynced);
+  const exerciseLogs = useExercisesStore(s => s.logs);
 
   return useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -96,6 +107,24 @@ export function useDataFieldRegistry(): DataFieldValue[] {
     }
     const balance = cardBalanceOffset + allInc - allExp;
 
+    // Ćwiczenia, PER KONKRETNE ĆWICZENIE (§408, user: "jak będę niby podłączał [kafelek
+    // treningu] żeby liczyło dane np jako trening_pompki... w historii treningów"). Rejestr
+    // dotąd miał TYLKO zbiorczy streak "Ćwiczenia" (dowolne, nie konkretne) — DYNAMICZNIE
+    // dokłada po jednym polu "dzisiaj" dla KAŻDEGO ćwiczenia, jakie user kiedykolwiek zalogował
+    // (nie zahardkodowana lista — `exercise: string` w `ExerciseLogEntry` i tak jest wolnym
+    // tekstem, "dowolne, własne nazwy też", patrz `personalQuests.ts`). `amountLoggedOn` to
+    // już istniejąca, czysta funkcja (sumuje dzisiejsze wpisy danego ćwiczenia) — zero nowej
+    // logiki, tylko zebranie unikalnych nazw + jedno wywołanie na nazwę. `useExercisesStore`
+    // to PROSTY selektor Zustand (ten sam koszt co `useExpensesStore`/`useMoodStore` wyżej) —
+    // źródło danych jest TO SAMO co karmi `/exercises-history` i zbiorczy streak "Ćwiczenia"
+    // na dashboardzie, więc kafel podpięty tutaj automatycznie zgadza się z obiema stronami.
+    const exerciseNames = Array.from(new Set(exerciseLogs.map(l => l.exercise))).sort((a, b) => a.localeCompare(b, 'pl'));
+    const exerciseFields: DataFieldValue[] = exerciseNames.map(name => ({
+      id: `exercise:${name}`,
+      label: `${name} — dzisiaj`,
+      value: String(amountLoggedOn(exerciseLogs, name, today)),
+    }));
+
     return [
       { id: 'pet.name', label: 'Imię pupila', value: petName },
       { id: 'pet.level', label: 'Poziom pupila', value: String(levelFromXp(petXp).level) },
@@ -108,6 +137,7 @@ export function useDataFieldRegistry(): DataFieldValue[] {
       { id: 'health.stepsToday', label: 'Kroki dzisiaj', value: petSynced ? stepsToday.toLocaleString('pl-PL') : 'Otwórz zakładkę Pupila' },
       { id: 'finance.balance', label: 'Saldo (karta)', value: balanceSynced ? fmtStat(balance, 'zł') : 'Otwórz zakładkę Finanse' },
       { id: 'pet.mood', label: 'Nastrój pupila', value: petSynced ? petMoodLabel : 'Otwórz zakładkę Pupila' },
+      ...exerciseFields,
     ];
-  }, [petName, petXp, tasks, expenses, moodEntries, stepsToday, petSynced, petMoodLabel, cardBalanceOffset, balanceSynced]);
+  }, [petName, petXp, tasks, expenses, moodEntries, stepsToday, petSynced, petMoodLabel, cardBalanceOffset, balanceSynced, exerciseLogs]);
 }

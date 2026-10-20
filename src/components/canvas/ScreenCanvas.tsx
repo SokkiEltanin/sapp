@@ -217,7 +217,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
     if (item.componentType === 'rectShape') return 'Prostokąt';
     if (item.componentType === 'ellipseShape') return 'Elipsa';
     if (item.componentType === 'lineShape') return 'Linia';
-    if (item.componentType === 'textShape') return 'Tekst';
+    if (item.componentType === 'textShape') {
+      if (!item.bindingKey) return 'Tekst';
+      return (allStreakItems.find(x => x.key === item.bindingKey)?.name
+        ?? dataFieldRegistry.find(f => f.id === item.bindingKey)?.label
+        ?? 'Tekst (podpięcie usunięte)');
+    }
     if (item.componentType === 'statTile') return item.bindingKey ? (WIDGET_METRICS.find(m => m.id === item.bindingKey)?.label ?? 'Wykres') : 'Wykres (brak podpięcia)';
     if (item.componentType === 'navTab') return item.bindingKey ? (PUPIL_NAV_TABS.find(t => t.key === item.bindingKey)?.label ?? 'Przycisk nawigacji') : 'Przycisk nawigacji (brak podpięcia)';
     if (item.componentType === 'progressBar') return item.bindingKey ? (allCountdownItems.find(x => x.id === item.bindingKey)?.name ?? 'Pasek progresu') : 'Pasek progresu (brak podpięcia)';
@@ -288,6 +293,18 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
   const dataFieldOptions: PickerOption[] = useMemo(
     () => dataFieldRegistry.map(f => ({ key: f.id, label: f.label, meta: f.value })),
     [dataFieldRegistry],
+  );
+  // Bindowanie "Tekstu" (kształt-prymitywny) do danych (§408, 2026-10-20) — user: "chcę też
+  // surowe kształty bindowalne do danych". `textShape` jest JEDYNYM z 4 gołych kształtów, który
+  // dostał tę zdolność (rect/ellipse/line zostają czysto wizualne — nie mają oczywistego "jak
+  // pokazać liczbę" bez nowego mechanizmu wypełnienia-progresu, osobna, większa zmiana).
+  // Połączona lista z DWÓCH już istniejących rejestrów (klucze z różnych namespace'ów —
+  // `h:`/`c:`/`ex:` dla serii, kropkowane ścieżki dla pól danych — zero ryzyka kolizji),
+  // żeby user mógł podpiąć ZARÓWNO serię (np. "Woda" — dni streaka) JAK I dowolne pole
+  // (np. "Pompki — dzisiaj", finanse, nastrój) z JEDNEGO pickera, bez budowania drugiego.
+  const textBindOptions: PickerOption[] = useMemo(
+    () => [...streakOptions, ...dataFieldOptions],
+    [streakOptions, dataFieldOptions],
   );
   // Piąty "widget z danymi" (§386) — rejestr z `statWidgets.ts` (29 metryk, 4 grupy, TEN SAM
   // rejestr co dashboardowe "Dodaj widget") — `meta` pokazuje grupę, żeby długa, płaska lista
@@ -393,8 +410,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const isDataField = item.componentType === 'dataField';
           // Kształty-primitywy (§357) i Ikona (§371) — BEZ podpięcia danych, tapnięcie nie robi
           // nic (ani metric-picker, ani nawigacja) — interakcja idzie WYŁĄCZNIE przez chrome
-          // `CanvasPlacedItem` (przeciąganie/resize/przycisk 🎨 stylu).
+          // `CanvasPlacedItem` (przeciąganie/resize/przycisk 🎨 stylu). WYJĄTEK (§408): `textShape`
+          // wyłamuje się z tej reguły — jedyny gołe-kształt typ, który DOSTAŁ podpięcie danych
+          // (patrz `isTextShape` niżej), więc jego tap MUSI przejść przez picker jak
+          // `dataField`/`statTile`, nie zostać po cichu zignorowany jak reszta kształtów.
           const isShape = isShapeType(item.componentType);
+          const isTextShape = item.componentType === 'textShape';
           const isIcon = item.componentType === 'iconTile';
           const isStat = item.componentType === 'statTile';
           // Przycisk nawigacji dla Navbaru Pupila (Faza §392) — podpięcie do JEDNEGO z 4
@@ -410,6 +431,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           const boundCountdown = isCountdown && item.bindingKey ? allCountdownItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundNote = isNote && item.bindingKey ? allNotesItems.find(x => x.id === item.bindingKey) ?? null : null;
           const boundDataField = isDataField && item.bindingKey ? dataFieldRegistry.find(f => f.id === item.bindingKey) ?? null : null;
+          // `textShape` binding (§408) — sprawdza OBA rejestry (seria/pole danych), bo
+          // `textBindOptions` to ich suma; namespace kluczy się nie kolejuje (`h:`/`c:`/`ex:`
+          // vs kropkowane ścieżki), więc bezpiecznie próbować najpierw serii, potem pola.
+          const boundTextStreak = isTextShape && item.bindingKey ? allStreakItems.find(x => x.key === item.bindingKey) ?? null : null;
+          const boundTextField = isTextShape && item.bindingKey && !boundTextStreak ? dataFieldRegistry.find(f => f.id === item.bindingKey) ?? null : null;
+          const boundTextValue = boundTextStreak ? String(boundTextStreak.days) : boundTextField ? boundTextField.value : null;
 
           const onTap = () => {
             // Tryb "Dane"/popup (§391) — PRIORYTET nad wszystkim innym poniżej (działa dla
@@ -417,7 +444,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
             // TYLKO poza edycją — w edycji tap zawsze służy do konfiguracji (picker/brak akcji
             // na kształtach), zgodnie z dotychczasowym zachowaniem.
             if (!editing && item.onTapAction === 'openPopup') { haptic.tap(); setPopup({ id: item.id, mode: 'view' }); return; }
-            if (isShape || isIcon) return;
+            if ((isShape && !isTextShape) || isIcon) return;
             if (editing) { setPickerForId(item.id); return; }
             if (isStreak) {
               if (boundStreak) navigateForStreakItem(boundStreak, item.style as StreakTileStyle);
@@ -542,6 +569,7 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
                   height={item.height}
                   onPress={onPress}
                   sizeStyle={sizeStyle}
+                  boundValue={boundTextValue}
                 />
               )}
             />
@@ -700,9 +728,9 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
 
       <MetricPickerModal
         visible={!!pickerItem}
-        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : pickerItem?.componentType === 'progressBar' ? 'Wybierz licznik' : 'Wybierz metrykę'}
-        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : pickerItem?.componentType === 'progressBar' ? CalendarClock : Flame}
-        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : pickerItem?.componentType === 'progressBar' ? countdownOptions : streakOptions}
+        title={pickerItem?.componentType === 'countdownTile' ? 'Wybierz odliczanie' : pickerItem?.componentType === 'notesTile' ? 'Wybierz notatkę' : pickerItem?.componentType === 'dataField' ? 'Wybierz pole danych' : pickerItem?.componentType === 'statTile' ? 'Wybierz metrykę wykresu' : pickerItem?.componentType === 'navTab' ? 'Wybierz zakładkę' : pickerItem?.componentType === 'progressBar' ? 'Wybierz licznik' : pickerItem?.componentType === 'textShape' ? 'Podepnij dane' : 'Wybierz metrykę'}
+        icon={pickerItem?.componentType === 'countdownTile' ? CalendarClock : pickerItem?.componentType === 'notesTile' ? FileText : pickerItem?.componentType === 'dataField' ? Database : pickerItem?.componentType === 'statTile' ? BarChart2 : pickerItem?.componentType === 'navTab' ? Compass : pickerItem?.componentType === 'progressBar' ? CalendarClock : pickerItem?.componentType === 'textShape' ? Type : Flame}
+        options={pickerItem?.componentType === 'countdownTile' ? countdownOptions : pickerItem?.componentType === 'notesTile' ? notesOptions : pickerItem?.componentType === 'dataField' ? dataFieldOptions : pickerItem?.componentType === 'statTile' ? statOptions : pickerItem?.componentType === 'navTab' ? navTabOptions : pickerItem?.componentType === 'progressBar' ? countdownOptions : pickerItem?.componentType === 'textShape' ? textBindOptions : streakOptions}
         currentKey={pickerItem?.bindingKey ?? null}
         emptyHint={pickerItem?.componentType === 'countdownTile' || pickerItem?.componentType === 'progressBar'
           ? 'Brak aktywnych odliczań na koncie — dodaj jedno w Licznikach.'
@@ -714,6 +742,8 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
           ? 'Rejestr metryk jest pusty — to nie powinno się zdarzyć.'
           : pickerItem?.componentType === 'navTab'
           ? 'Lista zakładek jest pusta — to nie powinno się zdarzyć.'
+          : pickerItem?.componentType === 'textShape'
+          ? 'Rejestr danych jest pusty — to nie powinno się zdarzyć.'
           : 'Brak nawyków/liczników/ćwiczeń z serią na koncie — dodaj jeden w Nawykach albo Licznikach.'}
         onSelect={(key) => { if (pickerItem) updateItem(pickerItem.id, { bindingKey: key }); setPickerForId(null); }}
         onClose={() => setPickerForId(null)}
@@ -763,6 +793,12 @@ export function ScreenCanvasBase({ screenKey, title, allStreakItems, allCountdow
         // Bezpieczeństwo typów żyje w samym modalu (branch wg `kind` PRZED użyciem pól).
         onChange={(patch) => { if (styleItem) updateItem(styleItem.id, { style: { ...(styleItem.style as any), ...patch } }); }}
         onClose={() => setStyleForId(null)}
+        boundLabel={styleItem && styleItem.componentType === 'textShape' && styleItem.bindingKey
+          ? (allStreakItems.find(x => x.key === styleItem.bindingKey)?.name ?? dataFieldRegistry.find(f => f.id === styleItem.bindingKey)?.label ?? null)
+          : null}
+        onOpenBindingPicker={styleItem && styleItem.componentType === 'textShape'
+          ? () => { const id = styleItem.id; setStyleForId(null); setPickerForId(id); }
+          : undefined}
       />
 
       <CanvasDataFieldStyleModal

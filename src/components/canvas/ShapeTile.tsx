@@ -33,7 +33,7 @@ function FillDefs({ fill }: { fill: Fill }) {
 // `viewBox="0 0 100 100"` + `preserveAspectRatio="none"` (patrz komentarz w
 // `shapeStyleDefaults.ts`) — SVG rozciąga się 1:1 z `sizeStyle` (flex 100%/100%), żywa animacja
 // podczas przeciągania uchwytu resize bez pomiaru `onLayout`.
-export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
+export function ShapeTile({ kind, style, width, height, onPress, sizeStyle, boundValue }: {
   kind: ShapeComponentType;
   style: RectShapeStyle | EllipseShapeStyle | LineShapeStyle | TextShapeStyle;
   // Realny rozmiar (w px) instancji na płótnie — TYLKO dla `rectShape`, patrz fix niżej (§387).
@@ -41,6 +41,13 @@ export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
   height: number;
   onPress: () => void;
   sizeStyle?: StyleProp<ViewStyle>;
+  // Podpięcie danych DLA `textShape` (§408, user: "chcę surowe kształty bindowalne do danych")
+  // — jedyny z 4 gołych kształtów z tą zdolnością. `null`/`undefined` = niepodpięte, renderuje
+  // się jak dotąd (statyczny `st.text`). Gdy podane — ZASTĘPUJE `st.text` w CAŁOŚCI (nie
+  // dokleja), bo user projektuje kafel WOKÓŁ liczby (gradient/font/wyrównanie zostają jego), a
+  // nie wpisuje tekstu ręcznie — patrz `CanvasShapeStyleModal.tsx`, pole treści jest tam
+  // zablokowane gdy podpięte, żeby nie sugerować że cokolwiek wpisane tam coś zmieni.
+  boundValue?: string | null;
 }) {
   if (kind === 'rectShape') {
     const st = style as RectShapeStyle;
@@ -92,7 +99,9 @@ export function ShapeTile({ kind, style, width, height, onPress, sizeStyle }: {
     );
   }
   const st = style as TextShapeStyle;
-  const shownText = st.text || 'Dwa kliknięcia na 🎨, żeby wpisać tekst';
+  // Podpięte (§408) → ZASTĘPUJE statyczny `st.text` w całości, patrz komentarz przy propie
+  // `boundValue` wyżej. Niepodpięte → zachowanie bez zmian (statyczny tekst / placeholder).
+  const shownText = boundValue != null ? boundValue : (st.text || 'Dwa kliknięcia na 🎨, żeby wpisać tekst');
   // Gradient na tekście (§402, user: "gradient na tekście") — RN <Text> nie ma natywnego
   // gradientowego wypełnienia (ten sam ograniczenie udokumentowane w `GradientText.tsx`), więc
   // gradient renderuje się jako PRAWDZIWE SVG (`<SvgText fill="url(#...)">`, reużyte
