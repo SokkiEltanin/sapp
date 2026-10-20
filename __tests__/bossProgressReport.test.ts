@@ -67,7 +67,7 @@ describe('bossProgressReport', () => {
       ],
     };
     const report = buildBossProgressReport(s);
-    expect(report).toContain('✓ 🌞 Złoty Leniwiec'); // reskin rosteru §399 — nazwa/emoji żywego 'sloth'
+    expect(report).toContain('✓ 🦊 Vulpes Solaris'); // §403 fix: prawdziwa nazwa z pliku portretu, nie wymyślona
     expect(report).toMatch(/kampania · Kanapowy Leniwiec · Lv2 · \+8 monet, \+60 XP/);
   });
 

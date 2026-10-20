@@ -21444,6 +21444,70 @@ kartę (tylko treść). Przełącz z powrotem na "Karta" → zjedź "Przezroczys
 TŁO blaknie, treść zostaje w pełni czytelna. Potwierdź że NIGDZIE nie pojawił się blur/
 rozmycie tła (świadomie pominięte).
 
+## 403. Fix: wymyślone nazwy bossów (§399) + mapa kampanii rozjechana od ścieżki (2026-10-20)
+
+User, wściekle: "Ale kurwa czemu ty sobie wymyśliłeś nazwy tam one miały nazwy te boss i
+takie miały być". Dwa osobne, oba potwierdzone statycznie (bez urządzenia, ale jednoznacznie
+z kodu/plików) bugi, oba dotyczące mapy/rosteru bossów z §399.
+
+**Fix 1 — wymyślone nazwy bossów.** §399 (reskin rosteru) ZIGNOROWAŁO, że 22 nowe portrety w
+`BOSSYNEW/` miały już wpisane nazwy WPROST W NAZWIE PLIKU — prefiks to żywioł (`LV_`=lawa,
+`W_`=woda, `BRZ_`=burza, `BS_`=niebo, `L_`=las), reszta to nazwa stworzenia po łacinie (np.
+`BS_Vulpes Solaris.png`, `W_Scylla.png`, `BRZ_Corvus Fulguris.png`, `L_Silvanus.png`) —
+zweryfikowane wprost przez `git log --diff-filter=A --name-only` (lista plików nigdy nie
+usunięta z historii repo, mimo że folder `BOSSYNEW/` dawno przeniesiony/posprzątany). Zamiast
+użyć tych nazw, §399 wymyśliło WŁASNE polskie nazwy/emoji (np. `sloth` → "Złoty Leniwiec" 🌞,
+podczas gdy portret to `Vulpes Solaris` — dosłownie "lis słoneczny" — zero związku z
+"leniwcem"/"słońcem" jako symbolem). Fix (`bosses.ts`): `name` każdego z 22 bossów kampanii
+to TERAZ dokładnie string z nazwy pliku portretu (bez prefiksu żywiołu/rozszerzenia) — ten
+sam precedens co już istniejące, nietłumaczone mitologiczne nazwy w starym rosterze (Hades,
+Cerberus, Cerberus zresztą dalej żyje jako `attackKind`/plik nieużywany). `emoji` przeliczone
+PRZY OKAZJI na gatunek wskazany przez PRAWDZIWĄ nazwę (np. `Vulpes`=lis→🦊, `Corvus`=kruk→
+🐦‍⬛ który już był trafny, `Carcharos`↔rekin→🦈 też już był trafny — część moich wymyślonych
+emoji przypadkiem pasowała do prawdziwego gatunku, część (np. 🌞 dla lisa) kompletnie nie).
+`id`/`order`/`unlockLevel`/`hp`/`weakness`/`loot`/`taunt`/`guard`/`regenPct`/`attackKind`
+NIETKNIĘTE (ten sam powód co §399 — trwałe klucze postępu/balansu). Pełna tabela id→nazwa w
+diffie `bosses.ts`. Test `bossProgressReport.test.ts` (asercja na starą wymyśloną nazwę
+"Złoty Leniwiec") zaktualizowany na "Vulpes Solaris".
+
+**Fix 2 — mapa kampanii: bossy "rozjechane" od ścieżki mimo poprawnego edytora.** User
+zrzutem: "mapa kampanii jest rozjebana względem tego jak ustawiłem, zobacz jak są bossy
+rozjechane od tej linii wgle nie tak jak trzeba mimo że w edytorze wszystko pięknie" — dokładnie
+scenariusz który §379 zostawiło jako "NIE w pełni potwierdzone" (patrz NEXT_STEPS.md wtedy:
+"czy to wyjaśnia CAŁĄ różnicę, czy zostaje coś w pomiarze szerokości viewportu"). Diagnoza
+(statyczna, z samej struktury kodu — wniosek logicznie wymuszony, nie zgadywanie): węzły
+(`View`, zwykłe `left`/`top`) i ścieżka (`<Path d=...>`) w `CampaignMap.tsx` pochodzą z
+DOKŁADNIE TEJ SAMEJ tablicy `nodes` w TYM SAMYM renderze (`n = nodes[i]` dla portretów,
+`catmullRomPath(nodes)` dla ścieżki) — więc jeśli user widzi je WIZUALNIE rozjechane, to
+MATEMATYCZNIE NIE MOŻE być bug danych (overrides/clamp/hydratacja) — każda taka przyczyna
+zmieniłaby OBIE warstwy naraz, w tym samym renderze. Jedyne pozostałe wytłumaczenie: natywna
+nie-aktualizacja samego `<Path>` — `d` prop na Androidzie (zwłaszcza New Arch/Fabric,
+`react-native-svg`) bywa "sklejony" po pierwszym montażu i nie odświeża się przy zwykłym
+update-w-miejscu, podczas gdy zwykłe RN `View` (pozycje węzłów) aktualizują się niezawodnie —
+DOKŁADNIE objaw: ikony w nowym miejscu, linia w starym. Ten sam problem klasy co już
+udokumentowane w CLAUDE.md "RN... SVG-propy stutterują" i ten sam fix co już istniejący
+`key={`${viewport.w}x${viewport.h}`}` na `ScrollView` w TYM SAMYM pliku (wymuszone remounty
+dla native-sync bugów to ustalony wzorzec w tym komponencie, nie nowy pomysł). Fix:
+`key={fullPathD}`/`key={litPathD}` na obu `<Path>` w `CampaignMap.tsx` — wymusza świeży,
+natywny węzeł Path (zamiast update-w-miejscu) za każdym razem gdy geometria FAKTYCZNIE się
+zmienia (np. po asynchronicznej hydratacji `bossMapLayoutStore`, która wczytuje nadpisania
+pozycji z edytora PO pierwszym montażu ekranu mapy). Ten sam, defensywny `key={pathD}` dodany
+też w `boss-map-editor.tsx` (tam user NIE zgłosił problemu — edytor jest na żywo przeciągany
+więc może "zdążyć" się zaktualizować — ale to ta sama klasa ryzyka, zero kosztu dodania).
+
+**NIE W PEŁNI POTWIERDZONE BEZ URZĄDZENIA** (ten sam zastrzeżenie co §379) — diagnoza jest
+logicznie wymuszona z samej struktury kodu (dwie warstwy z jednego źródła danych NIE MOGĄ się
+rozjechać bez bugu renderu), ale nie dało się bezpośrednio zaobserwować native-SVG
+nie-aktualizacji na urządzeniu. **Priorytet testu na urządzeniu — WYSOKI** — po tym fixie
+otwórz mapę kampanii (zwłaszcza PO zimnym starcie appki, żeby złapać moment hydratacji
+store'u) i porównaj z edytorem; jeśli bossy DALEJ są widocznie poza linią ścieżki, to NIE jest
+ten sam bug — zgłoś to, będzie trzeba szukać dalej (np. realna różnica w zmierzonej szerokości
+viewportu między ekranami, czego ten fix nie adresuje).
+
+**Testy**: `bossProgressReport.test.ts` zaktualizowany (nowa nazwa/emoji 'sloth'). `tsc
+--noEmit` czyste, `jest --silent` 115/115 suite, 1501/1501 testów (bez zmiany liczby — oba
+fixy to dane/JSX, nie nowa logika czystych funkcji).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
