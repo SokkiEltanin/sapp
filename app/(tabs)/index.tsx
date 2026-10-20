@@ -127,6 +127,7 @@ import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import { useUiPrefs, DASHBOARD_REFRESH_DELAY_MS } from '@/store/uiPrefs';
+import { useHabitsSync } from '@/store/habitsSync';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import { getLastBackup } from '@/services/backupService';
@@ -917,12 +918,38 @@ export default function DashboardScreen() {
     // card actually displays — a plain 7-day window (used on lighter focus-only syncs
     // below) left the other ~23 days permanently empty for anyone who never visited
     // Zdrowie's manual "Zsynchronizuj z zegarka" button (the only other 30-day sync).
-    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(force ? 30 : 7, force)).then(n => { if (n > 0) read(); }).catch(() => {});
+    // `bump()` (§406 fix, user: "ani woda z zegarka... się nie odświeżyło") — `autoSyncHealth`
+    // pisze świeżą wodę z zegarka do `health_YYYY-MM-DD`'s przez `feedWaterHabit`, ale
+    // `useHabits()` (skąd dashboard czyta licznik "woda" nawyku) ma WŁASNY, niezależny stan w
+    // pamięci, wczytany RAZ na mount/zmianę posiłków — nie wiedział, że ten zapis w ogóle
+    // zaszedł. `useHabitsSync`'s `version` to JUŻ istniejący broadcast-kanał dokładnie na ten
+    // scenariusz ("inna instancja zmutowała dane → wszystkie re-czytaj", patrz komentarz w
+    // `habitsSync.ts`) — tylko dotąd nic nie wołało go po zewnętrznym (nie-habitowym) zapisie.
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(force ? 30 : 7, force)).then(n => { if (n > 0) { read(); useHabitsSync.getState().bump(); } }).catch(() => {});
   }, []);
   useEffect(() => { reloadHealth(true); }, [reloadHealth]);  // cold start → force fresh
   // Re-read local health on focus (cheap multiGet) so a weight/steps logged elsewhere
   // isn't stale; the watch sync itself is throttled (force=false) via reloadHealth's default.
   useFocusEffect(useCallback(() => { reloadHealth(false); }, [reloadHealth]));
+  // Północ mijająca, podczas gdy dashboard stoi cały czas zamontowany/aktywny (user nigdy nie
+  // przełącza zakładki ani nie chowa appki w tle) — §406 fix, user: "jest już 8:33 a ani woda
+  // z zegarka ani ciekawostka się nie odświeżyło". Bez tego `reloadHealth(true)` na cold
+  // starcie to JEDYNY `force:true` wywołanie w całej sesji — wszystko po nim (focus) jest
+  // `force:false`, throttlowane i NIE backfilluje nowego dnia, jeśli żaden focus/resume event
+  // w ogóle nie zaszedł. TEN SAM wzorzec co już sprawdzony w `usePetHealthSync.ts`
+  // ("Trzecia dziura: północ mijająca podczas gdy ekran stał cały czas aktywny").
+  const lastDashboardDay = useRef(todayStr());
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const t = todayStr();
+      if (t !== lastDashboardDay.current) {
+        lastDashboardDay.current = t;
+        reloadHealth(true);
+        refreshStatsSnapshot();
+      }
+    }, 60000);
+    return () => clearInterval(iv);
+  }, [reloadHealth, refreshStatsSnapshot]);
   // Quick weight entry from the weight widget's popup.
   const saveWeightEntry = useCallback(async () => {
     const kg = parseFloat(weightInput.replace(',', '.'));

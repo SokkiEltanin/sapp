@@ -21615,6 +21615,66 @@ Ustaw "Oszczędnie" → zostań na dashboardzie, dodaj paragon z innego miejsca 
 → sprawdź że dashboard NIE przelicza natychmiast (poczekaj ~15s, powinien dogonić). Przełącz
 zakładkę i wróć → sprawdź że ZAWSZE odświeża się od razu (trigger A, niezależny od trybu).
 
+## 406. Fix: dashboard nie łapał nowego dnia bez focus/resume (woda z zegarka, ciekawostka) (2026-10-20)
+
+User: "jest już 8:33 a ani woda z zegarka ani ciekawostka się nie odświeżyło". NIE powiązane
+z §405 (opóźnienie trigera B dotyczy tylko snapshotu `expenses`) — osobny, realny bug w DWÓCH
+niezależnych podsystemach, obu z TYM SAMYM brakiem: żaden nie miał strażnika "minęła północ,
+podczas gdy ekran/kafelek stał CAŁY CZAS zamontowany/aktywny, bez ŻADNEGO focus/resume
+eventu, który normalnie wymusiłby odświeżenie".
+
+**Diagnoza** — dashboard (`index.tsx`) ma TYLKO trzy triggery odświeżania danych z zegarka:
+(A) cold start (`reloadHealth(true)`, `useEffect` z PUSTĄ tablicą zależności — leci RAZ na
+całą sesję), (B) focus zakładki (`reloadHealth(false)` — `force:false`, throttlowane do raz
+na 10 min przez `autoSyncHealth`'s `THROTTLE_MS`), (C) powrót appki z tła (`reloadHealth
+(true)`). Jeśli user NIGDY nie przełączył zakładki ani nie schował appki w tle (telefon po
+prostu leżał z appką otwartą na dashboardzie przez noc) — ŻADEN z tych trzech trigerów nie
+strzelił po północy, więc `autoSyncHealth` nigdy nie zaciągnęło nowego dnia z zegarka.
+`TriviaCard.tsx` miało TEN SAM problem w mniejszej skali: `useEffect` sprawdzający "czy dziś
+to nowy dzień" miał PUSTĄ tablicę zależności — leciał RAZ, przy montowaniu, i nigdy więcej
+(dashboard NIE odmontowuje kafli przy przełączaniu zakładek), więc kafelek mógł utknąć na
+wczorajszej ciekawostce bez końca.
+
+**Fix — ten sam, już sprawdzony wzorzec co `usePetHealthSync.ts`'s "Trzecia dziura: północ
+mijająca podczas gdy ekran stał cały czas aktywny"** (ref + `setInterval` co 60s, porównanie
+`todayStr()` z zapamiętaną wartością, akcja TYLKO gdy się różni — idempotentne, zero kosztu
+gdy dzień ten sam):
+- `app/(tabs)/index.tsx` — nowy `useEffect` z `setInterval`, przy zmianie dnia woła
+  `reloadHealth(true)` (forsuje pełny sync z zegarka, bypassując throttle) + `refreshStatsSnapshot()`
+  (odświeża też snapshot `expenses` na nowy dzień, niezależnie od ustawienia z §405 — to
+  osobny trigger, nie podlega opóźnieniu B).
+- **Przy okazji znaleziony i naprawiony DRUGI bug**: `reloadHealth`'s `autoSyncHealth()` pisze
+  świeżą wodę z zegarka do `health_YYYY-MM-DD` przez `feedWaterHabit`, ale dashboard czyta
+  licznik nawyku "woda" z `useHabits()` — WŁASNY, niezależny stan w pamięci, wczytany tylko na
+  mount/zmianę posiłków, nieświadomy że `autoSyncHealth` w ogóle coś zapisał. `useHabitsSync`'s
+  `version`/`bump()` to JUŻ ISTNIEJĄCY broadcast-kanał dokładnie na ten scenariusz ("inna
+  instancja zmutowała dane → wszyscy re-czytają", `habitsSync.ts`) — tylko nic dotąd nie
+  wołało go po zewnętrznym (nie-habitowym) zapisie. Fix: `reloadHealth`'s `autoSyncHealth`
+  success-callback (gdy `n > 0`, czyli faktycznie coś zapisano) teraz też woła
+  `useHabitsSync.getState().bump()` — naprawia to OGÓLNIE (każdy sync z zegarka, nie tylko
+  przy zmianie dnia), nie tylko ten jeden scenariusz.
+- `src/components/dashboard/TriviaCard.tsx` — `useEffect` wyciągnięty do `loadToday`
+  (`useCallback`), wołany PONOWNIE co minutę przy zmianie dnia, tym samym wzorcem co wyżej.
+  Dodany `mounted` ref (zastępuje usunięty, per-wywołaniowy `alive` closure) — `loadToday`
+  jest teraz wołane wielokrotnie z różnych miejsc (mount + interval), więc guard przeciw
+  `setSt` po odmontowaniu musi żyć POZA pojedynczym wywołaniem.
+
+**Świadomie NIE dotknięte**: `useHabits()`'s WŁASNA logika `load()` (nawyki inne niż "woda",
+serie, zamrożenia) — `bump()` już pokrywa przypadek "coś się zmieniło gdzie indziej, re-czytaj
+wszystko", to wystarczający fix dla zgłoszonego objawu, retrofitowanie całego `useHabits()` o
+WŁASNY, osobny strażnik północy to osobna, większa zmiana (dotyczyłaby też ekranu Nawyki, nie
+tylko dashboardu).
+
+**Testy**: brak nowych dedykowanych — czysto timing/wiring fix, zero nowej logiki czystych
+funkcji. `tsc --noEmit` czyste, `jest --silent` 115/115 suite, 1501/1501 testów (bez zmiany).
+
+**Priorytet testu na urządzeniu — WYSOKI** (dotyczy realnego, zgłoszonego buga, trudny do
+zweryfikowania bez czekania): zostaw appkę otwartą na dashboardzie (ekran niezablokowany, bez
+przełączania zakładek) przez przejście północy — sprawdź że po ~1 minucie od północy woda z
+zegarka i "Ciekawostka dnia" same się odświeżają, bez wymuszania focusu/resume. Trudne do
+przetestowania szybko — alternatywnie: zmień ręcznie zegar systemowy telefonu na następny
+dzień, zostając na dashboardzie, i poczekaj ~60s.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

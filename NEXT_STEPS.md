@@ -3,6 +3,24 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅🆕 Fix: dashboard nie łapał nowego dnia bez focus/resume (§406) — DO WERYFIKACJI (trudne, czasowe)
+
+User: "jest już 8:33 a ani woda z zegarka ani ciekawostka się nie odświeżyło" — NIE
+powiązane z §405. Realny bug: dashboard i `TriviaCard` sprawdzały "czy to nowy dzień" tylko
+przy focus/resume/mount — jeśli appka stała otwarta na dashboardzie całą noc bez przełączania
+zakładki czy chowania w tle, żaden trigger nie strzelił, więc nic się nie odświeżyło. Fix: ten
+sam wzorzec co już istniejący w `usePetHealthSync.ts` ("Trzecia dziura: północ mijająca
+podczas gdy ekran stał cały czas aktywny") — `setInterval` co 60s sprawdzający zmianę dnia,
+dodany do `index.tsx` i `TriviaCard.tsx`. Przy okazji naprawiony DRUGI bug: `useHabits()`
+(licznik "woda") nie wiedział, że `autoSyncHealth` zapisało nowe dane z zegarka — teraz
+`reloadHealth` woła `useHabitsSync.getState().bump()` po każdym udanym syncu. Checklist w
+ARCHITECTURE.md §406.
+
+**DO ZWERYFIKOWANIA na urządzeniu** (priorytet WYSOKI, ale CZASOWO trudne do przetestowania
+szybko) — zostaw appkę otwartą na dashboardzie przez przejście północy (albo przestaw zegar
+systemowy telefonu na następny dzień, zostając na dashboardzie) → po ~60s woda z zegarka i
+"Ciekawostka dnia" powinny się same odświeżyć, bez przełączania zakładki.
+
 ## ✅🆕 Ustawienie: opóźnienie odświeżania dashboardu (§405) — DO WERYFIKACJI
 
 User: "ustaw mi opcję żeby na dashboardzie aktualizowało się tylko raz na jakiś czas z

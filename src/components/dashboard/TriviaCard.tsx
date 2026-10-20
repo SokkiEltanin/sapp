@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlaskConical, Lightbulb, Globe, HeartPulse, Sparkles, Check, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -91,8 +91,17 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
   const s = makeS(c);
   const [st, setSt] = useState<Persist | null>(null);
 
-  useEffect(() => {
-    let alive = true;
+  // Wyciągnięte do `useCallback` (§406 fix, user: "jest już 8:33 a... ciekawostka się nie
+  // odświeżyła") — stary kod sprawdzał "nowy dzień?" TYLKO RAZ, w `useEffect` z pustą tablicą
+  // zależności, więc dopóki ten kafelek pozostawał zamontowany (dashboard NIE odmontowuje się
+  // przy przełączaniu zakładek), nigdy nie sprawdzał tego ponownie — kafelek mógł utknąć na
+  // wczorajszej ciekawostce w nieskończoność, jeśli user nigdy nie wymusił remountu (np.
+  // force-restart appki). Teraz wołane PONOWNIE co minutę, gdy data faktycznie się zmieni
+  // (ten sam wzorzec co `usePetHealthSync.ts`) — idempotentne, bez zmiany gdy dzień ten sam.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+
+  const loadToday = useCallback(() => {
     AsyncStorage.getItem(KEY).then(raw => {
       let p: Persist = raw ? JSON.parse(raw) : { counts: {}, lastShown: {}, currentKey: null, day: null };
       const today = todayStr();
@@ -102,10 +111,20 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
         p = { counts: r.counts, lastShown: r.lastShown, dismissed: p.dismissed ?? {}, currentKey: r.key, day: today };
         AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
       }
-      if (alive) setSt(p);
-    }).catch(() => { if (alive) setSt({ counts: {}, lastShown: {}, currentKey: keyOf(TRIVIA[0]), day: todayStr() }); });
-    return () => { alive = false; };
+      if (mounted.current) setSt(p);
+    }).catch(() => { if (mounted.current) setSt({ counts: {}, lastShown: {}, currentKey: keyOf(TRIVIA[0]), day: todayStr() }); });
   }, []);
+
+  useEffect(() => { loadToday(); }, [loadToday]);
+
+  const lastDay = useRef(todayStr());
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const t = todayStr();
+      if (t !== lastDay.current) { lastDay.current = t; loadToday(); }
+    }, 60000);
+    return () => clearInterval(iv);
+  }, [loadToday]);
 
   // Rozwiń/zwiń, TERAZ do 3 poziomów (2026-09-06 baza, rozszerzone 2026-10-04 — user: "jak
   // mnie zaciekawi bardzo i rozwinięcie mnie nie zadowoli to zeby byl jakis przycisk czytaj
