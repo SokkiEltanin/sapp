@@ -3,6 +3,66 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ⚠️ KRYTYCZNE — 2026-10-20/21, incydent OTA: user musiał zresetować appkę (wyczyść dane)
+
+Po §407/§408 user zgłosił, że mapa bossów/kafel streaka/edytor WCIĄŻ wyglądają jakby nic się
+nie zmieniło — okazało się, że automatyczne sprawdzanie OTA jest wyłączone (§268, user:
+"zrobię wtedy w ustawieniach aktualizację... żeby nie ładowało tak w kółko"), więc appka
+NIGDY sama nie ściąga nowych paczek JS. Po manualnym "Sprawdź aktualizację" → "Restart teraz"
+appka dała **totalny czarny ekran, zawsze, bez wyjątku** (nie nawet własna `ErrorBoundary`
+w `app/_layout.tsx` — ta łapie każdy normalny render-crash i pokazuje czerwony ekran z
+treścią błędu, więc TO nie był normalny JS-render-crash w Stacku). CI/EAS publish log był
+czysty (bez błędów assetów, runtime version się zgadzał) — najbardziej prawdopodobna
+przyczyna to przerwane/uszkodzone pobieranie samej aktualizacji (duży skok — JS bundle +
+dziesiątki MB assetów z §399 naraz), NIE bug w kodzie z tej sesji. User wyczyścił dane appki
+(Ustawienia Androida → Aplikacje → appka → Pamięć → Wyczyść dane) — appka wróciła do życia na
+starym, WBUDOWANYM (natywnym, sprzed-OTA) buildzie.
+
+**Co to znaczy dla następnej sesji**: urządzenie jest TERAZ na starym natywnym buildzie —
+**ŻADNA** zmiana z §399 do §409 (łącznie z tym plikiem) nie była jeszcze realnie
+zweryfikowana na urządzeniu. User ma spróbować OTA ponownie (najlepiej na solidnym Wi-Fi, bez
+zamykania appki w trakcie pobierania) — **dopiero PO potwierdzeniu, że appka normalnie
+wchodzi po restarcie**, wszystkie "DO WERYFIKACJI" pozycje niżej (§403-§409) są warte
+sprawdzania. Jeśli czarny ekran WRÓCI mimo stabilnego Wi-Fi — to już realny sygnał, że problem
+jest w kodzie, nie w pobieraniu, i trzeba szukać od nowa (zacząć od czegoś w krytycznej
+ścieżce startu: `app/_layout.tsx`, dashboard `index.tsx` — oba montują się na KAŻDYM
+starcie, nie tylko gdy user wejdzie na konkretny ekran).
+
+## ✅🆕 Edytor: ujednolicony start projektu "Jak zaczynamy?" (§409)
+
+User: "ten edytor jest źle zrobiony" + konkretny przykład niespójności (DASHBOARD pusty →
+dostał wybór startu, ZDROWIE niepusty → wpadł prosto w edytor, zero sposobu zrestartować bez
+ręcznego usuwania itemów). Doprecyzował szerszą listę (nawigacja / okienka zasłaniające
+płótno / kompletny rejestr danych / wykresy dla dowolnej danej), ale zamiast wybrać priorytet
+sam, odpisał: "zrób po kolei jak uważasz ale ma być dobrze... profesjonalny HIGH END" — ta
+sesja bierze **nawigację** jako pierwszy kawałek.
+
+Fix: wspólny `CanvasStartChooserModal` (3 opcje: Kopiuj aktualny ekran [NOWE] / Szablon /
+Pusty), wołany z DWÓCH miejsc — Ustawienia (jak dotąd, tylko gdy draft pusty) ORAZ nowy
+przycisk 🪄 w nagłówku `canvas-draft-editor.tsx` (ZAWSZE dostępny, za potwierdzeniem gdy
+draft ma coś do stracenia). Checklist w ARCHITECTURE.md §409.
+
+**DO ZROBIENIA, reszta listy usera (priorytet w tej kolejności, bo user zgodził się na "po
+kolei")**:
+1. **Okienka stylu/właściwości zasłaniające płótno** — user chce dolny panel (jak
+   Canva/Instagram), płótno widoczne nad nim, zmiany widoczne na żywo bez zamykania okienka.
+   Dziś `CanvasShapeStyleModal`/`CanvasStreakStyleModal`/`CanvasPropertiesModal`/itd. to
+   wyśrodkowane, pełnowysokościowe `<Modal>`y — wymaga przeprojektowania WSZYSTKICH naraz dla
+   spójności (nie tylko jednego), bo user zobaczy niespójność identyczną do tej z §409 jeśli
+   zrobimy tylko część.
+2. **Kompletny rejestr KAŻDEJ danej z apki** — user: "żebym miał dosłownie w dodawaniu danych
+   KAŻDĄ MOŻLIWĄ DANE występującą w aplikacji dostępną do wyboru". Dziś `useDataFieldRegistry`
+   ma ~15 pól + dynamiczne per-ćwiczenie — NIE każdą liczbę z apki (np. szczegóły per-kategoria
+   wydatków, etapy snu, pojedyncze wpisy nawyków, zmiany w pracy, tankowania pojazdów, długi,
+   produkty). Realnie duża faza — rozważyć kategoriami (np. najpierw finanse-szczegółowo,
+   potem zdrowie-szczegółowo), nie wszystko naraz.
+3. **Wykresy dla dowolnej podpiętej danej** — user: "w pełni modyfikowalną [...] w formie
+   wykresu". Dziś wykres = TYLKO `statTile`/`WIDGET_METRICS` (29 zahardkodowanych metryk) —
+   żeby DOWOLNE podpięcie (streak/dataField/przyszłe-szczegółowe-pola z pkt 2) mogło się też
+   pokazać jako wykres, trzeba najpierw wiedzieć, CO ma być na osi X (większość pól z rejestru
+   dziś to JEDNA liczba "dzisiaj", nie seria historyczna) — to może wymagać najpierw rozszerzenia
+   samego rejestru o historię, nie tylko UI wykresu. Zależne od pkt 2.
+
 ## ✅🆕 Przycisk "Przywróć poprzednią wersję" w Kreatorze (§407) + fix streaka ćwiczeń i bindowanie Tekstu (§408)
 
 **§407**: user: "na wszelki przycisk restart dashboardu... jak przez przypadek wdrożę coś

@@ -280,6 +280,23 @@ interface CanvasComponentsState {
   // ekranu) — UI chowa przycisk w tym wypadku, zamiast dawać coś co wygląda jak działa, a
   // nic nie robi.
   restoreBackup: (target: string) => boolean;
+  // Czyszczenie/start projektu roboczego (§409, 2026-10-21) — user: "wybieram ZDROWIE →
+  // pokazuje mi się że miałem już projekt zaczęty (mogę go wybrać lub pusty kanwas lub
+  // aktualną zakładkę do edycji)" — opisał TRZY równoprawne sposoby START-u projektu, ale kod
+  // dotąd dawał wybór ("Szablon"/"Pusty") WYŁĄCZNIE gdy draft był pusty (`count === 0` w
+  // `EditorProjectsList`) — dla NIEPUSTEGO draftu nie było żadnego sposobu "zacznij od nowa"
+  // bez ręcznego usuwania itemów jeden po jednym. `clearDraft` czyści TYLKO
+  // `draft:<target>` (żywy ekran i backup nietknięte) — bezpieczny pierwszy krok pod każdą z
+  // trzech opcji w nowym, współdzielonym `CanvasStartChooserModal` (wołany teraz z DWÓCH
+  // miejsc: `EditorProjectsList` gdy draft pusty, i nowy przycisk "Zacznij od nowa" w
+  // `canvas-draft-editor.tsx` gdy niepusty, za potwierdzeniem — patrz tam).
+  clearDraft: (target: string) => void;
+  // `startDraftFromLive` — trzecia, DOTĄD NIEISTNIEJĄCA opcja startu ("aktualna zakładka do
+  // edycji" z cytatu usera): kopiuje `<target>` (żywy ekran) → `draft:<target>` z NOWYMI id,
+  // ten sam trik co `deployDraft`/`restoreBackup` wyżej. Woła się PO `clearDraft` (chooser
+  // robi to jawnie, nie w środku tej funkcji — symetria z `applyTemplate`, która też zakłada
+  // czysty draft i NIE czyści go sama, patrz komentarz w `EditorProjectsList`).
+  startDraftFromLive: (target: string) => void;
   // Duplikuj/wyrównaj (Faza §400, 2026-10-19) — user: "jak dodaje prostokąt do canvas to
   // nadal nie mam allign to center albo snapa... nie mam jak ustawić np 2 kafelków na tym
   // samym poziomie lub nie mam opcji kopiuj". Trzy braki, trzy osobne akcje:
@@ -497,6 +514,23 @@ export const useCanvasComponentsStore = create<CanvasComponentsState>()(
         set((s) => ({ items: [...s.items.filter(i => i.screenKey !== target), ...restored] }));
         return true;
       },
+
+      clearDraft: (target) => set((s) => ({
+        items: s.items.filter(i => i.screenKey !== `draft:${target}`),
+      })),
+
+      startDraftFromLive: (target) => set((s) => {
+        const draftKey = `draft:${target}`;
+        const liveItems = s.items.filter(i => i.screenKey === target);
+        const stamp = Date.now();
+        const copied: CanvasItem[] = liveItems.map((i, idx) => ({
+          ...i, id: `canvas:${stamp}-live-${idx}-${Math.random().toString(36).slice(2, 8)}`, screenKey: draftKey,
+        }));
+        // Zakłada czysty draft (chooser woła `clearDraft` jawnie PRZED tym) — filtr tu jest
+        // tylko defensywny (ten sam powód co `deployDraft`'s filtr na `backupKey`), nie
+        // głównym mechanizmem czyszczenia.
+        return { items: [...s.items.filter(i => i.screenKey !== draftKey), ...copied] };
+      }),
 
       duplicateItem: (id, canvasWidth) => {
         const target = get().items.find(i => i.id === id);
