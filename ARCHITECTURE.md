@@ -21848,6 +21848,61 @@ nagłówku tapnij różdżkę 🪄 → powinno wyskoczyć potwierdzenie → potw
 wdrożone na żywo) → wybierz "Kopiuj aktualny ekran" → projekt roboczy powinien pokazać
 DOKŁADNIE to, co jest teraz na żywym ekranie, gotowe do edycji.
 
+## 410. Fix: mapa kampanii — Y nadpisań mogło łamać gwarancję braku samoprzecięć (2026-10-21)
+
+User, po PIERWSZYM potwierdzonym-aktualnym teście (nazwy bossów z §403 widoczne na zrzucie —
+więc to NIE był stary cache): "mapa kampanii nadal wygląda jak rozjechane gówno" + zrzut
+pokazujący węzły Vulpes Solaris/Draculus Caelestis WYRAŹNIE oddalone od niebieskiej linii
+ścieżki. Poprzednie dwie próby (§379, §403 — oba `key={d}` na `<Path>`, teoria "natywny
+re-render SVG-propu") były diagnozą BEZ dostępu do urządzenia i BEZ realnego dowodu — ten
+zrzut to pierwszy, dał coś konkretnego do analizy zamiast zgadywania.
+
+**Root cause, w końcu znaleziony.** `layoutBossMap`/`catmullRomPath` (§321-322) matematycznie
+gwarantują brak samoprzecięć TYLKO pod warunkiem, że Y ŚCIŚLE rośnie z indeksem (udokumentowane
+na górze `bossMapLayout.ts`, przetestowane dla bazowego układu w `bossMapLayout.test.ts`).
+`applyLayoutOverrides` (ręcznie przeciągnięte pozycje z `boss-map-editor.tsx`) przyjmowała
+nadpisane Y 1:1, BEZ sprawdzenia tej własności względem sąsiadów. `boss-map-editor.tsx`'s
+`onPanResponderMove` też jej nie pilnuje — jedyne ograniczenie to `Math.max(20, ...)` od GÓRY
+PŁÓTNA, nie względem sąsiednich węzłów. Skutek: user mógł (przeciągając palcem, przez cały
+czas trwania tej sesji intensywnego testowania edytora) przesunąć bossa na wysokość LUB NAD
+sąsiada — Catmull-Rom (`catmullRomPath`) wciąż PRZECHODZI dokładnie przez każdy punkt (to jego
+definiująca własność), ale żeby trafić w punkty w złej kolejności, krzywa między nimi
+"zawraca"/robi pętlę — DOKŁADNIE objaw ze zrzutu: każdy węzeł stoi poprawnie na swojej (zapisanej)
+pozycji, ale linia między nimi wygląda rozjechana.
+
+**Fix**: `applyLayoutOverrides` teraz CASCADE-klamruje Y w kolejności indeksu — każdy węzeł
+(nadpisany czy nie) dostaje `Math.max(jego_y, poprzedni_Y + MIN_Y_GAP)` (`MIN_Y_GAP=20`, ten
+sam floor co już używany w geście przeciągania). Dla układu BEZ ręcznych nadpisań to zawsze
+no-op (bazowy `ROW_GAP=170` >> `20`, warunek nigdy aktywny — zero zmiany dla nikogo, kto nie
+edytował mapy ręcznie). Dla nadpisań łamiących kolejność — KAŻDY kolejny węzeł "dogania"
+przesuniętego poprzednika automatycznie, gwarancja przetrwa DOWOLNĄ kombinację ręcznych
+pozycji, bez potrzeby ręcznego resetu w edytorze (choć "Zresetuj układ mapy" w nagłówku
+`boss-map-editor.tsx` dalej działa jako szybka, natychmiastowa opcja, gdyby user wolał zacząć
+od zera zamiast polegać na auto-korekcie).
+
+**Testy**: 3 nowe w `bossMapLayout.test.ts` — override "wyprzedzający" kolejny węzeł przesuwa
+go w dół o dokładnie `MIN_Y_GAP` (nie więcej niż trzeba); fuzz-test z celowo chaotycznymi/
+odwróconymi nadpisaniami potwierdza ścisły wzrost Y na całej sekwencji; brak nadpisań = no-op.
+Jeden istniejący test zaktualizowany (jego fixture `y:456` przypadkiem przekraczał kolejny
+węzeł, więc sam demonstrował buga — zmienione na wartość nie wyzwalającą kaskady, żeby test
+dalej sprawdzał to co deklaruje: izolację nadpisania gdy kolejność NIE jest łamana). `tsc
+--noEmit` czyste, `jest --silent` 115/115 suite, 1504/1504 testów.
+
+**Nie w pełni zweryfikowane pozostałe dwa punkty z tej samej wiadomości usera**:
+1. "Edytor hukowy... bez danych" — to §409 (nawigacja, zmergowane) + kolejka: kompletny
+   rejestr danych/okienka niezasłaniające/wykresy, priorytety w NEXT_STEPS.md. Ten PR NIE
+   dotyka tego punktu — rozwijany po kolei jak ustalono.
+2. "Dodatkowo pojawiają się anomalie błędy innych elementów" — ZA MAŁO konkretów żeby
+   cokolwiek naprawić (brak zrzutu/opisu KTÓRY element) — user poproszony o screeny/nazwy
+   ekranów w czacie, nie tutaj.
+
+**Priorytet testu na urządzeniu — WYSOKI**: w zakładce Bossy → Kampania, przewiń mapę w dół
+na pełnej długości → sprawdź czy KAŻDY węzeł (pokonany/aktualny/zablokowany) leży DOKŁADNIE
+na niebieskiej/czarnej linii ścieżki, bez wyjątku. Jeśli NADAL gdzieś widać rozjazd — to
+oznacza że root cause jest INNY niż Y-override (może dotyczyć samego `boss-map-editor.tsx`'s
+`PanResponder`/`responders.current` ref-owej logiki, albo czegoś w natywnym SVG-renderze,
+mimo matematycznie poprawnych danych) — zgłoś to z dokładnym zrzutem KTÓREGO konkretnie bossa.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
