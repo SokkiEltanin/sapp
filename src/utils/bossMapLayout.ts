@@ -73,13 +73,42 @@ export function layoutBossMap(count: number, areaWidth: number = 340): MapLayout
 // `x` jest przycinane do `[0, areaWidth]` (obrona przed pozycją zapisaną na innym rozmiarze
 // ekranu niż ten na którym mapa jest teraz oglądana) — `y` nie jest ograniczane, bo płótno i
 // tak rośnie w pionie żeby pomieścić najniżej przeciągnięty węzeł.
+// Minimalny odstęp Y wymuszany MIĘDZY SĄSIADAMI niżej — TEN SAM floor co `Math.max(20, ...)`
+// już używany jako dolne ograniczenie Y w geście przeciągania (`boss-map-editor.tsx`'s
+// `onPanResponderMove`), więc nie wprowadza nowej, niespójnej stałej.
+const MIN_Y_GAP = 20;
+
 export function applyLayoutOverrides(
   base: MapNode[], ids: string[], overrides: Record<string, MapNode>, areaWidth: number,
 ): MapLayout {
+  // Gwarancja "Y ściśle rośnie z indeksem" (komentarz na górze pliku, test w
+  // bossMapLayout.test.ts) dotyczyła DOTĄD tylko `layoutBossMap`'a bazowego, proceduralnego
+  // układu — `applyLayoutOverrides` przyjmowała ręczną pozycję 1:1, BEZ sprawdzenia czy nowe Y
+  // wciąż jest większe niż poprzedniego węzła. `boss-map-editor.tsx`'s gest przeciągania też
+  // tego nie pilnuje (jedyne ograniczenie to `Math.max(20, ...)` od GÓRY PŁÓTNA, nie względem
+  // SĄSIADÓW) — więc user mógł (celowo albo przez przypadek, przeciągając palcem) przesunąć
+  // bossa NAD albo na wysokość sąsiada, łamiąc własność, na której cała reszta systemu się
+  // opiera. Skutek: Catmull-Rom (`catmullRomPath` niżej) PRZECHODZI dokładnie przez każdy
+  // punkt (to jego definiująca własność — węzły i ścieżka NIGDY nie mogą się "rozjechać" przy
+  // poprawnych danych), ale gdy kolejność Y jest złamana, krzywa między punktami "zawraca"/
+  // robi pętlę, żeby trafić w kolejny punkt w złej kolejności — wizualnie wygląda dokładnie
+  // jak zgłoszone "mapa rozjechana, bossy daleko od ścieżki", mimo że KAŻDY węzeł z osobna
+  // stoi na swojej (jawnie zapisanej) pozycji.
+  //
+  // Fix: po zastosowaniu nadpisań (lub ich braku — procedura), Y jest CASCADE-klamrowane do
+  // co najmniej `poprzedni_Y + MIN_Y_GAP`, w kolejności indeksu. Dla układu BEZ żadnych
+  // nadpisań to zawsze no-op (bazowy ROW_GAP=170 >> MIN_Y_GAP=20, warunek nigdy aktywny) —
+  // zero zmiany dla nikogo kto nie edytował mapy ręcznie. Dla nadpisań, które łamały
+  // kolejność — KAŻDY kolejny węzeł (nadpisany czy nie) "dogania" przesuniętego poprzednika,
+  // więc gwarancja przetrwa DOWOLNĄ kombinację ręcznych pozycji, bez potrzeby resetowania
+  // układu w edytorze.
+  let prevY = -Infinity;
   const nodes = base.map((n, i) => {
     const o = overrides[ids[i]];
-    if (!o) return n;
-    return { x: Math.max(0, Math.min(areaWidth, o.x)), y: Math.max(0, o.y) };
+    const raw = o ? { x: Math.max(0, Math.min(areaWidth, o.x)), y: Math.max(0, o.y) } : n;
+    const y = Math.max(raw.y, prevY + MIN_Y_GAP);
+    prevY = y;
+    return { x: raw.x, y };
   });
   const maxY = nodes.reduce((m, n) => Math.max(m, n.y), 0);
   return { nodes, width: areaWidth, height: maxY + PAD_Y };

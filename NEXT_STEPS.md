@@ -28,6 +28,28 @@ jest w kodzie, nie w pobieraniu, i trzeba szukać od nowa (zacząć od czegoś w
 ścieżce startu: `app/_layout.tsx`, dashboard `index.tsx` — oba montują się na KAŻDYM
 starcie, nie tylko gdy user wejdzie na konkretny ekran).
 
+## ✅🆕 Fix: mapa kampanii — Y nadpisań mogło łamać gwarancję braku samoprzecięć (§410)
+
+User, po PIERWSZYM potwierdzonym-aktualnym teście (nazwy bossów z §403 widoczne na zrzucie,
+więc na pewno nie stary cache): "mapa kampani nadal wygląda jak rozjebane gówno" + zrzut z
+węzłami WYRAŹNIE oddalonymi od ścieżki. Root cause w końcu znaleziony (nie zgadywanie):
+`boss-map-editor.tsx`'s gest przeciągania NIE ogranicza Y węzła względem SĄSIADÓW (tylko floor
+20 od góry płótna) — user mógł przez przypadek złamać "Y ściśle rośnie z indeksem", na której
+opiera się CAŁA matematyczna gwarancja braku samoprzecięć trasy. `applyLayoutOverrides`
+(`bossMapLayout.ts`) teraz CASCADE-klamruje Y w kolejności indeksu — gwarancja przetrwa
+DOWOLNĄ kombinację ręcznych pozycji, zero zmiany dla map bez ręcznych nadpisań. 3 nowe testy.
+Checklist w ARCHITECTURE.md §410.
+
+**ZASTĘPUJE poprzednią diagnozę z §403** ("natywny re-render SVG-propu `<Path>`", `key={d}`
+fix) — ta teoria była BEZ dowodu z urządzenia i okazała się niewystarczająca (user potwierdził
+że problem WRACA mimo tamtego fixa, na potwierdzonym aktualnym buildzie). `key={d}` zostaje w
+kodzie (nieszkodliwy, tani) ale NIE jest już uznawany za fix tego problemu.
+
+**Priorytet testu na urządzeniu — WYSOKI**: zakładka Bossy → Kampania → przewiń całą mapę →
+KAŻDY węzeł powinien leżeć DOKŁADNIE na linii ścieżki. Jeśli NADAL rozjazd gdzieś widoczny —
+to oznacza inny root cause (może `PanResponder`/natywny SVG mimo poprawnych danych) — zgłoś z
+dokładnym zrzutem KTÓREGO bossa.
+
 ## ✅🆕 Edytor: ujednolicony start projektu "Jak zaczynamy?" (§409)
 
 User: "ten edytor jest źle zrobiony" + konkretny przykład niespójności (DASHBOARD pusty →
@@ -152,16 +174,10 @@ własne polskie zamiast nich. `bosses.ts`: `name`/`emoji` wszystkich 22 bossów 
 poprawione na realne nazwy z plików (reszta pól balansu nietknięta). ZROBIONE, nie wymaga
 testu na urządzeniu (czysta zmiana stringów).
 
-**Mapa kampanii** — domknięcie niepewności z §379 ("czy to wyjaśnia CAŁĄ różnicę, czy zostaje
-coś w pomiarze viewportu"). Diagnoza: węzły i ścieżka w `CampaignMap.tsx` biorą się z TEJ
-SAMEJ tablicy w TYM SAMYM renderze, więc rozjazd MUSI być bugiem natywnego renderu `<Path>`
-na Androidzie (SVG-prop "sklejony" po montażu), nie bugiem danych. Fix: `key={d}` na obu
-`<Path>` w `CampaignMap.tsx` + defensywnie w `boss-map-editor.tsx`, wymuszający remount przy
-zmianie geometrii. **NIE POTWIERDZONE NA URZĄDZENIU** (logicznie wymuszone z kodu, ale nie
-zaobserwowane bezpośrednio) — **priorytet WYSOKI**: otwórz mapę kampanii PO ZIMNYM STARCIE
-appki (żeby złapać moment hydratacji `bossMapLayoutStore`) i porównaj z edytorem. Jeśli bossy
-DALEJ są poza linią, to NIE jest ten sam bug — zgłoś to, będzie trzeba szukać realnej różnicy
-w zmierzonej szerokości viewportu między ekranami (ten fix tego nie adresuje).
+**Mapa kampanii** — ⚠️ **TA DIAGNOZA BYŁA BŁĘDNA/NIEWYSTARCZAJĄCA** — user potwierdził na
+potwierdzonym-aktualnym buildzie, że problem WRACA mimo `key={d}` fixa. Prawdziwy root cause
+(Y nadpisań łamiące kolejność sąsiadów) i realny fix → **§410 wyżej**. `key={d}` zostaje w
+kodzie jako nieszkodliwy dodatek, ale nie jest już traktowany jako naprawa tego problemu.
 
 ## ✅🆕 Gradient na tekście + przezroczystość tła Countdown/Notatki/Ikony (§402) — blur ŚWIADOMIE NIE zrobiony
 

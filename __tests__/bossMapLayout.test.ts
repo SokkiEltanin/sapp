@@ -86,13 +86,53 @@ describe('bossMapLayout — applyLayoutOverrides (edytor mapy, §322)', () => {
     expect(out.nodes).toEqual(base.nodes);
   });
 
-  test('nadpisanie konkretnego id zmienia TYLKO ten węzeł', () => {
+  test('nadpisanie konkretnego id zmienia TYLKO ten węzeł (gdy nie łamie kolejności Y sąsiadów)', () => {
     const base = layoutBossMap(3, 300);
     const ids = ['a', 'b', 'c'];
-    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 123, y: 456 } }, 300);
+    // y:200 celowo MIESZCZĄ SIĘ między sąsiadami (base: 100/270/440) — nie wyzwala kaskady
+    // niżej, więc test faktycznie sprawdza izolację, nie przypadkiem jej łamie.
+    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 123, y: 200 } }, 300);
     expect(out.nodes[0]).toEqual(base.nodes[0]);
-    expect(out.nodes[1]).toEqual({ x: 123, y: 456 });
+    expect(out.nodes[1]).toEqual({ x: 123, y: 200 });
     expect(out.nodes[2]).toEqual(base.nodes[2]);
+  });
+
+  // §410, 2026-10-21 — user zrzutem: mapa kampanii WCIĄŻ wyglądała rozjechana na POTWIERDZONYM
+  // aktualnym buildzie (nazwy bossów się zgadzały z §403). Root cause: `boss-map-editor.tsx`'s
+  // gest przeciągania nie ogranicza Y węzła względem SĄSIADÓW (tylko floor 20 od góry płótna),
+  // więc ręcznie ustawiona pozycja mogła złamać założenie "Y ściśle rośnie z indeksem", na
+  // którym opiera się CAŁA gwarancja braku samoprzecięć trasy (patrz test w `layoutBossMap`
+  // wyżej) — Catmull-Rom wtedy rysuje krzywą, która "zawraca", żeby trafić w punkty w złej
+  // kolejności, mimo że KAŻDY węzeł stoi dokładnie tam, gdzie go zapisano.
+  test('nadpisanie Y, które "wyprzedza" kolejny węzeł, przesuwa go w dół zamiast łamać kolejność', () => {
+    const base = layoutBossMap(3, 300); // y bazowe: 100, 270, 440
+    const ids = ['a', 'b', 'c'];
+    // 'b' nadpisane na y=500 — WIĘKSZE niż bazowe y węzła 'c' (440). Bez fixa: 'c' zostałby
+    // na 440, czyli NAD 'b' — złamana kolejność, samoprzecinająca się krzywa.
+    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 10, y: 500 } }, 300);
+    expect(out.nodes[1].y).toBe(500);
+    expect(out.nodes[2].y).toBeGreaterThan(out.nodes[1].y); // 'c' DOGANIA, nie zostaje w tyle
+    expect(out.nodes[2].y).toBe(500 + 20); // dokładnie o MIN_Y_GAP niżej, nie więcej niż trzeba
+  });
+
+  test('Y ściśle rośnie z indeksem NAWET z dowolną kombinacją ręcznych nadpisań (gwarancja przetrwa override)', () => {
+    const base = layoutBossMap(10, 300);
+    const ids = base.nodes.map((_, i) => `b${i}`);
+    // Celowo chaotyczne/odwrócone Y — dokładnie to, co user mógł zrobić ręcznie przeciągając.
+    const overrides: Record<string, { x: number; y: number }> = {
+      b2: { x: 50, y: 50 }, b3: { x: 50, y: 40 }, b7: { x: 50, y: 9999 }, b8: { x: 50, y: 10 },
+    };
+    const out = applyLayoutOverrides(base.nodes, ids, overrides, 300);
+    for (let i = 1; i < out.nodes.length; i++) {
+      expect(out.nodes[i].y).toBeGreaterThan(out.nodes[i - 1].y);
+    }
+  });
+
+  test('bez nadpisań — no-op (bazowy ROW_GAP już spełnia warunek, zero zmiany)', () => {
+    const base = layoutBossMap(22, 340);
+    const ids = base.nodes.map((_, i) => `b${i}`);
+    const out = applyLayoutOverrides(base.nodes, ids, {}, 340);
+    expect(out.nodes).toEqual(base.nodes);
   });
 
   test('nadpisane x przycinane do [0, areaWidth] — pozycja z innego rozmiaru ekranu nie wyjeżdża poza płótno', () => {
