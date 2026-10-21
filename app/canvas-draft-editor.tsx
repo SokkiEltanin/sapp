@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Pencil, Eye, Rocket, RotateCcw } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Eye, Rocket, RotateCcw, Wand2 } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ScreenCanvas from '@/components/canvas/ScreenCanvas';
+import CanvasStartChooserModal from '@/components/canvas/CanvasStartChooserModal';
 import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { PROJECT_SCREENS } from '@/data/canvasProjectScreens';
 import { useColors } from '@/theme/useColors';
@@ -44,7 +45,11 @@ export default function CanvasDraftEditorScreen() {
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
   const deployDraft = useCanvasComponentsStore(st => st.deployDraft);
   const restoreBackup = useCanvasComponentsStore(st => st.restoreBackup);
+  const clearDraft = useCanvasComponentsStore(st => st.clearDraft);
+  const startDraftFromLive = useCanvasComponentsStore(st => st.startDraftFromLive);
+  const applyTemplate = useCanvasComponentsStore(st => st.applyTemplate);
   const draftCount = items.filter(i => i.screenKey === draftKey).length;
+  const hasLiveContent = items.some(i => i.screenKey === target);
   // Przycisk "na wszelki wypadek" (§407, user: "na wszelki przycisk restart dashboardu
   // samego graficznego jak przez przypadek wdrożę coś czego nie chciałem") — widoczny TYLKO
   // gdy backup realnie istnieje (user wdrożył już COŚ przynajmniej raz dla tego ekranu),
@@ -53,6 +58,17 @@ export default function CanvasDraftEditorScreen() {
   const [mode, setMode] = useState<'edit' | 'simulate'>('edit');
   const [confirmDeploy, setConfirmDeploy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  // "Zacznij od nowa" (§409, 2026-10-21) — user: "edytor nadal nie ma wszystkich opcji" +
+  // opisany brak sposobu zrestartować NIEPUSTY projekt roboczy bez ręcznego usuwania każdego
+  // itemu. Dostępne ZAWSZE (nie tylko gdy `draftCount === 0`, w przeciwieństwie do
+  // `EditorProjectsList`'a automatycznego pytania przy tworzeniu) — bo user może dojść do
+  // zera itemów PODCZAS edycji (usunął wszystko ręcznie) i wtedy też chce świadomie wybrać
+  // punkt startowy, nie trafiać na niego przez przypadek. Niepusty draft → potwierdzenie
+  // NAJPIERW (czyści TYLKO draft, żywy ekran/backup nietknięte, ale progres w edytorze
+  // przepada) → potem ten sam `CanvasStartChooserModal` co w Ustawieniach.
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [startChooserOpen, setStartChooserOpen] = useState(false);
+  const openStartChooser = () => { haptic.tap(); if (draftCount > 0) setConfirmRestart(true); else setStartChooserOpen(true); };
 
   const enterEdit = () => { haptic.tap(); setPendingAutoEdit(draftKey); setMode('edit'); };
   const enterSimulate = () => { haptic.tap(); setMode('simulate'); };
@@ -66,13 +82,16 @@ export default function CanvasDraftEditorScreen() {
           <ChevronLeft size={22} color={c.text.primary} />
         </PressableScale>
         <Text style={s.headerTitle} numberOfLines={1}>{screen?.label ?? target}</Text>
-        {hasBackup ? (
-          <PressableScale onPress={() => { haptic.tap(); setConfirmRestore(true); }} style={s.backBtn}>
-            <RotateCcw size={18} color={c.text.secondary} />
+        <View style={{ flexDirection: 'row' }}>
+          <PressableScale onPress={openStartChooser} style={s.backBtn}>
+            <Wand2 size={18} color={c.text.secondary} />
           </PressableScale>
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
+          {hasBackup && (
+            <PressableScale onPress={() => { haptic.tap(); setConfirmRestore(true); }} style={s.backBtn}>
+              <RotateCcw size={18} color={c.text.secondary} />
+            </PressableScale>
+          )}
+        </View>
       </View>
 
       <View style={s.modeRow}>
@@ -133,6 +152,25 @@ export default function CanvasDraftEditorScreen() {
           toast.success(ok ? 'Przywrócono poprzednią wersję' : 'Nie było czego przywracać');
         }}
         onCancel={() => setConfirmRestore(false)}
+      />
+
+      <ConfirmDialog
+        visible={confirmRestart}
+        title="Zacznij od nowa?"
+        message="To wyczyści Twój obecny projekt roboczy w edytorze. To, co jest już WDROŻONE na żywym ekranie (i jego kopia zapasowa), zostaje bez zmian — tę decyzję można zawsze odwrócić przyciskiem przywracania w nagłówku."
+        confirmLabel="Wyczyść i wybierz start"
+        destructive
+        onConfirm={() => { clearDraft(target); setConfirmRestart(false); setStartChooserOpen(true); }}
+        onCancel={() => setConfirmRestart(false)}
+      />
+
+      <CanvasStartChooserModal
+        visible={startChooserOpen}
+        hasLiveContent={hasLiveContent}
+        onClose={() => setStartChooserOpen(false)}
+        onPickLive={() => { haptic.success(); startDraftFromLive(target); setStartChooserOpen(false); enterEdit(); }}
+        onPickTemplate={(templateId) => { haptic.success(); applyTemplate(draftKey, templateId); setStartChooserOpen(false); enterEdit(); }}
+        onPickEmpty={() => { setStartChooserOpen(false); enterEdit(); }}
       />
     </SafeAreaView>
   );

@@ -5,7 +5,7 @@ import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { computePayMonths } from '@/utils/workSummary';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share, BackHandler, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share, BackHandler, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -74,8 +74,8 @@ import { getOwnName, setOwnName } from '@/utils/ownName';
 import { workService } from '@/services/workService';
 import { SettingsSectionDef } from '@/types/settings';
 import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import { CANVAS_TEMPLATES } from '@/data/canvasTemplates';
 import { PROJECT_SCREENS } from '@/data/canvasProjectScreens';
+import CanvasStartChooserModal from '@/components/canvas/CanvasStartChooserModal';
 import SettingsSectionView from '@/components/settings/SettingsSectionView';
 import SettingsRow from '@/components/settings/SettingsRow';
 import { filterSections } from '@/utils/settingsSearch';
@@ -173,13 +173,15 @@ function EditorProjectsList() {
   const items = useCanvasComponentsStore(st => st.items);
   const setPendingAutoEdit = useCanvasComponentsStore(st => st.setPendingAutoEdit);
   const applyTemplate = useCanvasComponentsStore(st => st.applyTemplate);
+  const startDraftFromLive = useCanvasComponentsStore(st => st.startDraftFromLive);
   const fullScreenScreens = useCanvasComponentsStore(st => st.fullScreenScreens);
   const setFullScreen = useCanvasComponentsStore(st => st.setFullScreen);
-  // Nowy projekt — Szablon vs Pusty canvas (Faza §395, 2026-10-19) — user: "dodaj... szablony".
-  // Pytanie tylko dla PUSTYCH projektów (0 itemów w draft/navbar — patrz `isDraftable` niżej) —
-  // jeśli projekt roboczy już ma coś zbudowane, pytanie "szablon czy pusty" nie ma sensu (to
-  // już NIE jest "tworzenie", tylko kontynuacja edycji), więc tapnięcie idzie wprost do
-  // edytora jak dotąd.
+  // Nowy projekt — "Jak zaczynamy?" (Faza §395, rozszerzone §409) — pytanie tylko dla PUSTYCH
+  // projektów (0 itemów w draft/navbar — patrz `isDraftable` niżej): jeśli projekt roboczy już
+  // ma coś zbudowane, to NIE jest "tworzenie", tylko kontynuacja edycji, więc tapnięcie idzie
+  // wprost do edytora jak dotąd. Dla NIEPUSTEGO draftu, który user chce zacząć od nowa, patrz
+  // "Zacznij od nowa" w `canvas-draft-editor.tsx` (ten sam `CanvasStartChooserModal`, za
+  // potwierdzeniem — stąd go nie trzeba, bo tu nic jeszcze nie ma do stracenia).
   const [newProjectFor, setNewProjectFor] = useState<string | null>(null);
   // Pełny ekran — przeniesione TUTAJ z żywych ekranów (Faza §396, 2026-10-19) — user: "wywal
   // tamto było hujowe chcę mieć wszystko w ustawieniach". Ten sam `fullScreenScreens`/
@@ -260,55 +262,39 @@ masz dziś zbudowane tu i na innych ekranach nie zostanie usunięte."
         onCancel={() => setConfirmFullScreenFor(null)}
       />
 
-      <Modal visible={!!newProjectFor} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNewProjectFor(null)}>
-        <Pressable style={ds.overlay} onPress={() => setNewProjectFor(null)}>
-          <Pressable style={[ds.card, { backgroundColor: c.bg.secondary, borderColor: c.border.default }]} onPress={() => {}}>
-            <View style={ds.head}>
-              <LucideIcons.Sparkles size={16} color={c.accent.blue} />
-              <Text style={[ds.title, { color: c.text.primary }]}>Nowy projekt</Text>
-              <TouchableOpacity onPress={() => setNewProjectFor(null)} hitSlop={10}><LucideIcons.X size={18} color={c.text.muted} /></TouchableOpacity>
-            </View>
-            <Text style={[ds.hint, { color: c.text.muted }]}>Zacznij od szablonu albo od pustego płótna — zawsze możesz dalej wszystko przestawić.</Text>
-            {CANVAS_TEMPLATES.map(t => (
-              <TouchableOpacity key={t.id} onPress={() => {
-                if (!newProjectFor) return;
-                const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
-                if (!p) return;
-                haptic.success();
-                applyTemplate(isDraftable(p.key) ? `draft:${p.key}` : p.key, t.id);
-                setNewProjectFor(null);
-                goEdit(p);
-              }} style={[ds.row, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
-                <Text style={[ds.rowLabel, { color: c.text.primary }]}>{t.label}</Text>
-                <Text style={[ds.rowSub, { color: c.text.muted }]}>{t.description}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => {
-              if (!newProjectFor) return;
-              const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
-              if (!p) return;
-              setNewProjectFor(null);
-              goEdit(p);
-            }} style={[ds.row, { backgroundColor: 'transparent', borderColor: c.border.default, alignItems: 'center' }]}>
-              <Text style={[ds.rowLabel, { color: c.text.secondary }]}>Pusty canvas</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <CanvasStartChooserModal
+        visible={!!newProjectFor}
+        hasLiveContent={!!newProjectFor && items.some(i => i.screenKey === newProjectFor)}
+        onClose={() => setNewProjectFor(null)}
+        onPickLive={() => {
+          if (!newProjectFor) return;
+          const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
+          if (!p) return;
+          haptic.success();
+          startDraftFromLive(p.key); // isDraftable(p.key) zawsze true tutaj — navbar ma count=0 niedosiężny (patrz goEdit)
+          setNewProjectFor(null);
+          goEdit(p);
+        }}
+        onPickTemplate={(templateId) => {
+          if (!newProjectFor) return;
+          const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
+          if (!p) return;
+          haptic.success();
+          applyTemplate(isDraftable(p.key) ? `draft:${p.key}` : p.key, templateId);
+          setNewProjectFor(null);
+          goEdit(p);
+        }}
+        onPickEmpty={() => {
+          if (!newProjectFor) return;
+          const p = PROJECT_SCREENS.find(x => x.key === newProjectFor);
+          if (!p) return;
+          setNewProjectFor(null);
+          goEdit(p);
+        }}
+      />
     </View>
   );
 }
-
-const ds = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[5], paddingVertical: spacing[6] },
-  card: { width: '100%', maxWidth: 420, borderRadius: radius.xl, borderWidth: 1, padding: spacing[4], gap: spacing[2] },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { flex: 1, fontSize: 15, fontWeight: '800' },
-  hint: { fontSize: 12, lineHeight: 16, marginBottom: spacing[1] },
-  row: { borderRadius: radius.lg, borderWidth: 1, padding: spacing[3], gap: 2 },
-  rowLabel: { fontSize: 13.5, fontWeight: '700' },
-  rowSub: { fontSize: 11, lineHeight: 15 },
-});
 
 // Paleta koloru tła widgetu "Zadania" (2026-09-25, user: "koloru w razie czego") — domyślny
 // ciemny (dawny sztywny kolor widget_bg.xml) + ta sama paleta akcentów co swatche gdzie

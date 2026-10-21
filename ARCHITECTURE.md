@@ -21784,6 +21784,70 @@ szukać dalej (zgłoś to). Dodaj kształt "Tekst" na dowolnym ekranie → tapni
 kafel powinien pokazać ŻYWĄ wartość, zachowując własny font/kolor/gradient. 🎨 styl → pole
 "Treść" powinno być zablokowane z notatką "podpięte — pokazuje: X".
 
+## 409. Edytor: ujednolicony "Jak zaczynamy?" start projektu (2026-10-21)
+
+User, po dniu z crashem OTA (appka wymagała pełnego resetu danych, patrz incydent
+udokumentowany w czacie, nie tu — nie dotyczy kodu): "ten edytor jest źle zrobiony", opisał
+KONKRETNĄ niespójność, którą sam zaobserwował: dla DASHBOARD (draft pusty) tapnięcie w
+Ustawieniach pokazało wybór "edycja aktualnego/pusty", ale dla ZDROWIE (draft miał już coś
+od wcześniej) tapnięcie wsadziło go PROSTO w edytor, bez żadnego wyboru — brak jakiegokolwiek
+sposobu świadomie zrestartować/zmienić punkt startowy NIEPUSTEGO projektu roboczego bez
+ręcznego usuwania każdego itemu. Zgłosił to jako część szerszej listy (nawigacja edytora /
+okienka zasłaniające płótno / kompletny rejestr danych / wykresy dla dowolnej danej) —
+po `AskUserQuestion` (nie odpowiedział wprost, tylko: "zrób po kolei jak uważasz") ta sesja
+bierze **nawigację** jako pierwszy, najwęższy kawałek — reszta we `NEXT_STEPS.md`.
+
+**Fix — jeden, współdzielony "Jak zaczynamy?" chooser, dostępny z DWÓCH miejsc.**
+`src/components/canvas/CanvasStartChooserModal.tsx` (nowy, wydzielony z dotychczasowego
+ad-hoc modala w `EditorProjectsList`) — trzy opcje zamiast dwóch:
+- **Kopiuj aktualny ekran** (NOWA opcja, odpowiedź na "aktualną zakładkę do edycji" z opisu
+  usera) — `startDraftFromLive(target)` w `canvasComponentsStore.ts`, kopiuje `<target>` →
+  `draft:<target>` z NOWYMI id (ten sam trik co `deployDraft`/`restoreBackup`). Chowana
+  (`hasLiveContent=false`) gdy żywy ekran jest sam pusty — CLAUDE.md #7, nie zostawiaj opcji
+  która skopiowałaby zero itemów.
+- **Szablon** (bez zmian, `CANVAS_TEMPLATES`/`applyTemplate`).
+- **Pusty canvas** (bez zmian).
+
+Wywoływany z:
+1. `EditorProjectsList` (Ustawienia) — jak dotąd, TYLKO gdy draft jest pusty (count===0),
+   bez potwierdzenia (nic do stracenia).
+2. **NOWY** przycisk `Wand2` w nagłówku `canvas-draft-editor.tsx` — DOSTĘPNY ZAWSZE, nie
+   tylko gdy draft jest pusty. To naprawia dokładnie zgłoszoną niespójność: user może teraz
+   świadomie zrestartować projekt roboczy w KAŻDYM momencie, z KAŻDEGO ekranu, niezależnie od
+   tego ile już w nim jest. Niepusty draft → `ConfirmDialog` najpierw ("Zacznij od nowa?",
+   jasno mówi że żywy ekran/backup NIE są ruszane, tylko projekt roboczy w edytorze) → po
+   potwierdzeniu `clearDraft(target)` (nowa akcja store'u, czyści WYŁĄCZNIE `draft:<target>`)
+   → chooser. Pusty draft → chooser bez potwierdzenia.
+
+`clearDraft`/`startDraftFromLive` w `canvasComponentsStore.ts` — symetryczne z
+`deployDraft`/`restoreBackup` (ten sam namespacing-trik `draft:`/`backup:`, zero zmian w
+`CanvasItem`). `applyTemplate` zostaje bez zmian (dalej DOKLEJA, nie czyści) — wołający
+(chooser) czyści draft PRZED wywołaniem, gdy trzeba, więc kontrakt funkcji nie się zmienia
+dla żadnego istniejącego miejsca wywołania.
+
+`app/settings.tsx`: usunięty martwy, zduplikowany modal (`ds` stylesheet + ręczny
+`CANVAS_TEMPLATES.map`) na rzecz wspólnego komponentu — stary import `Modal`/`CANVAS_TEMPLATES`
+usunięte jako nieużywane.
+
+**Świadomie odłożone na kolejne fazy** (reszta listy usera, priorytety wg jego własnej
+odpowiedzi "po kolei"): okienka stylu/właściwości zasłaniające płótno (docelowo dolny panel
+jak Canva/Instagram, płótno widoczne nad nim), kompletny rejestr KAŻDEJ danej z apki (dziś
+rejestr ma ~15 pól + dynamiczne per-ćwiczenie, nie "wszystko"), wykresy dla dowolnej
+podpiętej danej (dziś wykres = tylko `statTile`/`WIDGET_METRICS`, nie uniwersalny). Patrz
+NEXT_STEPS.md.
+
+**Testy**: brak nowych dedykowanych — czysto UI-wiring + dwie proste, analogiczne do
+istniejących funkcje store'u. `tsc --noEmit` czyste, `jest --silent` 115/115 suite, 1501/1501
+testów (bez zmiany liczby).
+
+**Priorytet testu na urządzeniu — WYSOKI** (po ostatnim incydencie — zweryfikuj NAJPIERW, że
+appka się w ogóle uruchamia po tej aktualizacji, zanim przejdziesz do samego edytora): w
+Ustawieniach → Edytor płótna → Projekty, wybierz EKRAN Z JUŻ ISTNIEJĄCYM draftem → w
+nagłówku tapnij różdżkę 🪄 → powinno wyskoczyć potwierdzenie → potwierdź → powinien wyskoczyć
+"Jak zaczynamy?" z TRZEMA opcjami (łącznie z "Kopiuj aktualny ekran", jeśli ten ekran ma coś
+wdrożone na żywo) → wybierz "Kopiuj aktualny ekran" → projekt roboczy powinien pokazać
+DOKŁADNIE to, co jest teraz na żywym ekranie, gotowe do edycji.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
