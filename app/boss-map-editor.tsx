@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, PanResponder, PanResponderInstance, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path, Rect, Pattern, Circle, Defs } from 'react-native-svg';
@@ -10,7 +10,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Stepper from '@/components/ui/Stepper';
 import { BOSSES } from '@/utils/bosses';
-import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY, MapNode } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLaneOverrides, catmullRomPath, centerScrollY, xToLane, LANES, MapNode } from '@/utils/bossMapLayout';
 import { baseBossId } from '@/utils/madBosses';
 import { useBossMapLayoutStore } from '@/store/bossMapLayoutStore';
 import { useCampaignMapStyleStore } from '@/store/campaignMapStyleStore';
@@ -24,83 +24,55 @@ import { toast } from '@/store/toastStore';
 const BASE_NODE = 60;
 const GRID = 56;
 
-// Edytor mapy bossów (2026-10-14, ARCHITECTURE.md §322) — user po pięciu rundach prób na
-// proceduralnie generowanej mapie: "Moze zrobisz edytor ja sam ustawie wszystko mapę ścieżkę
-// i wgle (w sensie porozmieszczam punkty a ścieżkę polaczy soe sama z jakas tam modyfikacja
-// smooth". Najpierw zrobiony jako Artifact (web, poza appką) — user: "Ale to w apce xddd" —
-// więc TU, w samym Sapp. Każdy boss to osobny, przeciągalny węzeł (`PanResponder`, NIE
-// `Gesture.Pan` na całym płótnie — to świadomie inna, dużo prostsza klasa gestu niż ta która
-// psuła się w CampaignMap.tsx: pojedynczy, mały, niezależny obiekt przeciągany w swoich
-// własnych, lokalnych współrzędnych, bez KAMERY/transformu/klamrowania granic całego płótna
-// do pomylenia). Pozycja zapisuje się do `bossMapLayoutStore` DOPIERO przy puszczeniu palca
-// (nie na każdą klatkę przeciągania) — każdy inny węzeł re-renderowałby się niepotrzebnie
-// przy każdym pikselu ruchu, gdyby store aktualizował się w locie.
+// Edytor mapy bossów — PRZEBUDOWA OD ZERA #3 (2026-10-23, §412). Poprzednia wersja (od §322,
+// swobodny drag palcem po płótnie, `PanResponder` per węzeł) miała DWA nierozwiązane problemy:
+// (1) `ScrollView`-rodzic potrafił przejąć gest w trakcie ruchu mimo `onPanResponderTerminationRequest`
+// (user: "nic praktycznie nie mogę zrobić [w edytorze]"), (2) swobodny X/Y pozwalał ustawić
+// bossa w pozycji łamiącej "Y ściśle rośnie z indeksem", co było źródłem samoprzecinającej się
+// trasy na PRAWDZIWEJ mapie (§403/§410, user retestował §410 po OTA i dalej było źle — "musimy
+// ją chyba wywalić i zbudować od zera"). Nowy model usuwa OBA problemy naraz, strukturalnie:
+// Y nie jest tu już NIGDZIE edytowalne (zawsze `f(indeks)`, patrz `applyLaneOverrides` w
+// bossMapLayout.ts), a X to wybór jednego z `LANES` DYSKRETNYCH torów przez TAP na numerku/
+// węźle + Stepper w panelu niżej — żadnego gestu przeciągania, więc nie ma już z kim/czym
+// ScrollView mógłby "walczyć" o responder.
 export default function BossMapEditorScreen() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  // Style na żywo z Kreatora mapy bossów (2026-10-18, §379 — user zrzutem: "porównaj w
-  // edytorze i na normalnym ekranie kampanii, coś się dziwnie renderuje"). Edytor dotąd
-  // czytał ZASZYTE NA SZTYWNO stałe (`NODE=56`, `strokeWidth={5}`, siatka
-  // `rgba(255,255,255,0.08)`) zamiast `campaignMapStyleStore`'s `live` — dokładnie te same
-  // wartości, które `CampaignMap.tsx` (prawdziwa mapa) czyta i które user może zmienić w
-  // Ustawienia → Personalizacja → "Kreator mapy bossów". Rozjazd: domyślnie 56 vs 60 (węzeł),
-  // 5 vs 7 (grubość ścieżki) — i KAŻDA ręczna zmiana w Kreatorze (np. większe węzły) była
-  // niewidoczna w edytorze pozycji, mimo że obie mapy mają wyglądać identycznie.
+  // Style na żywo z Kreatora mapy bossów (2026-10-18, §379) — ten sam `campaignMapStyleStore`
+  // co `CampaignMap.tsx`, żeby podgląd w edytorze i realny render mapy się zgadzały.
   const mapStyle = useCampaignMapStyleStore(st => st.live);
   const NODE = mapStyle.nodeSize;
-  const overrides = useBossMapLayoutStore(st => st.positions);
-  const setPosition = useBossMapLayoutStore(st => st.setPosition);
-  const resetPosition = useBossMapLayoutStore(st => st.resetPosition);
+  const laneOverrides = useBossMapLayoutStore(st => st.lanes);
+  const setLane = useBossMapLayoutStore(st => st.setLane);
+  const resetLane = useBossMapLayoutStore(st => st.resetLane);
   const resetAll = useBossMapLayoutStore(st => st.resetAll);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [confirmReset, setConfirmReset] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  // Lista "skocz do bossa" (2026-10-17, user: "jak nie widac bosa i wystaje za ekran to jak
-  // mam go przeciągnąć" — przy 20+ bossach i ROW_GAP=170 płótno łatwo robi się dłuższe niż
-  // kilka ekranów, a edytor dotąd zawsze otwierał się na samej górze, bez ŻADNEGO sposobu
-  // dotrzeć do bossa poza bieżącym widokiem poza ręcznym przewijaniem na oślep). Ten sam
-  // `centerScrollY` co BUG #6 w `CampaignMap.tsx` (§343) — jedna definicja "jak wycentrować
-  // kamerę na węźle", teraz używana w DWÓCH miejscach zamiast tylko w prawdziwej mapie.
+  // Lista "skocz do bossa" (2026-10-17) — przy 20+ bossach płótno łatwo robi się dłuższe niż
+  // kilka ekranów; tapnięcie numeru centruje kamerę na TYM bosie, niezależnie jak daleko jest.
   const defeatedBosses = usePetStore(st => st.defeatedBosses);
   const currentIdx = useMemo(() => {
     const idx = BOSSES.findIndex(b => !defeatedBosses.includes(b.id));
     return idx === -1 ? BOSSES.length - 1 : idx;
   }, [defeatedBosses]);
-  // Pozycja PRZECIĄGANEGO węzła podczas gestu — lokalny stan, NIE store (patrz komentarz
-  // wyżej). `null` gdy nic nie jest aktualnie przeciągane.
-  const [dragPos, setDragPos] = useState<{ idx: number; x: number; y: number } | null>(null);
-  // Wybór bossa do edycji precyzyjnej (2026-10-18, §376) — user: "wybieram bosa i wybieram
-  // pozycję i mogę zresetować na środek ekranu... nie mam możliwości zobaczyć innych edycji"
-  // (porównanie do panelu właściwości X/Y + reset w systemie wolnego płótna z tej samej sesji,
-  // §359). Dotąd jedyny sposób zmiany pozycji to przeciąganie palcem (precyzyjne ustawienie
-  // "na pikselu" trudne) i jedyny reset to GLOBALNY `resetAll()` (wszyscy bossowie naraz) —
-  // `resetPosition(id)` w `bossMapLayoutStore.ts` istniał od Fazy edytora (§322), ale nigdy nie
-  // był podpięty do ŻADNEGO przycisku w UI. Tapnięcie chipu "skocz do bossa" ALBO złapanie
-  // węzła (start przeciągania) teraz RÓWNIEŻ wybiera bossa do panelu niżej.
+  // Wybór bossa do edycji (2026-10-18, §376, zachowane w §412) — tapnięcie węzła NA PŁÓTNIE
+  // albo numerka w górnym rzędzie wybiera bossa do panelu niżej, gdzie ustawia się jego tor.
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-  // `baseBossId` (2026-10-18, §379) — `bossMapLayoutStore`'s klucze są BAZOWE id (bez `mad_`
-  // prefiksu, patrz komentarz w store'u), dokładnie jak `CampaignMap.tsx` czyta je. Edytor
-  // dotąd czytał/pisał SUROWE `b.id` — dla kampanii (ta lista, bez `mad_` prefiksu) to i tak
-  // ten sam string (`baseBossId` to identity dla nieprzedrostkowanych id), więc nie gubiło
-  // zapisanych pozycji, ale było realną niespójnością konwencji vs `CampaignMap.tsx`.
+  // `baseBossId` — klucze `bossMapLayoutStore` są BAZOWE id (bez `mad_` prefiksu), dokładnie
+  // jak czyta je `CampaignMap.tsx` — kampania i MAD dzielą jeden fizyczny układ.
   const ids = useMemo(() => BOSSES.map(b => baseBossId(b.id)), []);
-  const { nodes: baseNodes, width: canvasW, height: canvasH } = useMemo(() => {
+  const { nodes, width: canvasW, height: canvasH } = useMemo(() => {
     const base = layoutBossMap(BOSSES.length, viewport.w || 340);
-    return applyLayoutOverrides(base.nodes, ids, overrides, base.width);
-  }, [ids, viewport.w, overrides]);
-  // Węzeł aktualnie przeciągany pokazuje się w `dragPos` (żywa pozycja gestu), reszta z
-  // `baseNodes` (ostatnio zapisane) — scalone w jedną tablicę do rysowania ścieżki na żywo.
-  const nodes: MapNode[] = useMemo(
-    () => (dragPos ? baseNodes.map((n, i) => (i === dragPos.idx ? { x: dragPos.x, y: dragPos.y } : n)) : baseNodes),
-    [baseNodes, dragPos],
-  );
+    return applyLaneOverrides(base.nodes, ids, laneOverrides, base.width);
+  }, [ids, viewport.w, laneOverrides]);
   const pathD = useMemo(() => catmullRomPath(nodes), [nodes]);
-  const initialTargetY = centerScrollY(baseNodes, currentIdx, viewport.h);
+  const initialTargetY = centerScrollY(nodes, currentIdx, viewport.h);
   const jumpTo = (idx: number) => {
     haptic.tap();
     setSelectedIdx(idx);
-    scrollRef.current?.scrollTo({ y: centerScrollY(baseNodes, idx, viewport.h), animated: true });
+    scrollRef.current?.scrollTo({ y: centerScrollY(nodes, idx, viewport.h), animated: true });
   };
 
   const onLayoutViewport = (e: LayoutChangeEvent) => {
@@ -108,52 +80,7 @@ export default function BossMapEditorScreen() {
     setViewport({ w: width, h: height });
   };
 
-  // `PanResponder.create` jest tworzony RAZ (ref, nie co render) — jego callbacki muszą więc
-  // czytać ŚWIEŻE `nodes`/`canvasW` przez ref, nie przez domknięcie z chwili stworzenia
-  // (dlatego te dwa `ref`y są zadeklarowane PRZED blokiem tworzącym respondery, mimo że same
-  // callbacki i tak wykonują się dopiero później, już po pełnym przebiegu renderu).
-  const nodesRef = useRef(baseNodes);
-  nodesRef.current = baseNodes;
-  const canvasWRef = useRef(canvasW);
-  canvasWRef.current = canvasW;
-
-  const responders = useRef<PanResponderInstance[]>([]);
-  if (responders.current.length !== BOSSES.length) {
-    responders.current = BOSSES.map((b, i) => PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        haptic.tap();
-        setSelectedIdx(i);
-        setDragPos({ idx: i, x: nodesRef.current[i].x, y: nodesRef.current[i].y });
-      },
-      onPanResponderMove: (_e, g) => {
-        setDragPos((prev) => {
-          if (!prev || prev.idx !== i) return prev;
-          const base = nodesRef.current[i];
-          const nx = Math.max(0, Math.min(canvasWRef.current, base.x + g.dx));
-          const ny = Math.max(20, base.y + g.dy);
-          return { idx: i, x: nx, y: ny };
-        });
-      },
-      onPanResponderRelease: () => {
-        setDragPos((prev) => {
-          if (prev && prev.idx === i) setPosition(baseBossId(b.id), Math.round(prev.x), Math.round(prev.y));
-          return null;
-        });
-      },
-      onPanResponderTerminate: () => setDragPos(null),
-      // Bez tych dwóch węzeł da się złapać (onStartShouldSetPanResponder), ale otaczający
-      // `ScrollView` (ten sam ekran) PRZEJMUJE gest w trakcie ruchu, gdy wykryje pionowy pan —
-      // domyślne zachowanie RN gdy `onPanResponderTerminationRequest` nie jest podane to
-      // ZEZWÓL na przejęcie. Na Androidzie (user testuje na `com.sokki.sapp`) dochodzi do tego
-      // RÓWNOLEGLE natywny responder systemu widoków — `onShouldBlockNativeResponder` blokuje
-      // i jego. User zrzutem: "nic praktycznie nie mogę zrobić [w edytorze]" — to dokładnie
-      // objaw przejętego w locie gestu (haptic na starcie łapania działa, ale ruch palca nie
-      // przesuwa węzła, bo ScrollView już przejął responder zanim palec zdążył się przesunąć).
-      onPanResponderTerminationRequest: () => false,
-      onShouldBlockNativeResponder: () => true,
-    }));
-  }
+  const selectBoss = (idx: number) => { haptic.tap(); setSelectedIdx(idx); };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -164,21 +91,17 @@ export default function BossMapEditorScreen() {
           <RotateCcw size={18} color={c.text.secondary} />
         </PressableScale>
       </View>
-      <Text style={s.hint}>Przeciągnij bossa palcem ALBO tapnij go/numerek, żeby wybrać i ustawić pozycję precyzyjnie niżej.</Text>
+      <Text style={s.hint}>Tapnij bossa lub numerek, żeby go wybrać i ustawić jego tor niżej.</Text>
 
-      {/* Lista "skocz do bossa" — numerki odpowiadają odznace na węźle. Rozwiązuje "nie widzę
-          bossa, jak mam go przeciągnąć": zamiast przewijać na oślep, tapnięcie numeru centruje
-          kamerę na TYM bosie, NIEZALEŻNIE jak daleko jest na płótnie. Kropka w rogu (§376,
-          user: "nie mam możliwości wgle zobaczyć innych edycji") — pokazuje, który boss ma
-          RĘCZNIE ustawioną pozycję (`overrides[b.id]` istnieje) a który dalej używa
-          domyślnego, proceduralnego układu — dotąd nie było ŻADNEGO sposobu to odróżnić bez
-          przeciągnięcia go i patrzenia czy "wraca" po resecie. */}
+      {/* Lista "skocz do bossa" — numerki odpowiadają odznace na węźle. Kropka w rogu — pokazuje
+          który boss ma RĘCZNIE ustawiony tor (`laneOverrides[id]` istnieje) a który dalej
+          używa domyślnego, proceduralnego toru. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.jumpRow} contentContainerStyle={s.jumpRowContent}>
         {BOSSES.map((b, i) => (
           <PressableScale key={b.id} onPress={() => jumpTo(i)}
             style={[s.jumpChip, i === currentIdx && { backgroundColor: '#38BDF8', borderColor: '#38BDF8' }, i === selectedIdx && i !== currentIdx && { borderColor: '#FB923C' }]}>
             <Text style={[s.jumpChipTxt, i === currentIdx && { color: '#05060A' }]}>{i + 1}</Text>
-            {overrides[baseBossId(b.id)] != null && <View style={s.jumpChipDot} />}
+            {laneOverrides[baseBossId(b.id)] != null && <View style={s.jumpChipDot} />}
           </PressableScale>
         ))}
       </ScrollView>
@@ -189,7 +112,6 @@ export default function BossMapEditorScreen() {
           key={`${viewport.w}x${viewport.h}`}
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!dragPos}
           contentOffset={{ x: 0, y: initialTargetY }}
         >
           <View style={{ width: canvasW, height: canvasH }}>
@@ -201,29 +123,23 @@ export default function BossMapEditorScreen() {
               </Defs>
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="#0B0E14" />
               <Rect x={0} y={0} width={canvasW} height={canvasH} fill="url(#mapGrid)" />
-              {/* `key={pathD}` (§403) — ten sam defensywny fix co `CampaignMap.tsx` (prawdziwa
-                  mapa): wymusza remount natywnego `<Path>` przy każdej zmianie geometrii,
-                  zamiast liczyć na to że update-w-miejscu `d` propu zawsze się odda na
-                  Androidzie. */}
+              {/* `key={pathD}` (§403) — wymusza remount natywnego `<Path>` przy każdej zmianie
+                  geometrii, zamiast liczyć na to że update-w-miejscu `d` propu zawsze się odda
+                  na Androidzie. */}
               {!!pathD && <Path key={pathD} d={pathD} stroke="#38BDF8" strokeWidth={mapStyle.pathWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
             </Svg>
 
             {BOSSES.map((b, i) => {
               const n = nodes[i];
-              const dragging = dragPos?.idx === i;
-              const selected = selectedIdx === i && !dragging;
+              const selected = selectedIdx === i;
               return (
-                <View
-                  key={b.id}
-                  {...responders.current[i].panHandlers}
-                  style={[st_node(n, dragging, NODE)]}
-                >
-                  <View style={[s.portrait, { width: NODE, height: NODE, borderRadius: NODE / 2 }, dragging && s.portraitDragging, selected && s.portraitSelected]}>
+                <PressableScale key={b.id} onPress={() => selectBoss(i)} style={st_node(n, NODE)}>
+                  <View style={[s.portrait, { width: NODE, height: NODE, borderRadius: NODE / 2 }, selected && s.portraitSelected]}>
                     <Text style={s.badge}>{i + 1}</Text>
                     <BossArt id={b.id} emoji={b.emoji} size={NODE} mystery={false} />
                   </View>
                   <Text style={s.nodeLabel} numberOfLines={1}>{b.name}</Text>
-                </View>
+                </PressableScale>
               );
             })}
           </View>
@@ -231,43 +147,36 @@ export default function BossMapEditorScreen() {
         )}
       </View>
 
-      {/* Panel edycji wybranego bossa (§376) — X/Y precyzyjnie (Stepper, nie tylko
-          przeciąganie palcem) + reset TYLKO tego bossa (`resetPosition`, istniał w store od
-          §322, nigdy nie podpięty do UI). Czyta `nodes[selectedIdx]` — ta sama, scalona z
-          `dragPos` wartość co rysowanie na płótnie, więc jeśli user WŁAŚNIE przeciąga
-          wybranego bossa, suwaki pokazują żywą pozycję, nie starą.
-          `position: 'absolute'` (fix PRZED wysłaniem, znaleziony przy własnym przeglądzie) —
-          jako zwykły sibling flex pod `stageWrap` (flex:1) panel ZMNIEJSZAŁBY jego zmierzoną
-          wysokość za każdym razem gdy się pojawia/znika, co przez `key={viewport.w x
-          viewport.h}` na `ScrollView` niżej WYMUSZAŁOBY jej REMOUNT (React remountuje przy
-          zmianie key) — a to zeruje `contentOffset`, skacząc z powrotem na aktualnego bossa
-          kampanii i gubiąc miejsce przewinięcia usera przy KAŻDYM wyborze bossa. Overlay nie
-          zmienia rozmiaru `stageWrap` wcale, więc `viewport`/`key` zostają stabilne. */}
+      {/* Panel edycji wybranego bossa (§376, przebudowany w §412: tor zamiast X/Y) — pojedynczy
+          `Stepper` 1..LANES (wyświetlany jako "Tor" 1-indeksowo dla usera, store trzyma
+          0-indeksowo) + reset TYLKO tego bossa. `position: 'absolute'` — panel NIE jest zwykłym
+          flex sibling'em `stageWrap` (flex:1), żeby nie zmieniać jego zmierzonej wysokości
+          (→ remount ScrollView przez `key` → reset scrolla) przy każdym pojawieniu/zniknięciu. */}
       {selectedIdx != null && (() => {
         const b = BOSSES[selectedIdx];
         const n = nodes[selectedIdx];
+        const lane = xToLane(n.x, canvasW);
+        const hasOverride = laneOverrides[baseBossId(b.id)] != null;
         return (
           <View style={s.editPanel}>
             <View style={s.editPanelHead}>
               <BossArt id={b.id} emoji={b.emoji} size={28} mystery={false} />
               <View style={{ flex: 1 }}>
                 <Text style={s.editPanelTitle} numberOfLines={1}>{b.name}</Text>
-                <Text style={s.editPanelSub}>{overrides[baseBossId(b.id)] != null ? 'Pozycja ustawiona ręcznie' : 'Pozycja domyślna (automatyczna)'}</Text>
+                <Text style={s.editPanelSub}>{hasOverride ? 'Tor ustawiony ręcznie' : 'Tor domyślny (automatyczny)'}</Text>
               </View>
               <PressableScale onPress={() => { haptic.tap(); setSelectedIdx(null); }} style={s.editPanelClose}>
                 <XIcon size={16} color={c.text.muted} />
               </PressableScale>
             </View>
-            <Stepper label="Pozycja X" value={Math.round(n.x)} min={0} max={Math.round(canvasW)} step={8}
-              onChange={(v) => setPosition(baseBossId(b.id), v, Math.round(n.y))} />
-            <Stepper label="Pozycja Y" value={Math.round(n.y)} min={20} max={Math.round(canvasH) - 20} step={8}
-              onChange={(v) => setPosition(baseBossId(b.id), Math.round(n.x), v)} />
+            <Stepper label="Tor" value={lane + 1} min={1} max={LANES} step={1}
+              onChange={(v) => setLane(baseBossId(b.id), v - 1)} />
             <PressableScale
-              onPress={() => { haptic.success(); resetPosition(baseBossId(b.id)); toast.success(`Zresetowano pozycję: ${b.name}`); }}
+              onPress={() => { haptic.success(); resetLane(baseBossId(b.id)); toast.success(`Zresetowano tor: ${b.name}`); }}
               style={s.editPanelReset}
             >
               <RotateCcw size={14} color={c.text.secondary} />
-              <Text style={s.editPanelResetTxt}>Resetuj tego bossa (domyślna pozycja)</Text>
+              <Text style={s.editPanelResetTxt}>Resetuj tego bossa (domyślny tor)</Text>
             </PressableScale>
           </View>
         );
@@ -285,13 +194,12 @@ export default function BossMapEditorScreen() {
   );
 }
 
-function st_node(n: MapNode, dragging: boolean, node: number) {
+function st_node(n: MapNode, node: number) {
   return {
     position: 'absolute' as const,
     left: n.x - node / 2, top: n.y - node / 2,
     width: node + 24, marginLeft: -12,
     alignItems: 'center' as const,
-    zIndex: dragging ? 10 : 1,
   };
 }
 
@@ -319,8 +227,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // `BASE_NODE` tu to tylko baza statyczna — realny, aktualny rozmiar z `campaignMapStyleStore`
   // nadpisywany inline w JSX (`NODE` w ciele komponentu), ten sam zabieg co CampaignMap.tsx.
   portrait: { width: BASE_NODE, height: BASE_NODE, borderRadius: BASE_NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12161F', borderWidth: 2, borderColor: '#262c3a' },
-  portraitDragging: { borderColor: '#FB923C', shadowColor: '#FB923C', shadowOpacity: 0.6, shadowRadius: 10, elevation: 8 },
-  portraitSelected: { borderColor: '#FB923C' },
+  portraitSelected: { borderColor: '#FB923C', shadowColor: '#FB923C', shadowOpacity: 0.6, shadowRadius: 10, elevation: 8 },
   badge: {
     position: 'absolute', top: -6, left: -6, width: 18, height: 18, borderRadius: 9,
     backgroundColor: '#05060A', borderWidth: 1, borderColor: '#262c3a', color: c.text.muted,
@@ -331,7 +238,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   editPanel: {
     // `position: 'absolute'` (patrz komentarz przy renderze) — panel NIE jest zwykłym flex
     // sibling'em `stageWrap`, żeby nie zmieniać jego zmierzonej wysokości (→ remount
-    // ScrollView przez `key` → reset scrolla) przy każdym pojawieniu/zniknięciu.
+    // ScrollView przez `key` → reset scrolla) przy każdym pojawieniu/zniknięciu. Overlay nie
+    // zmienia rozmiaru `stageWrap` wcale, więc `viewport`/`key` zostają stabilne.
     position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: c.bg.secondary, borderTopWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[3], gap: spacing[1],

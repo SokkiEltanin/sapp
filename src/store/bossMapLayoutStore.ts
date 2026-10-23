@@ -2,38 +2,44 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { throttledPersistStorage } from '@/utils/throttledStorage';
 
-export interface MapPosition { x: number; y: number }
-
-// Ręcznie ułożony layout mapy bossów (2026-10-14, user: "Moze zrobisz edytor ja sam ustawie
-// wszystko mapę ścieżkę" — po pięciu rundach prób na procedural-generowanym układzie, user
-// chciał po prostu sam rozstawić bossów palcem w appce). Klucz = BAZOWE id bossa (bez
-// `mad_` prefixu — ten sam fizyczny układ obsługuje kampanię I MAD, patrz `baseBossId` w
-// madBosses.ts i jego użycie w CampaignMap.tsx). Brak nadpisania dla danego id = ten boss
-// dalej używa proceduralnego zygzaka z `layoutBossMap` (§321) — więc nowo dodani bossowie
-// (user dopisuje ich "kilka dziennie", patrz NEXT_STEPS.md) od razu mają SENSOWNĄ pozycję
-// zanim user zdąży ich ręcznie poustawiać, zamiast (0,0) albo błędu.
+// Ręcznie ułożony layout mapy bossów — PRZEBUDOWA OD ZERA #3 (2026-10-23, §412) — user, po
+// trzeciej rundzie tego samego buga ("mapa rozjechana"): "musimy ją chyba wywalić i zbudować
+// od zera". Poprzedni model (`positions: Record<string, {x,y}>`, swobodny x/y drag) ŚWIADOMIE
+// PORZUCONY — bez względu na łatki (§403/§410) wciąż dawał możliwość złamania "Y ściśle rośnie
+// z indeksem", na której opiera się CAŁA gwarancja braku samoprzecięć trasy. Nowy model:
+// KAŻDY boss może dostać TYLKO numer toru (0..LANES-1, patrz `bossMapLayout.ts`'s `LANES`) —
+// Y jest TERAZ ZAWSZE proceduralne, nigdzie w kodzie nie da się go już nadpisać. Klucz =
+// BAZOWE id bossa (bez `mad_` prefixu — ten sam fizyczny układ obsługuje kampanię I MAD,
+// patrz `baseBossId` w madBosses.ts). Brak nadpisania dla danego id = ten boss używa
+// proceduralnego toru z `layoutBossMap` (więc nowo dodani bossowie od razu mają sensowną
+// pozycję, zanim user zdąży ich ręcznie poustawiać).
+//
+// Klucz persystencji podbity na `-v2` (ŚWIADOMIE, nie migracja) — stary `positions: {x,y}`
+// kształt danych jest niekompatybilny z nowym `lanes: number`, a dane pod starym kluczem i tak
+// mogły być źródłem zgłaszanego buga (złamana kolejność Y) — czysty start jest tu bezpieczniejszy
+// niż próba konwersji potencjalnie uszkodzonych pozycji na tory.
 interface BossMapLayoutState {
-  positions: Record<string, MapPosition>;
+  lanes: Record<string, number>;
   _hydrated: boolean;
-  setPosition: (id: string, x: number, y: number) => void;
-  resetPosition: (id: string) => void;
+  setLane: (id: string, lane: number) => void;
+  resetLane: (id: string) => void;
   resetAll: () => void;
 }
 
 export const useBossMapLayoutStore = create<BossMapLayoutState>()(
   persist(
     (set) => ({
-      positions: {},
+      lanes: {},
       _hydrated: false,
-      setPosition: (id, x, y) => set((s) => ({ positions: { ...s.positions, [id]: { x, y } } })),
-      resetPosition: (id) => set((s) => {
-        const { [id]: _removed, ...rest } = s.positions;
-        return { positions: rest };
+      setLane: (id, lane) => set((s) => ({ lanes: { ...s.lanes, [id]: lane } })),
+      resetLane: (id) => set((s) => {
+        const { [id]: _removed, ...rest } = s.lanes;
+        return { lanes: rest };
       }),
-      resetAll: () => set({ positions: {} }),
+      resetAll: () => set({ lanes: {} }),
     }),
     {
-      name: 'boss-map-layout-v1',
+      name: 'boss-map-layout-v2',
       storage: throttledPersistStorage(),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },

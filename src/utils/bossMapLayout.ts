@@ -21,7 +21,7 @@
 export interface MapNode { x: number; y: number }
 export interface MapLayout { nodes: MapNode[]; width: number; height: number }
 
-const LANES = 5;       // liczba "torów" w poziomie — wąski zygzak, nie swobodny spacer
+export const LANES = 5; // liczba "torów" w poziomie — wąski zygzak, nie swobodny spacer
 const ROW_GAP = 170;    // odstęp pionowy między kolejnymi bossami
 const PAD_Y = 100;      // margines góra/dół na portret+etykietę+popup
 
@@ -37,6 +37,24 @@ function clampLane(lane: number): number {
   return Math.max(0, Math.min(LANES - 1, lane));
 }
 
+// Środek toru `lane` w pikselach X, dla danej szerokości płótna — JEDNA definicja "gdzie jest
+// tor N", współdzielona przez bazowy proceduralny układ (`layoutBossMap` niżej) i ręczne
+// nadpisania (`applyLaneOverrides`, §412) — oba muszą się zgadzać co do piksela, inaczej węzeł
+// przesunięty na tor przez edytor wylądowałby w innym miejscu niż ten sam tor liczony
+// proceduralnie.
+export function laneX(lane: number, areaWidth: number): number {
+  const laneWidth = Math.max(1, areaWidth) / LANES;
+  return clampLane(lane) * laneWidth + laneWidth / 2;
+}
+
+// Odwrotność `laneX` — z piksela X na numer toru (§412, edytor: panel wybranego bossa pokazuje
+// AKTUALNY tor, także dla bossów bez ręcznego nadpisania, czyli tych na proceduralnym zygzaku —
+// stąd potrzeba odwrócenia, nie tylko odczytania zapisanej wartości z override'u).
+export function xToLane(x: number, areaWidth: number): number {
+  const laneWidth = Math.max(1, areaWidth) / LANES;
+  return clampLane(Math.round((x - laneWidth / 2) / laneWidth));
+}
+
 // `areaWidth` — szerokość dostępnego viewportu (CampaignMap.tsx mierzy ją przez `onLayout` i
 // przekazuje tu, żeby płótno ZAWSZE dokładnie mieściło się na ekranie, na każdym rozmiarze
 // telefonu, bez poziomego przycinania). Domyślne 340 to bezpieczny placeholder na pierwszy
@@ -50,7 +68,6 @@ function clampLane(lane: number): number {
 // NIGDY się nie zamieniały kolejnością (gwarancja braku samoprzecięć niezależnie od tego co
 // robi X).
 export function layoutBossMap(count: number, areaWidth: number = 340): MapLayout {
-  const laneWidth = Math.max(1, areaWidth) / LANES;
   if (count <= 0) return { nodes: [], width: areaWidth, height: PAD_Y * 2 };
   let lane = Math.floor(LANES / 2);
   const nodes: MapNode[] = [];
@@ -59,56 +76,38 @@ export function layoutBossMap(count: number, areaWidth: number = 340): MapLayout
       const step = Math.floor(hash01(i) * 3) - 1; // -1, 0 albo +1
       lane = clampLane(lane + step);
     }
-    nodes.push({ x: lane * laneWidth + laneWidth / 2, y: PAD_Y + i * ROW_GAP });
+    nodes.push({ x: laneX(lane, areaWidth), y: PAD_Y + i * ROW_GAP });
   }
   const height = PAD_Y * 2 + (count - 1) * ROW_GAP;
   return { nodes, width: areaWidth, height };
 }
 
-// Edytor mapy bossów (2026-10-14, ARCHITECTURE.md §322 — user: "zrobisz edytor ja sam
-// ustawie wszystko mapę ścieżkę") — ręcznie przeciągnięta pozycja (kluczowana BAZOWYM id
-// bossa, patrz `baseBossId` w madBosses.ts) NADPISUJE proceduralny zygzak dla tego jednego
-// węzła. Brak nadpisania = ten węzeł zostaje na swojej zygzakowej pozycji (więc nowo dodani
-// bossowie, zanim user zdąży ich poustawiać, od razu mają sensowną pozycję zamiast (0,0)).
-// `x` jest przycinane do `[0, areaWidth]` (obrona przed pozycją zapisaną na innym rozmiarze
-// ekranu niż ten na którym mapa jest teraz oglądana) — `y` nie jest ograniczane, bo płótno i
-// tak rośnie w pionie żeby pomieścić najniżej przeciągnięty węzeł.
-// Minimalny odstęp Y wymuszany MIĘDZY SĄSIADAMI niżej — TEN SAM floor co `Math.max(20, ...)`
-// już używany jako dolne ograniczenie Y w geście przeciągania (`boss-map-editor.tsx`'s
-// `onPanResponderMove`), więc nie wprowadza nowej, niespójnej stałej.
-const MIN_Y_GAP = 20;
-
-export function applyLayoutOverrides(
-  base: MapNode[], ids: string[], overrides: Record<string, MapNode>, areaWidth: number,
+// Edytor mapy bossów — PRZEBUDOWA OD ZERA #3 (2026-10-23, §412) — user, po TRZECH rundach
+// prób na tym samym systemie swobodnego x/y drag (§322 pierwsza wersja, §403 "key={d}" fix,
+// §410 cascade-klamrowanie Y): "musimy ją chyba wywalić i zbudować od zera", potwierdzone że
+// §410 NIE wystarczyło (retestowane po OTA, dalej źle). §410 ZAŁATAŁO jeden konkretny sposób
+// łamania "Y ściśle rośnie z indeksem" (nadpisanie Y > sąsiad), ale NIE usunęło samej
+// MOŻLIWOŚCI — user wciąż mógł przeciągnąć węzeł na dowolny X *i* Y, drag-gest w edytorze
+// wciąż walczył o gest ze ScrollView (udokumentowany, nigdy w pełni naprawiony "nic nie mogę
+// zrobić" bug), a SVG `<Path>` na Androidzie ma HISTORIĘ problemów ze świeżością `d` propu
+// (§403) — zbyt wiele ruchomych części, żeby ufać kolejnej łatce.
+//
+// Nowy model: Y jest TERAZ WYŁĄCZNIE f(indeks) — `layoutBossMap`'owe `PAD_Y + i*ROW_GAP`,
+// BEZ ŻADNEGO sposobu go nadpisać, nigdzie w kodzie. X nadal da się dostosować ręcznie, ale
+// TYLKO przez wybór jednego z `LANES` (5) DYSKRETNYCH torów (tap, nie drag) — dokładnie tych
+// samych torów, po których i tak porusza się proceduralny zygzak (`laneX()` wyżej, JEDNO
+// źródło prawdy współdzielone z `layoutBossMap`). Stan, w którym kolejność Y jest złamana,
+// jest TERAZ STRUKTURALNIE NIEOSIĄGALNY — nie ma już kodu, który potrafiłby go wytworzyć,
+// więc nie trzeba go ani walidować, ani klamrować po fakcie. Nadpisania kluczowane BAZOWYM id
+// bossa (patrz `baseBossId` w madBosses.ts) — bez nadpisania węzeł zostaje na swoim
+// proceduralnym torze (nowo dodani bossowie od razu mają sensowną pozycję).
+export function applyLaneOverrides(
+  base: MapNode[], ids: string[], laneOverrides: Record<string, number>, areaWidth: number,
 ): MapLayout {
-  // Gwarancja "Y ściśle rośnie z indeksem" (komentarz na górze pliku, test w
-  // bossMapLayout.test.ts) dotyczyła DOTĄD tylko `layoutBossMap`'a bazowego, proceduralnego
-  // układu — `applyLayoutOverrides` przyjmowała ręczną pozycję 1:1, BEZ sprawdzenia czy nowe Y
-  // wciąż jest większe niż poprzedniego węzła. `boss-map-editor.tsx`'s gest przeciągania też
-  // tego nie pilnuje (jedyne ograniczenie to `Math.max(20, ...)` od GÓRY PŁÓTNA, nie względem
-  // SĄSIADÓW) — więc user mógł (celowo albo przez przypadek, przeciągając palcem) przesunąć
-  // bossa NAD albo na wysokość sąsiada, łamiąc własność, na której cała reszta systemu się
-  // opiera. Skutek: Catmull-Rom (`catmullRomPath` niżej) PRZECHODZI dokładnie przez każdy
-  // punkt (to jego definiująca własność — węzły i ścieżka NIGDY nie mogą się "rozjechać" przy
-  // poprawnych danych), ale gdy kolejność Y jest złamana, krzywa między punktami "zawraca"/
-  // robi pętlę, żeby trafić w kolejny punkt w złej kolejności — wizualnie wygląda dokładnie
-  // jak zgłoszone "mapa rozjechana, bossy daleko od ścieżki", mimo że KAŻDY węzeł z osobna
-  // stoi na swojej (jawnie zapisanej) pozycji.
-  //
-  // Fix: po zastosowaniu nadpisań (lub ich braku — procedura), Y jest CASCADE-klamrowane do
-  // co najmniej `poprzedni_Y + MIN_Y_GAP`, w kolejności indeksu. Dla układu BEZ żadnych
-  // nadpisań to zawsze no-op (bazowy ROW_GAP=170 >> MIN_Y_GAP=20, warunek nigdy aktywny) —
-  // zero zmiany dla nikogo kto nie edytował mapy ręcznie. Dla nadpisań, które łamały
-  // kolejność — KAŻDY kolejny węzeł (nadpisany czy nie) "dogania" przesuniętego poprzednika,
-  // więc gwarancja przetrwa DOWOLNĄ kombinację ręcznych pozycji, bez potrzeby resetowania
-  // układu w edytorze.
-  let prevY = -Infinity;
   const nodes = base.map((n, i) => {
-    const o = overrides[ids[i]];
-    const raw = o ? { x: Math.max(0, Math.min(areaWidth, o.x)), y: Math.max(0, o.y) } : n;
-    const y = Math.max(raw.y, prevY + MIN_Y_GAP);
-    prevY = y;
-    return { x: raw.x, y };
+    const lane = laneOverrides[ids[i]];
+    const x = lane != null ? laneX(lane, areaWidth) : n.x;
+    return { x, y: n.y };
   });
   const maxY = nodes.reduce((m, n) => Math.max(m, n.y), 0);
   return { nodes, width: areaWidth, height: maxY + PAD_Y };
