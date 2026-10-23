@@ -17,9 +17,6 @@ import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
-import ScreenCanvas from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import ScreenHeader from '@/components/ui/ScreenHeader';
 
 const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const todayStr = () => {
@@ -50,8 +47,6 @@ export default function Food() {
   const manualGoal = useFoodStore(st => st.manualGoal);
   const setGoal    = useFoodStore(st => st.setGoal);
   const removeMeal = useFoodStore(st => st.removeMeal);
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['food'] ?? false);
 
   const [confirmDeleteMeal, setConfirmDeleteMeal] = useState<MealEntry | null>(null);
   const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned (watch)
@@ -326,19 +321,6 @@ export default function Food() {
     return dd.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short', year: y === new Date().getFullYear() ? undefined : 'numeric' });
   })();
 
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cały ekran Jedzenia (kalorie,
-  // posiłki, woda itd.) nie montuje się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={s.container} edges={[]}>
-        <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Jedzenie" subtitle="Pełny ekran" />
-        </View>
-        <ScreenCanvas screenKey="food" title="Twoje komponenty" />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingTop: insets.top + spacing[3] }]}>
@@ -585,10 +567,6 @@ export default function Food() {
           </TouchableOpacity>
         )}
 
-        {/* Wolne płótno — system kopiowania komponentów (Faza 15, §341). Pierwszy ekran poza
-            dashboardem z tym mechanizmem; user: "dodaje streak wody na dashbordzie i dodaje
-            streak słodyczy w jedzeniu" — dokładnie to miejsce. */}
-        <ScreenCanvas screenKey="food" title="Twoje komponenty" />
       </ScrollView>
 
       {/* Profil ciała → BMR (zapotrzebowanie spoczynkowe) */}

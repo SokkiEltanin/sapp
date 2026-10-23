@@ -24,15 +24,8 @@ import { missionLocationBg } from '@/utils/bossIcons';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost, combatItemStatText } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp, gearAtkFlat, gearById, gearSellValue, isBetterThanEquipped } from '@/utils/gear';
 import { computePetState, PetInput } from '@/utils/petState';
-import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
-import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
-import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
-import { useAllNotesItems } from '@/hooks/useAllNotesItems';
-import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
 import { useMoodStore } from '@/store/moodStore';
@@ -281,16 +274,6 @@ export default function Pet() {
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
   const { habits, todayDone, getStreak } = useHabits();
-  // Wolne płótno (§373) — ten ekran JUŻ montuje `useHabits()` wyżej, więc jak `mood.tsx`/
-  // `habits.tsx` (§368/§373): `useStreakItemsFromHabits()` dociąga resztę bez drugiego
-  // AsyncStorage fetchu. Reszta hooków wołana normalnie — ten ekran ich nie montuje.
-  const canvasStreakItems = useStreakItemsFromHabits(habits, getStreak);
-  const canvasCountdownItems = useAllCountdownItems();
-  const canvasNotesItems = useAllNotesItems();
-  const canvasDataFieldRegistry = useDataFieldRegistry();
-  const { color: canvasAccentColor } = useTimeAccent();
-  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['pet'] ?? false);
   const { entries: moodEntries } = useMoodStore();
   // Selektor pojedynczego pola (2026-09-18, audyt wydajności runda 4) — gołe
   // `useExpensesStore()` obok już zoptymalizowanego `usePetStore(useShallow(...))` tuż nad tą
@@ -347,16 +330,6 @@ export default function Pet() {
   }, [health, stepGoal, todayDone.length, habits.length, moodEntries, overBudget]);
 
   const pet = useMemo(() => computePetState(input), [input]);
-  // Snapshot dla `useDataFieldRegistry.ts` (§404) — kroki/sen/nastrój pupila są JUŻ policzone
-  // tutaj (ten sam `health`/`pet` co reszta ekranu), więc jedna linia zapisu do małego,
-  // persystowanego store'u wystarcza, żeby kafel "Pole danych" na płótnie mógł je pokazać bez
-  // montowania własnego `usePetHealthSync()`/`computePetState()` per instancja.
-  useEffect(() => {
-    useLiveStatsSnapshotStore.getState().update({
-      stepsToday: health.steps, sleepMinutesToday: health.sleep,
-      petMoodLabel: pet.label, petWellbeing: pet.wellbeing, petSynced: true,
-    });
-  }, [health.steps, health.sleep, pet.label, pet.wellbeing]);
   const stage = growthStage(lvl.level);
   // Kotek NIE MOŻE być szerszy niż faktycznie dostępna kolumna między slotami ekwipunku
   // (2026-09-12, user: "obszar głaskania pupila nie wchodził na itemy" — `STAGE_SIZE[stage]
@@ -437,33 +410,6 @@ export default function Pet() {
       if (upgradeCombatItem(id, cost, maxLevel)) { haptic.success(); toast.success(`${COMBAT_ITEMS[id].name} → poziom ${level + 1}`); }
     });
   };
-
-  // Tryb pełnoekranowy płótna (§381, Faza 2) — gdy włączony, reszta ekranu Pupila nie
-  // montuje się wcale. `PupilNavbar` ZOSTAJE (ten sam hub, user dalej musi móc przejść do
-  // Bossy/Sklep/Questy stąd, nie jest to drill-down ekran jak Zdrowie/Nawyki/Notatki).
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={s.container} edges={['top']}>
-        <View style={s.header}>
-          <PressableScale onPress={() => router.back()} style={s.backBtn}>
-            <ChevronLeft size={22} color={c.text.primary} />
-          </PressableScale>
-          <Text style={s.headerTitle}>Pupil</Text>
-          <View style={s.backBtn} />
-        </View>
-        <ScreenCanvasBase
-          screenKey="pet"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
-        <PupilNavbar current="pet" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -808,17 +754,6 @@ export default function Pet() {
           })}
         </View>
 
-        {/* Wolne płótno (§373) — `allStreakItems` budowany ręcznie wyżej, żeby nie montować
-            `useHabits()` drugi raz. */}
-        <ScreenCanvasBase
-          screenKey="pet"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
       </ScrollView>
 
       <ConfirmDialog

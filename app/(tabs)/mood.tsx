@@ -29,17 +29,6 @@ import { useWorkStore } from '@/store/workStore';
 import { useHabits } from '@/hooks/useHabits';
 import { useDayKey } from '@/hooks/useDayKey';
 import { useExpensesStore } from '@/store/expensesStore';
-import { useFoodStore } from '@/store/foodStore';
-import { useCounters } from '@/store/countersStore';
-import { useExercisesStore } from '@/store/exercisesStore';
-import { exerciseStreakFrom } from '@/utils/personalQuests';
-import { buildStreakItems } from '@/hooks/useAllStreakItems';
-import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
-import { useAllNotesItems } from '@/hooks/useAllNotesItems';
-import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
-import { useTimeAccent } from '@/hooks/useTimeAccent';
-import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -887,33 +876,6 @@ export default function MoodScreen() {
   const streak = useMemo(() => calcStreak(entries), [entries]);
   const recent = useMemo(() => entries.slice(0, 14), [entries]);
 
-  // Płótno na tym ekranie (§368, task "każde okno poza Ustawieniami") — `mood.tsx` JUŻ
-  // montuje `useHabits()` wyżej (dla `habitRateByDate`), więc jak `index.tsx`/kreator,
-  // NIE wolno użyć domyślnego `<ScreenCanvas>` (zamontowałby `useHabits()` drugi raz przez
-  // `useAllStreakItems()`) — budujemy `allStreakItems` ręcznie przez wyodrębnioną
-  // `buildStreakItems()`, resztę (`useAllCountdownItems`/`useAllNotesItems`/
-  // `useDataFieldRegistry`/`useTimeAccent`) wołamy normalnie, bo ten ekran ich jeszcze
-  // nigdzie nie montuje.
-  const canvasCounters = useCounters(st => st.counters);
-  const canvasFoodMeals = useFoodStore(st => st.meals);
-  const canvasFoodProducts = useFoodStore(st => st.products);
-  const canvasExerciseLogs = useExercisesStore(st => st.logs);
-  const canvasDayKey = useDayKey();
-  const canvasExerciseStreak = useMemo(() => exerciseStreakFrom(canvasExerciseLogs, canvasDayKey), [canvasExerciseLogs, canvasDayKey]);
-  const canvasStreakItems = useMemo(
-    () => buildStreakItems({
-      habits, getStreak, counters: canvasCounters, expenses: allExpenses,
-      foodMeals: canvasFoodMeals, foodProducts: canvasFoodProducts, exerciseStreak: canvasExerciseStreak,
-    }),
-    [habits, getStreak, canvasCounters, allExpenses, canvasFoodMeals, canvasFoodProducts, canvasExerciseStreak],
-  );
-  const canvasCountdownItems = useAllCountdownItems();
-  const canvasNotesItems = useAllNotesItems();
-  const canvasDataFieldRegistry = useDataFieldRegistry();
-  const { color: canvasAccentColor } = useTimeAccent();
-  // Tryb pełnoekranowy płótna (§381, Faza 2c) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['mood'] ?? false);
-
   const todayColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : colors.text.muted;
 
   const openCheckin = (entry?: MoodEntry | null) => {
@@ -929,25 +891,6 @@ export default function MoodScreen() {
     await moodService.remove(entry.id).catch(() => {});
     toast.info('Usunięto');
   };
-
-  // Tryb pełnoekranowy płótna (§381, Faza 2c) — gdy włączony, reszta ekranu Nastroju (wykresy/
-  // wpisy/statystyki) nie montuje się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={styles.container} edges={[]}>
-        <ScreenHeader title="Nastrój" subtitle="Pełny ekran" accentColor={P.accent} style={{ paddingTop: insets.top + spacing[3] }} />
-        <ScreenCanvasBase
-          screenKey="mood"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
@@ -1102,17 +1045,6 @@ export default function MoodScreen() {
           </View>
         )}
 
-        {/* Wolne płótno (§368) — `allStreakItems` budowany ręcznie wyżej, żeby nie montować
-            `useHabits()` drugi raz (ten ekran już go woła dla `habitRateByDate`). */}
-        <ScreenCanvasBase
-          screenKey="mood"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
       </ScrollView>
 
       <MoodCheckInModal

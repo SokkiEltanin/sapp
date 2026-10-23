@@ -84,10 +84,6 @@ import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
-import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
@@ -316,14 +312,6 @@ export default function DashboardScreen() {
   // Stat cards flip with the theme; the hero stays immersive (cardBg/gradientTop).
   const cardBgDark = colors.bg.card;
   const heroFont = heroFontById('black'); // single, fixed greeting font (picker removed)
-  // Tryb pełnoekranowy płótna (§381, Faza 3 — OSTATNI ekran) — ten sam wzorzec co pozostałe
-  // 13 ekranów (§381-384), ale TU rozgałęzienie na samym `return` ma dodatkową, realną
-  // korzyść wydajnościową: cały `nodes` (ogromny, niepamiętany blok budujący DZIESIĄTKI
-  // kart dashboardu, patrz IIFE niżej w JSX) w ogóle się nie wykonuje, gdy ten branch jest
-  // aktywny — nie tylko się nie renderuje, DOSŁOWNIE się nie liczy. Ten sam ekran, którego
-  // komentarze w tym pliku wielokrotnie opisują jako "najbardziej czuły na wydajność", więc
-  // to jest TU czystym zyskiem, nie tylko neutralnym refaktorem.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['dashboard'] ?? false);
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
   // Wąskie selektory zamiast całych store'ów (2026-08-12, krok 3 z hardening_index.md) —
@@ -575,16 +563,6 @@ export default function DashboardScreen() {
     [counters, dayKey],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
-  // Dla płótna dashboardu (§356) — TA SAMA logika co `activeCountdowns`, ale BEZ filtra
-  // `onDashboard`: komponenty-odliczania na płótnie mają być dostępne niezależnie od checkboxa
-  // "pokaż na dashboardzie" (który steruje starą, osobną kartą `CountdownsCard`, nie płótnem).
-  const allCountdownItemsForCanvas = useMemo(
-    () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
-    [counters, dayKey],
-  );
-  // Generyczny data-binding na płótnie (§358) — lekkie Zustand selectory (pupil/zadania), zero
-  // dodatkowego AsyncStorage fetchu — bezpieczne do wołania tutaj RÓWNOLEGLE z resztą dashboardu.
-  const dataFieldRegistry = useDataFieldRegistry();
   // 2026-09-26, audyt dashboardu — `mode==='auto'` liczniki (np. "bez słodyczy") pokazywały
   // się TU *i* w `streakWall`/"Twoje Serie" naraz (streakWall filtruje `mode==='auto'`, ten
   // filtr tego nie wykluczał) — dokładnie ta duplikacja, którą §180/§181 miały wyeliminować
@@ -2609,34 +2587,6 @@ export default function DashboardScreen() {
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  // Tryb pełnoekranowy płótna (§381, Faza 3) — gdy włączony, CAŁY wbudowany dashboard (hero,
-  // wszystkie karty, cały `nodes`-blok niżej) nie montuje się ani nie liczy wcale, zastąpiony
-  // samym płótnem na cały ekran. `streakWall`/`allCountdownItemsForCanvas`/`allNotes`/
-  // `dataFieldRegistry`/`accentColor` — te same, już obliczone wartości, które normalny branch
-  // przekazuje do `nodes['custom-canvas']` niżej (patrz komentarz tam: "dashboard ma je już w
-  // pamięci").
-  if (canvasFullScreen) {
-    return (
-      <View style={s.root}>
-        <SafeAreaView style={s.safe} edges={[]}>
-          <View style={{ paddingTop: insets.top }}>
-            <ScreenHeader title="Dashboard" subtitle="Pełny ekran" />
-          </View>
-          <ScreenCanvasBase
-            screenKey="dashboard"
-            title="Twoje komponenty"
-            allStreakItems={streakWall}
-            allCountdownItems={allCountdownItemsForCanvas}
-            allNotesItems={allNotes}
-            dataFieldRegistry={dataFieldRegistry}
-            accentColor={accentColor}
-            statCtx={statCtx}
-          />
-        </SafeAreaView>
-      </View>
-    );
-  }
-
   return (
     <View style={s.root}>
       {/* Subtle accent wash → base bg. A faint accent tint (not a dark band) so it
@@ -3181,22 +3131,6 @@ export default function DashboardScreen() {
             // widgety") — ten sam streak teraz jako pozycja WEWNĄTRZ tej karty.
             nodes['streak-wall'] = streakWall.length > 0 && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
-            // Dashboard jako wolne płótno (§356, user: "Dashboard jako wolne płótno") — TA SAMA
-            // mechanika co na Food/Exercises/Finances (`ScreenCanvas`), ale tutaj przez
-            // `ScreenCanvasBase` żeby NIE montować drugi raz `useHabits()`/liczników/notatek —
-            // dashboard ma je już w pamięci (`streakWall`, `allCountdownItemsForCanvas`, `allNotes`).
-            nodes['custom-canvas'] = (
-              <ScreenCanvasBase
-                screenKey="dashboard"
-                title="Twoje komponenty"
-                allStreakItems={streakWall}
-                allCountdownItems={allCountdownItemsForCanvas}
-                allNotesItems={allNotes}
-                dataFieldRegistry={dataFieldRegistry}
-                accentColor={accentColor}
-                statCtx={statCtx}
-              />
-            );
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
 

@@ -12,8 +12,6 @@ import {
 } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenCanvas from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -288,8 +286,6 @@ export default function CalendarTabScreen() {
   // zamontowany ekran kalendarza na każdy zapis nastroju gdziekolwiek w appce.
   const moodEntries = useMoodStore(s => s.entries);
   const { expenses } = useExpensesStore();
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['stats'] ?? false);
 
   const now = new Date();
   const [viewYear, setViewYear]         = useState(now.getFullYear());
@@ -509,19 +505,6 @@ export default function CalendarTabScreen() {
     return AlignJustify;
   };
 
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cały kalendarz/widgety statystyk
-  // nie montują się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={styles.container} edges={[]}>
-        <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Kalendarz" subtitle="Pełny ekran" style={{ borderBottomColor: VP.cardBorder }} />
-        </View>
-        <ScreenCanvas screenKey="stats" title="Twoje komponenty" />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <View style={{ flex: 1 }}>
@@ -714,9 +697,6 @@ export default function CalendarTabScreen() {
             )}
           </View>
 
-          {/* Wolne płótno (§368, "każde okno poza Ustawieniami") — ten ekran nie montuje
-              `useHabits()`/`useAllNotesItems()`, zero ryzyka duplikacji. */}
-          <ScreenCanvas screenKey="stats" title="Twoje komponenty" />
         </ScrollView>
       </View>
 

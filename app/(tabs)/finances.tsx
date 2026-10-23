@@ -6,7 +6,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
-import { useLiveStatsSnapshotStore } from '@/store/liveStatsSnapshotStore';
 import { useStatsScope, isMine, inScope, countsForConsumption, MY_PAYER } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
@@ -23,8 +22,6 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
-import ScreenCanvas from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import DisplayText from '@/components/ui/DisplayText';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -72,8 +69,6 @@ function monthDates(): string[] {
 export default function FinancesScreen() {
   const insets = useSafeAreaInsets();
   const kb = useKeyboardHeight();
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['finances'] ?? false);
   // Theme-reactive: shadow module colors/F so the screen + its StyleSheet flip.
   const colors = useColors();
   const F = useMemo(() => ({
@@ -140,26 +135,16 @@ export default function FinancesScreen() {
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
   }, []);
-  // Snapshot dla `useDataFieldRegistry.ts` (§404) — ten sam wzorzec co `app/pet.tsx` dla
-  // kroków/nastroju pupila: zapisuje do małego, persystowanego store'u PO KAŻDYM realnym
-  // odczycie `getBalanceOffset()` (nie na starcie z domyślnym `useState(0)` — stąd osobna
-  // funkcja zamiast efektu zależnego od `balanceOffset`, który oznaczyłby "zsynchronizowane"
-  // ZANIM prawdziwa wartość w ogóle się wczyta). Kafel "Pole danych" na płótnie czyta stąd,
-  // zamiast ciągnąć surowy `getBalanceOffset()` per-instancja.
-  const applyBalanceOffset = useCallback((v: number) => {
-    setBalanceOffset(v);
-    useLiveStatsSnapshotStore.getState().update({ cardBalanceOffset: v, balanceSynced: true });
-  }, []);
   // Re-read the offset on focus so a value set in Settings shows immediately.
   useFocusEffect(useCallback(() => {
-    getBalanceOffset().then(applyBalanceOffset).catch(() => {});
-  }, [applyBalanceOffset]));
+    getBalanceOffset().then(setBalanceOffset).catch(() => {});
+  }, []));
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
   useEffect(() => {
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') getBalanceOffset().then(applyBalanceOffset).catch(() => {}); });
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') getBalanceOffset().then(setBalanceOffset).catch(() => {}); });
     return () => sub.remove();
-  }, [applyBalanceOffset]);
+  }, []);
 
   const availableTags = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -423,19 +408,6 @@ export default function FinancesScreen() {
     return map;
   }, [expenses]);
 
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cała lista finansów nie
-  // montuje się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={st.root} edges={[]}>
-        <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Finanse" subtitle="Pełny ekran" />
-        </View>
-        <ScreenCanvas screenKey="finances" title="Twoje komponenty" />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={st.root} edges={[]}>
       <View style={{ flex: 1 }}>
@@ -691,12 +663,6 @@ export default function FinancesScreen() {
                   <Text style={st.loadOlderTxt}>{showAllTx ? 'Pokaż tylko ostatni miesiąc' : 'Pokaż starsze transakcje'}</Text>
                 </PressableScale>
               )}
-              {/* Wolne płótno — system kopiowania komponentów, Faza 19 (2026-10-17). Trzeci
-                  ekran poza dashboardem — `useExpensesStore()` już montowany tu wcześniej dla
-                  własnej treści, ale to Zustand store (współdzielony singleton), nie hook z
-                  własnym fetchem jak `useHabits()` — drugie wywołanie jest bezpieczne, patrz
-                  ostrzeżenie w `useAllStreakItems.ts`. */}
-              <ScreenCanvas screenKey="finances" title="Twoje komponenty" />
             </>
           }
           contentContainerStyle={{ paddingTop: insets.top + spacing[3], paddingBottom: 200 }}
