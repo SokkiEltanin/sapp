@@ -80,6 +80,15 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   // `applyLaneOverrides` w bossMapLayout.ts). Kluczowane BAZOWYM id (`baseBossId`) — TEN SAM
   // fizyczny układ obowiązuje kampanię i MAD (mapy się nie dubluje per wariant).
   const laneOverrides = useBossMapLayoutStore(st => st.lanes);
+  // Bramka hydratacji (2026-10-23, §413, user zrzutem: "mapa dalej rozjechana mimo że dobrze
+  // ustawiona w edytorze... może ty zmieniasz edytor nie tę mapę") — `lanes` czyta się jako
+  // `{}` (pusty, domyślny stan) PRZED tym jak store wczyta się z dysku. Edytor otwiera się
+  // PÓŹNIEJ w nawigacji (więcej czasu minęło = hydratacja prawie zawsze już skończona), więc
+  // pokazywał prawdziwe tory — pierwszy render TEJ mapy (często pierwszy ekran po starcie
+  // appki) czasem łapał moment z jeszcze PUSTYMI nadpisaniami, renderując czysto proceduralny
+  // układ zamiast realnie zapisanego. Dopóki `!lanesHydrated`, komponent czeka (ten sam wzorzec
+  // co gate na `viewport.w/h` niżej) zamiast pokazać mapę która zaraz "skoczy" pod userem.
+  const lanesHydrated = useBossMapLayoutStore(st => st._hydrated);
   // Szerokość płótna = ZMIERZONA szerokość viewportu (nie stała) — gwarantuje że zygzak
   // zawsze dokładnie mieści się na ekranie, na KAŻDYM rozmiarze telefonu, bez poziomego
   // przycinania/scrolla. Dopóki viewport nie jest jeszcze zmierzony, 340 to bezpieczny
@@ -156,7 +165,7 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           poprawiać. `key` wymusza remount (nie sam update propu — `contentOffset` RN czyta
           TYLKO przy montażu) gdy zmierzony rozmiar się zmieni, patrz komentarz przy BUG #6
           wyżej. */}
-      {viewport.w > 0 && viewport.h > 0 && (
+      {viewport.w > 0 && viewport.h > 0 && lanesHydrated && (
       <ScrollView
         key={`${viewport.w}x${viewport.h}`}
         ref={scrollRef}

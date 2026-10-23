@@ -39,12 +39,16 @@ describe('madBosses — balans (STAŁE hp = kampania × MAD_HP_MULT, 2026-08-21)
     expect(mad.hp).toBe(sloth.hp * MAD_HP_MULT);
   });
 
+  // §413 (2026-10-23): kolejność bossów przełożona na bloki żywiołów — 'wizard' nie jest już
+  // gwarantowanym wysokim orderem (teraz las, order5), więc porównanie "wyższy order = więcej
+  // hp" bierze BOSSES[last] (zawsze najwyższy order, niezależnie od tego KTÓRY to akurat boss)
+  // zamiast konkretnego id.
   test('hp rośnie z `order` bossa TYLKO przez to że kampanijne hp też rośnie z order — nie osobną krzywą', () => {
-    const wizard = BOSSES.find(b => b.id === 'wizard')!;
+    const highestOrderBoss = BOSSES[BOSSES.length - 1];
     const madSloth = madBossFor(sloth);
-    const madWizard = madBossFor(wizard);
-    expect(madWizard.hp).toBe(wizard.hp * MAD_HP_MULT);
-    expect(madWizard.hp).toBeGreaterThan(madSloth.hp);
+    const madHighest = madBossFor(highestOrderBoss);
+    expect(madHighest.hp).toBe(highestOrderBoss.hp * MAD_HP_MULT);
+    expect(madHighest.hp).toBeGreaterThan(madSloth.hp);
   });
 
   test('counterMult ustawiony na MAD_COUNTER_MULT (dodatkowy mnożnik kontrataku, user: "z większym o wiele atakiem")', () => {
@@ -63,24 +67,29 @@ describe('madBosses — balans (STAŁE hp = kampania × MAD_HP_MULT, 2026-08-21)
 // model (floor = 100% finału OD order1) potwierdzony w logu jako przyczyna: MAD order1 dawał
 // 1:1 tyle co pokonanie finału kampanii. Nowy model: order1 = własna nagroda bossa × mnożnik
 // trudności (maleje z orderem), order22 (=finał) = dokładnie nagroda finału, bez skoku.
+// §413 (2026-10-23): kolejność bossów przełożona na bloki żywiołów (Las→Lawa→Woda→Burza→
+// Niebo) — `order`/najniższy i najwyższy się NIE zmieniają (dalej 1..22, dalej monotoniczne z
+// hp), tylko KTÓRY boss nosi `order` 1 albo 22 jest teraz inny. Testy niżej biorą
+// `BOSSES[0]`/`BOSSES[BOSSES.length-1]` zamiast dawnych hardkodowanych id ('sloth'/'wizard'),
+// żeby pilnować tej samej własności niezależnie od tego, kto akurat stoi na brzegach rosteru.
 describe('madBosses — nagrody (interpolacja własna→finał z malejącym mnożnikiem trudności, 2026-09-20)', () => {
-  const sloth = BOSSES.find(b => b.id === 'sloth')!; // order 1 — najsłabszy bazowy boss
-  const finale = BOSSES[BOSSES.length - 1]; // Iluzja Kontroli, order 22
+  const firstBoss = BOSSES[0]; // order 1 — najsłabszy bazowy boss
+  const finale = BOSSES[BOSSES.length - 1]; // order 22 — najmocniejszy bazowy boss
 
-  test('MAD order 1 (Kanapowy Leniwiec) daje WYRAŹNIE mniej niż finał kampanii, ale wyraźnie więcej niż własna nagroda', () => {
-    const mad = madBossFor(sloth);
+  test('MAD order 1 daje WYRAŹNIE mniej niż finał kampanii, ale wyraźnie więcej niż własna nagroda', () => {
+    const mad = madBossFor(firstBoss);
     expect(mad.coins).toBeLessThan(finale.coins);
     expect(mad.xp).toBeLessThan(finale.xp);
     // mnożnik trudności (REWARD_BOOST_AT_ORDER_1=20) — MAD ma stałe 10× hp/3× kontratak
     // niezależnie od poziomu trudności bazowego bossa, więc nawet order1 potrzebuje wyraźnie
-    // więcej niż goła własna nagroda (8 monet/60 XP), inaczej opłaca się mniej niż quest.
-    expect(mad.coins).toBeGreaterThan(sloth.coins * 15);
-    expect(mad.xp).toBeGreaterThan(sloth.xp * 15);
+    // więcej niż goła własna nagroda (8 monet/60 XP, ten sam slot1 co zawsze — patrz
+    // komentarz nad BOSSES w bosses.ts), inaczej opłaca się mniej niż quest.
+    expect(mad.coins).toBeGreaterThan(firstBoss.coins * 15);
+    expect(mad.xp).toBeGreaterThan(firstBoss.xp * 15);
   });
 
   test('MAD ostatniego bossa kampanii (order22 = sam finał) daje DOKŁADNIE tyle co finał — bez skoku na granicy', () => {
-    const wizard = BOSSES.find(b => b.id === 'wizard')!; // order 22 = Iluzja Kontroli = finale
-    const mad = madBossFor(wizard);
+    const mad = madBossFor(finale);
     expect(mad.coins).toBe(finale.coins);
     expect(mad.xp).toBe(finale.xp);
   });
@@ -104,9 +113,9 @@ describe('madBosses — nagrody (interpolacja własna→finał z malejącym mno�
   });
 
   test('unlockLevel to FLAT MAD_UNLOCK_LEVEL, nie oryginalny unlockLevel bossa', () => {
-    const mad = madBossFor(sloth);
+    const mad = madBossFor(firstBoss);
     expect(mad.unlockLevel).toBe(MAD_UNLOCK_LEVEL);
-    expect(mad.unlockLevel).not.toBe(sloth.unlockLevel);
+    expect(mad.unlockLevel).not.toBe(firstBoss.unlockLevel);
   });
 
   test('guard/regenPct NIE są dziedziczone z oryginału (fix 2026-08-15, patrz komentarz)', () => {
@@ -117,8 +126,8 @@ describe('madBosses — nagrody (interpolacja własna→finał z malejącym mno�
   });
 
   test('id/name/weakness pochodzą od bossa bazowego', () => {
-    const mad = madBossFor(sloth);
-    expect(mad.id).toBe('mad_sloth');
-    expect(mad.weakness).toBe(sloth.weakness);
+    const mad = madBossFor(firstBoss);
+    expect(mad.id).toBe(`mad_${firstBoss.id}`);
+    expect(mad.weakness).toBe(firstBoss.weakness);
   });
 });

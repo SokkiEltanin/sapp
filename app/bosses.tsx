@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { View, Text, StyleSheet, Pressable, AppState } from 'react-native';
+import { View, Text, StyleSheet, Pressable, AppState, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Zap, Swords, Trophy, Pencil } from 'lucide-react-native';
@@ -88,6 +88,19 @@ export default function Bosses() {
     atkStatBonus: s.atkStatBonus, menaceId: s.menaceId, menaceHp: s.menaceHp, menaceMaxHp: s.menaceMaxHp, menaceEnsure: s.menaceEnsure,
     equippedGear: s.equippedGear, ownedGear: s.ownedGear,
   })));
+  // Splash (`_layout.tsx`) jest ŚWIADOMIE odsprzęgnięty od hydratacji store'ów — ekrany pod
+  // spodem same muszą obsłużyć moment ZANIM `usePetStore`/`useBossMapLayoutStore` wczytają się
+  // z dysku (2026-10-23, §413, user zrzutem: "nie ma bosa z którym walczę teraz... mapa dalej
+  // rozjechana mimo że dobrze ustawiona w edytorze"). Bez tej bramki `defeatedBosses` chwilowo
+  // czyta się jako `[]` (domyślny stan PRZED hydratacją) → `current` na chwilę wskazuje
+  // PIERWSZEGO bossa kampanii zamiast prawdziwego → kamera mapy (CampaignMap.tsx) montuje się z
+  // `contentOffset` liczonym z TEJ fałszywej pozycji; late-fix (animowany `scrollTo` gdy
+  // `currentId` się zmieni) próbuje to potem nadgonić, ale user zdążył złapać zrzutem ten
+  // przejściowy, zły stan. Ta sama rasa bugów po stronie `bossMapLayoutStore` (§412) robiła
+  // mapę "rozjechaną względem edytora" — edytor otwiera się PÓŹNIEJ (więcej czasu na
+  // hydratację), więc zdążał pokazać prawdziwe tory, podczas gdy pierwszy render mapy czasem
+  // łapał moment z jeszcze pustym `lanes: {}`.
+  const petHydrated = usePetStore(st => st._hydrated);
   // Selektor pojedynczego pola (2026-09-20, audyt logika/optymalizacja) — goły
   // `useExpensesStore()` subskrybował cały store (filters/isLoading/pendingSync...) na
   // ekranie, który już wcześniej w tej sesji dostał ten sam fix dla usePetStore.
@@ -283,6 +296,14 @@ export default function Bosses() {
           miejsca w layoucie (user: "zrob caloekranowa te mapę... zeby nie zasłaniały
           mapy"). ── */}
       <View style={{ flex: 1 }}>
+        {/* Bramka hydratacji (2026-10-23, §413, patrz komentarz przy `petHydrated` wyżej) —
+            NIC zależnego od `defeatedBosses`/`lanes` nie renderuje się, dopóki store nie
+            wczyta się z dysku, żeby user nie złapał przejściowego, błędnego stanu (zły
+            "aktualny" boss, kamera w złym miejscu, mapa nie zgadzająca się z edytorem). */}
+        {!petHydrated ? (
+          <View style={s.doneCenter}><ActivityIndicator color={c.text.muted} /></View>
+        ) : (
+        <>
         {bossView === 'campaign' && (
           current ? (
             <CampaignMap
@@ -359,6 +380,8 @@ export default function Bosses() {
             </PressableScale>
           )}
         </View>
+        </>
+        )}
       </View>
 
       {/* Popup raid/wydarzenie — treść 1:1 ze starej zawsze-widocznej mini-karty, teraz na

@@ -4,7 +4,7 @@ import { throttledPersistStorage } from '@/utils/throttledStorage';
 import { weekKeyOf, questRewardMult } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
-import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
+import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts, BOSSES } from '@/utils/bosses';
 import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE, menaceHpFor } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST, raidHpFor } from '@/utils/raid';
@@ -1159,6 +1159,34 @@ export const usePetStore = create<PetState>()(
         state.lastLoginDay = state.lastLoginDay ?? null;
         state.loginBonusDay = state.loginBonusDay ?? null;
         state.bossLog = state.bossLog ?? [];   // stary stan sprzed 2026-08-14 nie miał logu walk
+        // Migracja kolejności kampanii (§413, 2026-10-23, bosses.ts: kolejność bossów
+        // przełożona z poprzeplatanej na blokami żywiołów Las→Lawa→Woda→Burza→Niebo) —
+        // `defeatedBosses`/`defeatedMadBosses` są listami ID, więc dane SAME W SOBIE nie
+        // "psują się" przy reorderze, ALE mapa kampanii (`CampaignMap.tsx`) i `current`
+        // (pierwszy NIEpokonany w `BOSSES`) liczą "pokonany"/"aktualny" z ZAŁOŻENIEM że ta
+        // lista to ściśle PREFIKS aktualnej kolejności `BOSSES` (gra jest sekwencyjna — da się
+        // tylko walczyć z `current`, więc przy NIEZMIENIONEJ kolejności ta własność trzyma się
+        // sama automatycznie). Przełożenie kolejności jednorazowo łamie tę własność (stare
+        // pokonane id są rozrzucone po całej NOWEJ kolejności, nie jej prefiksem) — bez tej
+        // migracji user straciłby WIDOCZNY postęp (mapa pokazałaby prawie nic jako pokonane,
+        // `current` skoczyłby na początek), mimo że dane leżą cało w `defeatedBosses`.
+        // Naprawa: zachowaj TĘ SAMĄ LICZBĘ pokonanych, zmapowaną na pierwsze N id w NOWEJ
+        // kolejności (nie da się uczciwie zachować "które konkretnie id" przy indeksowym
+        // modelu gry — to najbliższe uczciwe przybliżenie "ile postępu", nie "jakiego").
+        // CELOWO bezwarunkowe (bez flagi "już zmigrowano") — funkcja jest IDEMPOTENTNA
+        // (ponowne zastosowanie do już zmigrowanej listy daje dokładnie tę samą listę, bo
+        // liczy się wyłącznie z `.length`), więc nie potrzeba wersjonowania ani ryzyka
+        // podwójnego airdropu; jeśli kolejność `BOSSES` już się nie zmieni, to po prostu no-op
+        // na każdej kolejnej hydratacji. `defeatedMadBosses` przycięty do długości
+        // zmigrowanego `defeatedBosses` (prefiks TEGO prefiksu) — MAD wymaga pokonanej
+        // kampanijnej wersji najpierw (`madCandidate`), więc nie może być "więcej" MAD-ów niż
+        // kampanijnych zwycięstw po migracji.
+        {
+          const migratedCampaign = BOSSES.slice(0, Math.min((state.defeatedBosses ?? []).length, BOSSES.length)).map(b => b.id);
+          const migratedMad = migratedCampaign.slice(0, Math.min((state.defeatedMadBosses ?? []).length, migratedCampaign.length));
+          state.defeatedBosses = migratedCampaign;
+          state.defeatedMadBosses = migratedMad;
+        }
         // Migracja raidMaxHp (2026-09-20, audyt logika/optymalizacja runda 3) — stary stan
         // sprzed dodania tego pola go nie ma. Trwający tydzień raidu (raidWeek ustawiony)
         // dostaje ZAMROŻONĄ wartość policzoną z AKTUALNEGO poziomu w chwili migracji — dokładnie

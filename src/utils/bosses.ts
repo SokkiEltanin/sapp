@@ -185,49 +185,84 @@ export interface Boss {
 // mitologiczne nazwy w starym rosterze (Hades, Cerberus). `emoji` przeliczone PRZY OKAZJI na
 // gatunek wskazany przez PRAWDZIWĄ nazwę (np. `Vulpes` = lis → 🦊, nie `🌞` wymyślone pod
 // błędną nazwę "Złoty Leniwiec") — `id`/`order`/pozostałe pola balansu nietknięte jak w §399.
+//
+// PRZEŁOŻENIE NA KOLEJNOŚĆ ŻYWIOŁÓW (§413, 2026-10-23) — user zrzutem: "bosy musza byc
+// poukładane kolejnością najpierw leśne na kampani potem ogniste potem itp itd". Dotąd
+// żywioły były rozrzucone po całym rosterze (niebo 1,2,6,10 → burza 3,9,12,13 → lawa
+// 4,7,8,16,19 → woda 5,11,17,18 → las 14,15,20,21,22, patrz BOSS_ELEMENT w bossIcons.ts) —
+// kampania ściśle sekwencyjna (pokonaj N → odblokuj N+1), więc gracz fizycznie WALCZYŁ w tej
+// poprzeplatanej kolejności żywiołów, nie blokami. Potwierdzone AskUserQuestion: nowa
+// kolejność bloków to **Las → Lawa → Woda → Burza → Niebo** (niebo/boskie jest TERAZ finałem
+// kampanii zamiast lasu — klown/princess/wizard przestają być "ostatnimi trzema bossami",
+// zostają za to mini-finałem WEWNĄTRZ bloku lasu, patrz kolejność niżej).
+//
+// `id`/`name`/`emoji`/`weakness`/`weaknessLabel`/`loot`/`taunt`/`attackKind`/`guard`/
+// `regenPct` są TOŻSAMOŚCIĄ bossa — NIETKNIĘTE, podróżują z nim na nowe miejsce w kolejności
+// (ten sam "trwały klucz" powód co przy §399/§403: `id` jest kluczem w `defeatedBosses`,
+// `loot.id` w `ownedItems`). Zmienione jest WYŁĄCZNIE `order`/`unlockLevel`/`hp`/`coins`/`xp`
+// — user świadomie wybrał "przelicz HP/poziomy od nowa pod nową kolejność" (NIE "zostaw HP
+// jak jest, zmień tylko kolejność walk", co zepsułoby pierwszą walkę: boss dawnego order14,
+// hp≈4260, jako dosłownie pierwsza walka w grze). Realizacja: te same 22 skalibrowane pary
+// (unlockLevel,hp,coins,xp) — setki godzin balansu, patrz BALANCE REVIEW/PODBITE komentarze
+// wyżej w tym pliku — zostają jako NUMERY SLOTÓW 1..22 w NIEZMIENIONEJ kolejności, tylko
+// przypięte do bossów w ICH NOWEJ kolejności zamiast starej. Krzywa trudności (monotoniczny
+// wzrost hp z `order`, patrz test „hp rośnie monotonicznie z order" w bosses.test.ts) zostaje
+// DOKŁADNIE taka sama jak przed przełożeniem — zmienia się tylko KTÓRY boss stoi w którym
+// miejscu tej krzywej. Kolejność WEWNĄTRZ każdego bloku żywiołu = stara względna kolejność
+// (stabilne sortowanie), żeby nie gubić istniejącej logiki "trudniejszy wariant tego samego
+// motywu później" tam gdzie już była (np. w lesie: devourer→samurai→klown→princess→wizard).
+// Loot (treść/moc bonusu) ŚWIADOMIE NIETKNIĘTY mimo że to TEŻ liczba rosnąca z trudnością w
+// starej kolejności — przeliczenie mocy lootu wymagałoby też przepisania jego opisowego
+// tekstu (`desc` koduje % na sztywno jako string), więc moc lootu zostaje dowiązana do
+// TOŻSAMOŚCI bossa jak dotąd (odłożone jako osobny, opcjonalny follow-up, patrz NEXT_STEPS.md).
+//
+// Migracja istniejącego postępu (`defeatedBosses`/`defeatedMadBosses`) → `onRehydrateStorage`
+// w petStore.ts: ta sama LICZBA pokonanych bossów zostaje zachowana, zmapowana na pierwsze N
+// id w TEJ nowej kolejności (idempotentne, patrz komentarz tam) — dokładne "które konkretnie
+// id" nie da się uczciwie zachować 1:1, bo `isDefeated`/`current` na mapie kampanii są
+// z założenia indeksowe (sekwencyjna gra), nie per-id.
 export const BOSSES: Boss[] = [
+  // ── LAS (5) — klown/princess/wizard były "ostatnimi trzema bossami" PRZED §413; teraz
+  // zostają mini-finałem WEWNĄTRZ tego bloku, nie całej kampanii. ──
   {
-    id: 'sloth', name: 'Vulpes Solaris', emoji: '🦊', order: 1, unlockLevel: 2, hp: 540,
-    attackKind: 'claw',
-    weakness: 'steps', weaknessLabel: 'kroki',
-    // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
-    // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
-    // przedmiot. Sama poduszka jako trofeum za pokonanie LENIWCA była tematycznie
-    // odwrotna (nagroda-symbol lenistwa za POKONANIE lenistwa) — tylko reflavor.
-    loot: { id: 'loot_pillow', name: 'Iskra Poranka', emoji: '⚡', desc: '+6% energii z dbania o siebie', bonus: { energyMult: 0.06 } },
-    coins: 8, xp: 60, taunt: 'Po co dziś wstawać…',
-  },
-  {
-    id: 'sugar', name: 'Draculus Caelestis', emoji: '🐲', order: 2, unlockLevel: 4, hp: 585,
+    id: 'devourer', name: 'Golem Fungalus', emoji: '🍄', order: 1, unlockLevel: 2, hp: 540,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
-    loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
-    coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
+    loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +3% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.03, energyMult: 0.08, crit: 0.05 } },
+    coins: 8, xp: 60, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true,
   },
   {
-    id: 'snake', name: 'Serpens Tempestatis', emoji: '🐍', order: 3, unlockLevel: 6, hp: 634,
+    id: 'samurai', name: 'Custos Nemoris', emoji: '🌲', order: 2, unlockLevel: 4, hp: 585,
+    attackKind: 'sword',
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
+    coins: 12, xp: 100, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
+  },
+  {
+    id: 'clown', name: 'Ferox Floralis', emoji: '🌹', order: 3, unlockLevel: 6, hp: 634,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_truthmask', name: 'Maska Prawdy', emoji: '🎭', desc: '+9% kryt, +5% atak', bonus: { crit: 0.09, atk: 0.05 } },
+    coins: 18, xp: 160, taunt: 'Uśmiechnij się, nikt nie musi wiedzieć…',
+  },
+  {
+    id: 'princess', name: 'Cornipes Silvae', emoji: '🦌', order: 4, unlockLevel: 9, hp: 700,
     weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
-    coins: 18, xp: 160, taunt: 'Odpuść dziś nawyki…',
-    attackKind: 'claw', // user (2026-08-26): "wąż możemy też pazury"
+    loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +2% uniku', bonus: { energyMult: 0.12, dodge: 0.02 } },
+    coins: 30, xp: 300, taunt: 'Ktoś w końcu to za ciebie naprawi…',
   },
   {
-    id: 'dragon', name: 'Draco Vulcanicus', emoji: '🐉', order: 4, unlockLevel: 9, hp: 700,
+    id: 'wizard', name: 'Silvanus', emoji: '🌳', order: 5, unlockLevel: 12, hp: 769,
+    attackKind: 'magic',
+    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
+    loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +4% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.04, energyMult: 0.10, crit: 0.08 } },
+    coins: 45, xp: 450, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
+  },
+  // ── LAWA (5) ──
+  {
+    id: 'dragon', name: 'Draco Vulcanicus', emoji: '🐉', order: 6, unlockLevel: 15, hp: 841,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Łuska Chaosu', emoji: '🐲', desc: '+2% uniku, +3% siły ataku', bonus: { dodge: 0.02, atk: 0.03 } },
-    coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
+    coins: 60, xp: 600, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
     attackKind: 'fire', // user (2026-08-26): "SMOK niech ogniem lub kulą ognia rzuca"
-  },
-  {
-    id: 'scroll', name: 'Scylla', emoji: '🦑', order: 5, unlockLevel: 12, hp: 769,
-    weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
-    coins: 45, xp: 450, taunt: 'Jeszcze tylko jeden filmik…',
-  },
-  {
-    id: 'stress', name: 'Anima Lactea', emoji: '✨', order: 6, unlockLevel: 15, hp: 841,
-    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+2% uniku', bonus: { dodge: 0.02 } },
-    coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
   },
   {
     id: 'junk', name: 'Ursus Vulcanicus', emoji: '🐻', order: 7, unlockLevel: 18, hp: 915,
@@ -240,108 +275,106 @@ export const BOSSES: Boss[] = [
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +2% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.02, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
-    // Custom art z 2026-09-23 (niedźwiedź z dymu/pustki, "Pustka Wypalenia") ZASTĄPIONA
-    // pełnym reskinem rosteru §399 — patrz komentarz na górze pliku.
     attackKind: 'claw',
   },
-  // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
-    id: 'insomnia', name: 'Elementum Fulguris', emoji: '⚡', order: 9, unlockLevel: 26, hp: 1356,
-    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
-    loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
-    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true,
-  },
-  {
-    id: 'compare', name: 'Essentia Aetheris', emoji: '💫', order: 10, unlockLevel: 30, hp: 1481,
-    attackKind: 'magic',
-    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+3% uniku, +3% atak', bonus: { dodge: 0.03, atk: 0.03 } },
-    coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
-  },
-  {
-    id: 'drought', name: 'Sanguis Vorax', emoji: '🐙', order: 11, unlockLevel: 35, hp: 3266,
-    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
-    loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
-    coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
-  },
-  {
-    id: 'procrast', name: 'Draco Fulguris', emoji: '🐲', order: 12, unlockLevel: 40, hp: 3582,
-    attackKind: 'magic', // piorun — elementarny/magiczny, nie fizyczny cios
-    weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
-    coins: 380, xp: 3800, taunt: 'Zrobisz to jutro… na pewno…',
-  },
-  {
-    id: 'doubt', name: 'Corvus Fulguris', emoji: '🐦‍⬛', order: 13, unlockLevel: 46, hp: 3956,
-    // Custom art z 2026-09-23 (mroczny kruk, "Cień Zwątpienia") ZASTĄPIONA pełnym reskinem
-    // rosteru §399 (NOWY kruk — patrz komentarz na górze pliku) — kruk jako motyw PRZETRWAŁ
-    // obie zmiany, tylko konkretny portret/nazwa się zmieniły.
-    attackKind: 'claw',
-    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +3% uniku', bonus: { atk: 0.08, dodge: 0.03 } },
-    coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
-  },
-  {
-    id: 'devourer', name: 'Golem Fungalus', emoji: '🍄', order: 14, unlockLevel: 52, hp: 4260,
-    weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
-    loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +3% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.03, energyMult: 0.08, crit: 0.05 } },
-    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true,
-  },
-  // ── prestiż (2026-08-09) — 8 nowych, z zapasowych portretów w assets/ikonybosów/;
-  // HP już NIE kontynuuje starej krzywej devourera (~×1.4/krok) — patrz balance-review
-  // komentarz nad BOSSES.
-  {
-    id: 'samurai', name: 'Custos Nemoris', emoji: '🌲', order: 15, unlockLevel: 58, hp: 4572,
-    attackKind: 'sword',
-    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
-    coins: 1300, xp: 13500, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
-  },
-  {
-    id: 'jaguar', name: 'Mantis Ignivora', emoji: '🦗', order: 16, unlockLevel: 65, hp: 4920,
+    id: 'jaguar', name: 'Mantis Ignivora', emoji: '🦗', order: 9, unlockLevel: 26, hp: 1356,
     attackKind: 'claw',
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+4% uniku', bonus: { dodge: 0.04 } },
-    coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
+    coins: 150, xp: 1500, taunt: 'Kup to teraz, pomyślisz później…',
   },
   {
-    id: 'dinosaur', name: 'Carcharos', emoji: '🦈', order: 17, unlockLevel: 72, hp: 5682,
+    id: 'hades', name: 'Vulpes Ignivorus', emoji: '🔥', order: 10, unlockLevel: 30, hp: 1481,
+    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
+    loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+5% uniku, +4% atak', bonus: { dodge: 0.05, atk: 0.04 } },
+    coins: 200, xp: 2000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
+  },
+  // ── WODA (4) ──
+  {
+    id: 'scroll', name: 'Scylla', emoji: '🦑', order: 11, unlockLevel: 35, hp: 3266,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
+    coins: 280, xp: 2800, taunt: 'Jeszcze tylko jeden filmik…',
+  },
+  {
+    id: 'drought', name: 'Sanguis Vorax', emoji: '🐙', order: 12, unlockLevel: 40, hp: 3582,
+    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
+    loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
+    coins: 380, xp: 3800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
+  },
+  {
+    id: 'dinosaur', name: 'Carcharos', emoji: '🦈', order: 13, unlockLevel: 46, hp: 3956,
     attackKind: 'claw',
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_fossil', name: 'Skamielina Mocy', emoji: '🦴', desc: '+10% atak, +3% kryt', bonus: { atk: 0.10, crit: 0.03 } },
-    coins: 3000, xp: 30000, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
+    coins: 550, xp: 5500, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
   },
   {
-    id: 'piratecapitan', name: 'Tempestas', emoji: '🌊', order: 18, unlockLevel: 80, hp: 6132,
+    id: 'piratecapitan', name: 'Tempestas', emoji: '🌊', order: 14, unlockLevel: 52, hp: 4260,
     attackKind: 'sword',
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_treasuremap', name: 'Mapa Skarbów', emoji: '🗺️', desc: '+10% energii, +4% atak', bonus: { energyMult: 0.10, atk: 0.04 } },
-    coins: 4500, xp: 45000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
+    coins: 900, xp: 9000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
   },
+  // ── BURZA (4) ──
   {
-    id: 'hades', name: 'Vulpes Ignivorus', emoji: '🔥', order: 19, unlockLevel: 88, hp: 7066,
-    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
-    loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+5% uniku, +4% atak', bonus: { dodge: 0.05, atk: 0.04 } },
-    coins: 6800, xp: 68000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
-  },
-  {
-    id: 'clown', name: 'Ferox Floralis', emoji: '🌹', order: 20, unlockLevel: 97, hp: 7586,
-    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_truthmask', name: 'Maska Prawdy', emoji: '🎭', desc: '+9% kryt, +5% atak', bonus: { crit: 0.09, atk: 0.05 } },
-    coins: 10000, xp: 100000, taunt: 'Uśmiechnij się, nikt nie musi wiedzieć…',
-  },
-  {
-    id: 'princess', name: 'Cornipes Silvae', emoji: '🦌', order: 21, unlockLevel: 106, hp: 8106,
+    id: 'snake', name: 'Serpens Tempestatis', emoji: '🐍', order: 15, unlockLevel: 58, hp: 4572,
     weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +2% uniku', bonus: { energyMult: 0.12, dodge: 0.02 } },
-    coins: 15000, xp: 150000, taunt: 'Ktoś w końcu to za ciebie naprawi…',
+    loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
+    coins: 1300, xp: 13500, taunt: 'Odpuść dziś nawyki…',
+    attackKind: 'claw', // user (2026-08-26): "wąż możemy też pazury"
   },
   {
-    id: 'wizard', name: 'Silvanus', emoji: '🌳', order: 22, unlockLevel: 116, hp: 9318,
+    id: 'insomnia', name: 'Elementum Fulguris', emoji: '⚡', order: 16, unlockLevel: 65, hp: 4920,
+    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
+    loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
+    coins: 2000, xp: 20000, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true,
+  },
+  {
+    id: 'procrast', name: 'Draco Fulguris', emoji: '🐲', order: 17, unlockLevel: 72, hp: 5682,
+    attackKind: 'magic', // piorun — elementarny/magiczny, nie fizyczny cios
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
+    coins: 3000, xp: 30000, taunt: 'Zrobisz to jutro… na pewno…',
+  },
+  {
+    id: 'doubt', name: 'Corvus Fulguris', emoji: '🐦‍⬛', order: 18, unlockLevel: 80, hp: 6132,
+    attackKind: 'claw',
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +3% uniku', bonus: { atk: 0.08, dodge: 0.03 } },
+    coins: 4500, xp: 45000, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
+  },
+  // ── NIEBO (4) — nowy finał kampanii (było: las, przed §413). ──
+  {
+    id: 'sloth', name: 'Vulpes Solaris', emoji: '🦊', order: 19, unlockLevel: 88, hp: 7066,
+    attackKind: 'claw',
+    weakness: 'steps', weaknessLabel: 'kroki',
+    // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
+    // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
+    // przedmiot. Sama poduszka jako trofeum za pokonanie LENIWCA była tematycznie
+    // odwrotna (nagroda-symbol lenistwa za POKONANIE lenistwa) — tylko reflavor.
+    loot: { id: 'loot_pillow', name: 'Iskra Poranka', emoji: '⚡', desc: '+6% energii z dbania o siebie', bonus: { energyMult: 0.06 } },
+    coins: 6800, xp: 68000, taunt: 'Po co dziś wstawać…',
+  },
+  {
+    id: 'sugar', name: 'Draculus Caelestis', emoji: '🐲', order: 20, unlockLevel: 97, hp: 7586,
+    weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
+    loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
+    coins: 10000, xp: 100000, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
+  },
+  {
+    id: 'stress', name: 'Anima Lactea', emoji: '✨', order: 21, unlockLevel: 106, hp: 8106,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+2% uniku', bonus: { dodge: 0.02 } },
+    coins: 15000, xp: 150000, taunt: 'Martw się wszystkim naraz…',
+  },
+  {
+    id: 'compare', name: 'Essentia Aetheris', emoji: '💫', order: 22, unlockLevel: 116, hp: 9318,
     attackKind: 'magic',
-    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
-    loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +4% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.04, energyMult: 0.10, crit: 0.08 } },
-    coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+3% uniku, +3% atak', bonus: { dodge: 0.03, atk: 0.03 } },
+    coins: 22000, xp: 225000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
 ];
 

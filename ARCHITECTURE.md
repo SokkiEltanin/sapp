@@ -22067,6 +22067,71 @@ Wszystkie istniejące ręczne nadpisania pozycji (stary `'boss-map-layout-v1'` k
 ŚWIADOMIE zgubione przy tej aktualizacji (nowy klucz `-v2`, czysty start) — user będzie musiał
 ponownie poustawiać tory dla bossów, którym zależało na innym niż domyślny.
 
+## 413. Bramka hydratacji mapy bossów + kampania przełożona na bloki żywiołów (2026-10-23)
+
+User zrzutem, zaraz po zmergowaniu §412: "nie ma bosa z którym walczę teraz... mapa dalej
+rozjechana mimo że dobrze ustawiona w edytorze (może ty zmieniasz edytor nie tę mapę)" +
+"bosy muszą być poukładane kolejnością najpierw leśne na kampanii potem ogniste potem itd" +
+zgłoszenie "behemota cukru" jako rzekomo pokonanego bez walki. Trzy osobne sprawy:
+
+**1. Bramka hydratacji (prawdziwy bug §412, nie regres)** — `_layout.tsx`'s splash jest
+ŚWIADOMIE odsprzęgnięty od hydratacji store'ów (komentarz tam: "ekrany pod spodem po prostu
+pokazują normalny stan ładowania/pusty przez tę chwilę"), ale `bosses.tsx`/`CampaignMap.tsx`/
+`boss-map-editor.tsx` tego nie robiły — pierwszy render mógł złapać `usePetStore`'s
+`defeatedBosses=[]` (jeszcze nie wczytane z dysku) → `current` chwilowo = pierwszy boss →
+kamera mapy montuje się (raz, `contentOffset` czytany TYLKO przy montażu) z fałszywą
+pozycją — ORAZ `useBossMapLayoutStore`'s `lanes={}` (też jeszcze nie wczytane) → mapa chwilowo
+pokazuje czysto proceduralny układ zamiast ręcznie ustawionych torów, podczas gdy EDYTOR
+(otwarty później w nawigacji, więcej czasu na hydratację) już pokazywał poprawne dane —
+dokładnie zgłoszony rozjazd "edytor dobry, mapa zła". Fix: `bosses.tsx` nie renderuje mapy/
+energii dopóki `usePetStore`'s `_hydrated` nie jest `true` (ActivityIndicator zamiast); 
+`CampaignMap.tsx`/`boss-map-editor.tsx` nie montują `ScrollView` dopóki
+`useBossMapLayoutStore`'s `_hydrated` nie jest `true` (ten sam wzorzec co istniejąca bramka na
+`viewport.w/h`). "Behemot Cukru" okazał się NIE być bugiem — to kafel RAJDU (prawy dolny róg,
+`src/utils/raid.ts`'s `{id:'behemoth', name:'Behemot Cukru'}`), nie boss kampanii; odznaka z
+liczbą to łączny licznik wygranych rajdów, nie "pokonany bez walki".
+
+**2. Kampania przełożona na kolejność żywiołów** — potwierdzone `AskUserQuestion`: **Las →
+Lawa → Woda → Burza → Niebo** (było poprzeplatane: niebo 1,2,6,10 / burza 3,9,12,13 / lawa
+4,7,8,16,19 / woda 5,11,17,18 / las 14,15,20,21,22). Niebo/boskie jest TERAZ finałem kampanii
+zamiast lasu — klown/princess/wizard przestają być "ostatnimi trzema bossami", zostają
+mini-finałem WEWNĄTRZ bloku lasu. `id`/`name`/`emoji`/`weakness`/`loot`/`taunt`/`attackKind`/
+`guard`/`regenPct` są tożsamością bossa — nietknięte, podróżują z nim. Zmienione WYŁĄCZNIE
+`order`/`unlockLevel`/`hp`/`coins`/`xp`: user wybrał "przelicz od nowa pod nową kolejność"
+(rekomendowane) — w praktyce te same 22 skalibrowane pary (unlockLevel,hp,coins,xp), jako
+numery slotów 1..22 w niezmienionej kolejności, przypięte do bossów w ICH nowej kolejności
+zamiast starej (krzywa trudności identyczna, zmienia się tylko KTO stoi gdzie). Kolejność
+WEWNĄTRZ bloku = stara względna kolejność (stabilne sortowanie). Loot (moc bonusu/`desc`
+string) ŚWIADOMIE NIETKNIĘTY — przeliczenie wymagałoby też przepisania opisowego tekstu,
+odłożone jako opcjonalny follow-up (patrz NEXT_STEPS.md). Pełne uzasadnienie i tabela slotów →
+obszerny komentarz nad `BOSSES` w `bosses.ts`.
+
+**Migracja postępu** (`petStore.ts`'s `onRehydrateStorage`) — `defeatedBosses`/
+`defeatedMadBosses` są listami ID, więc same w sobie nie "psują się" przy reorderze, ale
+`CampaignMap.tsx`'s `isDefeated`/`current` liczą się INDEKSOWO (gra sekwencyjna: `defeatedBosses`
+musi być prefiksem `BOSSES` w AKTUALNEJ kolejności, inaczej mapa pokazuje prawie nic jako
+pokonane). Migracja zachowuje TĘ SAMĄ LICZBĘ pokonanych, zmapowaną na pierwsze N id w NOWEJ
+kolejności (`BOSSES.slice(0, N)`) — nie da się uczciwie zachować "które konkretnie id" przy
+modelu indeksowym, to najbliższe uczciwe przybliżenie "ile postępu". `defeatedMadBosses`
+przycięty do prefiksu zmigrowanego `defeatedBosses` (MAD wymaga pokonanej kampanijnej wersji
+najpierw). Funkcja CELOWO bezwarunkowa, bez flagi "już zmigrowano" — jest idempotentna
+(ponowne zastosowanie do już zmigrowanej listy to no-op, liczy się wyłącznie z `.length`).
+
+**Testy zaktualizowane** (`bosses.test.ts`/`madBosses.test.ts`) — dwa miejsca zakładały
+konkretne id na konkretnych pozycjach (`BOSSES[0]`='sloth', `wizard`=finale order22) —
+przepisane na pozycyjne odwołania (`BOSSES[0]`/`BOSSES[BOSSES.length-1]`) zamiast
+hardkodowanych id, żeby testować WŁASNOŚĆ (monotoniczność/granice), nie przypadkową tożsamość.
+Lista common/elite id (8/14 podział wg `unlockLevel<26`) przeliczona pod nowe przypisanie.
+
+**Weryfikacja**: `tsc --noEmit` czyste. `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: po OTA, Bossy → Kampania powinna pokazać
+bossów leśnych jako pierwszych do pokonania (zamiast dawnego Vulpes Solaris/niebo). Istniejący
+postęp (jeśli jakiś był) powinien zostać zachowany jako "tyle samo pokonanych", teraz
+dotyczących innych konkretnych bossów niż wcześniej (oczekiwane, nie bug — patrz migracja
+wyżej). Kamera powinna od razu (bez opóźnienia/flashu) wycelować w aktualnego bossa, a mapa od
+razu zgadzać się z tym co pokazuje edytor.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
