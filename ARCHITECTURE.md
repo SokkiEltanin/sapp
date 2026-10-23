@@ -21999,6 +21999,74 @@ Pupila (dół ekranów Pupil/Bossy/Sklep/Questy) powinien pokazywać zwykły, sz
 zakładek — jeśli ktoś miał wcześniej włączony custom navbar, po tej zmianie wraca do domyślnego
 (oczekiwane, nie bug).
 
+## 412. Mapa kampanii bossów — przebudowa od zera #3, model "lane" (2026-10-23)
+
+User po §410 (cascade-clamp Y) retestował na potwierdzonym aktualnym buildzie i mapa WCIĄŻ
+była rozjechana: "Tak, zaktualizowałem i dalej źle". Trzecia runda tego samego buga na tej
+samej architekturze (§322 pierwotny swobodny drag → §403 "key={d}" SVG-staleness theory →
+§410 cascade-clamp Y) — user: "musimy ją chyba wywalić i zbudować od zera". Zamiast czwartej
+łatki walidującej/klamrującej Y PO FAKCIE, root fix robi niepoprawny stan STRUKTURALNIE
+NIEOSIĄGALNYM: żaden kod nigdzie w repo nie ma już możliwości nadpisać Y.
+
+**Nowy model**:
+- **Y jest WYŁĄCZNIE `f(indeks)`** — `layoutBossMap`'owe `PAD_Y + i*ROW_GAP`. Brak jakiegokolwiek
+  parametru/override'u, który mógłby je zmienić — nie trzeba już pisać testu "Y przetrwa
+  nadpisanie", bo nie ma już KODU który mógłby je złamać (`applyLaneOverrides`'s sygnatura to
+  `Record<string, number>` — jedna liczba, tor, nie `{x,y}`).
+- **X to wybór jednego z `LANES` (5) DYSKRETNYCH torów**, przez TAP (nie drag) — te same tory,
+  po których i tak chodzi proceduralny zygzak. Jedno źródło prawdy tor→piksel: `laneX(lane,
+  areaWidth)` w `bossMapLayout.ts`, używane TAK SAMO przez `layoutBossMap` (bazowy układ) i
+  `applyLaneOverrides` (ręczne nadpisania) — węzeł przesunięty na tor N w edytorze ZAWSZE
+  wyląduje w tym samym pikselu co proceduralny węzeł na torze N. `xToLane(x, areaWidth)` —
+  odwrotność, do pokazania w edytorze AKTUALNEGO toru nawet dla bossów bez ręcznego nadpisania.
+
+**Zmienione pliki**:
+- `src/utils/bossMapLayout.ts` — `LANES` wyeksportowane; nowe `laneX()`/`xToLane()`;
+  `applyLayoutOverrides({x,y})` USUNIĘTE CAŁKOWICIE, zamiennik `applyLaneOverrides(base, ids,
+  Record<string, number>, areaWidth)`. `layoutBossMap` przepisany żeby wołać `laneX()` zamiast
+  własnej kopii formuły (było realne ryzyko rozjazdu dwóch kopii tej samej matematyki).
+  `catmullRomPath`/`centerScrollY` NIETKNIĘTE (potwierdzone w §403/§410 że nie są źródłem buga).
+- `src/store/bossMapLayoutStore.ts` — `positions: Record<string,{x,y}>` → `lanes:
+  Record<string, number>`; `setPosition`→`setLane`, `resetPosition`→`resetLane`, `resetAll`
+  zostaje. Klucz persystencji podbity `'boss-map-layout-v1'` → `'boss-map-layout-v2'`
+  ŚWIADOMIE (nie migracja) — stary kształt danych niekompatybilny z nowym, a dane pod starym
+  kluczem mogły same być źródłem zgłaszanego buga, więc czysty start bezpieczniejszy niż próba
+  konwersji potencjalnie uszkodzonych pozycji na tory.
+- `src/components/bosses/CampaignMap.tsx` — czyta `st.lanes` (było `st.positions`), woła
+  `applyLaneOverrides` (było `applyLayoutOverrides`). Reszta komponentu (kamera/ScrollView/
+  Catmull-Rom render/popup) nietknięta.
+- `app/boss-map-editor.tsx` — **PanResponder-owy drag gest USUNIĘTY CAŁKOWICIE** (`dragPos`
+  state, `responders.current` ref-owa tablica, `onPanResponderMove/Grant/Release/Terminate/
+  TerminationRequest`, `onShouldBlockNativeResponder` — to był dokładnie udokumentowany,
+  nigdy w pełni naprawiony bug "ScrollView przejmuje gest w locie", user: "nic praktycznie nie
+  mogę zrobić"). Zamiennik: tap na węźle/numerku wybiera bossa (`selectedIdx`, mechanizm z §376
+  zachowany), panel niżej dostał JEDEN `Stepper` "Tor" (1..LANES, 1-indeksowo dla usera, store
+  trzyma 0-indeksowo) zamiast dwóch Stepperów X/Y. Brak własnego gestu drag = strukturalnie
+  brak z czym ScrollView mógłby "walczyć" o responder — cała klasa buga usunięta, nie tylko
+  załatana.
+- `__tests__/bossMapLayout.test.ts` — testy `applyLayoutOverrides`/§410 cascade-clamp
+  (nadpisanie Y, kolejność Y przetrwa override, przycinanie X, wysokość płótna) ZASTĄPIONE
+  testami `laneX`/`xToLane` (odwrotność, przycinanie toru) i `applyLaneOverrides` (Y zawsze
+  bazowe niezależnie od KOMBINACJI nadpisań torów — bo override nigdy nie niesie Y w ogóle,
+  nie dlatego że jest walidowany).
+
+**Co NIE zmieniło się**: tło/mgła/siatka SVG, popup bossa, `campaignMapStyleStore` (rozmiar
+węzła/szerokość ścieżki/promień popupu — kreator stylu, osobna faza §379), wejście do edytora
+z `bosses.tsx` (`router.push('/boss-map-editor')`).
+
+**Weryfikacja**: `tsc --noEmit` czyste. `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: po aktualizacji OTA, w Bossy → Kampania sprawdź że
+KAŻDY węzeł leży dokładnie na linii ścieżki (powtórka testu z §410/§403, teraz na strukturalnie
+innej architekturze — nie powinno dać się tego już złamać, ale to wymaga potwierdzenia na
+prawdziwym urządzeniu, nie tylko w jest). W edytorze mapy: sprawdź że tap na bossa/numerku
+wybiera go (panel "Tor" się pojawia), Stepper +/- faktycznie przesuwa węzeł między torami na
+żywo, i że przewijanie ScrollView działa NORMALNIE nawet z palcem blisko węzła (nie ma już
+gestu drag, więc nie powinno być już KONFLIKTU, ale to też wymaga potwierdzenia na urządzeniu).
+Wszystkie istniejące ręczne nadpisania pozycji (stary `'boss-map-layout-v1'` klucz) są
+ŚWIADOMIE zgubione przy tej aktualizacji (nowy klucz `-v2`, czysty start) — user będzie musiał
+ponownie poustawiać tory dla bossów, którym zależało na innym niż domyślny.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

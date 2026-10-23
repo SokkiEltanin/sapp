@@ -30,6 +30,29 @@ user wejdzie na konkretny ekran). ⚠️ **UWAGA**: §403-§409 niżej opisywał
 edytora płótna, który od §411 (patrz NAJNOWSZY wpis poniżej) **już nie istnieje** — te wpisy są
 teraz historią, nie do testowania.
 
+## ✅🆕 Mapa kampanii bossów — przebudowa od zera #3, model "lane" (§412)
+
+User po §410 retestował na potwierdzonym aktualnym buildzie i mapa WCIĄŻ była rozjechana:
+"Tak, zaktualizowałem i dalej źle" — trzecia runda tego samego buga (§322→§403→§410). Root fix
+(nie czwarta łatka): Y jest teraz WYŁĄCZNIE `f(indeks)`, bez ŻADNEGO sposobu go nadpisać
+nigdzie w kodzie (nie walidowane po fakcie — strukturalnie nieosiągalne złamanie kolejności).
+X to wybór jednego z 5 DYSKRETNYCH torów przez TAP (nie drag), tą samą `laneX()` co bazowy
+proceduralny zygzak. Edytor (`boss-map-editor.tsx`) stracił CAŁY `PanResponder`-owy drag gest
+(źródło udokumentowanego, nigdy w pełni naprawionego "ScrollView przejmuje gest w locie" buga,
+user: "nic praktycznie nie mogę zrobić") — zamiennik to tap-wybór + jeden Stepper "Tor" w
+panelu. Store (`bossMapLayoutStore.ts`) przeszedł z `positions: {x,y}` na `lanes: number`,
+klucz persystencji podbity `-v1`→`-v2` ŚWIADOMIE (stare ręczne nadpisania pozycji są zgubione —
+user będzie musiał ponownie poustawiać tory). Pełny opis zmienionych plików i powód każdej
+decyzji → ARCHITECTURE.md §412.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: po OTA, Bossy → Kampania — każdy węzeł DOKŁADNIE
+na linii ścieżki (powtórka testu z §410, teraz na innej architekturze). Edytor mapy: tap na
+bossa/numerku wybiera go, Stepper "Tor" przesuwa węzeł między torami na żywo, przewijanie
+ScrollView działa normalnie nawet z palcem blisko węzła (brak już gestu drag, który z nim
+konkurował).
+
 ## ⚠️🆕 Usunięcie generycznego systemu edytora płótna w całości (§411)
 
 User: "ten edytor jest źle zrobiony... myślałem że dostanę Figmę a dostałem gówno i nie mam
@@ -52,21 +75,19 @@ usunięte razem z kodem który testowały), 1432/1432 testów — wszystkie pozo
 zmian.
 
 **DO ZROBIENIA, reszta planu usera (w tej kolejności)**:
-1. **Mapa kampanii bossów od zera** — user: "musimy ją chyba wywalić i zbudować od zera"
-   (potwierdził że §410 NIE wystarczyło, retestowane po OTA). Plan: model "tor/lane" zamiast
-   swobodnego x/y drag + Catmull-Rom (źródło powtarzających się bugów przez CAŁĄ historię tej
-   mapy) — Y zawsze = f(indeks), NIGDY nadpisywalne; X = wybór dyskretnego toru przez TAP, nie
-   drag. Stan niepoprawny strukturalnie niemożliwy do osiągnięcia, zamiast walidowany po fakcie.
+1. ✅ **Mapa kampanii bossów od zera** — ZROBIONE, patrz §412 wyżej.
 2. **Pozostałe bossy/questy ze starym artem** — user zgłosił "leśne" portrety do podmiany, ale
    WSZYSTKIE 5 plików `L_*.png` w `assets/bossy/kampania/` są już podpięte pod kampanię (3 z
    nich to ostatnie bossy finałowe: clown→Ferox Floralis/princess→Cornipes Silvae/
    wizard→Silvanus, §403) — **BLOKADA, czeka na odpowiedź usera**: czy chodziło o coś innego
    (minibossy/raid/seasonalEvents WCIĄŻ mają stary art, patrz NEXT_STEPS niżej, §399) czy
    paczka faktycznie nie dotarła do repo (sprawdzone: brak commitów z nowymi assetami po §399).
-3. **Okienka stylu zasłaniające płótno / kompletny rejestr danych / wykresy dla dowolnej
+3. **Nowy, prosty edytor pozycji/skali obrazków na ekranie Pupila** — confirmed scope z §411
+   (JEDYNE co zostaje z generycznego systemu płótna, nie zbudowane jeszcze — osobna, dużo
+   prostsza funkcja niż stary system).
+4. **Okienka stylu zasłaniające płótno / kompletny rejestr danych / wykresy dla dowolnej
    danej** — MOOT po §411 (dotyczyły systemu który już nie istnieje) — jeśli user wróci do tych
-   próśb, to będzie dotyczyć NOWEGO, jeszcze niezaprojektowanego systemu (pkt 2 z confirmed
-   scope: proste pozycjonowanie obrazków na Pupilu), nie naprawy starego.
+   próśb, to będzie dotyczyć NOWEGO systemu z pkt 3, nie naprawy starego.
 
 **Priorytet testu na urządzeniu — WYSOKI**: po OTA sprawdź że wszystkie 14 ekranów otwierają
 się normalnie (bez czarnego ekranu), a wbudowane karty dashboardu + navbar Pupila (zwykły,

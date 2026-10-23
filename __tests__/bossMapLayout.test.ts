@@ -1,4 +1,4 @@
-import { layoutBossMap, applyLayoutOverrides, catmullRomPath, centerScrollY } from '@/utils/bossMapLayout';
+import { layoutBossMap, applyLaneOverrides, laneX, xToLane, LANES, catmullRomPath, centerScrollY } from '@/utils/bossMapLayout';
 
 describe('bossMapLayout — layoutBossMap', () => {
   test('count 0 → brak węzłów', () => {
@@ -78,74 +78,76 @@ describe('bossMapLayout — layoutBossMap', () => {
   });
 });
 
-describe('bossMapLayout — applyLayoutOverrides (edytor mapy, §322)', () => {
+// §412, 2026-10-23 — PRZEBUDOWA OD ZERA #3. `applyLayoutOverrides` (swobodny x/y, §322/§410)
+// USUNIĘTE CAŁKOWICIE: user retestował §410 (cascade-clamp Y) po świeżym OTA i mapa WCIĄŻ była
+// rozjechana ("Tak, zaktualizowałem i dalej źle") — trzecia runda tego samego buga na tej samej
+// architekturze. Zamiast kolejnej łatki walidującej Y po fakcie: Y jest teraz WYŁĄCZNIE f(indeks),
+// bez ŻADNEGO sposobu go nadpisać — testy niżej właśnie to sprawdzają (złamana kolejność Y jest
+// strukturalnie nieosiągalna, nie tylko "nieopłacalna"). X to wybór jednego z `LANES`
+// DYSKRETNYCH torów (ta sama `laneX()` co bazowy proceduralny zygzak — jedno źródło prawdy).
+describe('bossMapLayout — laneX / xToLane (jedno źródło prawdy tor↔piksel, §412)', () => {
+  test('laneX zawsze w [0, areaWidth], niezależnie od toru', () => {
+    for (let lane = -2; lane <= LANES + 2; lane++) {
+      const x = laneX(lane, 300);
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(300);
+    }
+  });
+
+  test('laneX przycina tor do [0, LANES-1] — spoza zakresu nie wyjeżdża poza pasmo torów', () => {
+    expect(laneX(-5, 300)).toBe(laneX(0, 300));
+    expect(laneX(999, 300)).toBe(laneX(LANES - 1, 300));
+  });
+
+  test('xToLane jest odwrotnością laneX dla każdego poprawnego toru', () => {
+    for (let lane = 0; lane < LANES; lane++) {
+      expect(xToLane(laneX(lane, 340), 340)).toBe(lane);
+    }
+  });
+});
+
+describe('bossMapLayout — applyLaneOverrides (edytor mapy, §412)', () => {
   test('brak nadpisań → węzły bez zmian (procedural zostaje)', () => {
     const base = layoutBossMap(5, 300);
     const ids = ['a', 'b', 'c', 'd', 'e'];
-    const out = applyLayoutOverrides(base.nodes, ids, {}, 300);
+    const out = applyLaneOverrides(base.nodes, ids, {}, 300);
     expect(out.nodes).toEqual(base.nodes);
   });
 
-  test('nadpisanie konkretnego id zmienia TYLKO ten węzeł (gdy nie łamie kolejności Y sąsiadów)', () => {
+  test('nadpisanie toru zmienia TYLKO X tego węzła — Y zostaje bazowe, nietknięte', () => {
     const base = layoutBossMap(3, 300);
     const ids = ['a', 'b', 'c'];
-    // y:200 celowo MIESZCZĄ SIĘ między sąsiadami (base: 100/270/440) — nie wyzwala kaskady
-    // niżej, więc test faktycznie sprawdza izolację, nie przypadkiem jej łamie.
-    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 123, y: 200 } }, 300);
+    const out = applyLaneOverrides(base.nodes, ids, { b: 4 }, 300);
     expect(out.nodes[0]).toEqual(base.nodes[0]);
-    expect(out.nodes[1]).toEqual({ x: 123, y: 200 });
+    expect(out.nodes[1]).toEqual({ x: laneX(4, 300), y: base.nodes[1].y });
     expect(out.nodes[2]).toEqual(base.nodes[2]);
   });
 
-  // §410, 2026-10-21 — user zrzutem: mapa kampanii WCIĄŻ wyglądała rozjechana na POTWIERDZONYM
-  // aktualnym buildzie (nazwy bossów się zgadzały z §403). Root cause: `boss-map-editor.tsx`'s
-  // gest przeciągania nie ogranicza Y węzła względem SĄSIADÓW (tylko floor 20 od góry płótna),
-  // więc ręcznie ustawiona pozycja mogła złamać założenie "Y ściśle rośnie z indeksem", na
-  // którym opiera się CAŁA gwarancja braku samoprzecięć trasy (patrz test w `layoutBossMap`
-  // wyżej) — Catmull-Rom wtedy rysuje krzywą, która "zawraca", żeby trafić w punkty w złej
-  // kolejności, mimo że KAŻDY węzeł stoi dokładnie tam, gdzie go zapisano.
-  test('nadpisanie Y, które "wyprzedza" kolejny węzeł, przesuwa go w dół zamiast łamać kolejność', () => {
-    const base = layoutBossMap(3, 300); // y bazowe: 100, 270, 440
-    const ids = ['a', 'b', 'c'];
-    // 'b' nadpisane na y=500 — WIĘKSZE niż bazowe y węzła 'c' (440). Bez fixa: 'c' zostałby
-    // na 440, czyli NAD 'b' — złamana kolejność, samoprzecinająca się krzywa.
-    const out = applyLayoutOverrides(base.nodes, ids, { b: { x: 10, y: 500 } }, 300);
-    expect(out.nodes[1].y).toBe(500);
-    expect(out.nodes[2].y).toBeGreaterThan(out.nodes[1].y); // 'c' DOGANIA, nie zostaje w tyle
-    expect(out.nodes[2].y).toBe(500 + 20); // dokładnie o MIN_Y_GAP niżej, nie więcej niż trzeba
-  });
-
-  test('Y ściśle rośnie z indeksem NAWET z dowolną kombinacją ręcznych nadpisań (gwarancja przetrwa override)', () => {
+  // Rdzeń §412 — nie "Y przetrwa override", ale "nie ma już KODU który mógłby go złamać",
+  // bo `applyLaneOverrides` nigdy nie czyta Y z `laneOverrides` w ogóle (patrz sygnatura:
+  // `Record<string, number>`, jedna liczba — tor — nie {x,y}).
+  test('Y ściśle rośnie z indeksem NIEZALEŻNIE od DOWOLNEJ kombinacji nadpisań torów', () => {
     const base = layoutBossMap(10, 300);
     const ids = base.nodes.map((_, i) => `b${i}`);
-    // Celowo chaotyczne/odwrócone Y — dokładnie to, co user mógł zrobić ręcznie przeciągając.
-    const overrides: Record<string, { x: number; y: number }> = {
-      b2: { x: 50, y: 50 }, b3: { x: 50, y: 40 }, b7: { x: 50, y: 9999 }, b8: { x: 50, y: 10 },
-    };
-    const out = applyLayoutOverrides(base.nodes, ids, overrides, 300);
+    const overrides: Record<string, number> = { b2: 0, b3: 4, b7: 0, b8: 4 };
+    const out = applyLaneOverrides(base.nodes, ids, overrides, 300);
     for (let i = 1; i < out.nodes.length; i++) {
       expect(out.nodes[i].y).toBeGreaterThan(out.nodes[i - 1].y);
     }
   });
 
-  test('bez nadpisań — no-op (bazowy ROW_GAP już spełnia warunek, zero zmiany)', () => {
-    const base = layoutBossMap(22, 340);
-    const ids = base.nodes.map((_, i) => `b${i}`);
-    const out = applyLayoutOverrides(base.nodes, ids, {}, 340);
-    expect(out.nodes).toEqual(base.nodes);
-  });
-
-  test('nadpisane x przycinane do [0, areaWidth] — pozycja z innego rozmiaru ekranu nie wyjeżdża poza płótno', () => {
+  test('nadpisany tor spoza [0, LANES-1] przycinany — nie wyjeżdża poza pasmo torów', () => {
     const base = layoutBossMap(2, 300);
-    const out = applyLayoutOverrides(base.nodes, ['a', 'b'], { a: { x: 999, y: 10 }, b: { x: -50, y: 10 } }, 300);
-    expect(out.nodes[0].x).toBe(300);
-    expect(out.nodes[1].x).toBe(0);
+    const out = applyLaneOverrides(base.nodes, ['a', 'b'], { a: 999, b: -50 }, 300);
+    expect(out.nodes[0].x).toBe(laneX(LANES - 1, 300));
+    expect(out.nodes[1].x).toBe(laneX(0, 300));
   });
 
-  test('wysokość płótna rośnie, żeby pomieścić węzeł przeciągnięty niżej niż domyślny układ', () => {
+  test('wysokość płótna = max Y + margines, Y bazowy jedynym źródłem (nadpisania toru nie wpływają)', () => {
     const base = layoutBossMap(3, 300);
-    const out = applyLayoutOverrides(base.nodes, ['a', 'b', 'c'], { c: { x: 10, y: 99999 } }, 300);
-    expect(out.height).toBeGreaterThan(99999);
+    const outNoOverride = applyLaneOverrides(base.nodes, ['a', 'b', 'c'], {}, 300);
+    const outWithOverride = applyLaneOverrides(base.nodes, ['a', 'b', 'c'], { c: 2 }, 300);
+    expect(outWithOverride.height).toBe(outNoOverride.height);
   });
 });
 
