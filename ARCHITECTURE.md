@@ -18538,6 +18538,15 @@ czysto refaktor, zero nowej logiki do przetestowania).
 serie" wygląda i działa IDENTYCZNIE jak przed tą zmianą we WSZYSTKICH 4 stylach (przełącz w
 kreatorze kafelków), łącznie z tapnięciem (nawigacja do kalendarza/historii) i progresem paska.
 
+> ⚠️ **USUNIĘTE W CAŁOŚCI (§411, 2026-10-23)** — sekcje §341 do §409 niżej opisują generyczny
+> system wolnego płótna (kafle serii/pola danych/kształty/tekst-bindowanie, edytor Draft/
+> Symulator/Wdrożenie, custom navbar), który **już nie istnieje w kodzie**. User: "usuń
+> wszystkie edytora płótna i wszystkie elementy które po nich zostały". Historia zostaje tu
+> jako ZAPIS DECYZJI (dlaczego kolejne fazy wyglądały tak jak wyglądały), ale **NIE jest to już
+> aktualna architektura** — nie próbuj naprawiać/rozszerzać niczego opisanego tu przez wzgląd na
+> te sekcje, kod którego dotyczą nie istnieje. Pełny opis usunięcia i co ZOSTAŁO (mapa bossów,
+> `dashboard-tile-creator.tsx` z fixed-tile stylami) → **§411 na końcu pliku**.
+
 ## 341. System kopiowania komponentów — Faza 15: wolne płótno, pierwszy ekran (2026-10-16)
 
 Po fundamencie z Fazy 14 (§340, ekstrakcja `StreakTile`) — pełny, działający wolny canvas na
@@ -21902,6 +21911,93 @@ na niebieskiej/czarnej linii ścieżki, bez wyjątku. Jeśli NADAL gdzieś wida�
 oznacza że root cause jest INNY niż Y-override (może dotyczyć samego `boss-map-editor.tsx`'s
 `PanResponder`/`responders.current` ref-owej logiki, albo czegoś w natywnym SVG-renderze,
 mimo matematycznie poprawnych danych) — zgłoś to z dokładnym zrzutem KTÓREGO konkretnie bossa.
+
+## 411. Usunięcie generycznego systemu edytora płótna w całości (2026-10-23)
+
+User, po §409 (nawigacja edytora) i §410 (fix mapy): "ten edytor jest źle zrobiony... myślałem
+że dostanę Figmę a dostałem gówno i nie mam danych wszystkich". Zaproponował pełny rewrite
+appki w innym języku (C++) — po rozmowie o trade-offach (język nie był realnym źródłem lagów,
+pełny rewrite to miesiące pracy i realne ryzyko odtworzenia tych samych bugów) user zgodził się
+najpierw NAPRAWIĆ to co jest, zaczynając od **usunięcia CAŁEGO generycznego systemu edytora
+płótna** — po `AskUserQuestion` user potwierdził dokładny zakres:
+- Navbar Pupila → wraca do sztywnego, domyślnego paska (custom-navbar przez płótno wylatuje).
+- Ekran Pupila → zostaje TYLKO pozycjonowanie/skalowanie obrazków (przyszła, osobna, dużo
+  prostsza funkcja — NIE zbudowana w tej fazie, to czysto usunięcie starego systemu).
+- Wszystkie pozostałe 12 ekranów → generyczny system znika całkowicie, bez zamiennika.
+
+**Co zostało USUNIĘTE** (pliki skasowane w całości):
+- `src/store/canvasComponentsStore.ts` (cały rdzeń: `CanvasItem`, `addItem`/`updateItem`/
+  `deployDraft`/`restoreBackup`/`clearDraft`/`startDraftFromLive`/`groupItems`/itd.)
+- `src/components/canvas/` (cały katalog: `ScreenCanvas.tsx`, `CanvasPlacedItem.tsx`, wszystkie
+  `Canvas*StyleModal.tsx`, `ShapeTile.tsx`/`IconTile.tsx`/`DataFieldTile.tsx`/
+  `StatCanvasTile.tsx`/`NavTabTile.tsx`/`ProgressBarTile.tsx`, `MetricPickerModal.tsx`,
+  `CanvasStartChooserModal.tsx` ze świeżo zmergowanego §409)
+- `src/store/{shapeStyleDefaults,dataFieldTileStyleDefaults,iconTileStyleDefaults,
+  statTileStyleDefaults,progressBarStyleDefaults,navTabStyleDefaults,gradientFill,
+  liveStatsSnapshotStore}.ts`
+- `src/data/{canvasProjectScreens,canvasTemplates}.ts`
+- `src/hooks/{useAllStreakItems,useAllCountdownItems,useAllNotesItems,useDataFieldRegistry,
+  useStreakItemsFromHabits}.ts`, `src/utils/buildStreakItems.ts` (osierocony w tym samym
+  sprzątaniu — zero pozostałych importów po usunięciu `useAllStreakItems.ts`)
+- `app/canvas-draft-editor.tsx`, `app/navbar-editor.tsx`
+- `__tests__/{canvasComponentsStore,buildStreakItems,gradientFill}.test.ts`
+
+**Co ZOSTAŁO** (świadomie, zweryfikowane PRZED kasowaniem przez sprawdzenie realnych
+konsumentów, nie zgadywanie):
+- `src/components/dashboard/{StreakTile,CountdownTile,NotesTile}.tsx` — mimo nazw brzmiących
+  jak część systemu płótna, te trzy pliki są NAPRAWDĘ używane przez wbudowane karty
+  (`StreakWallCard.tsx`/`CountdownsCard.tsx`/`PinnedNotesCard.tsx`, import `./StreakTile`
+  względny, nie `@/components/dashboard/StreakTile` — stąd pierwszy przebieg grepa je
+  przeoczył, znalezione dopiero przez `tsc`'owe błędy po skasowaniu).
+- `src/store/{countdownTileStyleDefaults,notesTileStyleDefaults}.ts` — bazowe typy/defaulty
+  współdzielone z ZUPEŁNIE osobnymi, już istniejącymi store'ami stylu wbudowanych kart
+  (`countdownsTileStyleStore.ts`/`pinnedNotesTileStyleStore.ts`) — kasowanie zepsułoby te karty.
+- `app/dashboard-tile-creator.tsx` + `src/store/tileStylePresetsStore.ts` +
+  `{records,pinnedNotes,countdowns}TileStyleStore.ts` — CAŁKOWICIE OSOBNY, starszy system
+  stylowania wbudowanych kafli dashboardu (zero importu `canvasComponentsStore`/`ScreenCanvas`,
+  zweryfikowane przed ruszeniem czegokolwiek) — nietknięty.
+- Mapa kampanii bossów (`CampaignMap.tsx`/`boss-map-editor.tsx`/`bossMapLayoutStore.ts`/
+  `campaignMapStyleStore.ts`/`campaign-map-creator.tsx`) — WŁASNY, niezależny system (własny
+  edytor pozycji/stylu), nigdy nie korzystał z generycznego płótna mimo wizualnego
+  podobieństwa nazw. Nietknięty, osobna faza (§410 już scalona, dalszy rebuild osobno).
+- `statCtx`/`StatTile`/`WeeklyBoard` na dashboardzie (§386's "Wykres") — osobny, starszy system
+  widgetów statystyk, nie konsument canvasa mimo współdzielonej nazwy "Wykres"/"statTile" w
+  nazwach plików canvasowych — nietknięty.
+
+**Dodatkowe sprzątanie przy okazji usuwania**:
+- `src/store/dashboardLayout.ts` — usunięty wpis `'custom-canvas'` z `DEFAULT_DASHBOARD_SECTIONS`
+  + `SECTION_TITLES`/`SECTION_DESC`/`SECTION_GROUP` (martwy klucz sekcji bez odpowiadającego
+  node'a w `index.tsx` crashowałby albo cicho nic nie renderował).
+- `app/(tabs)/finances.tsx` — `applyBalanceOffset` wrapper (istniał TYLKO żeby zapisywać do
+  skasowanego `liveStatsSnapshotStore`) uproszczony z powrotem do bezpośredniego
+  `setBalanceOffset`.
+- `app/pet.tsx` — `useEffect` zapisujący snapshot kroków/snu/nastroju do skasowanego store'u
+  usunięty.
+- `src/components/pet/PupilNavbar.tsx` — `CustomPupilNavbarContent` (cały komponent renderujący
+  navbar z itemów płótna) + walidacja `isCustomValid`/`customNavbarEnabled` usunięte, navbar
+  renderuje TERAZ ZAWSZE sztywny, domyślny pasek (kod z tego brancha i tak już istniał,
+  nietknięty — usunięty tylko branch WYBIERAJĄCY między nimi).
+
+**Weryfikacja przed kasowaniem** (metoda, nie zgadywanie): dla każdego pliku o niejednoznacznej
+nazwie (np. `useAllStreakItems`, `StreakTile.tsx`, `countdownTileStyleDefaults.ts`) sprawdzony
+realny graf importów (`grep` po dokładnej ścieżce importu, WŁĄCZNIE ze sprawdzeniem względnych
+`./X` obok `@/...` — lekcja z tej fazy: pierwszy przebieg nie złapał `StreakTile.tsx`/
+`CountdownTile.tsx`/`NotesTile.tsx` właśnie przez to rozróżnienie, odzyskane z `git checkout`
+po tym jak `tsc` pokazał błędy w kartach wbudowanych, zanim cokolwiek trafiło do commita).
+
+**Testy**: usunięte 3 pliki testów dotyczące skasowanego kodu (`canvasComponentsStore`/
+`buildStreakItems`/`gradientFill`). `tsc --noEmit` czyste (zero błędów w całym repo).
+`jest --silent` 112/112 suite (ze 115 — 3 usunięte celowo), 1432/1432 testów (z 1504 — ubytek to
+usunięte testy, nie regresja: WSZYSTKIE pozostałe testy przechodzą bez zmian).
+
+**Priorytet testu na urządzeniu — WYSOKI**: po aktualizacji OTA sprawdź że WSZYSTKIE 14
+ekranów (Dashboard, Zdrowie, Jedzenie, Zadania, Finanse, Kalendarz×2, Nastrój, Nawyki, Notatki,
+Pupil, Liczniki, Ćwiczenia) otwierają się normalnie, bez czarnego ekranu/crasha — i że
+wbudowane karty (Twoje Serie, Liczniki, Przypięte notatki na dashboardzie) wyglądają i działają
+DOKŁADNIE jak przed tą zmianą (to były świadomie zachowane, nie przypadkowo ocalałe). Navbar
+Pupila (dół ekranów Pupil/Bossy/Sklep/Questy) powinien pokazywać zwykły, sztywny pasek 4
+zakładek — jeśli ktoś miał wcześniej włączony custom navbar, po tej zmianie wraca do domyślnego
+(oczekiwane, nie bug).
 
 ---
 

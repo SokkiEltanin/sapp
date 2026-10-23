@@ -22,11 +22,55 @@ starym, WBUDOWANYM (natywnym, sprzed-OTA) buildzie.
 **ŻADNA** zmiana z §399 do §409 (łącznie z tym plikiem) nie była jeszcze realnie
 zweryfikowana na urządzeniu. User ma spróbować OTA ponownie (najlepiej na solidnym Wi-Fi, bez
 zamykania appki w trakcie pobierania) — **dopiero PO potwierdzeniu, że appka normalnie
-wchodzi po restarcie**, wszystkie "DO WERYFIKACJI" pozycje niżej (§403-§409) są warte
-sprawdzania. Jeśli czarny ekran WRÓCI mimo stabilnego Wi-Fi — to już realny sygnał, że problem
-jest w kodzie, nie w pobieraniu, i trzeba szukać od nowa (zacząć od czegoś w krytycznej
-ścieżce startu: `app/_layout.tsx`, dashboard `index.tsx` — oba montują się na KAŻDYM
-starcie, nie tylko gdy user wejdzie na konkretny ekran).
+wchodzi po restarcie**, wszystkie "DO WERYFIKACJI" pozycje niżej są warte sprawdzania. Jeśli
+czarny ekran WRÓCI mimo stabilnego Wi-Fi — to już realny sygnał, że problem jest w kodzie, nie
+w pobieraniu, i trzeba szukać od nowa (zacząć od czegoś w krytycznej ścieżce startu:
+`app/_layout.tsx`, dashboard `index.tsx` — oba montują się na KAŻDYM starcie, nie tylko gdy
+user wejdzie na konkretny ekran). ⚠️ **UWAGA**: §403-§409 niżej opisywały generyczny system
+edytora płótna, który od §411 (patrz NAJNOWSZY wpis poniżej) **już nie istnieje** — te wpisy są
+teraz historią, nie do testowania.
+
+## ⚠️🆕 Usunięcie generycznego systemu edytora płótna w całości (§411)
+
+User: "ten edytor jest źle zrobiony... myślałem że dostanę Figmę a dostałem gówno i nie mam
+danych wszystkich" — po propozycji pełnego rewrite'u appki w C++ i rozmowie o trade-offach
+(odrzucone — język nie był źródłem realnych problemów), user zgodził się najpierw NAPRAWIĆ
+istniejącą appkę, zaczynając od usunięcia CAŁEGO generycznego systemu edytora płótna
+(§341-409: kafle serii/pola danych/kształty/tekst-bindowanie, Draft/Symulator/Wdrożenie, custom
+navbar). Potwierdzony `AskUserQuestion`-em zakres: Navbar Pupila wraca do sztywnego paska;
+ekran Pupila zostaje TYLKO z (przyszłym, NIE zbudowanym jeszcze) pozycjonowaniem obrazków;
+wszystkie pozostałe 12 ekranów tracą płótno bez zamiennika. Pełna lista usuniętych/zachowanych
+plików + metoda weryfikacji w ARCHITECTURE.md §411.
+
+**ZACHOWANE, zweryfikowane PRZED kasowaniem** (nie przypadek): wbudowane karty "Twoje Serie"/
+"Liczniki"/"Przypięte notatki" na dashboardzie, CAŁY `dashboard-tile-creator.tsx` (osobny,
+starszy system stylu kafli), mapa kampanii bossów (własny, niezależny system), `statCtx`/
+"Wykres" na dashboardzie.
+
+`tsc --noEmit` czyste (zero błędów w całym repo), `jest --silent` 112/112 suite (3 pliki testów
+usunięte razem z kodem który testowały), 1432/1432 testów — wszystkie pozostałe testy bez
+zmian.
+
+**DO ZROBIENIA, reszta planu usera (w tej kolejności)**:
+1. **Mapa kampanii bossów od zera** — user: "musimy ją chyba wywalić i zbudować od zera"
+   (potwierdził że §410 NIE wystarczyło, retestowane po OTA). Plan: model "tor/lane" zamiast
+   swobodnego x/y drag + Catmull-Rom (źródło powtarzających się bugów przez CAŁĄ historię tej
+   mapy) — Y zawsze = f(indeks), NIGDY nadpisywalne; X = wybór dyskretnego toru przez TAP, nie
+   drag. Stan niepoprawny strukturalnie niemożliwy do osiągnięcia, zamiast walidowany po fakcie.
+2. **Pozostałe bossy/questy ze starym artem** — user zgłosił "leśne" portrety do podmiany, ale
+   WSZYSTKIE 5 plików `L_*.png` w `assets/bossy/kampania/` są już podpięte pod kampanię (3 z
+   nich to ostatnie bossy finałowe: clown→Ferox Floralis/princess→Cornipes Silvae/
+   wizard→Silvanus, §403) — **BLOKADA, czeka na odpowiedź usera**: czy chodziło o coś innego
+   (minibossy/raid/seasonalEvents WCIĄŻ mają stary art, patrz NEXT_STEPS niżej, §399) czy
+   paczka faktycznie nie dotarła do repo (sprawdzone: brak commitów z nowymi assetami po §399).
+3. **Okienka stylu zasłaniające płótno / kompletny rejestr danych / wykresy dla dowolnej
+   danej** — MOOT po §411 (dotyczyły systemu który już nie istnieje) — jeśli user wróci do tych
+   próśb, to będzie dotyczyć NOWEGO, jeszcze niezaprojektowanego systemu (pkt 2 z confirmed
+   scope: proste pozycjonowanie obrazków na Pupilu), nie naprawy starego.
+
+**Priorytet testu na urządzeniu — WYSOKI**: po OTA sprawdź że wszystkie 14 ekranów otwierają
+się normalnie (bez czarnego ekranu), a wbudowane karty dashboardu + navbar Pupila (zwykły,
+sztywny pasek) wyglądają/działają identycznie jak przed tą zmianą.
 
 ## ✅🆕 Fix: mapa kampanii — Y nadpisań mogło łamać gwarancję braku samoprzecięć (§410)
 

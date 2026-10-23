@@ -15,13 +15,6 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useHabits, DayState } from '@/hooks/useHabits';
 import { useDayKey } from '@/hooks/useDayKey';
-import { ScreenCanvasBase } from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import { useStreakItemsFromHabits } from '@/hooks/useStreakItemsFromHabits';
-import { useAllCountdownItems } from '@/hooks/useAllCountdownItems';
-import { useAllNotesItems } from '@/hooks/useAllNotesItems';
-import { useDataFieldRegistry } from '@/hooks/useDataFieldRegistry';
-import { useTimeAccent } from '@/hooks/useTimeAccent';
 
 const ICE = '#7DD3FC';   // dzień uratowany zamrożeniem serii = niebieski
 import { stepFor } from '@/utils/habits';
@@ -771,17 +764,6 @@ export default function HabitsScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { habits, todayDone, isLoading, toggle, increment, decrement, add, remove, update, getStreak, getLast7, getLast30, getTodayCount, reload } = useHabits();
-  // Wolne płótno (§373) — ten ekran JUŻ montuje `useHabits()` wyżej, więc jak `mood.tsx`
-  // (§368): `useStreakItemsFromHabits()` dociąga resztę (tanie Zustand-selektory) bez
-  // drugiego AsyncStorage fetchu. `useAllCountdownItems`/`useAllNotesItems`/
-  // `useDataFieldRegistry`/`useTimeAccent` wołane normalnie — ten ekran ich nie montuje.
-  const canvasStreakItems = useStreakItemsFromHabits(habits, getStreak);
-  const canvasCountdownItems = useAllCountdownItems();
-  const canvasNotesItems = useAllNotesItems();
-  const canvasDataFieldRegistry = useDataFieldRegistry();
-  const { color: canvasAccentColor } = useTimeAccent();
-  // Tryb pełnoekranowy płótna (§381, Faza 2) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['habits'] ?? false);
   // Refresh on focus so HC-fed water (and edits made elsewhere) show up live.
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
@@ -821,34 +803,6 @@ export default function HabitsScreen() {
 
   const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null);
   const handleDelete = (habit: Habit) => { haptic.tap(); setConfirmDelete(habit); };
-
-  // Tryb pełnoekranowy płótna (§381, Faza 2) — gdy włączony, reszta ekranu (lista nawyków,
-  // siatka miesiąca itd.) nie montuje się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <PressableScale onPress={() => router.back()} style={styles.iconBtn}>
-            <ArrowLeft size={20} color={colors.text.secondary} />
-          </PressableScale>
-          <View style={styles.headerCenter}>
-            <Text style={styles.title}>Nawyki</Text>
-            <Text style={styles.subtitle}>Pełny ekran</Text>
-          </View>
-          <View style={styles.iconBtn} />
-        </View>
-        <ScreenCanvasBase
-          screenKey="habits"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -951,17 +905,6 @@ export default function HabitsScreen() {
           </>
         )}
 
-        {/* Wolne płótno (§373) — `allStreakItems` budowany ręcznie wyżej (patrz komentarz
-            przy `useStreakItemsFromHabits`), żeby nie montować `useHabits()` drugi raz. */}
-        <ScreenCanvasBase
-          screenKey="habits"
-          title="Twoje komponenty"
-          allStreakItems={canvasStreakItems}
-          allCountdownItems={canvasCountdownItems}
-          allNotesItems={canvasNotesItems}
-          dataFieldRegistry={canvasDataFieldRegistry}
-          accentColor={canvasAccentColor}
-        />
       </ScrollView>
 
       <HabitFormModal

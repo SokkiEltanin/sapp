@@ -24,9 +24,6 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { notificationsService } from '@/services/notificationsService';
 import { useUiActions } from '@/store/uiActions';
-import ScreenCanvas from '@/components/canvas/ScreenCanvas';
-import { useCanvasComponentsStore } from '@/store/canvasComponentsStore';
-import ScreenHeader from '@/components/ui/ScreenHeader';
 import { usePressGuard } from '@/hooks/usePressGuard';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -597,8 +594,6 @@ export default function TasksScreen() {
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
   const startPomodoro  = usePomodoroStore(s => s.startFor);
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — ten sam wzorzec co health.tsx.
-  const canvasFullScreen = useCanvasComponentsStore(st => st.fullScreenScreens['tasks'] ?? false);
 
   const [sort, setSort]       = useState<SortKey>('deadline');
   const [sortOpen, setSortOpen] = useState(false);
@@ -662,19 +657,6 @@ export default function TasksScreen() {
     const idx = KIND_ORDER.indexOf(cur);
     setQuickKind(KIND_ORDER[(idx + 1) % KIND_ORDER.length]);
   }, [effectiveQuickKind]);
-
-  // Tryb pełnoekranowy płótna (§381, Faza 2b) — gdy włączony, cała lista zadań nie montuje
-  // się wcale.
-  if (canvasFullScreen) {
-    return (
-      <SafeAreaView style={s.root} edges={[]}>
-        <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Zadania" subtitle="Pełny ekran" />
-        </View>
-        <ScreenCanvas screenKey="tasks" title="Twoje komponenty" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={s.root} edges={[]}>
@@ -774,13 +756,6 @@ export default function TasksScreen() {
               <Text style={s.emptyTitle}>Brak zadań</Text>
               <Text style={s.emptySub}>Naciśnij + żeby dodać pierwsze</Text>
             </View>
-          }
-          ListFooterComponent={
-            // Wolne płótno (§368, "każde okno poza Ustawieniami") — `FlatList`, nie
-            // `ScrollView`, więc jak `finances.tsx`'s `SectionList` wpięte przez
-            // `ListFooterComponent`. Ten ekran nie montuje `useHabits()`/`useAllNotesItems()`,
-            // zero ryzyka duplikacji.
-            <ScreenCanvas screenKey="tasks" title="Twoje komponenty" />
           }
         />
 
