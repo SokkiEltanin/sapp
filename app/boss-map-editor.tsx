@@ -43,6 +43,11 @@ export default function BossMapEditorScreen() {
   const mapStyle = useCampaignMapStyleStore(st => st.live);
   const NODE = mapStyle.nodeSize;
   const laneOverrides = useBossMapLayoutStore(st => st.lanes);
+  // Bramka hydratacji (2026-10-23, §413) — ten sam fix co `CampaignMap.tsx`: `lanes` czyta się
+  // jako `{}` zanim store wczyta się z dysku, więc bez tej flagi pierwszy render edytora mógłby
+  // (rzadziej niż na prawdziwej mapie, bo edytor zwykle otwiera się później w nawigacji) na
+  // chwilę pokazać czysto proceduralny układ zamiast zapisanych torów.
+  const lanesHydrated = useBossMapLayoutStore(st => st._hydrated);
   const setLane = useBossMapLayoutStore(st => st.setLane);
   const resetLane = useBossMapLayoutStore(st => st.resetLane);
   const resetAll = useBossMapLayoutStore(st => st.resetAll);
@@ -107,7 +112,7 @@ export default function BossMapEditorScreen() {
       </ScrollView>
 
       <View style={s.stageWrap} onLayout={onLayoutViewport}>
-        {viewport.w > 0 && viewport.h > 0 && (
+        {viewport.w > 0 && viewport.h > 0 && lanesHydrated && (
         <ScrollView
           key={`${viewport.w}x${viewport.h}`}
           ref={scrollRef}

@@ -30,6 +30,38 @@ user wejdzie na konkretny ekran). ⚠️ **UWAGA**: §403-§409 niżej opisywał
 edytora płótna, który od §411 (patrz NAJNOWSZY wpis poniżej) **już nie istnieje** — te wpisy są
 teraz historią, nie do testowania.
 
+## ✅🆕 Bramka hydratacji mapy bossów + kampania przełożona na bloki żywiołów (§413)
+
+User zaraz po §412: "nie ma bosa z którym walczę teraz... mapa dalej rozjechana mimo że
+dobrze ustawiona w edytorze (może ty zmieniasz edytor nie tę mapę)" + "bosy muszą być
+poukładane kolejnością najpierw leśne na kampanii potem ogniste potem itd". Dwie osobne sprawy:
+
+1. **Prawdziwy bug (nie regres §412)**: `bosses.tsx`/`CampaignMap.tsx`/`boss-map-editor.tsx`
+   renderowały się PRZED tym jak `usePetStore`/`useBossMapLayoutStore` wczytały się z dysku
+   (splash w `_layout.tsx` jest świadomie odsprzęgnięty od hydratacji store'ów) — stąd chwilowy
+   zły "aktualny" boss/kamera i rozjazd "edytor dobry (otwarty później, więcej czasu), mapa zła
+   (często pierwszy ekran po starcie)". Naprawione bramką `_hydrated` w obu miejscach — mapa/
+   edytor czekają na hydratację zamiast pokazać coś co zaraz "skoczy". "Behemot Cukru" (zgłoszony
+   jako "pokonany bez walki") to NIE bug — to kafel RAJDU w prawym dolnym rogu, nie boss
+   kampanii; odznaka to licznik wygranych rajdów.
+2. **Kampania przełożona na kolejność żywiołów**: Las → Lawa → Woda → Burza → Niebo
+   (potwierdzone AskUserQuestion). `order`/`unlockLevel`/`hp`/`coins`/`xp` przeliczone pod nową
+   kolejność (te same 22 skalibrowane pary, teraz przypięte do innych bossów) — `id`/loot/
+   weakness/taunt nietknięte. Istniejący postęp (`defeatedBosses`) zmigrowany jednorazowo w
+   `petStore.ts`'s `onRehydrateStorage`: ta sama LICZBA pokonanych, zmapowana na pierwsze N id w
+   nowej kolejności. Pełny opis → ARCHITECTURE.md §413.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**DO ZROBIENIA (opcjonalny follow-up, nie zablokowany)**: moc lootu (bonus/`desc` string) NIE
+została przeliczona pod nową kolejność trudności — zostaje dowiązana do tożsamości bossa jak
+dotąd, więc progresja mocy lootu już nie jest ściśle monotoniczna z nowym `order`. Jeśli user
+tego chce, to osobna robota (wymaga też przepisania opisowych stringów z zaszytym %).
+
+**Priorytet testu na urządzeniu — WYSOKI**: po OTA, Bossy → Kampania — leśni bossowie jako
+pierwsi do pokonania; kamera od razu (bez flasha) na aktualnym bossie; mapa od razu zgadza się
+z edytorem; istniejący postęp (jeśli był) zachowany jako "tyle samo pokonanych bossów".
+
 ## ✅🆕 Mapa kampanii bossów — przebudowa od zera #3, model "lane" (§412)
 
 User po §410 retestował na potwierdzonym aktualnym buildzie i mapa WCIĄŻ była rozjechana:

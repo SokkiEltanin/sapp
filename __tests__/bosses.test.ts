@@ -191,13 +191,18 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
     expect(bossTier(boss({ unlockLevel: 26 }))).toBe('elite');
     expect(bossTier(boss({ unlockLevel: 52 }))).toBe('elite');
   });
-  test('kampania: pierwsze 8 bossów common, endgame (insomnia+) elite', () => {
+  // §413 (2026-10-23) — kolejność bossów przełożona na bloki żywiołów (Las→Lawa→Woda→Burza→
+  // Niebo), ale SAME PARY (unlockLevel,hp) zostały 1:1 jako numery slotów 1..22 (patrz
+  // obszerny komentarz nad BOSSES w bosses.ts) — więc "pierwsze 8/pozostałe 14" wciąż trzyma
+  // się jako LICZBA, tylko inne id trafiają w te pozycje (las+pierwsza połowa lawy zamiast
+  // dawnej poprzeplatanej mieszanki).
+  test('kampania: pierwsze 8 bossów common, reszta (jaguar+) elite', () => {
     const common = BOSSES.filter(b => bossTier(b) === 'common');
     const elite = BOSSES.filter(b => bossTier(b) === 'elite');
     expect(common.length).toBe(8);
     expect(elite.map(b => b.id)).toEqual([
-      'insomnia', 'compare', 'drought', 'procrast', 'doubt', 'devourer',
-      'samurai', 'jaguar', 'dinosaur', 'piratecapitan', 'hades', 'clown', 'princess', 'wizard',
+      'jaguar', 'hades', 'scroll', 'drought', 'dinosaur', 'piratecapitan',
+      'snake', 'insomnia', 'procrast', 'doubt', 'sloth', 'sugar', 'stress', 'compare',
     ]);
   });
 });
@@ -314,9 +319,11 @@ describe('bosses — simulateFight (silnik rund)', () => {
     // boss #1 kampanii przy odblokowaniu, bazowe staty gracza (bez zakupów) — pod starym
     // sztywnym FIGHT_ROUNDS=3 to ZAWSZE kończyło się remisem (300 HP bossa, ~40 dmg/cios),
     // więc walkę dało się TYLKO przegrać przez wyczerpanie, nigdy realnie wygrać/przegrać.
-    const sloth = BOSSES[0];
+    // (§413, 2026-10-23: BOSSES[0] to teraz 'devourer', nie 'sloth' — kolejność przełożona na
+    // bloki żywiołów, ale para unlockLevel/hp slotu 1 jest ta sama co była.)
+    const firstBoss = BOSSES[0];
     const bonuses: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
-    const r = simulateFight(0, sloth.unlockLevel, bonuses, sloth, 100); // domyślny roundCount = MAX_FIGHT_ROUNDS
+    const r = simulateFight(0, firstBoss.unlockLevel, bonuses, firstBoss, 100); // domyślny roundCount = MAX_FIGHT_ROUNDS
     expect(r.rounds.length).toBeGreaterThan(3); // nie ucięte po 3 wymianach
     expect(r.won || r.catFainted).toBe(true);   // realny wynik: ktoś padł, nie "czas się skończył"
   });
