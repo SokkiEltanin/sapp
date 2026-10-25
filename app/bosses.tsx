@@ -3,11 +3,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet, Pressable, AppState, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Swords, Trophy, Pencil } from 'lucide-react-native';
+import { ChevronLeft, Zap, Swords, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
-import CampaignMap from '@/components/bosses/CampaignMap';
+import CampaignTileGrid from '@/components/bosses/CampaignTileGrid';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, fmtEnergyCountdown } from '@/utils/bosses';
@@ -56,6 +56,14 @@ function nextLocalMidnightIso(): string {
 //    user: "sa bez sensu i zle wyglądają" — licznik medali ZOSTAJE jako mała odznaka na
 //    kompaktowym kaflu (powyżej), reszta (sama ściana ikon) skasowana wraz z martwym
 //    importem `raidIcon`/`eventIcon`/`eventBossFromKey` (używanymi WYŁĄCZNIE tam).
+//
+// 2026-10-25 (§422) — `CampaignMap` (lane-model mapa, §412-§414) ZASTĄPIONA
+// `CampaignTileGrid` (zwykła przewijana lista kafelków) — user po kolejnej rundzie poprawek:
+// "ta mapa dziala słabo wywalmy ją i zróbmy po prostu basic kafelki jak kiedyś na razie
+// przynajmniej". Pełny opis → CampaignTileGrid.tsx. Wejście do edytora lanów (ołówek, dawniej
+// tutaj) USUNIĘTE — edycja pozycji na torze który się już nie renderuje nie ma sensu.
+// `CampaignMap.tsx`/`boss-map-editor.tsx`/`campaign-map-creator.tsx` (+ ich store'y) ŚWIADOMIE
+// NIE usunięte z repo — "na razie" sugeruje że to może wrócić przy pełnym redesignie appki.
 export default function Bosses() {
   const c = useColors();
   // Prześwit nad `PupilNavbar` (2026-10-18, §378) — ołówek edytora mapy i kafle raid/event
@@ -193,12 +201,13 @@ export default function Bosses() {
   // gdy kampania skończona (`!current`), inaczej "campaign".
   const bossView = bossViewOverride ?? (current ? 'campaign' : 'mad');
   // Nawigacja do walki kampanii — WYCIĄGNIĘTA do `useCallback` (2026-10-12, mapa kampanii)
-  // specjalnie po to, żeby `CampaignMap`'s `memo()` miało sens: bez stabilnej referencji tu
-  // inline `() => router.push(...)` tworzyłby nowe closure na KAŻDY render tego ekranu
-  // (odliczanie energii re-renderuje go często), łamiąc porównanie propsów memo.
+  // specjalnie po to, żeby `CampaignTileGrid`'s `memo()` miało sens (§422, dawniej
+  // `CampaignMap`): bez stabilnej referencji tu inline `() => router.push(...)` tworzyłby
+  // nowe closure na KAŻDY render tego ekranu (odliczanie energii re-renderuje go często),
+  // łamiąc porównanie propsów memo.
   const goFight = useCallback(() => router.push('/boss-fight' as any), []);
-  // Mapa MAD (2026-10-13) — ten sam wzorzec co `goFight`/CampaignMap wyżej, osobny stabilny
-  // callback żeby `CampaignMap`'s memo() łapało "nic się nie zmieniło" też w trybie MAD.
+  // Mapa MAD (2026-10-13) — ten sam wzorzec co `goFight`/`CampaignTileGrid` wyżej, osobny
+  // stabilny callback żeby memo() łapało "nic się nie zmieniło" też w trybie MAD.
   const goFightMad = useCallback(() => router.push('/boss-fight?kind=mad' as any), []);
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
@@ -209,13 +218,13 @@ export default function Bosses() {
   const madUnlocked = level >= MAD_UNLOCK_LEVEL && !!madBase;
   // Mapa MAD (2026-10-13, user: "mad bosy to tez pokonane i mapa zmienia kolor na lekko
   // czerwony i te bosy pokonane sa do kliknięcia wtedy jako ich mad wersje") — reużywa
-  // CAMPAIGNMAP z `variant="mad"` zamiast osobnego komponentu: MAD dzieli DOKŁADNIE tę samą
-  // sekwencyjną "aktualny/pokonany/zablokowany po indeksie" logikę co kampania (patrz
-  // komentarz przy `variant` w CampaignMap.tsx), tylko tablica bossów to MAD-owe warianty
-  // (`madBossFor`, przeliczone hp/nagrody) zamiast gołych `BOSSES`. `useMemo` z pustymi
-  // deps — `madBossFor` jest czystą funkcją nad STAŁĄ `BOSSES`, wynik nigdy się nie zmienia
-  // między renderami tego ekranu, a CampaignMap jest `memo()`-owany więc stabilna referencja
-  // tej tablicy ma znaczenie (patrz komentarz na dole CampaignMap.tsx).
+  // `CampaignTileGrid` z `variant="mad"` zamiast osobnego komponentu (§422, dawniej
+  // `CampaignMap`): MAD dzieli DOKŁADNIE tę samą sekwencyjną "aktualny/pokonany/zablokowany
+  // po indeksie" logikę co kampania, tylko tablica bossów to MAD-owe warianty (`madBossFor`,
+  // przeliczone hp/nagrody) zamiast gołych `BOSSES`. `useMemo` z pustymi deps — `madBossFor`
+  // jest czystą funkcją nad STAŁĄ `BOSSES`, wynik nigdy się nie zmienia między renderami tego
+  // ekranu, a `CampaignTileGrid` jest `memo()`-owany więc stabilna referencja
+  // tej tablicy ma znaczenie (patrz komentarz na dole CampaignTileGrid.tsx).
   const madBosses = useMemo(() => BOSSES.map(b => madBossFor(b)), []);
 
   // ── raid tygodniowy ──
@@ -306,13 +315,13 @@ export default function Bosses() {
         <>
         {bossView === 'campaign' && (
           current ? (
-            <CampaignMap
+            <CampaignTileGrid
               bosses={BOSSES} currentId={current.id} onPressCurrent={goFight}
               energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
             />
           ) : (
             <>
-              <CampaignMap
+              <CampaignTileGrid
                 bosses={BOSSES} currentId={null} onPressCurrent={goFight}
                 energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
               />
@@ -326,7 +335,7 @@ export default function Bosses() {
 
         {bossView === 'mad' && (
           madBoss ? (
-            <CampaignMap
+            <CampaignTileGrid
               bosses={madBosses} currentId={madBoss.id} onPressCurrent={goFightMad}
               energy={energy} energyMax={campaignEnergyMax} energyRegenAt={energyRegenAt}
               variant="mad" locked={!madUnlocked}
@@ -353,13 +362,6 @@ export default function Bosses() {
             </View>
           </PressableScale>
         </View>
-
-        {/* Wejście do edytora mapy (2026-10-14, ARCHITECTURE.md §322 — user: "zrobisz edytor
-            ja sam ustawie wszystko mapę ścieżkę") — pływa w lewym dolnym rogu, symetrycznie
-            do kafli raid/event po prawej. */}
-        <PressableScale onPress={() => { haptic.tap(); router.push('/boss-map-editor' as any); }} style={[s.editMapBtn, { bottom: navbarClearance }]}>
-          <Pencil size={18} color={c.text.secondary} />
-        </PressableScale>
 
         {/* Raid + wydarzenie — kompaktowe kafle-ikony (user: "te bosy evetowe muszą byc w
             kafelkach mniejsze jak w grach zeby po kliknięciu sie pokazywalo zeby nie
@@ -511,11 +513,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   doneCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3], paddingHorizontal: spacing[6] },
   doneCenterTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
 
-  editMapBtn: {
-    position: 'absolute', left: spacing[3], bottom: spacing[3], width: 44, height: 44,
-    borderRadius: radius.lg, backgroundColor: 'rgba(15,17,20,0.92)', borderWidth: 1,
-    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
-  },
   tileRow: { position: 'absolute', right: spacing[3], bottom: spacing[3], gap: spacing[2] },
   tile: {
     width: 52, height: 52, borderRadius: radius.lg, backgroundColor: 'rgba(15,17,20,0.92)',

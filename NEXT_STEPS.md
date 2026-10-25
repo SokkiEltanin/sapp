@@ -67,6 +67,26 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    szczegółowe opisy ekranów od usera, zapowiedziane jako kolejne wiadomości — nic do zrobienia
    z tej strony, dopóki nie przyjdą.
 
+## ✅🆕 Mapa kampanii bossów wycofana na rzecz listy kafelków — TYMCZASOWO (§422)
+
+User po kolejnej rundzie zgłoszeń mimo §412-§414: "ta mapa dziala słabo wywalmy ją i zróbmy
+po prostu basic kafelki jak kiedyś na razie przynajmniej". `CampaignMap.tsx` (lane-model,
+dwie pełne przebudowy od zera) zastąpiona nowym `CampaignTileGrid.tsx` — zwykła przewijana
+lista, pogrupowana wg żywiołu, bez własnej kamery/layoutu. Ten sam popup/WALCZ co wcześniej.
+
+**Świadomie NIE usunięte z repo** — `CampaignMap.tsx`/`boss-map-editor.tsx`/
+`campaign-map-creator.tsx` + store'y zostają w kodzie, tylko odpięte (user: "na razie
+przynajmniej" sugeruje że to wróci w jakiejś formie przy pełnym redesignie appki). Usunięte
+tylko dwa wejścia donikąd: pływający ołówek edytora mapy w `bosses.tsx` i "Kreator mapy
+bossów" w Ustawieniach.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów. Pełny opis →
+ARCHITECTURE.md §422.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Bossy → Kampania → lista pogrupowana wg żywiołu,
+Twój cel podświetlony+klikalny, pokonani z zieloną odznaką, zablokowani jako sylwetka+kłódka.
+Przełącznik Kampania/MAD i kafle raid/wydarzenie dalej pływają nad listą.
+
 ## ✅🆕 Fix (root cause): pusty kolorowy kafel "Ćwiczenia" w Twoje serie (§421)
 
 User zrzutem, drugi raz ten sam objaw co §408: kafel "Ćwiczenia" czasami renderuje się jako

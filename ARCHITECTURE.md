@@ -22509,6 +22509,54 @@ dane się wczytają (albo pokazuje 0/wygaszony, albo od razu realną liczbę —
 tekstu"). Dla wody: `/water-calendar` → sprawdź dzień po dniu czy 92 dni z rzędu faktycznie
 mają zalogowaną wodę (ręcznie albo przez zegarek).
 
+## 422. Mapa kampanii bossów WYCOFANA na rzecz zwykłej listy kafelków (tymczasowo) (2026-10-25)
+
+User, po jeszcze jednej rundzie zgłoszeń mapy mimo §412 (przebudowa od zera #2, lane-model)
+i §413/§414 (bramka hydratacji + zawsze-widoczny baner "Twój cel"): "ten boss z kampanii ni
+huja nadal ta mapa dziala słabo wywalmy ją i zróbmy po prostu basic kafelki jak kiedyś na
+razie przynajmniej". Mapa (`CampaignMap.tsx`) przeszła już DWIE pełne przebudowy od zera
+(PR #419-426 swobodny pan+zoom, potem §412 wąski zygzak+ScrollView) i user dalej jej nie
+ufa — zamiast kolejnej rundy debugowania na ślepo bez dostępu do urządzenia, wycofanie na
+coś strukturalnie prostszego i mniej podatnego na te same klasy błędów (kamera/layout/
+hydratacja) — user explicite: "na razie przynajmniej", czyli tymczasowa decyzja.
+
+**Nowy komponent `src/components/bosses/CampaignTileGrid.tsx`** — zwykła, pionowo przewijana
+lista (`ScrollView`), BEZ własnej kamery/layoutu zygzaka/krzywej/nadpisań pozycji z edytora.
+Ten sam model co dawna "płaska lista pokonani+zablokowani" sprzed `CampaignMap` (§302).
+Grupowanie wg żywiołu (Las/Lawa/Woda/Burza/Niebo, §413) jako nagłówki sekcji — liczone z
+`order` (stały podział 5/5/4/4/4, bez nowego pola na `Boss`), nie z osobnego pola. Każdy
+wiersz: portret + nazwa + status (pokonany ✓ zielony, Twój cel podświetlony akcentem,
+zablokowany sylwetka-mystery + kłódka, nieklikalny). Tap na pokonanym/aktualnym otwiera TEN
+SAM popup co dawniej (portret/taunt/HP/słabość/WALCZ albo "Pokonany ✓ + loot") — treść
+popupu przeniesiona 1:1 z `CampaignMap.tsx`, zero zmiany w tej części UX.
+
+**Podpięcie w `app/bosses.tsx`**: `CampaignMap` → `CampaignTileGrid`, identyczne propsy
+(`bosses`/`currentId`/`onPressCurrent`/`energy*`/`variant`/`locked`/`lockMessage`) — zero
+zmian w logice ekranu (hydration gate §413, przełącznik Kampania/MAD, pływające kafle raid/
+event, popup raid/event) poza samą mapą. Pływający przycisk-ołówek "Edytor mapy" USUNIĘTY —
+edycja pozycji na torze, który się już nie renderuje, byłaby martwym wejściem donikąd.
+
+**Świadomie NIE usunięte z repo** (CLAUDE.md "nie zostawiaj dead-endów" dotyczy REACHABLE
+dead-endów, nie kodu w spoczynku): `CampaignMap.tsx`, `boss-map-editor.tsx`,
+`campaign-map-creator.tsx`, `bossMapLayoutStore.ts`, `campaignMapStyleStore.ts` — user: "na
+razie przynajmniej" sugeruje że lane-model może wrócić w jakiejś formie przy pełnym
+redesignie appki (temat właśnie ustalany, patrz NEXT_STEPS.md), więc kasowanie całej,
+sporej, już raz przemyślanej architektury teraz byłoby stratą. ZAMIAST tego: dwa faktyczne
+wejścia donikąd posprzątane — pływający ołówek w `bosses.tsx` (jedyne wejście do
+`boss-map-editor.tsx`) i wpis "Kreator mapy bossów" w Ustawieniach (jedyne wejście do
+`campaign-map-creator.tsx`, który i tak tylko podglądał styl `CampaignMap` na żywo) — oba
+prowadziły teraz do edycji/stylowania czegoś niewidocznego nigdzie w appce.
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych — czysto UI, ta sama logika sekwencyjna pokonany/aktualny/zablokowany co dotąd, tylko
+inny render).
+
+**Priorytet testu na urządzeniu — WYSOKI**: Bossy → zakładka Kampania powinna pokazać
+przewijaną listę pogrupowaną wg żywiołu, Twój cel podświetlony i klikalny → WALCZ, pokonani
+z zieloną odznaką, zablokowani jako sylwetka+kłódka. Przełącznik Kampania/MAD i kafle raid/
+wydarzenie dalej pływają nad listą jak wcześniej nad mapą. Pencil/edytor mapy nie powinien
+być już nigdzie widoczny w tej zakładce.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
