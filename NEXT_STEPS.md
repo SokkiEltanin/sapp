@@ -49,19 +49,46 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    `app/training-session.tsx` ("Dzisiejsza sesja" — odhaczanie pozycji, "zrobione" czytane
    wprost z loga więc PRZEŻYWA zamknięcie appki, edycja ilości przez rozwijaną historię wpisu).
    Stoper dla deski — ✅ ZROBIONE (§417, `PlankStopwatch.tsx`, podpięty w `exercises.tsx` i
-   `training-session.tsx`). Zostaje: dalsze ewentualne poprawki UX tego ekranu, jeśli user
-   wróci z nowymi uwagami po przetestowaniu na urządzeniu.
-3. **Zadania — przebudowa** — swipe usunięty (§415). Reszta: user explicite oddał decyzję
-   projektową ("ty tu jesteś mastermind programista, możesz proponować najlepsze wersje") —
-   NASTĘPNE w kolejce: zaprojektować i zbudować sekcje TERAZ/bezterminowe/terminowe (łącząc z
-   tym co już jest: dwa istniejące tryby grupowania — po terminie i po rodzaju Szybkie/Do
-   skupienia/Poczekalnia — oraz istniejący, niewykorzystany na liście głównej `Task.tags`) jako
-   WŁASNA propozycja, bez dalszego wypytywania usera o detale UI.
+   `training-session.tsx`). Masowe "Ukończ wszystko" dla całej sesji + wsteczne dopisywanie
+   customowych ćwiczeń w Historii — ✅ ZROBIONE (§419, user wrócił z tymi dwoma po
+   przetestowaniu poprzedniej rundy). Zostaje: dalsze ewentualne poprawki UX tego ekranu,
+   jeśli user wróci z nowymi uwagami po przetestowaniu na urządzeniu.
+3. **Zadania — przebudowa** — ✅ ZROBIONE (§415 swipe usunięty, §418 pełna przebudowa
+   grupowania + filtr tagów). Lista teraz grupuje wg PILNOŚCI zamiast rodzaju: Terminowe
+   (sub-grupowane po dacie, ożywiony martwy kod sprzed sesji) → Teraz (bez terminu) →
+   Poczekalnia (bezterminowe/czekam) → Ukończone. Rząd chipów `#tag` pod polem dodawania
+   filtruje listę. **DO ZROBIENIA/CZEKA na feedback usera po przetestowaniu**: to jest MOJA
+   własna propozycja kształtu (user oddał decyzję), może wymagać korekt po realnym użyciu —
+   np. czy kolejność kubełków (terminowe na górze) faktycznie pasuje, czy "TERAZ" powinno
+   jednak dzielić się dalej na Szybkie/Do skupienia.
 4. **Dashboard: backup przed redesignem** — ✅ ROZSTRZYGNIĘTE, BEZ AKCJI: user potwierdził że
    historia gita wystarczy jako backup, nic dodatkowego nie trzeba robić. Reszta punktu 4
    (popup-windowy zamiast pełnych ekranów, optymalizacja UX innych zakładek) — CZEKA na
    szczegółowe opisy ekranów od usera, zapowiedziane jako kolejne wiadomości — nic do zrobienia
    z tej strony, dopóki nie przyjdą.
+
+## ✅🆕 Sesja treningowa "Ukończ wszystko" + wsteczne customowe ćwiczenia (§419)
+
+User, po przetestowaniu poprzedniej rundy ćwiczeń: "mogę kliknąć, że wykonałem cały plan...
+czasami nie chcę babrać się w telefonie jak mam spocone ręce, robię to samo co wczoraj" +
+"wstecznie mogę dodawać... customowych swoich ćwiczeń... np. leg raises... nie mogę ich
+dodać że wczoraj zrobiłem".
+
+1. `app/training-session.tsx` — nowy przycisk "Ukończ wszystko" nad listą pozycji sesji:
+   otwiera tryb masowy z polami wstępnie wypełnionymi (wczorajsza suma, inaczej cel z
+   buildera), edytowalnymi przed jednym "Zatwierdź wszystko". Loguje przez ten sam
+   `logAmount` co pojedyncza pozycja — quest/nagroda pupila działają identycznie.
+2. `app/exercises-history.tsx` — picker "Dopisz wpis" miał TYLKO 6 kanonicznych ćwiczeń z
+   `EXERCISE_META`; teraz dodatkowo chipsy już-użytych customowych nazw + "+ Własne" na
+   zupełnie nową nazwę, dla WYBRANEJ (przeszłej) daty.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów. Pełny opis →
+ARCHITECTURE.md §419.
+
+**Priorytet testu na urządzeniu — WYSOKI**: "Ukończ wszystko" w sesji z niezrobioną pozycją
+powinno dać edytowalne pola i po zatwierdzeniu zaliczyć questy pupila tam gdzie pozycja ma
+podpięte kanoniczne ćwiczenie. "+ Własne" w Historii powinno zapisać nazwę pod wybraną datą i
+potem wracać jako gotowy chip do wyboru.
 
 ## ✅🆕 Mapa bossów: zawsze widoczny baner "Twój cel" (§414)
 

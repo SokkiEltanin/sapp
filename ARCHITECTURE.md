@@ -22283,6 +22283,103 @@ pokryta istniejącymi testami).
 liczy w górę (nie w dół), STOP zapisuje dokładnie tyle sekund ile minęło i pojawia się w "Dziś:
 X / cel". To samo w "Dzisiejsza sesja" dla pozycji podpiętej pod deskę.
 
+## 418. Zadania: przebudowa na oś pilności (Terminowe/Teraz/Poczekalnia) + filtr tagów (2026-10-25)
+
+User: "Chciałem wgle przebudować zadania tak jak opisałem żeby działały bo staramy się zrobić
+high end... ty tu jesteś mastermind programista, możesz proponować najlepsze wersje tego co
+proponuję" — pełna decyzja projektowa oddana w ręce asystenta, po oryginalnym opisie: "muszę
+mieć zadania jako kafelek z zadaniami na TERAZ... potem zadania na przeczekanie czyli
+bezterminowe... i zadania terminowe z dokładnym terminem" + "muszę mieć lepsze sortowanie
+tagami np żebym widział oznaczone zadania na UNIWERSYTET np z prefiksem [UR]".
+
+**Odkrycie przed zmianą**: lista miała DWIE funkcje grupujące, ale tylko JEDNA była realnie
+używana — `buildGroupedList` (grupowanie po terminie: PRZETERMINOWANE/DZIŚ/JUTRO/W TYM
+TYGODNIU/PÓŹNIEJ/BEZ TERMINU) była zdefiniowana, ale NIGDZIE nie wołana (martwy kod z
+wcześniejszej iteracji projektu) — faktycznym, jedynym trybem widoku było grupowanie po
+`kind` (Szybkie/Do skupienia/Poczekalnia, `buildKindGroupedList`). `sort`/`SortSheet`
+(deadline/priorytet/data utworzenia/alfabetycznie) to ODDZIELNY mechanizm — porządkuje
+WEWNĄTRZ grupy, nie wybiera trybu grupowania.
+
+**Nowy model** — jedna funkcja `buildPrimaryGroupedList`, trzy kubełki wg PILNOŚCI (najpilniejsze
+u góry, ten sam priorytet co już istniejący kolor "zaległe=czerwony" na karcie):
+1. **TERMINOWE** — każde aktywne zadanie z `deadline`/`scheduledDate` ustawionym, NIEZALEŻNIE
+   od `kind` — sub-grupowane wg pilności. OŻYWIONY martwy kod: `SECTION_DEFS`/`taskSection`
+   (ta sama matematyka dat co wcześniej) teraz żyje jako PODGRUPA tego jednego kubełka, nie
+   martwy, osobny tryb widoku. Usunięty wariant `'none'` z `SECTION_DEFS` (ten kubełek z
+   definicji zawiera tylko zadania Z datą).
+2. **TERAZ** — aktywne, BEZ terminu, `kind` quick/deep. Ikonka rodzaju ZOSTAJE przy karcie
+   (`KindIcon`, niezmieniona), ale przestaje być osią grupowania NAJWYŻSZEGO poziomu — user
+   chciał pilność jako główną oś, rodzaj zostaje lżejszym, per-kartowym sygnałem.
+3. **BEZTERMINOWE (Poczekalnia)** — `kind==='waiting'`, bez zmian względem poprzedniej wersji
+   (to już BYŁO dokładnie "bezterminowe, czekam na coś z zewnątrz" — `wakeAt` które minęło
+   dalej automatycznie wraca do aktywnych grup, logika nietknięta).
+
+**Filtr po tagach** — `Task.tags: string[]` i edycja tagów (`app/tasks/[id].tsx`/
+`app/tasks/add.tsx`) już istniały, karta już pokazywała chip `#tag`, ale NIC na liście głównej
+nie pozwalało filtrować po nich — każdy tag (np. user's "ur" dla Uniwersytetu Rzeszowskiego)
+był czysto dekoracyjny. Nowy rząd chipów (poziomy scroll, pod polem szybkiego dodawania,
+pokazuje się TYLKO gdy jakiś tag jest w użyciu) — lista unikalnych tagów z aktywnych zadań,
+tap filtruje (toggle, tap aktywnego czyści). Filtr obejmuje też sekcję UKOŃCZONE (licznik na
+badge liczy PO filtrze, nie total).
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — przegrupowanie istniejących danych + nowy UI filtr, bez nowej logiki domenowej
+poza prostym `.filter()` po tablicy tagów).
+
+**Priorytet testu na urządzeniu — WYSOKI**: lista Zadań powinna pokazać (od góry, tylko
+niepuste sekcje): daty-pilności (jeśli jakieś zadania mają termin), potem TERAZ, potem
+POCZEKALNIA, potem UKOŃCZONE (zwinięte). Jeśli masz jakieś tagi na zadaniach — pod polem
+"Dodaj zadanie" powinien pojawić się rząd chipów `#tag`, tap filtruje listę.
+
+---
+
+## 419. Sesja treningowa: "Ukończ wszystko" + wsteczne dopisywanie customowych ćwiczeń (2026-10-25)
+
+User, dwie rzeczy naraz: (1) "mogę kliknąć, że wykonałem cały plan treningowy, albo lekko go
+zmodyfikować i kliknąć ukończ wszystko... czasami nie chcę babrać się w telefonie jak mam
+spocone ręce... robię to samo co wczoraj"; (2) "wstecznie mogę dodawać innych customowych
+swoich ćwiczeń... jeżeli np. zrobiłem leg raises... nie mogę ich dodać że wczoraj zrobiłem".
+
+**(1) "Ukończ wszystko" w `app/training-session.tsx`** — nowy przycisk nad listą (widoczny gdy
+sesja nie jest jeszcze w pełni zrobiona), otwiera "tryb masowy": każda NIEZROBIONA jeszcze
+dziś pozycja dostaje edytowalne pole z ilością WSTĘPNIE wypełnioną — wczorajszą zalogowaną
+sumą (`amountLoggedOn(..., yesterday)`) jeśli trenował wczoraj, inaczej celem z buildera
+(`targetAmount`). Jedna akcja na dole ("Zatwierdź wszystko") loguje wszystkie pozycje naraz
+przez ten sam `logAmount` co zwykły zapis pojedynczej pozycji (identyczne sprawdzanie
+questu/nagrody pupila per pozycja, §320/§416). Pokrywa OBA warianty usera jednym ekranem:
+sam tap "Zatwierdź" (wartości już wypełnione — zero babrania się) ALBO poprawka wybranych
+pól przed tapem. Deska w trybie masowym dostaje zwykłe pole liczbowe, NIE stoper (§417) —
+masowy tryb jest z definicji "szybko, bez precyzji", stoper wymaga aktywnego odmierzania.
+Toast: pętla woła `logAmount` N razy (ten sam, jednosłotowy `toastStore`, patrz
+`src/store/toastStore.ts` — kolejne `set` nadpisuje poprzednie), więc własny
+`toast.success('Ukończono N ćwiczeń')` PO pętli naturalnie nadpisuje toast ostatniej pozycji —
+żadnych zmian w `useExerciseLogging.ts` (reszta ekranów dalej dostaje swój pojedynczy toast).
+
+**(2) Dopisywanie wsteczne customowych ćwiczeń w `app/exercises-history.tsx`** — picker
+"Dopisz wpis" (tap-dzień w kalendarzu/pasku tygodnia) miał TYLKO 6 kanonicznych chipsów z
+`EXERCISE_META` — ćwiczenie z buildera planów bez `linkedExercise` (user: "dowolne, własne
+nazwy też", patrz `trainingPlans.ts`) nie dawało się dopisać wstecz WCALE, mimo że loguje się
+pod zwykłym string-kluczem identycznie jak kanoniczne (`ExerciseLogEntry.exercise: string`,
+patrz `personalQuests.ts`). Picker teraz: chipsy EXERCISE_META + chipsy już-użytych
+customowych nazw (`customExerciseNames`, zbierane z `logs` — wszystko czego `exercise` nie
+jest jednym z 6 kanonicznych id, więc "leg raises" po pierwszym dodaniu wraca jako chip, nie
+trzeba wpisywać nazwy od nowa każdy raz) + chip "+ Własne" (sentinel `NEW_CUSTOM`) z polem na
+zupełnie nową nazwę. Customowy wpis nie ma zapisanej jednostki (ten sam brak co przy logowaniu
+customowego ćwiczenia z planu — jednostka żyje tylko w `TrainingPlanItem`, nie w logu; tu nie
+ma planu w kontekście, więc po prostu brak jednostki w potwierdzeniu/toastcie, nie regresja).
+
+**Weryfikacja**: `tsc --noEmit` czyste (1 fix po drodze: `Set<TrainingExercise>` → wymagało
+explicit `Set<string>`, bo `EXERCISE_META.map(m => m.id)` zawęża typ), `jest --silent`
+112/112 suite, 1433/1433 testów (brak nowych testów — czysto UI, logowanie idzie przez już
+przetestowane `addLog`/`logAmount`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: (1) w "Dzisiejsza sesja" z niezrobioną pozycją —
+"Ukończ wszystko" powinno pokazać pola z sensownymi domyślnymi wartościami, "Zatwierdź
+wszystko" powinno zaliczyć quest/nagrodę pupila tam gdzie pozycja ma `linkedExercise` i
+przekroczy próg. (2) w Historii ćwiczeń, dzień z przeszłości — "+ Własne" powinno pozwolić
+wpisać nową nazwę i zapisać dla TEJ daty, a powtórne otwarcie formularza pokazać tę nazwę
+jako gotowy chip.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

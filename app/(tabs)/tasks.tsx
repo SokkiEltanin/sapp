@@ -135,13 +135,27 @@ function sortTasks(tasks: Task[], sort: SortKey): Task[] {
 type SectionHeader = { type: 'section'; key: string; label: string; color: string; count: number };
 type ListItem = Task | SectionHeader | 'done-header';
 
+// §418 (2026-10-25) — przebudowa na WYRAŹNĄ oś PILNOŚCI zamiast samego "rodzaju" zadania.
+// User: "muszę mieć zadania jako kafelek z zadaniami na TERAZ... potem zadania na
+// przeczekanie czyli bezterminowe... i zadania terminowe z dokładnym terminem" — po
+// doprecyzowaniu oddał dokładny kształt w moje ręce ("ty tu jesteś mastermind programista").
+// Trzy kubełki, w tej kolejności (najpilniejsze u góry — ten sam priorytet co już ustalony
+// kolor "zaległe=czerwony" na karcie, patrz TaskCard niżej):
+// 1. TERMINOWE — każde aktywne zadanie z `deadline`/`scheduledDate` ustawionym, NIEZALEŻNIE
+//    od `kind` — sub-grupowane wg pilności (PRZETERMINOWANE/DZIŚ/JUTRO/W TYM TYGODNIU/PÓŹNIEJ,
+//    ożywione `SECTION_DEFS`/`taskSection` z poprzedniej wersji listy — ta sama matematyka dat,
+//    tylko teraz jako PODGRUPA jednego z trzech kubełków, nie jedyny tryb widoku).
+// 2. TERAZ — aktywne, BEZ terminu, `kind` quick/deep (ikonka rodzaju zostaje PRZY karcie, ale
+//    przestaje być osią grupowania najwyższego poziomu — user chciał PILNOŚĆ jako główną oś).
+// 3. BEZTERMINOWE (Poczekalnia) — `kind==='waiting'`, bez zmian względem poprzedniej wersji
+//    (to już BYŁO dokładnie "bezterminowe, czekam na coś z zewnątrz" — `wakeAt` które minęło
+//    dalej automatycznie wraca do aktywnych, patrz pętla niżej).
 const SECTION_DEFS = [
   { key: 'overdue',  label: 'PRZETERMINOWANE', color: G.accent  },
   { key: 'today',    label: 'DZIŚ',            color: G.accent  },
   { key: 'tomorrow', label: 'JUTRO',           color: G.accent + 'BB' },
   { key: 'week',     label: 'W TYM TYGODNIU',  color: G.accent + '80' },
   { key: 'later',    label: 'PÓŹNIEJ',          color: colors.text.muted },
-  { key: 'none',     label: 'BEZ TERMINU',      color: colors.text.muted },
 ] as const;
 
 function taskSection(task: Task, today: string, tomorrow: string, weekEnd: string): typeof SECTION_DEFS[number]['key'] {
@@ -151,48 +165,52 @@ function taskSection(task: Task, today: string, tomorrow: string, weekEnd: strin
   if (d === today || s === today) return 'today';
   if (d === tomorrow || (!d && s === tomorrow)) return 'tomorrow';
   if ((d && d <= weekEnd) || (!d && s && s <= weekEnd)) return 'week';
-  if (d || s) return 'later';
-  return 'none';
+  return 'later';
 }
-
-function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem[] {
-  const tomorrow = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
-  const weekEnd  = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
-  const buckets: Record<string, Task[]> = { overdue: [], today: [], tomorrow: [], week: [], later: [], none: [] };
-  for (const t of sorted) buckets[taskSection(t, today, tomorrow, weekEnd)].push(t);
-  const result: ListItem[] = [];
-  for (const def of SECTION_DEFS) {
-    const tasks = buckets[def.key];
-    if (tasks.length === 0) continue;
-    result.push({ type: 'section', key: def.key, label: def.label, color: def.color, count: tasks.length });
-    result.push(...tasks);
-  }
-  if (done.length > 0) { result.push('done-header'); result.push(...done); }
-  return result;
-}
-
-// ─── Kind grouping (the new primary view: Szybkie / Do skupienia / Poczekalnia) ──
 
 const KIND_ICON: Record<TaskKind, any> = { quick: Zap, deep: Target, waiting: Hourglass };
+const NOW_BUCKET_COLOR = '#6C9EFF'; // ta sama "aktualnie" niebieska co kolor karty (TaskCard niżej)
 
-function buildKindGroupedList(sorted: Task[]): ListItem[] {
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const buckets: Record<TaskKind, Task[]> = { quick: [], deep: [], waiting: [] };
+function buildPrimaryGroupedList(sorted: Task[], today: string): ListItem[] {
+  const tomorrow = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+  const weekEnd  = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+
+  const scheduled: Task[] = [];
+  const nowBucket: Task[] = [];
+  const waiting: Task[] = [];
   for (const t of sorted) {
     let k = resolveKind(t);
     // „Poczekalnia" z ustawioną datą „obudź gdy", która już minęła → wraca jako aktywne.
     if (k === 'waiting' && t.wakeAt && t.wakeAt <= today) k = 'quick';
-    buckets[k].push(t);
+    if (k === 'waiting') { waiting.push(t); continue; }
+    if (t.deadline || t.scheduledDate) { scheduled.push(t); continue; }
+    nowBucket.push(t);
   }
+
   const result: ListItem[] = [];
-  for (const k of KIND_ORDER) {
-    const arr = buckets[k];
-    if (arr.length === 0) continue;
-    const m = KIND_META[k];
-    result.push({ type: 'section', key: `kind-${k}`, label: `${m.label} · ${m.hint}`.toUpperCase(), color: m.color, count: arr.length });
-    result.push(...arr);
+
+  if (scheduled.length > 0) {
+    const buckets: Record<string, Task[]> = { overdue: [], today: [], tomorrow: [], week: [], later: [] };
+    for (const t of scheduled) buckets[taskSection(t, today, tomorrow, weekEnd)].push(t);
+    for (const def of SECTION_DEFS) {
+      const arr = buckets[def.key];
+      if (arr.length === 0) continue;
+      result.push({ type: 'section', key: def.key, label: def.label, color: def.color, count: arr.length });
+      result.push(...arr);
+    }
   }
+
+  if (nowBucket.length > 0) {
+    result.push({ type: 'section', key: 'now-bucket', label: 'TERAZ · bez terminu, do zrobienia wkrótce', color: NOW_BUCKET_COLOR, count: nowBucket.length });
+    result.push(...nowBucket);
+  }
+
+  if (waiting.length > 0) {
+    const m = KIND_META.waiting;
+    result.push({ type: 'section', key: 'waiting-bucket', label: `${m.label} · ${m.hint}`.toUpperCase(), color: m.color, count: waiting.length });
+    result.push(...waiting);
+  }
+
   return result;
 }
 
@@ -575,6 +593,23 @@ export default function TasksScreen() {
   const sorted = useMemo(() => sortTasks(active, sort), [active, sort]);
   const overdue = active.filter(t => { const d = t.deadline?.split('T')[0]; return !!d && d < today; }).length;
 
+  // Filtr po tagach (§418, 2026-10-25) — user: "muszę mieć lepsze sortowanie tagami np żebym
+  // widział oznaczone zadania na UNIWERSYTET np z prefiksem [UR]". Tagi już istniały w modelu
+  // (`Task.tags`, edytowalne w szczegółach zadania) i na karcie (chip `#tag`), ale NIC na
+  // liście głównej nie pozwalało filtrować po nich — każdy tag który user sobie wymyślił
+  // (np. "ur") był czysto dekoracyjny. Lista unikalnych tagów z AKTYWNYCH zadań, tap na chip
+  // filtruje (toggle — tap aktywnego czyści filtr).
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of active) for (const tag of t.tags ?? []) set.add(tag);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [active]);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const filteredSorted = useMemo(
+    () => (tagFilter ? sorted.filter(t => (t.tags ?? []).includes(tagFilter)) : sorted),
+    [sorted, tagFilter],
+  );
+
   // haptics + the reward toast now live in the hook so every path is consistent
   const handleCompletePress = useCallback((task: Task) => { toggle(task.id); }, [toggle]);
 
@@ -584,13 +619,18 @@ export default function TasksScreen() {
   const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.navigate('/pomodoro' as any); }, [startPomodoro]);
   const handleQuickSnooze   = useCallback((id: string) => { const d = new Date(); d.setHours(d.getHours() + 1); snooze(id, d); haptic.tap(); toast.info('Odłożono na godzinę'); }, [snooze]);
 
-  // Primary view groups by KIND (Szybkie / Do skupienia / Poczekalnia); the sort sheet
-  // orders within each group.
+  // Primary view groups by PILNOŚĆ (§418: Terminowe / Teraz / Poczekalnia), nie już samym
+  // rodzajem — patrz obszerny komentarz przy `buildPrimaryGroupedList`. Sort sheet dalej
+  // porządkuje WEWNĄTRZ każdego kubełka.
+  const doneFiltered = useMemo(
+    () => (tagFilter ? done.filter(t => (t.tags ?? []).includes(tagFilter)) : done),
+    [done, tagFilter],
+  );
   const listData: ListItem[] = useMemo(() => {
-    const shownDone  = doneCollapsed ? [] : done;
-    const doneBlock: ListItem[] = done.length > 0 ? ['done-header' as const, ...shownDone] : [];
-    return [...buildKindGroupedList(sorted), ...doneBlock];
-  }, [sorted, done, doneCollapsed]);
+    const shownDone  = doneCollapsed ? [] : doneFiltered;
+    const doneBlock: ListItem[] = doneFiltered.length > 0 ? ['done-header' as const, ...shownDone] : [];
+    return [...buildPrimaryGroupedList(filteredSorted, today), ...doneBlock];
+  }, [filteredSorted, doneFiltered, doneCollapsed, today]);
 
   // One-line quick capture: type → Enter → task created with an auto-inferred kind you
   // can cycle with a tap. Zero-friction so you actually jot things down.
@@ -635,7 +675,7 @@ export default function TasksScreen() {
                   <View style={s.sectionLine} />
                   <View style={s.sectionLabelRow}>
                     <Text style={s.sectionLabel}>UKOŃCZONE</Text>
-                    <View style={s.sectionBadge}><Text style={s.sectionBadgeText}>{done.length}</Text></View>
+                    <View style={s.sectionBadge}><Text style={s.sectionBadgeText}>{doneFiltered.length}</Text></View>
                     {doneCollapsed
                       ? <ChevronRight size={11} color={colors.text.muted} />
                       : <Square size={11} color={colors.text.muted} strokeWidth={1.5} />}
@@ -707,6 +747,23 @@ export default function TasksScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+              {allTags.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tagFilterRow} contentContainerStyle={s.tagFilterRowContent}>
+                  {allTags.map(tag => {
+                    const on = tagFilter === tag;
+                    return (
+                      <TouchableOpacity
+                        key={tag}
+                        onPress={() => { haptic.tap(); setTagFilter(prev => (prev === tag ? null : tag)); }}
+                        activeOpacity={0.8}
+                        style={[s.tagFilterChip, on && { backgroundColor: G.accent + '22', borderColor: G.accent }]}
+                      >
+                        <Text style={[s.tagFilterTxt, on && { color: G.accent }]}>#{tag}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
           }
           ListEmptyComponent={
@@ -754,6 +811,11 @@ const makeS = themedStyles((c: any) => {
   quickKindTxt: { fontSize: 11, fontWeight: '800' },
   quickInput: { flex: 1, fontSize: 14, color: c.text.primary, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: g.cardBorder, paddingHorizontal: spacing[3], paddingVertical: 9 },
   quickSubmit: { width: 38, height: 38, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+
+  tagFilterRow: { flexGrow: 0, marginTop: spacing[2] },
+  tagFilterRowContent: { paddingHorizontal: spacing[4], gap: 6 },
+  tagFilterChip: { borderRadius: radius.full, borderWidth: 1, borderColor: g.cardBorder, backgroundColor: c.bg.card, paddingHorizontal: 11, paddingVertical: 6 },
+  tagFilterTxt: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary },
 
   list: { paddingHorizontal: spacing[4], paddingBottom: 180, gap: spacing[2] },
 
