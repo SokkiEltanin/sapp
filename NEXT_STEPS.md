@@ -51,12 +51,14 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    Stoper dla deski — ✅ ZROBIONE (§417, `PlankStopwatch.tsx`, podpięty w `exercises.tsx` i
    `training-session.tsx`). Zostaje: dalsze ewentualne poprawki UX tego ekranu, jeśli user
    wróci z nowymi uwagami po przetestowaniu na urządzeniu.
-3. **Zadania — przebudowa** — swipe usunięty (§415). Reszta: user explicite oddał decyzję
-   projektową ("ty tu jesteś mastermind programista, możesz proponować najlepsze wersje") —
-   NASTĘPNE w kolejce: zaprojektować i zbudować sekcje TERAZ/bezterminowe/terminowe (łącząc z
-   tym co już jest: dwa istniejące tryby grupowania — po terminie i po rodzaju Szybkie/Do
-   skupienia/Poczekalnia — oraz istniejący, niewykorzystany na liście głównej `Task.tags`) jako
-   WŁASNA propozycja, bez dalszego wypytywania usera o detale UI.
+3. **Zadania — przebudowa** — ✅ ZROBIONE (§415 swipe usunięty, §418 pełna przebudowa
+   grupowania + filtr tagów). Lista teraz grupuje wg PILNOŚCI zamiast rodzaju: Terminowe
+   (sub-grupowane po dacie, ożywiony martwy kod sprzed sesji) → Teraz (bez terminu) →
+   Poczekalnia (bezterminowe/czekam) → Ukończone. Rząd chipów `#tag` pod polem dodawania
+   filtruje listę. **DO ZROBIENIA/CZEKA na feedback usera po przetestowaniu**: to jest MOJA
+   własna propozycja kształtu (user oddał decyzję), może wymagać korekt po realnym użyciu —
+   np. czy kolejność kubełków (terminowe na górze) faktycznie pasuje, czy "TERAZ" powinno
+   jednak dzielić się dalej na Szybkie/Do skupienia.
 4. **Dashboard: backup przed redesignem** — ✅ ROZSTRZYGNIĘTE, BEZ AKCJI: user potwierdził że
    historia gita wystarczy jako backup, nic dodatkowego nie trzeba robić. Reszta punktu 4
    (popup-windowy zamiast pełnych ekranów, optymalizacja UX innych zakładek) — CZEKA na

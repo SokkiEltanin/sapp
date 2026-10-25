@@ -22283,6 +22283,54 @@ pokryta istniejącymi testami).
 liczy w górę (nie w dół), STOP zapisuje dokładnie tyle sekund ile minęło i pojawia się w "Dziś:
 X / cel". To samo w "Dzisiejsza sesja" dla pozycji podpiętej pod deskę.
 
+## 418. Zadania: przebudowa na oś pilności (Terminowe/Teraz/Poczekalnia) + filtr tagów (2026-10-25)
+
+User: "Chciałem wgle przebudować zadania tak jak opisałem żeby działały bo staramy się zrobić
+high end... ty tu jesteś mastermind programista, możesz proponować najlepsze wersje tego co
+proponuję" — pełna decyzja projektowa oddana w ręce asystenta, po oryginalnym opisie: "muszę
+mieć zadania jako kafelek z zadaniami na TERAZ... potem zadania na przeczekanie czyli
+bezterminowe... i zadania terminowe z dokładnym terminem" + "muszę mieć lepsze sortowanie
+tagami np żebym widział oznaczone zadania na UNIWERSYTET np z prefiksem [UR]".
+
+**Odkrycie przed zmianą**: lista miała DWIE funkcje grupujące, ale tylko JEDNA była realnie
+używana — `buildGroupedList` (grupowanie po terminie: PRZETERMINOWANE/DZIŚ/JUTRO/W TYM
+TYGODNIU/PÓŹNIEJ/BEZ TERMINU) była zdefiniowana, ale NIGDZIE nie wołana (martwy kod z
+wcześniejszej iteracji projektu) — faktycznym, jedynym trybem widoku było grupowanie po
+`kind` (Szybkie/Do skupienia/Poczekalnia, `buildKindGroupedList`). `sort`/`SortSheet`
+(deadline/priorytet/data utworzenia/alfabetycznie) to ODDZIELNY mechanizm — porządkuje
+WEWNĄTRZ grupy, nie wybiera trybu grupowania.
+
+**Nowy model** — jedna funkcja `buildPrimaryGroupedList`, trzy kubełki wg PILNOŚCI (najpilniejsze
+u góry, ten sam priorytet co już istniejący kolor "zaległe=czerwony" na karcie):
+1. **TERMINOWE** — każde aktywne zadanie z `deadline`/`scheduledDate` ustawionym, NIEZALEŻNIE
+   od `kind` — sub-grupowane wg pilności. OŻYWIONY martwy kod: `SECTION_DEFS`/`taskSection`
+   (ta sama matematyka dat co wcześniej) teraz żyje jako PODGRUPA tego jednego kubełka, nie
+   martwy, osobny tryb widoku. Usunięty wariant `'none'` z `SECTION_DEFS` (ten kubełek z
+   definicji zawiera tylko zadania Z datą).
+2. **TERAZ** — aktywne, BEZ terminu, `kind` quick/deep. Ikonka rodzaju ZOSTAJE przy karcie
+   (`KindIcon`, niezmieniona), ale przestaje być osią grupowania NAJWYŻSZEGO poziomu — user
+   chciał pilność jako główną oś, rodzaj zostaje lżejszym, per-kartowym sygnałem.
+3. **BEZTERMINOWE (Poczekalnia)** — `kind==='waiting'`, bez zmian względem poprzedniej wersji
+   (to już BYŁO dokładnie "bezterminowe, czekam na coś z zewnątrz" — `wakeAt` które minęło
+   dalej automatycznie wraca do aktywnych grup, logika nietknięta).
+
+**Filtr po tagach** — `Task.tags: string[]` i edycja tagów (`app/tasks/[id].tsx`/
+`app/tasks/add.tsx`) już istniały, karta już pokazywała chip `#tag`, ale NIC na liście głównej
+nie pozwalało filtrować po nich — każdy tag (np. user's "ur" dla Uniwersytetu Rzeszowskiego)
+był czysto dekoracyjny. Nowy rząd chipów (poziomy scroll, pod polem szybkiego dodawania,
+pokazuje się TYLKO gdy jakiś tag jest w użyciu) — lista unikalnych tagów z aktywnych zadań,
+tap filtruje (toggle, tap aktywnego czyści). Filtr obejmuje też sekcję UKOŃCZONE (licznik na
+badge liczy PO filtrze, nie total).
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — przegrupowanie istniejących danych + nowy UI filtr, bez nowej logiki domenowej
+poza prostym `.filter()` po tablicy tagów).
+
+**Priorytet testu na urządzeniu — WYSOKI**: lista Zadań powinna pokazać (od góry, tylko
+niepuste sekcje): daty-pilności (jeśli jakieś zadania mają termin), potem TERAZ, potem
+POCZEKALNIA, potem UKOŃCZONE (zwinięte). Jeśli masz jakieś tagi na zadaniach — pod polem
+"Dodaj zadanie" powinien pojawić się rząd chipów `#tag`, tap filtruje listę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
