@@ -67,6 +67,30 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    szczegółowe opisy ekranów od usera, zapowiedziane jako kolejne wiadomości — nic do zrobienia
    z tej strony, dopóki nie przyjdą.
 
+## ✅🆕 Fix (root cause): pusty kolorowy kafel "Ćwiczenia" w Twoje serie (§421)
+
+User zrzutem, drugi raz ten sam objaw co §408: kafel "Ćwiczenia" czasami renderuje się jako
+pełnokolorowy prostokąt bez liczby/etykiety. §408 (2026-10-20) zgadywał na NaN i NIE
+potwierdził przyczyny. Tym razem znaleziona i naprawiona prawdziwa przyczyna: outer wrapper
+kafla zmieniał TYP elementu (`View`→`View`→`LinearGradient`) zależnie od `isZero`/
+`gradientMode`, co wymuszało remount CAŁEGO poddrzewa (razem z tekstem) — dokładnie w oknie
+gdy `exercisesStore` kończy hydratację i `exerciseStreak` skacze z 0 na realną wartość.
+Fix: jeden stabilny `<View>` wrapper zawsze, tło jako osobna warstwa POD treścią zamiast
+opakowania NAD nią — zero okazji na remount. Pełny opis → ARCHITECTURE.md §421.
+
+Przy okazji sprawdzone (NIE zmienione, bo kod wygląda poprawnie): liczenie streaka wody —
+`getStreak()`/`feedWaterHabit()`/konwersja ml↔l z Health Connect, wszystko bez sztywnych
+limitów i bez wykrytego buga. User ma sam zweryfikować 92-dniową serię wody przez
+`/water-calendar` (dzień-po-dniu) — jeśli ma zegarek logujący wodę w Samsung Health od
+miesięcy, retroaktywne "leczenie" serii (do 30 dni wstecz na każde otwarcie appki) w pełni
+to wyjaśnia.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: świeży start appki → kafel Ćwiczenia w Twoje
+serie nigdy nie powinien być pustym kolorowym prostokątem. `/water-calendar` → czy 92 dni
+wody faktycznie się zgadza dzień po dniu.
+
 ## ✅🆕 Edytor układu walki — wizard krokowy (§420)
 
 User po zrzucie ekranu: "zrób ten edytor dobrze, każdy element osobno, pełno ekranów" (nawiązanie

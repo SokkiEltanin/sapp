@@ -22442,6 +22442,73 @@ jest przyciemniony (i odwrotnie na "Boss"), ale dalej da się go przeciągnąć;
 rozmiaru/pozycji na dowolnym kroku widoczna NATYCHMIAST w scenie u góry, bez przechodzenia
 między krokami; (5) eksport pokazuje JSON i działa "Udostępnij".
 
+## 421. Fix (root cause, nie tylko hardening): pusty kafel serii po przejściu zero→kolorowy (2026-10-25)
+
+User zrzutem, DRUGI raz ten sam objaw co §408 (2026-10-20, "buguje się chyba streak
+ćwiczeń"): "czasami kolor kafelka wypierdala na górę i się tak robi że streaku nie widać".
+§408 podejrzewało `item.days`/NaN z nieznanego upstream buga, dodało defensywny hardening
+(klamrowanie `days`/`name`), ale WPROST zaznaczyło "NIE POTWIERDZONE jako root cause" — i
+rzeczywiście nie było, skoro problem wrócił identycznie.
+
+**Prawdziwa przyczyna** (`StreakTile.tsx`, preset "klasyczny"): outer wrapper kafla ZMIENIAŁ
+TYP ELEMENTU zależnie od `isZero`/`gradientMode` — `<View>` (zero, przerywana ramka) albo
+`<View>` (flat kolor) albo `<LinearGradient>` (gradient). React/RN przy zmianie typu
+elementu w TYM SAMYM miejscu drzewa odmontowuje całe stare poddrzewo i montuje nowe od zera
+— ŁĄCZNIE z `content` (liczba + etykieta), który żył JAKO DZIECKO tego zmieniającego-typ
+wrappera. "Ćwiczenia" to JEDYNY wpis w `streakWall` karmiony z async-hydrującego się store'u
+(`exercisesStore` — patrz `exerciseStreak` w `index.tsx`): pierwszy render (przed
+hydratacją `exercisesStore`) ma `days=0` → `isZero=true` → zwykły `<View>`. Hydratacja
+kończy się chwilę później, `exerciseStreak` skacze na realną wartość → `isZero` na `false`
+→ wrapper przeskakuje na `<LinearGradient>`. W TYM oknie (świeżo zamontowane poddrzewo)
+Android potrafi wymalować nowe TŁO (proste wypełnienie, szybkie) ZANIM tekst zdąży się
+zmierzyć/wymalować — i jeśli nic nie wymusi kolejnego renderu, ten stan ZOSTAJE (identyczny
+mechanizm co tofu-glify opisane w `DisplayText.tsx` przy §222: "stan potrafi zostać na stałe,
+jeśli nic nie wymusi kolejnego renderu"). Habity/liczniki NIE pokazywały tego objawu, bo ich
+dane nie pochodzą z async-hydrującego się store'u widzianego przez TEN komponent — ich
+pierwsza wartość jest już ostateczna.
+
+**Fix**: JEDEN stabilny `<View>` wrapper ZAWSZE (nigdy nie zmienia typu niezależnie od
+`isZero`/`gradientMode`) — tło (brak przy zero / płaskie / gradient) to teraz osobna,
+absolutnie pozycjonowana (`StyleSheet.absoluteFillObject`), `pointerEvents="none"` warstwa
+POD `content`, nie opakowanie NAD nim. `content` mieszka w jednym, nigdy-nie-
+odmontowywanym miejscu drzewa — zero okazji na remount przy przejściu zero→kolorowy,
+niezależnie jak szybko/wolno hydratacja się skończy. Presety "ring"/"stripe"/"compact" NIE
+miały tej wady (już używały jednego stałego `<View>` wrappera) — zmiana dotyczy tylko
+klasycznego.
+
+**Świadomie NIE zrobione**: gate `exerciseStreak` na `_hydrated` exercisesStore (ukryłoby
+chwilowe "0" przed hydratacją) — z fixem powyżej nawet ten flip jest teraz wizualnie
+bezpieczny (żaden remount), więc dodatkowe hydration-gate byłoby kosmetyką bez realnej
+korzyści, nie root-cause fixem.
+
+**Przy okazji sprawdzone, NIE zmienione** — user też zwątpił: "sprawdź to liczenie streaków
+wody, czy aby na pewno jest już 90 kilka dni". Przejrzana cała ścieżka: `getStreak()`
+(useHabits.ts, bez sztywnego limitu od §187/#2, ten sam `weeklyTargetStreak`/`isDoneOrFrozen`
+co `habit-year.tsx`, `LOAD_WINDOW_DAYS=371` zgodne z tamtym ekranem), `feedWaterHabit()`
+(healthAutoSync.ts — MAX ze starą wartością, nigdy nie nadpisuje ręcznych tapnięć, bounded
+realnym oknem Health Connect `readHealthRange(≤30)`, nie syntetyzuje dni), konwersja
+ml/l w `healthConnectService.ts` (`r.volume?.inMilliliters ?? inLiters*1000` — poprawna).
+ŻADNEGO konkretnego buga nie znaleziono — mechanizm retroaktywnego "leczenia" serii wody z
+zegarka (Health Connect → Samsung Health, per-dzień, do 30 dni wstecz na KAŻDE otwarcie
+appki) w pełni wyjaśnia jak seria mogła dojść do 90+ dni bez ręcznego tapania codziennie,
+JEŚLI user realnie loguje nawodnienie w Samsung Health od miesięcy — nie da się tego
+potwierdzić/wykluczyć statyczną analizą kodu (zależy od realnych danych na urządzeniu usera).
+Diagnostyka JUŻ ISTNIEJE w kodzie (`probeHydration()`/`formatWaterDiagnostic()`,
+Ustawienia i Zdrowie → ikonka diagnostyki wody) — pokazuje liczbę realnych rekordów Hydration
+z Health Connect. User odesłany do `/water-calendar` (kalendarz dzień-po-dniu) żeby wizualnie
+zweryfikować które dni rzeczywiście mają wodę, zamiast zgadywanej poprawki kodu, który po
+audycie wygląda poprawnie.
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych — czysto restrukturyzacja renderu, zero zmiany logiki `isZero`/`color`/`content`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: świeży start appki (albo wymuszone odświeżenie
+`exercisesStore`, np. zamknij i otwórz appkę) → kafel "Ćwiczenia" w "Twoje serie" NIE powinien
+nigdy pokazać się jako pusty kolorowy prostokąt, nawet w pierwszej chwili po starcie zanim
+dane się wczytają (albo pokazuje 0/wygaszony, albo od razu realną liczbę — nigdy "kolor bez
+tekstu"). Dla wody: `/water-calendar` → sprawdź dzień po dniu czy 92 dni z rzędu faktycznie
+mają zalogowaną wodę (ręcznie albo przez zegarek).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

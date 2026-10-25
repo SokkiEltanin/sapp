@@ -168,17 +168,37 @@ export function StreakTile({ item: rawItem, tileStyle, onPress, sizeStyle }: {
     </>
   );
   const content = tileStyle.flameOnTop ? <>{text}{flame}</> : <>{flame}{text}</>;
+  // §421 (2026-10-25) — user zrzutem, DRUGI raz ten sam objaw co §408 ("buguje się chyba
+  // streak ćwiczeń"): kafelek pełnoKOLOROWY, ale ZUPEŁNIE bez liczby/etykiety. §408 zgadywał
+  // na `item.days`/NaN (hardening wyżej) i NIE POTWIERDZIŁ root cause. Prawdziwy winowajca:
+  // wrapper outer elementu ZMIENIAŁ TYP (`<View>` zero → `<View>` flat → `<LinearGradient>`
+  // gradient) za każdym razem gdy `isZero`/`gradientMode` się zmieniały — React/RN usuwa i
+  // montuje CAŁE poddrzewo (łącznie z `content`, czyli liczbą/etykietą) na nowo przy zmianie
+  // typu elementu w tym samym miejscu drzewa. "Ćwiczenia" to JEDYNY wpis karmiony z
+  // async-hydrującego się store'u (`exercisesStore`, patrz `index.tsx`'s `exerciseStreak`) —
+  // pierwszy render (przed hydratacją) ma `days=0` (isZero=true, zwykły `View`), hydratacja
+  // kończy się chwilę później i `isZero` przeskakuje na `false` (`View`→`LinearGradient`) —
+  // dokładnie w tym oknie Android potrafi wymalować nowe TŁO (proste wypełnienie, szybkie)
+  // zanim TEKST zdąży się zmierzyć/wymalować w nowo zamontowanym poddrzewie, i bez kolejnego
+  // renderu ten stan ZOSTAJE (ten sam mechanizm co tofu-glify w `DisplayText.tsx`, §222: "stan
+  // potrafi ZOSTAĆ na stałe, jeśli nic nie wymusi kolejnego renderu").
+  // Fix: JEDEN stabilny `<View>` wrapper ZAWSZE (nigdy nie zmienia typu) — tło (płaskie ALBO
+  // gradient ALBO brak przy zero) to osobna, absolutnie pozycjonowana warstwa POD `content`,
+  // nie opakowanie NAD nim. `content` (liczba/etykieta) mieszka teraz w JEDNYM, nigdy-nie-
+  // odmontowywanym miejscu drzewa niezależnie od tego jak `isZero`/`gradientMode` się zmieniają
+  // — zero okazji na remount w trakcie przejścia zero→kolorowy.
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={sizeStyle}>
-      {isZero ? (
-        <View style={[s.tile, s.tileZero, radiusStyle, alignStyle]}>{content}</View>
-      ) : tileStyle.gradientMode === 'flat' ? (
-        <View style={[s.tile, radiusStyle, alignStyle, { backgroundColor: color }]}>{content}</View>
-      ) : (
-        <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.tile, radiusStyle, alignStyle]}>
-          {content}
-        </LinearGradient>
-      )}
+      <View style={[s.tile, radiusStyle, alignStyle, isZero && s.tileZero]}>
+        {!isZero && (
+          tileStyle.gradientMode === 'flat' ? (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, radiusStyle, { backgroundColor: color }]} />
+          ) : (
+            <LinearGradient pointerEvents="none" colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFillObject, radiusStyle]} />
+          )
+        )}
+        {content}
+      </View>
     </TouchableOpacity>
   );
 }
