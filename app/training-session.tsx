@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Check, Circle, Dumbbell, History, ChevronDown } from 'lucide-react-native';
+import { subDays } from 'date-fns';
+import { ChevronLeft, Check, Circle, Dumbbell, History, ChevronDown, CheckCheck } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
@@ -12,10 +13,13 @@ import { useTrainingPlansStore } from '@/store/trainingPlansStore';
 import { useExerciseLogging } from '@/hooks/useExerciseLogging';
 import { planItemDoneToday, planItemLogKey } from '@/utils/trainingPlans';
 import { amountLoggedOn } from '@/utils/personalQuests';
+import { ymd } from '@/utils/date';
+import { plPlural } from '@/utils/plural';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 
 // "Dzisiejsza sesja" (2026-10-14, ARCHITECTURE.md §320) — odpalenie planu z buildera: tap na
 // pozycję → inline pole z ilością wypełnione celem z planu (user: "tap otwiera pole z ilością
@@ -34,6 +38,9 @@ export default function TrainingSessionScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkDrafts, setBulkDrafts] = useState<Record<string, string>>({});
+  const yesterday = useMemo(() => ymd(subDays(new Date(), 1)), []);
 
   if (!plan) {
     return (
@@ -75,6 +82,40 @@ export default function TrainingSessionScreen() {
     setOpenId(null);
   };
 
+  // "Ukończ wszystko" (2026-10-25) — user: "czasami... robię to samo co wczoraj i chcę po
+  // prostu kliknąć, że wykonałem" (spocone ręce, nie chce babrać się w telefonie) "albo lekko
+  // go zmodyfikować i kliknąć ukończ wszystko". Domyślna wartość per pozycja = wczorajsza
+  // zalogowana suma (jeśli trenował wczoraj — to i jest "to samo co wczoraj"), inaczej cel z
+  // buildera. Pola zostają EDYTOWALNE przed zatwierdzeniem — pokrywa oba przypadki jednym
+  // ekranem: samo potwierdzenie (wartości już wypełnione) albo drobna korekta przed tapem.
+  const notDoneItems = plan.items.filter((it) => !planItemDoneToday(logs, it, today));
+
+  const openBulk = () => {
+    haptic.tap();
+    setOpenId(null);
+    setBulkDrafts(Object.fromEntries(notDoneItems.map((it) => {
+      const y = amountLoggedOn(logs, planItemLogKey(it), yesterday);
+      return [it.id, String(y > 0 ? y : it.targetAmount)];
+    })));
+    setBulkOpen(true);
+  };
+  const closeBulk = () => { setBulkOpen(false); setBulkDrafts({}); };
+  const confirmBulk = () => {
+    let count = 0;
+    for (const it of notDoneItems) {
+      const raw = bulkDrafts[it.id];
+      const amount = parseFloat((raw ?? '').replace(',', '.'));
+      if (!raw || isNaN(amount) || amount <= 0) continue;
+      logAmount({ exercise: planItemLogKey(it), linkedExercise: it.linkedExercise, label: it.name, unit: it.unit, amount });
+      count++;
+    }
+    closeBulk();
+    // Nadpisuje toast ostatniej pozycji z pętli (ten sam, jednosłotowy `toastStore` — ostatnie
+    // `set` wygrywa) własnym podsumowaniem, bez zmian w `useExerciseLogging` (reszta ekranów
+    // dalej dostaje swój pojedynczy toast przy zwykłym logowaniu).
+    if (count > 0) toast.success(`Ukończono ${count} ${plPlural(count, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}`);
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -83,15 +124,25 @@ export default function TrainingSessionScreen() {
         <View style={s.countPill}><Text style={s.countTxt}>{doneCount}/{plan.items.length}</Text></View>
       </View>
 
+      {!allDone && !bulkOpen && plan.items.length > 0 && (
+        <PressableScale onPress={openBulk} style={s.bulkOpenBtn}>
+          <CheckCheck size={16} color="#2AC68F" />
+          <Text style={s.bulkOpenTxt}>Ukończ wszystko</Text>
+        </PressableScale>
+      )}
+      {bulkOpen && (
+        <Text style={s.bulkHint}>Wartości wypełnione z wczoraj (albo celu) — popraw co inne, resztę po prostu zatwierdź.</Text>
+      )}
+
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {plan.items.map((it) => {
           const todayAmt = amountLoggedOn(logs, planItemLogKey(it), today);
           const done = planItemDoneToday(logs, it, today);
-          const open = openId === it.id;
+          const open = !bulkOpen && openId === it.id;
           return (
             <View key={it.id} style={[s.card, done && s.cardDone]}>
               <View style={s.cardHead}>
-                <PressableScale onPress={() => openItem(it.id, it.targetAmount)} style={s.cardHeadMain}>
+                <PressableScale onPress={() => { if (!bulkOpen) openItem(it.id, it.targetAmount); }} style={s.cardHeadMain} disabled={bulkOpen}>
                   <View style={s.iconWrap}>
                     {it.linkedExercise
                       ? <ExerciseIcon id={it.linkedExercise} fallback={Dumbbell} size={18} color="#FB923C" />
@@ -104,7 +155,7 @@ export default function TrainingSessionScreen() {
                     </Text>
                   </View>
                 </PressableScale>
-                {todayAmt > 0 && (
+                {!bulkOpen && todayAmt > 0 && (
                   <PressableScale
                     onPress={() => { haptic.tap(); setHistoryFor((prev) => (prev === it.id ? null : it.id)); }}
                     style={s.historyBtn}
@@ -133,7 +184,19 @@ export default function TrainingSessionScreen() {
                 )
               )}
 
-              {historyFor === it.id && (
+              {bulkOpen && !done && (
+                <View style={s.inputRow}>
+                  <TextInput
+                    style={s.input}
+                    keyboardType="numeric"
+                    value={bulkDrafts[it.id] ?? ''}
+                    onChangeText={(v) => setBulkDrafts((prev) => ({ ...prev, [it.id]: v }))}
+                  />
+                  <Text style={s.bulkUnitTxt}>{it.unit}</Text>
+                </View>
+              )}
+
+              {!bulkOpen && historyFor === it.id && (
                 <ExerciseLogHistory
                   entries={logs.filter((l) => l.exercise === planItemLogKey(it) && l.date === today)}
                   unit={it.unit}
@@ -151,6 +214,18 @@ export default function TrainingSessionScreen() {
           </View>
         )}
       </ScrollView>
+
+      {bulkOpen && (
+        <View style={s.bulkFooter}>
+          <PressableScale onPress={closeBulk} style={s.bulkCancelBtn}>
+            <Text style={s.bulkCancelTxt}>Anuluj</Text>
+          </PressableScale>
+          <PressableScale onPress={confirmBulk} style={s.bulkConfirmBtn}>
+            <CheckCheck size={16} color="#07160F" />
+            <Text style={s.bulkConfirmTxt}>Zatwierdź wszystko</Text>
+          </PressableScale>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -183,4 +258,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   doneBox: { padding: spacing[3], borderRadius: radius.lg, backgroundColor: '#2AC68F14', borderWidth: 1, borderColor: '#2AC68F44' },
   doneTxt: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17, textAlign: 'center' },
+
+  bulkOpenBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginHorizontal: spacing[4], marginBottom: spacing[2], backgroundColor: '#2AC68F14', borderRadius: radius.lg, borderWidth: 1, borderColor: '#2AC68F44', paddingVertical: 11 },
+  bulkOpenTxt: { fontSize: 13, fontWeight: '800', color: '#2AC68F' },
+  bulkHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', paddingHorizontal: spacing[4], marginBottom: spacing[2] },
+  bulkUnitTxt: { fontSize: 12.5, color: c.text.muted, alignSelf: 'center' },
+  bulkFooter: { flexDirection: 'row', gap: spacing[2], padding: spacing[3], borderTopWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
+  bulkCancelBtn: { paddingHorizontal: 18, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, justifyContent: 'center' },
+  bulkCancelTxt: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  bulkConfirmBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#2AC68F', borderRadius: radius.md, paddingVertical: 11 },
+  bulkConfirmTxt: { fontSize: 13.5, fontWeight: '800', color: '#07160F' },
 }));

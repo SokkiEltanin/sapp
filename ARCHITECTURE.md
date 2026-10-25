@@ -22333,6 +22333,55 @@ POCZEKALNIA, potem UKOŃCZONE (zwinięte). Jeśli masz jakieś tagi na zadaniach
 
 ---
 
+## 419. Sesja treningowa: "Ukończ wszystko" + wsteczne dopisywanie customowych ćwiczeń (2026-10-25)
+
+User, dwie rzeczy naraz: (1) "mogę kliknąć, że wykonałem cały plan treningowy, albo lekko go
+zmodyfikować i kliknąć ukończ wszystko... czasami nie chcę babrać się w telefonie jak mam
+spocone ręce... robię to samo co wczoraj"; (2) "wstecznie mogę dodawać innych customowych
+swoich ćwiczeń... jeżeli np. zrobiłem leg raises... nie mogę ich dodać że wczoraj zrobiłem".
+
+**(1) "Ukończ wszystko" w `app/training-session.tsx`** — nowy przycisk nad listą (widoczny gdy
+sesja nie jest jeszcze w pełni zrobiona), otwiera "tryb masowy": każda NIEZROBIONA jeszcze
+dziś pozycja dostaje edytowalne pole z ilością WSTĘPNIE wypełnioną — wczorajszą zalogowaną
+sumą (`amountLoggedOn(..., yesterday)`) jeśli trenował wczoraj, inaczej celem z buildera
+(`targetAmount`). Jedna akcja na dole ("Zatwierdź wszystko") loguje wszystkie pozycje naraz
+przez ten sam `logAmount` co zwykły zapis pojedynczej pozycji (identyczne sprawdzanie
+questu/nagrody pupila per pozycja, §320/§416). Pokrywa OBA warianty usera jednym ekranem:
+sam tap "Zatwierdź" (wartości już wypełnione — zero babrania się) ALBO poprawka wybranych
+pól przed tapem. Deska w trybie masowym dostaje zwykłe pole liczbowe, NIE stoper (§417) —
+masowy tryb jest z definicji "szybko, bez precyzji", stoper wymaga aktywnego odmierzania.
+Toast: pętla woła `logAmount` N razy (ten sam, jednosłotowy `toastStore`, patrz
+`src/store/toastStore.ts` — kolejne `set` nadpisuje poprzednie), więc własny
+`toast.success('Ukończono N ćwiczeń')` PO pętli naturalnie nadpisuje toast ostatniej pozycji —
+żadnych zmian w `useExerciseLogging.ts` (reszta ekranów dalej dostaje swój pojedynczy toast).
+
+**(2) Dopisywanie wsteczne customowych ćwiczeń w `app/exercises-history.tsx`** — picker
+"Dopisz wpis" (tap-dzień w kalendarzu/pasku tygodnia) miał TYLKO 6 kanonicznych chipsów z
+`EXERCISE_META` — ćwiczenie z buildera planów bez `linkedExercise` (user: "dowolne, własne
+nazwy też", patrz `trainingPlans.ts`) nie dawało się dopisać wstecz WCALE, mimo że loguje się
+pod zwykłym string-kluczem identycznie jak kanoniczne (`ExerciseLogEntry.exercise: string`,
+patrz `personalQuests.ts`). Picker teraz: chipsy EXERCISE_META + chipsy już-użytych
+customowych nazw (`customExerciseNames`, zbierane z `logs` — wszystko czego `exercise` nie
+jest jednym z 6 kanonicznych id, więc "leg raises" po pierwszym dodaniu wraca jako chip, nie
+trzeba wpisywać nazwy od nowa każdy raz) + chip "+ Własne" (sentinel `NEW_CUSTOM`) z polem na
+zupełnie nową nazwę. Customowy wpis nie ma zapisanej jednostki (ten sam brak co przy logowaniu
+customowego ćwiczenia z planu — jednostka żyje tylko w `TrainingPlanItem`, nie w logu; tu nie
+ma planu w kontekście, więc po prostu brak jednostki w potwierdzeniu/toastcie, nie regresja).
+
+**Weryfikacja**: `tsc --noEmit` czyste (1 fix po drodze: `Set<TrainingExercise>` → wymagało
+explicit `Set<string>`, bo `EXERCISE_META.map(m => m.id)` zawęża typ), `jest --silent`
+112/112 suite, 1433/1433 testów (brak nowych testów — czysto UI, logowanie idzie przez już
+przetestowane `addLog`/`logAmount`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: (1) w "Dzisiejsza sesja" z niezrobioną pozycją —
+"Ukończ wszystko" powinno pokazać pola z sensownymi domyślnymi wartościami, "Zatwierdź
+wszystko" powinno zaliczyć quest/nagrodę pupila tam gdzie pozycja ma `linkedExercise` i
+przekroczy próg. (2) w Historii ćwiczeń, dzień z przeszłości — "+ Własne" powinno pozwolić
+wpisać nową nazwę i zapisać dla TEJ daty, a powtórne otwarcie formularza pokazać tę nazwę
+jako gotowy chip.
+
+---
+
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
 dashboard_nav_internals, bank_auto_expenses, pet_blob_design, perf_stylesheets,
 theme_system, consumption_scope.*

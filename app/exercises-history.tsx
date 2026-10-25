@@ -23,6 +23,9 @@ const ACCENT = '#FB923C';   // ten sam pomarańcz co reszta akcentu "Trening" w 
 const MONTHS = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const WINDOW = 371;
+// Sentinel dla "dodaj zupełnie nowe własne ćwiczenie" w pickerze wpisu wstecznego — patrz
+// komentarz przy `customExerciseNames` niżej.
+const NEW_CUSTOM = '__custom_new__';
 
 function resolveLabel(exercise: string): { label: string; unit: string } {
   const meta = EXERCISE_META.find((m) => m.id === exercise);
@@ -52,11 +55,25 @@ export default function ExercisesHistoryScreen() {
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [addExerciseId, setAddExerciseId] = useState<string | null>(null);
+  const [addCustomName, setAddCustomName] = useState('');
   const [addDraft, setAddDraft] = useState('');
 
   const todayKey = ymd(new Date());
   const currentMonthKey = todayKey.slice(0, 7);
   const monthSummary = useMemo(() => exerciseMonthSummary(logs, currentMonthKey), [logs, currentMonthKey]);
+
+  // Dopisywanie wsteczne customowych ćwiczeń (2026-10-25) — user: "jeżeli zrobiłem leg raises...
+  // nie mogę ich dodać że wczoraj zrobiłem". Picker wpisu miał TYLKO 6 kanonicznych chipsów z
+  // `EXERCISE_META` — ćwiczenia z buildera planów (`linkedExercise` nieustawione, logowane pod
+  // własną nazwą, patrz trainingPlans.ts) nie dawały się dopisać wstecz wcale. Lista niżej
+  // zbiera nazwy już kiedyś użyte (żeby nie trzeba było wpisywać "leg raises" na nowo każdy
+  // raz) + sentinel `NEW_CUSTOM` otwiera pole na zupełnie nową nazwę.
+  const customExerciseNames = useMemo(() => {
+    const metaIds = new Set<string>(EXERCISE_META.map((m) => m.id));
+    const seen = new Set<string>();
+    for (const l of logs) if (!metaIds.has(l.exercise)) seen.add(l.exercise);
+    return Array.from(seen).sort((a, b) => a.localeCompare(b, 'pl'));
+  }, [logs]);
 
   const { cells, weeks, monthCols } = useMemo(() => {
     const now = new Date();
@@ -90,19 +107,28 @@ export default function ExercisesHistoryScreen() {
     haptic.tap();
     setSelectedDate((prev) => (prev === ds ? null : ds));
     setAddExerciseId(null);
+    setAddCustomName('');
     setAddDraft('');
   };
 
   const confirmAdd = () => {
     if (!selectedDate || !addExerciseId) return;
-    const meta = EXERCISE_META.find((m) => m.id === addExerciseId);
-    if (!meta) return;
+    let exerciseKey: string, label: string, unit: string;
+    if (addExerciseId === NEW_CUSTOM) {
+      const trimmed = addCustomName.trim();
+      if (!trimmed) { toast.error('Podaj nazwę ćwiczenia'); return; }
+      exerciseKey = trimmed; label = trimmed; unit = '';
+    } else {
+      const meta = EXERCISE_META.find((m) => m.id === addExerciseId);
+      exerciseKey = addExerciseId; label = meta?.label ?? addExerciseId; unit = meta?.unit ?? '';
+    }
     const amount = parseFloat(addDraft.replace(',', '.'));
     if (!addDraft || isNaN(amount) || amount <= 0) return;
-    addLog(addExerciseId, amount, selectedDate);
+    addLog(exerciseKey, amount, selectedDate);
     haptic.success();
-    toast.success(`${fmtDay(selectedDate, todayKey)}: +${amount} ${meta.unit} ${meta.label}`);
+    toast.success(`${fmtDay(selectedDate, todayKey)}: +${amount}${unit ? ' ' + unit : ''} ${label}`);
     setAddExerciseId(null);
+    setAddCustomName('');
     setAddDraft('');
   };
 
@@ -243,18 +269,36 @@ export default function ExercisesHistoryScreen() {
             <Text style={s.addTitle}>Dopisz wpis</Text>
             <View style={s.chipsRow}>
               {EXERCISE_META.map((m) => (
-                <PressableScale key={m.id} onPress={() => { haptic.tap(); setAddExerciseId(m.id); }} style={[s.chip, addExerciseId === m.id && s.chipActive]}>
+                <PressableScale key={m.id} onPress={() => { haptic.tap(); setAddExerciseId(m.id); setAddCustomName(''); }} style={[s.chip, addExerciseId === m.id && s.chipActive]}>
                   <Text style={[s.chipTxt, addExerciseId === m.id && s.chipTxtActive]}>{m.label}</Text>
                 </PressableScale>
               ))}
+              {customExerciseNames.map((name) => (
+                <PressableScale key={name} onPress={() => { haptic.tap(); setAddExerciseId(name); setAddCustomName(''); }} style={[s.chip, addExerciseId === name && s.chipActive]}>
+                  <Text style={[s.chipTxt, addExerciseId === name && s.chipTxtActive]}>{name}</Text>
+                </PressableScale>
+              ))}
+              <PressableScale onPress={() => { haptic.tap(); setAddExerciseId(NEW_CUSTOM); setAddCustomName(''); }} style={[s.chip, addExerciseId === NEW_CUSTOM && s.chipActive]}>
+                <Text style={[s.chipTxt, addExerciseId === NEW_CUSTOM && s.chipTxtActive]}>+ Własne</Text>
+              </PressableScale>
             </View>
+            {addExerciseId === NEW_CUSTOM && (
+              <TextInput
+                style={s.addInput}
+                autoFocus
+                placeholder="Nazwa ćwiczenia, np. Leg raises"
+                placeholderTextColor={c.text.muted}
+                value={addCustomName}
+                onChangeText={setAddCustomName}
+              />
+            )}
             {addExerciseId && (
               <View style={s.addRow}>
                 <TextInput
                   style={s.addInput}
                   keyboardType="numeric"
-                  autoFocus
-                  placeholder={`Ile ${EXERCISE_META.find((m) => m.id === addExerciseId)?.unit}…`}
+                  autoFocus={addExerciseId !== NEW_CUSTOM}
+                  placeholder={addExerciseId === NEW_CUSTOM ? 'Ile…' : `Ile ${EXERCISE_META.find((m) => m.id === addExerciseId)?.unit ?? ''}…`}
                   placeholderTextColor={c.text.muted}
                   value={addDraft}
                   onChangeText={setAddDraft}
