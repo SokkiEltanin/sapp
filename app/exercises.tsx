@@ -8,6 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import StreakFlame from '@/components/counters/StreakFlame';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
 import ExerciseLogHistory from '@/components/health/ExerciseLogHistory';
+import PlankStopwatch from '@/components/health/PlankStopwatch';
 import { useProfileStore } from '@/store/profileStore';
 import { useExerciseLogging } from '@/hooks/useExerciseLogging';
 import { amountLoggedOn } from '@/utils/personalQuests';
@@ -137,19 +138,26 @@ export default function ExercisesScreen() {
                   </PressableScale>
                 )}
               </View>
-              <View style={s.inputRow}>
-                <TextInput
-                  style={s.input}
-                  keyboardType="numeric"
-                  placeholder={`Wpisz ${ex.unit}…`}
-                  placeholderTextColor={c.text.muted}
-                  value={inputs[ex.id] ?? ''}
-                  onChangeText={(v) => setInputs((prev) => ({ ...prev, [ex.id]: v }))}
-                />
-                <PressableScale onPress={() => save(ex)} style={s.saveBtn}>
-                  <Text style={s.saveBtnTxt}>Zapisz</Text>
-                </PressableScale>
-              </View>
+              {/* Stoper deski (§417, 2026-10-25) — user: "timer jest tylko nie 40s tylko od 0s
+                  do kliknięcia STOP... widać czy wyrobiłem cel". Zamiast ręcznego wpisywania
+                  sekund (user sam szacował w głowie) — START/STOP od zegara ściennego. */}
+              {ex.id === 'plank' ? (
+                <PlankStopwatch onDone={(seconds) => logAmount(ex, seconds)} />
+              ) : (
+                <View style={s.inputRow}>
+                  <TextInput
+                    style={s.input}
+                    keyboardType="numeric"
+                    placeholder={`Wpisz ${ex.unit}…`}
+                    placeholderTextColor={c.text.muted}
+                    value={inputs[ex.id] ?? ''}
+                    onChangeText={(v) => setInputs((prev) => ({ ...prev, [ex.id]: v }))}
+                  />
+                  <PressableScale onPress={() => save(ex)} style={s.saveBtn}>
+                    <Text style={s.saveBtnTxt}>Zapisz</Text>
+                  </PressableScale>
+                </View>
+              )}
               {historyFor === ex.id && (
                 <ExerciseLogHistory
                   entries={logs.filter((l) => l.exercise === ex.id && l.date === today)}
