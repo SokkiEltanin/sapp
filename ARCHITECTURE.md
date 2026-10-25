@@ -22132,6 +22132,39 @@ dotyczących innych konkretnych bossów niż wcześniej (oczekiwane, nie bug —
 wyżej). Kamera powinna od razu (bez opóźnienia/flashu) wycelować w aktualnego bossa, a mapa od
 razu zgadzać się z tym co pokazuje edytor.
 
+## 414. Mapa bossów: zawsze widoczny baner "Twój cel" (2026-10-25)
+
+User zrzutem, zaraz po §413: "jest teraz lepiej już nie są rozrzucone... ale teraz problem bo
+nadal nie ma bosa aktualnego, jest pusto xddd". Zrzut pokazywał jednego pokonanego bossa
+(Draco Vulcanicus, X na portrecie) i zaraz pod nim zablokowanego (kłódka), z dużą ilością
+czarnej pustki między nimi — bez wyraźnie widocznego "aktualnego" węzła z niebieską obwódką.
+Kolejne pytania diagnostyczne (AskUserQuestion) nie dały rozstrzygającej odpowiedzi ("[No
+preference]" na oba) — bez dostępu do urządzenia nie da się ze zrzutu w 100% rozstrzygnąć czy
+to: (a) ring faktycznie tam jest, tylko za mało kontrastowy na ciemnym portrecie smoka, (b)
+kamera centruje się w miejscu gdzie węzeł akurat wypada blisko krawędzi, czy (c) coś głębszego
+w renderze konkretnego węzła.
+
+Zamiast dalej zgadywać z pikseli: naprawa STRUKTURALNA, niezależna od przyczyny. Dodany
+zawsze widoczny, pływający baner "Twój cel" (`CampaignMap.tsx`, nowy `currentBoss`/
+`st.goalBanner`) — portret + nazwa aktualnego bossa + przycisk WALCZ, zadokowany na STAŁEJ
+pozycji pod `modeToggle` (ten sam wzorzec co `doneBanner`/`modeToggle` w `bosses.tsx`), tap
+otwiera DOKŁADNIE ten sam popup co tap na węźle na mapie (`kind: 'current'`, jedna definicja
+treści, nie duplikat). Niezależnie od tego gdzie akurat wyląduje kamera i jak kontrastowy
+wypadnie ring na danym portrecie, cel jest teraz dostępny z jednego, gwarantowanego miejsca na
+ekranie. Dla MAD-zablokowanego celu (`locked` prop) baner pokazuje "Zablokowany cel"/"ZOBACZ"
+zamiast "Twój cel"/"WALCZ", popup i tak pokaże pełny komunikat blokady jak dotąd.
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — zmiana czysto wizualna/UI, logika indeksowa `isCurrent`/`isDefeated`/
+`isLocked` z §412/§413 nietknięta, już pokryta istniejącymi testami `bossMapLayout.test.ts`).
+
+**Priorytet testu na urządzeniu — WYSOKI**: po OTA, Bossy → Kampania — baner "Twój cel" musi
+być widoczny od razu po wejściu (bez scrollowania), tap musi otwierać popup z poprawnym
+bossem (tauntem/HP/przyciskiem WALCZ), WALCZ musi przechodzić do walki. Jeśli PO tej zmianie
+nadal brakuje "aktualnego" węzła NA SAMEJ mapie (nie w banerze) — to potwierdzi że to osobny,
+głębszy problem renderu konkretnego węzła, nie tylko kontrast/widoczność, i trzeba będzie
+szukać dalej z tą dodatkową informacją.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

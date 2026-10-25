@@ -30,6 +30,24 @@ user wejdzie na konkretny ekran). ⚠️ **UWAGA**: §403-§409 niżej opisywał
 edytora płótna, który od §411 (patrz NAJNOWSZY wpis poniżej) **już nie istnieje** — te wpisy są
 teraz historią, nie do testowania.
 
+## ✅🆕 Mapa bossów: zawsze widoczny baner "Twój cel" (§414)
+
+User zaraz po §413: "jest teraz lepiej już nie są rozrzucone... ale nadal nie ma bosa
+aktualnego, jest pusto xddd". Nie udało się ze zrzutu/pytań diagnostycznych w 100% ustalić
+czy to brak kontrastu ringa na ciemnym portrecie, pozycja kamery, czy coś głębszego w
+renderze — więc fix jest STRUKTURALNY, nie kolejna korekta zgadywana na ślepo: zawsze
+widoczny, pływający baner "Twój cel" (portret+nazwa+WALCZ) na stałej pozycji nad mapą,
+niezależny od scrolla/kontrastu. Tap otwiera ten sam popup co tap na węźle. Pełny opis →
+ARCHITECTURE.md §414.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów.
+
+**Priorytet testu na urządzeniu — WYSOKI**: baner musi być widoczny od razu, tap musi
+otwierać popup z poprawnym bossem i prowadzić do walki. **Jeśli PO tej zmianie węzeł
+"aktualnego" bossa NA SAMEJ mapie (nie w banerze) nadal się nie pokazuje/nie podświetla** —
+to sygnał że przyczyna jest głębsza niż kontrast, trzeba będzie kopać dalej z tą informacją
+(np. poprosić o zrzut PO przewinięciu całej ścieżki, albo eksport stanu `defeatedBosses`).
+
 ## ✅🆕 Bramka hydratacji mapy bossów + kampania przełożona na bloki żywiołów (§413)
 
 User zaraz po §412: "nie ma bosa z którym walczę teraz... mapa dalej rozjechana mimo że
