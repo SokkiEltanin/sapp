@@ -30,6 +30,43 @@ user wejdzie na konkretny ekran). ⚠️ **UWAGA**: §403-§409 niżej opisywał
 edytora płótna, który od §411 (patrz NAJNOWSZY wpis poniżej) **już nie istnieje** — te wpisy są
 teraz historią, nie do testowania.
 
+## 🆕 Duża lista usera (2026-10-25) — 4 obszary, w trakcie rozbioru
+
+User przysłał jedną wiadomość z 4 ponumerowanymi obszarami "do ogarnięcia". Rozbite na
+osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
+
+1. **Pompki w Ćwiczeniach → auto-zaliczenie questu w Pupil Zadania** — ZWERYFIKOWANE w
+   kodzie: `useExerciseLogging.ts`'s `logAmount()` → `exerciseJustUnlocked()` → `markXDone()`
+   (petStore) → toast "Nagroda czeka w Pupil → Zadania" — JUŻ istnieje i powinno działać dla
+   wszystkich 6 kanonicznych ćwiczeń logowanych z `app/exercises.tsx` LUB z pozycji planu w
+   `app/training-session.tsx` (jeśli ma `linkedExercise`). Jeśli user mimo to widzi że nie
+   działa — to prawdopodobnie konkretny, odtwarzalny bug (np. zły próg celu), nie brak
+   połączenia — czeka na potwierdzenie/dokładniejszy opis od usera.
+2. **Przebudowa zakładki Ćwiczenia** — część już ISTNIEJE: `app/training-plan-builder.tsx`
+   (customowe ćwiczenie z nazwą/celem/jednostką, "Własne" odpina quest) +
+   `app/training-session.tsx` ("Dzisiejsza sesja" — odhaczanie pozycji, "zrobione" czytane
+   wprost z loga więc PRZEŻYWA zamknięcie appki, edycja ilości przez rozwijaną historię wpisu
+   `ExerciseLogHistory`/`updateLog`). BRAKUJE: stoper dla deski (count-up od 0s + STOP, zamiast
+   ręcznego wpisywania sekund) — czeka na implementację. NIEJASNE: co dokładnie user ma na
+   myśli mówiąc "Zadania na głównym ekranie ćwiczeń są bez sensu" — w `app/exercises.tsx` nie
+   ma osobnej sekcji "Zadania" (jest już lista 6 ćwiczeń z danymi dziś/cel + linki do Historii i
+   "Moje plany") — możliwe że user nie widział jeszcze "Moje plany treningowe", albo mówi o
+   czymś innym (np. `app/pet-quests.tsx`) — czeka na doprecyzowanie.
+3. **Zadania — usunięcie swipe'a** — ✅ ZROBIONE, patrz §415 w ARCHITECTURE.md. Pozostałe dwa
+   punkty z listy usera (sekcje TERAZ/bezterminowe/terminowe, filtr po tagach z prefiksem)
+   NIE zrobione — lista ma już dwa tryby grupowania (po terminie / po rodzaju Szybkie-Do
+   skupienia-Poczekalnia, ten drugi domyślny) i już ma tagi w modelu (`Task.tags`, edytowalne w
+   `app/tasks/[id].tsx`/`app/tasks/add.tsx`) — brakuje UI filtra po tagu na liście głównej oraz
+   ustalenia z userem jak dokładnie ma wyglądać podział na 3 sekcje względem istniejących 2
+   trybów (nowy trzeci tryb? modyfikacja istniejącego "po rodzaju"?).
+4. **Dashboard: backup przed redesignem + przygotowanie appki** — NIE ZACZĘTE. User chce
+   zbackupować obecne widgety "w GitHubie, nie w appce" przed całkowitą przebudową od zera,
+   plus zapowiada że część zakładek przejdzie na popup-windowy i będzie opisywał to screen po
+   screenie w kolejnych wiadomościach. Czeka na: (a) dokładny format backupu jakiego user
+   chce (osobna gałąź? plik-dokumentacja? coś innego — git history i tak zachowuje wszystko,
+   warto to userowi powiedzieć), (b) szczegółowe opisy ekranów od usera, zanim cokolwiek
+   konkretnego da się zacząć przy punkcie 4.
+
 ## ✅🆕 Mapa bossów: zawsze widoczny baner "Twój cel" (§414)
 
 User zaraz po §413: "jest teraz lepiej już nie są rozrzucone... ale nadal nie ma bosa
