@@ -22165,6 +22165,40 @@ nadal brakuje "aktualnego" węzła NA SAMEJ mapie (nie w banerze) — to potwier
 głębszy problem renderu konkretnego węzła, nie tylko kontrast/widoczność, i trzeba będzie
 szukać dalej z tą dodatkową informacją.
 
+## 415. Zadania: usunięcie gestu swipe z listy (2026-10-25)
+
+User, w ramach dużej listy "rzeczy do ogarnięcia" (4 obszary — mapa bossów/ćwiczenia/zadania/
+dashboard, patrz NEXT_STEPS.md): "Zadania są hujowo dostarczone... usunąć swipe, przez
+przypadek częściej przesuwam niż specjalnie xd". `app/(tabs)/tasks.tsx`'s `SwipeRow`
+(`ReanimatedSwipeable` wokół `TaskCard`) dawał dwie akcje: swipe w prawo = "GOTOWE"/"COFNIJ"
+(oznacz zrobione), swipe w lewo = "ZA GODZ." (odłóż o godzinę). Audyt przed usunięciem: "GOTOWE"
+miało JUŻ niezależny, zawsze widoczny przycisk (`doneBtn`, okrągły checkmark w lewym rogu karty)
+— gest był tu czystym duplikatem, zero realnej funkcji do zastąpienia. "ZA GODZ." była JEDYNĄ
+akcją wyłącznie w geście — dostała nowy, zawsze widoczny mały przycisk z ikoną zegara obok
+istniejącego przycisku edycji (ukryty gdy zadanie już zrobione, dokładnie jak poprzednio
+ukryty wariant swipe'a w lewo).
+
+Usunięte w całości: `ReanimatedSwipeable`/`SwipeableMethods` import, `SwipeRow` komponent,
+`makeSw` arkusz stylów (ujawnień swipe'a). `TaskCard` przejął memoizację `React.memo()` (było
+na `SwipeRow`, teraz bezpośrednio na nim, bo to on trafia teraz prosto do `FlatList`'s
+`renderItem`) i dostał nowy prop `onQuickSnooze` do nowego przycisku.
+
+**Świadomie NIETKNIĘTE w tym PR** (osobne zadania z tej samej listy usera, patrz
+NEXT_STEPS.md): reorganizacja listy na sekcje TERAZ/bezterminowe/terminowe (lista ma już DWA
+tryby grupowania — po terminie `buildGroupedList`/`SECTION_DEFS` i po rodzaju `buildKindGroupedList`/
+`KIND_ORDER` Szybkie/Do skupienia/Poczekalnia, ten drugi jest DOMYŚLNY — zanim to ruszę, czekam
+na doprecyzowanie usera czy chodzi o nowy, trzeci tryb czy modyfikację istniejącego); filtr po
+tagach (model `Task.tags: string[]` i edycja tagów już istnieją w `app/tasks/[id].tsx`/
+`app/tasks/add.tsx`, brakuje UI filtrowania/wyszukiwania po tagu na liście głównej).
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — zmiana czysto interakcyjna/UI, bez nowej logiki domenowej do przetestowania).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: lista zadań — upewnić się że przeciąganie karty w
+bok już nic nie robi (żadnego przypadkowego триgera), że okrągły przycisk ✓ dalej oznacza
+zrobione/cofnij, i że nowy mały przycisk z zegarem obok ołówka faktycznie odkłada zadanie o
+godzinę (toast "Odłożono na godzinę", zadanie znika z aktywnej listy na godzinę).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

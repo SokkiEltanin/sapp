@@ -12,7 +12,6 @@ import {
   Square, CheckSquare2, Clock, Timer, RefreshCw, Activity, Coins,
   Zap, Target, Hourglass,
 } from 'lucide-react-native';
-import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useTasks, taskReward } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
@@ -199,12 +198,19 @@ function buildKindGroupedList(sorted: Task[]): ListItem[] {
 
 // ─── Task card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
+// React.memo (2026-09-18, audyt wydajności runda 4, przeniesione z usuniętego `SwipeRow` w
+// §415) — bez memoizacji SAMEGO wiersza każda zmiana stanu ekranu (quickText w polu szybkiego
+// dodawania, doneCollapsed, sortOpen...) re-renderowała WSZYSTKIE widoczne wiersze zadań, nie
+// tylko ten dotknięty. Callbacki przekazywane tu (handleCompletePress/handleEditPress/
+// handleEditDirect/handleQuickSnooze, patrz `TasksScreen` niżej) są już stabilne przez
+// `useCallback`, więc goły `memo()` bez customowego comparatora wystarcza.
+const TaskCard = memo(function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQuickSnooze }: {
   task: Task;
   pomodoroTaskId?: string;
   onComplete: (task: Task) => void;
   onEdit: (task: Task) => void;
   onEditDirect: (task: Task) => void;
+  onQuickSnooze: (id: string) => void;
 }) {
   const colors = useColors();
   const G = useMemo(() => gFor(colors), [colors]);
@@ -251,7 +257,13 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
     >
       {isCurrent && <View pointerEvents="none" style={[s.greenWash, { backgroundColor: CURRENT_BLUE + '1C' }]} />}
       {isCurrent && <View pointerEvents="none" style={[s.accentBar, s.accentBarStrong, { backgroundColor: CURRENT_BLUE }]} />}
-      {/* Left controls: done swoosh + edit */}
+      {/* Left controls: done swoosh + edit + (jeśli aktywne) odłóż o godzinę. §415
+          (2026-10-25) — user: "usunąć swipe, przez przypadek częściej przesuwam niż
+          specjalnie" — gest swipe'a (GOTOWE w prawo / ZA GODZ. w lewo) usunięty w całości;
+          "GOTOWE" miało już niezależny, widoczny przycisk (`doneBtn` niżej) więc nic tu nie
+          traci funkcji — jedyna akcja TYLKO w geście była "odłóż o godzinę", stąd nowy
+          widoczny przycisk `snoozeBtn` (ukryty gdy zadanie już zrobione, dokładnie jak
+          poprzednio ukryty wariant swipe'a w lewo). */}
       <View style={s.leftControls}>
         <TouchableOpacity
           style={[s.doneBtn, isDone && s.doneBtnActive]}
@@ -270,6 +282,17 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
         >
           <Pencil size={11} color={isDone ? colors.text.muted : colors.text.secondary} strokeWidth={2} />
         </TouchableOpacity>
+
+        {!isDone && (
+          <TouchableOpacity
+            style={s.editBtn}
+            onPress={(e: any) => { e.stopPropagation?.(); onQuickSnooze(task.id); }}
+            hitSlop={6}
+            activeOpacity={0.8}
+          >
+            <Clock size={11} color={colors.text.secondary} strokeWidth={2} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Content */}
@@ -327,7 +350,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Task detail modal ────────────────────────────────────────────────────────
 
@@ -519,71 +542,6 @@ const makeSs = (c: any, g: any) => StyleSheet.create({
   sub: { fontSize: 11, color: c.text.muted, marginTop: 2 },
 });
 
-// ─── Swipe row ────────────────────────────────────────────────────────────────
-
-// React.memo (2026-09-18, audyt wydajności runda 4) — ten sam wzorzec/klasa buga co
-// ExpenseItem.tsx (§118): FlatList `renderItem` w tym pliku jest gołym inline closure, więc
-// bez memoizacji SAMEGO wiersza każda zmiana stanu ekranu (quickText w polu szybkiego dodawania,
-// doneCollapsed, sortOpen...) re-renderowała WSZYSTKIE widoczne wiersze zadań, nie tylko ten
-// dotknięty. Callbacki przekazywane do `SwipeRow` (handleCompletePress/handleEditPress/
-// handleEditDirect/handleQuickSnooze, patrz `TasksScreen` niżej) są już stabilne przez
-// `useCallback`, więc goły `memo()` bez customowego comparatora wystarcza — inaczej niż
-// scan.tsx (audyt tej samej rundy), które MA gołe callbacki inline i memo tam nic by nie dało.
-const SwipeRow = memo(function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQuickSnooze }: {
-  task: Task; pomodoroTaskId?: string;
-  onComplete: (task: Task) => void; onEdit: (task: Task) => void;
-  onEditDirect: (task: Task) => void; onQuickSnooze: (id: string) => void;
-}) {
-  const colors = useColors();
-  const G = useMemo(() => gFor(colors), [colors]);
-  const sw = useMemo(() => makeSw(colors), [colors]);
-  const swRef = useRef<SwipeableMethods>(null);
-  const isDone = task.status === 'done';
-  return (
-    <ReanimatedSwipeable
-      ref={swRef} friction={2} overshootFriction={8} leftThreshold={72} rightThreshold={72}
-      renderLeftActions={() => (
-        <View style={[sw.leftReveal, isDone && sw.leftRevealDone]}>
-          <Check size={18} color={isDone ? G.accent : G.card} strokeWidth={3} />
-          <Text style={[sw.revealText, isDone && sw.revealTextDone]}>{isDone ? 'COFNIJ' : 'GOTOWE'}</Text>
-        </View>
-      )}
-      renderRightActions={() => isDone ? null : (
-        <View style={sw.rightReveal}>
-          <Text style={sw.revealText}>ZA GODZ.</Text>
-          <Clock size={18} color={G.card} strokeWidth={2.5} />
-        </View>
-      )}
-      onSwipeableOpen={(dir) => {
-        swRef.current?.close();
-        if (dir === 'right') { onComplete(task); }
-        else if (!isDone) { onQuickSnooze(task.id); }
-      }}
-    >
-      <TaskCard task={task} pomodoroTaskId={pomodoroTaskId} onComplete={onComplete} onEdit={onEdit} onEditDirect={onEditDirect} />
-    </ReanimatedSwipeable>
-  );
-});
-
-// `themedStyles` (2026-09-26, agent-audyt optymalizacji) — było gołe `(c, g) =>
-// StyleSheet.create(...)` wywoływane per-instancja `useMemo(() => makeSw(colors, G), ...)` w
-// KAŻDYM wierszu listy zadań (`SwipeRow`, memo() ale to nie chroni WNĘTRZA — memo tylko
-// pomija re-render przy niezmienionych propsach, a mount N wierszy i tak budował N kopii tego
-// samego arkusza stylów). Dokładnie ten sam ANR-owy wzorzec co opisany w nagłówku
-// `themedStyles.ts` (i już raz naprawiony w `ExpenseItem.tsx`/`habits.tsx`), tylko w tym pliku
-// przeoczony. `g = gFor(c)` jest czystą funkcją `c`, więc bezpiecznie zwinięta do wnętrza —
-// cache key zostaje tym samym obiektem `Colors`.
-const makeSw = themedStyles((c: any) => {
-  const g = gFor(c);
-  return StyleSheet.create({
-    leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: g.accent, borderRadius: 18 },
-    leftRevealDone: { backgroundColor: g.accentDim },
-    rightReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 20, gap: 8, backgroundColor: c.accent.amber, borderRadius: 18 },
-    revealText: { fontSize: 10, fontWeight: '800', color: g.card, letterSpacing: 0.8 },
-    revealTextDone: { color: g.accent },
-  });
-});
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
@@ -697,7 +655,7 @@ export default function TasksScreen() {
               );
             }
             return (
-              <SwipeRow
+              <TaskCard
                 task={item as Task}
                 pomodoroTaskId={pomodoroTaskId}
                 onComplete={handleCompletePress}
