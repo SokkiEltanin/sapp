@@ -36,8 +36,12 @@ export default function TrainingPlanBuilderScreen() {
   const addPlan = useTrainingPlansStore((st) => st.addPlan);
   const updatePlan = useTrainingPlansStore((st) => st.updatePlan);
 
+  // §416 (2026-10-25) — ten sam fix co usePetQuests.ts/useExerciseLogging.ts: `targetsFor`
+  // samo domyślnie ląduje na poziom początkujący gdy `trainingLevel` jest `null`, więc gate
+  // tutaj niepotrzebnie chował skrót-chip "uzupełnij z celu" dla userów bez ustawionego
+  // poziomu.
   const targets = useMemo(
-    () => (trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null),
+    () => targetsFor(trainingLevel, ageFrom(birthdate), gender),
     [trainingLevel, birthdate, gender],
   );
 

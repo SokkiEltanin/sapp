@@ -64,8 +64,18 @@ export function usePetQuests() {
   const affToday = affectionDay === todayISO() ? affection : 0;
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
+  // §416 (2026-10-25) — user: "te zadania tam się nie odhaczały jak robiłem i nie łapie tych
+  // realnie co robię ćwiczeń" — root cause: `trainingLevel` domyślnie `null` (profileStore), a
+  // TEN gate (`trainingLevel ? targetsFor(...) : null`) blokował questy treningowe W CAŁOŚCI
+  // dopóki user nie odwiedził Ustawienia → Personalizacja i ręcznie nie wybrał poziomu —
+  // `targetsFor` samo w sobie JUŻ domyślnie ląduje na `'poczatkujacy'` gdy `level` jest `null`
+  // (patrz `BASE[level ?? 'poczatkujacy']` w personalQuests.ts), więc ten gate był zbędną,
+  // nadgorliwą obroną która po cichu wyłączała całą funkcję zamiast dać sensowny domyślny cel.
+  // Usunięty — questy treningowe teraz DZIAŁAJĄ OD RAZU (cel poziomu początkującego), Ustawienia
+  // → Personalizacja dalej pozwala je dostroić (wyższy poziom/wiek/płeć), ale przestają być
+  // wymaganym pierwszym krokiem.
   const personalTargets = useMemo(
-    () => trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null,
+    () => targetsFor(trainingLevel, ageFrom(birthdate), gender),
     [trainingLevel, birthdate, gender],
   );
   const todaysPool = useMemo(() => dailyExercisePool(todayISO()), []);
