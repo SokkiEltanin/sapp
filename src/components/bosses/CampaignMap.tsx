@@ -75,6 +75,15 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
   const scrollRef = useRef<ScrollView>(null);
 
   const currentIdx = currentId ? bosses.findIndex(b => b.id === currentId) : bosses.length;
+  // Zawsze widoczny baner "Twój cel" (2026-10-25, §414) — user po §413 (reorder kampanii):
+  // "nadal nie ma bosa aktualnego, jest pusto xddd" — niebieska obwódka na węźle na ciemnym
+  // portrecie, otoczona dużą czarną "mgłą" niepokazanej trasy, okazała się za mało widoczna
+  // (zwłaszcza na smoczych/ciemnych portretach), a sam węzeł bywa daleko od miejsca gdzie akurat
+  // wyląduje kamera na mniejszych ekranach. Zamiast kolejnej korekty samego scrolla/ringa —
+  // STRUKTURALNA gwarancja: niezależnie od tego gdzie kamera akurat jest i jak kontrastowy
+  // wypadnie ring na danym portrecie, cel jest ZAWSZE dostępny z jednego, stałego miejsca na
+  // ekranie, pływającego NAD mapą (ten sam wzorzec co `doneBanner`/`modeToggle` w bosses.tsx).
+  const currentBoss = currentId ? bosses.find(b => b.id === currentId) ?? null : null;
   // Edytor mapy (2026-10-14, ARCHITECTURE.md §322, PRZEBUDOWANY OD ZERA w §412) — nadpisanie
   // toru NADPISUJE X proceduralnego zygzaka dla danego bossa, Y jest ZAWSZE proceduralne (patrz
   // `applyLaneOverrides` w bossMapLayout.ts). Kluczowane BAZOWYM id (`baseBossId`) — TEN SAM
@@ -304,6 +313,26 @@ function CampaignMap({ bosses, currentId, onPressCurrent, energy, energyMax, ene
           </View>
         </View>
       )}
+
+      {/* Baner "Twój cel" (§414) — zawsze widoczny, niezależnie od scrolla/kontrastu ringa na
+          mapie. Tap otwiera DOKŁADNIE ten sam popup co tap na węźle na mapie (`kind: 'current'`)
+          — jedna definicja treści popupu, nie duplikat. */}
+      {!!currentBoss && !popup && (
+        <PressableScale
+          onPress={() => { haptic.tap(); setPopup({ kind: 'current', boss: currentBoss }); }}
+          style={[st.goalBanner, { top: spacing[3] + 56 }]}
+        >
+          <BossArt id={currentBoss.id} emoji={currentBoss.emoji} size={36} mystery={false} powered={isMad} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={st.goalLabel}>{locked ? 'Zablokowany cel' : 'Twój cel'}</Text>
+            <Text style={st.goalName} numberOfLines={1}>{currentBoss.name}</Text>
+          </View>
+          <View style={[st.goalBtn, locked && { opacity: 0.5 }]}>
+            {locked ? <Lock size={13} color="#fff" /> : <Swords size={13} color="#fff" />}
+            <Text style={st.goalBtnTxt}>{locked ? 'ZOBACZ' : 'WALCZ'}</Text>
+          </View>
+        </PressableScale>
+      )}
     </View>
   );
 }
@@ -325,6 +354,20 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
   },
   nodeLabel: { fontSize: 10, fontWeight: '800', textAlign: 'center', marginTop: 4, width: BASE_NODE + 32, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+
+  // Baner "Twój cel" (§414) — pływa pod `modeToggle` (ten pływa w `bosses.tsx` na `top:
+  // spacing[3]`, ~48px wysoki), ten sam poziomy margines co `doneBanner` tam.
+  goalBanner: {
+    position: 'absolute', left: spacing[3], right: spacing[3],
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: 'rgba(15,17,20,0.94)', borderRadius: radius.lg, borderWidth: 1,
+    borderColor: 'rgba(56,189,248,0.35)', paddingVertical: 8, paddingHorizontal: spacing[3],
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 10,
+  },
+  goalLabel: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6, color: 'rgba(255,255,255,0.5)' },
+  goalName: { fontSize: 13.5, fontWeight: '800', color: '#fff', marginTop: 1 },
+  goalBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', borderRadius: radius.md, paddingVertical: 7, paddingHorizontal: 10 },
+  goalBtnTxt: { fontSize: 11, fontWeight: '900', color: '#fff' },
 
   popupBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   popup: {
