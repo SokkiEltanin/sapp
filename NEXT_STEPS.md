@@ -67,6 +67,23 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    szczegółowe opisy ekranów od usera, zapowiedziane jako kolejne wiadomości — nic do zrobienia
    z tej strony, dopóki nie przyjdą.
 
+## ✅🆕 Edytor układu walki — wizard krokowy (§420)
+
+User po zrzucie ekranu: "zrób ten edytor dobrze, każdy element osobno, pełno ekranów" (nawiązanie
+do "jak kiedyś ze sklepikarzem" — dopytane, chodziło ogólnie o styl/jakość, nie konkretny
+wcześniejszy ekran). Dawne 8 sekcji na jednym długim scrollu (`app/battle-layout-lab.tsx`)
+przebudowane na wizard: 6 osobnych kroków (Tło → Pupil → Boss → Cień → Odbicie → Eksport),
+kropki postępu tappable pod headerem, nawigacja Wstecz/Dalej przypięta na dole. Scena-podgląd
+(przeciąganie kotka/bossa/pasków HP) zostaje widoczna na każdym kroku, nieaktywny element
+(np. boss podczas kroku "Pupil") dostaje przyciemnienie jako wizualny sygnał.
+
+`tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów. Pełny opis →
+ARCHITECTURE.md §420.
+
+**Priorytet testu na urządzeniu — WYSOKI**: Ustawienia → Pupil → Edytor układu walki —
+nawigacja kropek/Wstecz/Dalej, przyciemnienie nieaktywnego elementu na kroku Pupil/Boss, i
+czy zmiana widoczna w scenie na bieżąco niezależnie od kroku.
+
 ## ✅🆕 Sesja treningowa "Ukończ wszystko" + wsteczne customowe ćwiczenia (§419)
 
 User, po przetestowaniu poprzedniej rundy ćwiczeń: "mogę kliknąć, że wykonałem cały plan...
