@@ -48,8 +48,9 @@ osobne zadania (patrz TaskList tej sesji #39-#45), status poniżej:
    DZIAŁA): `app/training-plan-builder.tsx` (customowe ćwiczenie z nazwą/celem/jednostką) +
    `app/training-session.tsx` ("Dzisiejsza sesja" — odhaczanie pozycji, "zrobione" czytane
    wprost z loga więc PRZEŻYWA zamknięcie appki, edycja ilości przez rozwijaną historię wpisu).
-   BRAKUJE: stoper dla deski (count-up od 0s + STOP, zamiast ręcznego wpisywania sekund) —
-   NASTĘPNE w kolejce do zrobienia.
+   Stoper dla deski — ✅ ZROBIONE (§417, `PlankStopwatch.tsx`, podpięty w `exercises.tsx` i
+   `training-session.tsx`). Zostaje: dalsze ewentualne poprawki UX tego ekranu, jeśli user
+   wróci z nowymi uwagami po przetestowaniu na urządzeniu.
 3. **Zadania — przebudowa** — swipe usunięty (§415). Reszta: user explicite oddał decyzję
    projektową ("ty tu jesteś mastermind programista, możesz proponować najlepsze wersje") —
    NASTĘPNE w kolejce: zaprojektować i zbudować sekcje TERAZ/bezterminowe/terminowe (łącząc z

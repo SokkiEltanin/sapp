@@ -22245,6 +22245,44 @@ karta powinna pokazać ✓/"zrobione" gdy suma osiągnie próg początkującego,
 "Nagroda czeka w Pupil → Zadania", I faktycznie być tam widoczna do odebrania. To samo dla
 pozycji w "Dzisiejsza sesja" (training-session.tsx) z `linkedExercise`.
 
+## 417. Stoper deski (count-up + STOP) zamiast ręcznego wpisywania sekund (2026-10-25)
+
+User, w ramach tej samej dużej listy, punkt o przebudowie Ćwiczeń: "a jak pokazuje się deska
+to timer jest tylko nie 40s tylko od 0s do kliknięcia STOP jakby przez co widać czy wyrobiłem
+cel np 40s czy zrobiłem dłużej np 110s". Deska (plank) dotąd logowała się TAK SAMO jak
+pompki/przysiady — ręczny numeryczny input, user sam szacował/liczył sekundy w głowie zamiast
+appka to robiła.
+
+**Nowy komponent** `src/components/health/PlankStopwatch.tsx` — START zapisuje `Date.now()`,
+STOP liczy różnicę i OD RAZU loguje wynik (`onDone(seconds)`, min. 1s). Oparty o zegar ścienny
+(`Date.now()`), NIE licznik inkrementowany co tick `setInterval` — zostaje dokładny nawet jeśli
+JS na chwilę przyśnie (throttling w tle/starszy telefon), `setInterval` tu tylko WYZWALA
+przeliczenie z `Date.now()`, nie jest samym źródłem czasu. Świadomie BEZ pauzy — deska to jeden
+ciągły wysiłek, pauza nie miałaby tu sensu.
+
+**Podpięte w dwóch miejscach** (wszędzie gdzie deska dotąd miała zwykły input):
+- `app/exercises.tsx` — karta "Deska" (6 kanonicznych ćwiczeń) zamienia cały `inputRow`
+  (TextInput+Zapisz) na `PlankStopwatch`, `onDone` woła ten sam `logAmount(ex, seconds)` co
+  reszta ekranu (quest/nagroda pupila — patrz §416 — liczy się identycznie).
+- `app/training-session.tsx` — pozycja planu z `linkedExercise === 'plank'` (customowy plan
+  MOŻE podpiąć deskę jak każde z 6 kanonicznych ćwiczeń) dostaje ten sam stoper zamiast
+  standardowego inline-inputu po tapnięciu karty. Nowa funkcja `confirmStopwatch` — loguje OD
+  RAZU bez pośredniego draftu/potwierdzenia (sam odczyt stopera JEST już potwierdzeniem, user
+  patrzy na liczbę w trakcie, nie wpisuje jej po fakcie z pamięci).
+
+**Świadomie NIE zrobione**: stoper dotyczy TYLKO deski (`linkedExercise === 'plank'` /
+`ex.id === 'plank'`) — nie uogólniony na WSZYSTKIE czasowe custom-ćwiczenia (user prosił
+konkretnie o deskę, nie o generyczny "typ: czas" w builderze planów — to byłaby dodatkowa,
+nieproszona abstrakcja).
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — czysto interakcyjny komponent UI, logika logowania/questów niezmieniona i już
+pokryta istniejącymi testami).
+
+**Priorytet testu na urządzeniu — ŚREDNI**: ekran Ćwiczenia → karta Deska → START faktycznie
+liczy w górę (nie w dół), STOP zapisuje dokładnie tyle sekund ile minęło i pojawia się w "Dziś:
+X / cel". To samo w "Dzisiejsza sesja" dla pozycji podpiętej pod deskę.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

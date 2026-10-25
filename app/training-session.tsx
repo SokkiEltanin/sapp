@@ -7,6 +7,7 @@ import { ChevronLeft, Check, Circle, Dumbbell, History, ChevronDown } from 'luci
 import PressableScale from '@/components/ui/PressableScale';
 import ExerciseIcon from '@/components/health/ExerciseIcon';
 import ExerciseLogHistory from '@/components/health/ExerciseLogHistory';
+import PlankStopwatch from '@/components/health/PlankStopwatch';
 import { useTrainingPlansStore } from '@/store/trainingPlansStore';
 import { useExerciseLogging } from '@/hooks/useExerciseLogging';
 import { planItemDoneToday, planItemLogKey } from '@/utils/trainingPlans';
@@ -65,6 +66,15 @@ export default function TrainingSessionScreen() {
     setOpenId(null);
   };
 
+  // Stoper deski (§417) — STOP loguje OD RAZU, bez pośredniego draftu/potwierdzenia (sam
+  // odczyt stopera JEST już potwierdzeniem — user patrzy na liczbę w trakcie, nie po fakcie).
+  const confirmStopwatch = (itemId: string, seconds: number) => {
+    const item = plan.items.find((it) => it.id === itemId);
+    if (!item) return;
+    logAmount({ exercise: planItemLogKey(item), linkedExercise: item.linkedExercise, label: item.name, unit: item.unit, amount: seconds });
+    setOpenId(null);
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -105,18 +115,22 @@ export default function TrainingSessionScreen() {
               </View>
 
               {open && (
-                <View style={s.inputRow}>
-                  <TextInput
-                    style={s.input}
-                    keyboardType="numeric"
-                    autoFocus
-                    value={draft}
-                    onChangeText={setDraft}
-                  />
-                  <PressableScale onPress={() => confirm(it.id)} style={s.saveBtn}>
-                    <Text style={s.saveBtnTxt}>Zapisz</Text>
-                  </PressableScale>
-                </View>
+                it.linkedExercise === 'plank' ? (
+                  <PlankStopwatch onDone={(seconds) => confirmStopwatch(it.id, seconds)} />
+                ) : (
+                  <View style={s.inputRow}>
+                    <TextInput
+                      style={s.input}
+                      keyboardType="numeric"
+                      autoFocus
+                      value={draft}
+                      onChangeText={setDraft}
+                    />
+                    <PressableScale onPress={() => confirm(it.id)} style={s.saveBtn}>
+                      <Text style={s.saveBtnTxt}>Zapisz</Text>
+                    </PressableScale>
+                  </View>
+                )
               )}
 
               {historyFor === it.id && (
