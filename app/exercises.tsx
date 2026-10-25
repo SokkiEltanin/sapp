@@ -73,11 +73,16 @@ export default function ExercisesScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* §416 (2026-10-25) — user: "nie łapie tych realnie co robię ćwiczeń" — cele
+            DZIAŁAJĄ już od razu (liczą się jako poziom początkujący, patrz usePetQuests.ts/
+            useExerciseLogging.ts), ten banner tylko ZACHĘCA do dostrojenia, nie ostrzega że
+            czegoś brakuje jak poprzednio ("Logowanie działa już teraz, bez celów" sugerowało
+            że cele/odhaczanie NIE działają bez wizyty w Ustawieniach — nieprawda po fixie). */}
         {!trainingLevel && (
           <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={s.setupBanner}>
             <SettingsIcon size={16} color="#FB923C" />
             <Text style={s.setupBannerTxt}>
-              Ustaw poziom treningowy w Ustawienia → Personalizacja, żeby zobaczyć spersonalizowane cele. Logowanie działa już teraz, bez celów.
+              Cele liczą się teraz jako poziom początkujący — ustaw dokładniejszy w Ustawienia → Personalizacja.
             </Text>
           </PressableScale>
         )}

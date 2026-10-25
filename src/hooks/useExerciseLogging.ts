@@ -45,8 +45,12 @@ export function useExerciseLogging() {
   })));
 
   const today = todayISO();
+  // §416 (2026-10-25) — ten sam fix co `usePetQuests.ts`: `targetsFor` już samo domyślnie
+  // ląduje na poziom początkujący gdy `trainingLevel` jest `null`, więc ten gate po cichu
+  // wyłączał cele/odhaczanie "zrobione"/quest pupila dla KAŻDEGO usera który nie odwiedził
+  // jeszcze Ustawień — patrz obszerny komentarz w usePetQuests.ts.
   const targets = useMemo(
-    () => (trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null),
+    () => targetsFor(trainingLevel, ageFrom(birthdate), gender),
     [trainingLevel, birthdate, gender],
   );
   const streak = useMemo(() => exerciseStreakFrom(logs, today), [logs, today]);

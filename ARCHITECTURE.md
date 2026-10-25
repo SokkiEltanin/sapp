@@ -22199,6 +22199,52 @@ bok już nic nie robi (żadnego przypadkowego триgera), że okrągły przycis
 zrobione/cofnij, i że nowy mały przycisk z zegarem obok ołówka faktycznie odkłada zadanie o
 godzinę (toast "Odłożono na godzinę", zadanie znika z aktywnej listy na godzinę).
 
+## 416. Fix: questy treningowe/"zrobione" nie działały bez ustawienia poziomu w Ustawieniach (2026-10-25)
+
+User, w ramach tej samej dużej listy: "ZADANIA W ZAKŁADCE PUPILA i AKTYWNOŚCI z ZADAŃ DO
+ODEBRANIA czy są podpięte pod zakładkę ĆWICZEŃ (skoro robię 15 pompek to żeby zaliczało że
+zrobiłem)" i potem, po doprecyzowaniu: "te zadania tam się nie odhaczały jak robiłem i nie
+łapie tych realnie co robię ćwiczeń itp".
+
+**Root cause** (nie brak podpięcia — podpięcie `useExerciseLogging.ts`→`exerciseJustUnlocked`→
+`markXDone()` ISTNIAŁO i działało poprawnie): `trainingLevel` w `profileStore.ts` domyślnie
+`null` (user nigdy nie odwiedził Ustawienia → Personalizacja → Poziom treningowy — niezbyt
+odkrywalne, nic w normalnym flow appki tam nie prowadzi). TRZY miejsca (`usePetQuests.ts`'s
+`personalTargets`, `useExerciseLogging.ts`'s `targets`, `training-plan-builder.tsx`'s `targets`)
+miały identyczny gate `trainingLevel ? targetsFor(...) : null` — mimo że `targetsFor()` SAMO W
+SOBIE już bezpiecznie domyślnie ląduje na `'poczatkujacy'` gdy `level` jest `null`
+(`BASE[level ?? 'poczatkujacy']`, personalQuests.ts, zweryfikowane istniejącym testem
+`targetsFor(null,null,null) === targetsFor('poczatkujacy',null,null)`). Efekt tego zbędnego,
+nadgorliwego gate'u: dla KAŻDEGO usera który nie odwiedził Ustawień — `target` zawsze `null` →
+`done`/checkmark na `app/exercises.tsx` i `app/training-session.tsx` NIGDY nie pokazywał się
+jako zrobiony (`done = target != null && todayAmt >= target`), a `exerciseJustUnlocked` (które
+wymaga realnego `target` do porównania) nigdy nie zwracało `true` → quest w Pupil → Zadania
+nigdy się nie odblokowywał, mimo że user faktycznie logował ćwiczenia. Settings' własny podpis
+TO POTWIERDZAŁ wprost: "Nieustawiony — questy treningowe ukryte" — świadomy, ale (jak się
+okazało) szkodliwy wybór projektowy sprzed tej sesji.
+
+**Fix**: usunięty gate we wszystkich trzech miejscach — `targetsFor(trainingLevel, ...)` woła
+się TERAZ zawsze, pozwalając jej własnemu `?? 'poczatkujacy'` fallbackowi zadziałać. Questy/
+odhaczanie DZIAŁAJĄ OD RAZU (cel poziomu początkującego), Ustawienia → Personalizacja dalej
+pozwalają je dostroić (wyższy poziom/wiek/płeć), ale przestają być wymaganym PIERWSZYM krokiem.
+Zaktualizowane teksty, które zakładały stary (błędny) stan: Ustawień podpis ("Nieustawiony —
+questy treningowe ukryte" → "...liczy się jako Początkujący"), opis sekcji ("Odblokowuje
+rotujące questy..." → "Dostraja cele..., bez wyboru liczą się jako Początkujący, nie są
+ukryte"), baner na `app/exercises.tsx` (było: "Logowanie działa już teraz, bez celów" —
+sugerujące że cele NIE działają bez Ustawień, nieprawda po fixie — teraz: "Cele liczą się
+teraz jako poziom początkujący — ustaw dokładniejszy...").
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów — brak
+nowych testów, bo `targetsFor(null,...)`'s fallback na `'poczatkujacy'` był JUŻ pokryty
+istniejącym testem w `personalQuests.test.ts` (sama funkcja była zawsze poprawna, błąd był
+wyłącznie w zbędnym gate na wywołaniach).
+
+**Priorytet testu na urządzeniu — WYSOKI**: na ŚWIEŻYM koncie (albo po "Resetuj postęp pupila"
+w Ustawieniach, bez dotykania Personalizacji) zaloguj np. 15 pompek na ekranie Ćwiczenia —
+karta powinna pokazać ✓/"zrobione" gdy suma osiągnie próg początkującego, I pojawić się toast
+"Nagroda czeka w Pupil → Zadania", I faktycznie być tam widoczna do odebrania. To samo dla
+pozycji w "Dzisiejsza sesja" (training-session.tsx) z `linkedExercise`.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

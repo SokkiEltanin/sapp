@@ -1026,7 +1026,10 @@ export default function SettingsScreen() {
         },
         {
           id: 'personal-training', title: 'Poziom treningowy',
-          subtitle: trainingLevel === 'poczatkujacy' ? 'Początkujący' : trainingLevel === 'sredni' ? 'Średni' : trainingLevel === 'zaawansowany' ? 'Zaawansowany' : 'Nieustawiony — questy treningowe ukryte',
+          // §416 (2026-10-25) — trainingLevel nieustawiony NIE chowa już questów treningowych
+          // (patrz usePetQuests.ts) — liczą się jako poziom początkujący, dopóki nie ustawisz
+          // dokładniejszego, więc podpis już nie straszy "ukryte".
+          subtitle: trainingLevel === 'poczatkujacy' ? 'Początkujący' : trainingLevel === 'sredni' ? 'Średni' : trainingLevel === 'zaawansowany' ? 'Zaawansowany' : 'Nieustawiony — liczy się jako Początkujący',
           keywords: ['trening', 'poziom', 'pompki', 'przysiady', 'brzuszki', 'deska', 'rozciąganie', 'rower', 'fitness', 'kondycja', 'questy'],
           control: { kind: 'custom', render: () => (
             <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
@@ -1036,7 +1039,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={styles.rowText}>
                   <Text style={styles.rowLabel}>Poziom treningowy</Text>
-                  <Text style={styles.rowSub}>Odblokowuje rotujące questy pupila: pompki, przysiady, brzuszki, deska, rozciąganie, rower — {DAILY_EXERCISE_COUNT} losowe dziennie</Text>
+                  <Text style={styles.rowSub}>Dostraja cele rotujących questów pupila (pompki, przysiady, brzuszki, deska, rozciąganie, rower — {DAILY_EXERCISE_COUNT} losowe dziennie) — bez wyboru liczą się jako Początkujący, nie są ukryte</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: spacing[2] }}>
