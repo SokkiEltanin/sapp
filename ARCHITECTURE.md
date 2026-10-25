@@ -22380,6 +22380,68 @@ przekroczy próg. (2) w Historii ćwiczeń, dzień z przeszłości — "+ Własn
 wpisać nową nazwę i zapisać dla TEJ daty, a powtórne otwarcie formularza pokazać tę nazwę
 jako gotowy chip.
 
+## 420. Edytor układu walki — przebudowa na wizard krokowy (2026-10-25)
+
+User (po zrzucie ekranu edytora): "zrób ten edytor w końcu dobrze... jak kiedyś ze
+sklepikarzem, każdy element osobno dobrze na ekranie, pełno ekranów". Dopytane przez
+`AskUserQuestion` (nie znalazłem w historii edytora Rynku dosłownego multi-ekranowego
+wzorca do skopiowania 1:1) — user potwierdził: chodziło o STYL/JAKOŚĆ ogólnie, nie konkretny
+wcześniejszy ekran, i wybrał explicite strukturę "wizard krok po kroku" z zaproponowanego
+rozbicia: Tło → Pupil → Boss → Cień → Odbicie → Eksport.
+
+**Przed**: `app/battle-layout-lab.tsx` miał WSZYSTKIE 8 sekcji (tło areny, jasność tła, boss
+podglądu, rozmiar, pozycja X/Y dla obu sprite'ów i obu pasków HP naraz, cień dla obu,
+odbicie dla obu, eksport) jedna pod drugą na JEDNYM długim, przewijanym ekranie — scena-
+podgląd na samej górze, scrollowało się przez wszystko żeby dotrzeć do np. odbicia.
+
+**Po — wizard, 6 kroków** (`STEP_TITLES`, stan `step` 0-5):
+1. **Tło** — wybór tła areny + ściemnienie (bez zmian funkcjonalnych, tylko własny ekran).
+2. **Pupil** — rozmiar + pozycja X/Y (pupil i jego pasek HP). Boss TYLKO przyciemniony
+   (`tileDim`, opacity 0.35) w scenie-podglądzie — czytelny sygnał "nie ten krok", bez
+   blokowania przeciągania (dalej działa, na wypadek drobnej korekty przy okazji).
+3. **Boss** — picker "Boss podglądu" (Następny/Resetuj tego, przeniesiony z dawnej osobnej
+   sekcji) + rozmiar + pozycja X/Y bossa i jego paska HP. Pupil przyciemniony.
+4. **Cień** — TERAZ dwie osobne karty ("Cień — Pupil"/"Cień — Boss") zamiast jednej
+   wspólnej listy 6 steperów — ta sama logika (niezależna skala X/Y + offsetY per sprite,
+   §"cienie nie pasują skali"), czytelniejszy podział.
+5. **Odbicie** — analogicznie, dwie karty zamiast jednej z dwoma wierszami.
+6. **Eksport** — bez toggle'a "Eksportuj układ"/"Zwiń eksport" (zbędny w dedykowanym kroku,
+   który i tak trzeba świadomie odwiedzić) — JSON + Udostępnij widoczne od razu.
+
+**Mechanika wizarda**:
+- Pasek kropek pod headerem — TAPPABLE (bezpośredni skok do dowolnego kroku, nie tylko
+  liniowo Dalej/Wstecz), aktywny/odwiedzony/nieodwiedzony wizualnie rozróżnione.
+- Nawigacja Wstecz/Dalej PRZYPIĘTA na dole ekranu (`insets.bottom` z
+  `useSafeAreaInsets`, SafeAreaView ma tylko `edges={['top']}` więc dół trzeba było doliczyć
+  ręcznie) — na ostatnim kroku "Dalej" zamienia się w "Zakończ" (`router.back()`).
+- **Scena-podgląd (Draggable kotek/boss/paski HP) celowo NIE jest częścią żadnego kroku** —
+  zostaje PRZYPIĘTA nad przewijanym panelem sterowania (poza `ScrollView`), więc widać
+  efekt zmian na bieżąco niezależnie od tego który krok akurat edytujesz, zamiast znikać przy
+  przechodzeniu między krokami. Panel sterowania pod spodem dostał `key={step}` na
+  `ScrollView` — resetuje scroll do góry przy zmianie kroku, zamiast dziedziczyć offset z
+  poprzedniego (bez tego, scroll w dół na kroku "Boss" przenosiłby się na następny krok).
+- Drobny fix przy okazji: `hintTxt` (podpowiedź "przeciągnij...") używał `c.text.muted`
+  (kolor z MOTYWU) mimo że renderuje się NAD zdjęciem areny, nie nad kartą tła — w jasnym
+  motywie byłby nieczytelny. Przełączone na biały + text-shadow, identycznie jak
+  `tileLabel`/`tileHpTxt` tuż obok w tym samym pliku (ten sam kontekst wizualny).
+
+**Świadomie NIE zmienione**: logika store'u (`battleLayoutDraftStore.ts`, `perBoss`/`perBg`,
+stos cofania) — ten sam mechanizm, tylko inaczej rozłożony na ekranie. Market/sklepikarz
+(`ArtAdjust`/`editScene` w `pet-shop.tsx`) też NIE ruszony — user potwierdził że to nie był
+dosłowny wzorzec do skopiowania, tylko ogólna inspiracja stylem.
+
+**Weryfikacja**: `tsc --noEmit` czyste, `jest --silent` 112/112 suite, 1433/1433 testów (brak
+nowych testów — czysto UI, przełożenie istniejących kontrolek na kroki, zero nowej logiki
+domenowej).
+
+**Priorytet testu na urządzeniu — WYSOKI** (duża przebudowa UI, zero pokrycia testami):
+Ustawienia → Pupil → Edytor układu walki → (1) kropki na górze skaczą do kroku po tapnięciu;
+(2) Wstecz/Dalej na dole działają, na kroku 1 Wstecz jest wyszarzone, na kroku 6 "Dalej"
+zamienia się w "Zakończ" i wraca do poprzedniego ekranu; (3) na kroku "Pupil" boss w scenie
+jest przyciemniony (i odwrotnie na "Boss"), ale dalej da się go przeciągnąć; (4) zmiana
+rozmiaru/pozycji na dowolnym kroku widoczna NATYCHMIAST w scenie u góry, bez przechodzenia
+między krokami; (5) eksport pokazuje JSON i działa "Udostępnij".
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
